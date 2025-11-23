@@ -5,8 +5,7 @@
  */
 
 // Export the singleton API client instance
-export { apiClient, ApiClient } from './client';
-
+export { apiClient, ApiClient } from './client.ts';
 // Export endpoints for direct usage if needed
 export { endpoints, buildQueryString } from './endpoints';
 
