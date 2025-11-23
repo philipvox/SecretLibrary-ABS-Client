@@ -1,70 +1,108 @@
 /**
  * src/core/auth/authService.ts
  * 
- * Authentication service handling login, logout, and secure credential storage.
- * Uses Expo SecureStore for encrypted token storage on device.
+ * Authentication service with cross-platform storage
  */
 
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { apiClient } from '../api';
-import { User } from '../types';
 
-// SecureStore keys
-const STORAGE_KEYS = {
-  AUTH_TOKEN: 'auth_token',
-  SERVER_URL: 'server_url',
-  USER_DATA: 'user_data',
-} as const;
+// Storage keys
+const TOKEN_KEY = 'auth_token';
+const SERVER_URL_KEY = 'server_url';
+const USER_KEY = 'user_data';
 
 /**
- * Authentication service for managing user sessions
+ * Cross-platform secure storage wrapper
  */
-class AuthService {
+class Storage {
   /**
-   * Login with username and password
-   * Configures API client and stores credentials on success
+   * Check if we can use SecureStore (native only)
    */
-  async login(serverUrl: string, username: string, password: string): Promise<User> {
-    try {
-      // Validate server URL format
-      const validatedUrl = this.validateServerUrl(serverUrl);
+  private canUseSecureStore(): boolean {
+    return Platform.OS === 'ios' || Platform.OS === 'android';
+  }
 
-      // Configure API client with server URL
-      apiClient.configure({ baseURL: validatedUrl });
-
-      // Attempt login
-      const response = await apiClient.login(username, password);
-
-      // Store credentials securely
-      await this.storeCredentials(response.user.token, validatedUrl, response.user);
-
-      return response.user;
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
+  /**
+   * Save value
+   */
+  async setItem(key: string, value: string): Promise<void> {
+    if (this.canUseSecureStore()) {
+      await SecureStore.setItemAsync(key, value);
+    } else {
+      await AsyncStorage.setItem(key, value);
     }
   }
 
   /**
-   * Logout and clear all stored credentials
+   * Get value
    */
-  async logout(): Promise<void> {
+  async getItem(key: string): Promise<string | null> {
+    if (this.canUseSecureStore()) {
+      return await SecureStore.getItemAsync(key);
+    } else {
+      return await AsyncStorage.getItem(key);
+    }
+  }
+
+  /**
+   * Delete value
+   */
+  async deleteItem(key: string): Promise<void> {
+    if (this.canUseSecureStore()) {
+      await SecureStore.deleteItemAsync(key);
+    } else {
+      await AsyncStorage.removeItem(key);
+    }
+  }
+}
+
+const storage = new Storage();
+
+/**
+ * User interface
+ */
+export interface User {
+  id: string;
+  username: string;
+  email?: string;
+  type: string;
+  token: string;
+  mediaProgress?: any[];
+  seriesHideFromContinueListening?: string[];
+  bookmarks?: any[];
+  isActive: boolean;
+  isLocked: boolean;
+  lastSeen?: number;
+  createdAt: number;
+  permissions: {
+    download: boolean;
+    update: boolean;
+    delete: boolean;
+    upload: boolean;
+    accessAllLibraries: boolean;
+    accessAllTags: boolean;
+    accessExplicitContent: boolean;
+  };
+  librariesAccessible: string[];
+  itemTagsAccessible: string[];
+}
+
+/**
+ * Authentication service
+ */
+class AuthService {
+  /**
+   * Store authentication token securely
+   */
+  async storeToken(token: string): Promise<void> {
     try {
-      // Attempt to notify server (best effort, don't fail if it errors)
-      try {
-        await apiClient.logout();
-      } catch (error) {
-        console.warn('Server logout failed, continuing with local logout:', error);
-      }
-
-      // Clear stored credentials
-      await this.clearCredentials();
-
-      // Clear API client token
-      apiClient.clearAuthToken();
+      await storage.setItem(TOKEN_KEY, token);
     } catch (error) {
-      console.error('Logout failed:', error);
-      throw error;
+      console.error('Failed to store token:', error);
+      throw new Error('Failed to store authentication token');
     }
   }
 
@@ -73,10 +111,22 @@ class AuthService {
    */
   async getStoredToken(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+      return await storage.getItem(TOKEN_KEY);
     } catch (error) {
       console.error('Failed to get stored token:', error);
       return null;
+    }
+  }
+
+  /**
+   * Store server URL
+   */
+  async storeServerUrl(url: string): Promise<void> {
+    try {
+      await storage.setItem(SERVER_URL_KEY, url);
+    } catch (error) {
+      console.error('Failed to store server URL:', error);
+      throw new Error('Failed to store server URL');
     }
   }
 
@@ -85,10 +135,22 @@ class AuthService {
    */
   async getStoredServerUrl(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(STORAGE_KEYS.SERVER_URL);
+      return await storage.getItem(SERVER_URL_KEY);
     } catch (error) {
       console.error('Failed to get stored server URL:', error);
       return null;
+    }
+  }
+
+  /**
+   * Store user data
+   */
+  async storeUser(user: User): Promise<void> {
+    try {
+      await storage.setItem(USER_KEY, JSON.stringify(user));
+    } catch (error) {
+      console.error('Failed to store user:', error);
+      throw new Error('Failed to store user data');
     }
   }
 
@@ -97,8 +159,8 @@ class AuthService {
    */
   async getStoredUser(): Promise<User | null> {
     try {
-      const userData = await SecureStore.getItemAsync(STORAGE_KEYS.USER_DATA);
-      return userData ? JSON.parse(userData) : null;
+      const userJson = await storage.getItem(USER_KEY);
+      return userJson ? JSON.parse(userJson) : null;
     } catch (error) {
       console.error('Failed to get stored user:', error);
       return null;
@@ -106,97 +168,116 @@ class AuthService {
   }
 
   /**
-   * Store credentials securely
+   * Clear all stored authentication data
    */
-  async storeCredentials(token: string, serverUrl: string, user: User): Promise<void> {
+  async clearStorage(): Promise<void> {
     try {
-      await Promise.all([
-        SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, token),
-        SecureStore.setItemAsync(STORAGE_KEYS.SERVER_URL, serverUrl),
-        SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(user)),
-      ]);
+      await storage.deleteItem(TOKEN_KEY);
+      await storage.deleteItem(SERVER_URL_KEY);
+      await storage.deleteItem(USER_KEY);
     } catch (error) {
-      console.error('Failed to store credentials:', error);
-      throw new Error('Failed to save login credentials');
+      console.error('Failed to clear storage:', error);
     }
   }
 
   /**
-   * Clear all stored credentials
+   * Login with username and password
    */
-  async clearCredentials(): Promise<void> {
+  async login(
+    serverUrl: string,
+    username: string,
+    password: string
+  ): Promise<User> {
     try {
-      await Promise.all([
-        SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN),
-        SecureStore.deleteItemAsync(STORAGE_KEYS.SERVER_URL),
-        SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA),
-      ]);
+      // Configure API client with server URL
+      apiClient.setServerUrl(serverUrl);
+
+      // Make login request
+      const response = await apiClient.request<{ user: User }>('/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.user) {
+        throw new Error('Invalid response from server');
+      }
+
+      const user = response.user;
+
+      // Store credentials
+      await this.storeToken(user.token);
+      await this.storeServerUrl(serverUrl);
+      await this.storeUser(user);
+
+      // Set token in API client
+      apiClient.setToken(user.token);
+
+      return user;
     } catch (error) {
-      console.error('Failed to clear credentials:', error);
-      // Don't throw - clearing is best effort
+      console.error('Login failed:', error);
+      throw error;
     }
   }
 
   /**
    * Restore session from stored credentials
-   * Returns user data and server URL if valid session exists
    */
-  async restoreSession(): Promise<{ user: User; serverUrl: string } | null> {
+  async restoreSession(): Promise<{
+    user: User | null;
+    serverUrl: string | null;
+  }> {
     try {
-      const [token, serverUrl, userData] = await Promise.all([
-        this.getStoredToken(),
-        this.getStoredServerUrl(),
-        this.getStoredUser(),
-      ]);
+      const token = await this.getStoredToken();
+      const serverUrl = await this.getStoredServerUrl();
+      const user = await this.getStoredUser();
 
-      // All credentials must exist for valid session
-      if (!token || !serverUrl || !userData) {
-        return null;
+      if (token && serverUrl && user) {
+        // Configure API client
+        apiClient.setServerUrl(serverUrl);
+        apiClient.setToken(token);
+
+        return { user, serverUrl };
       }
 
-      // Configure API client with stored credentials
-      apiClient.configure({ baseURL: serverUrl, token });
-
-      // Verify token is still valid by fetching current user
-      try {
-        const currentUser = await apiClient.getCurrentUser();
-        // Update stored user data with fresh data
-        await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(currentUser));
-        return { user: currentUser, serverUrl };
-      } catch (error) {
-        // Token is invalid or expired, clear credentials
-        console.warn('Stored token is invalid, clearing session:', error);
-        await this.clearCredentials();
-        return null;
-      }
+      return { user: null, serverUrl: null };
     } catch (error) {
       console.error('Failed to restore session:', error);
-      return null;
+      return { user: null, serverUrl: null };
     }
   }
 
   /**
-   * Validate and normalize server URL
-   * Ensures URL has proper format: http://server:port or https://server:port
+   * Logout and clear stored credentials
    */
-  private validateServerUrl(url: string): string {
-    // Remove trailing slash
-    let normalized = url.trim().replace(/\/$/, '');
-
-    // Add protocol if missing
-    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
-      normalized = `http://${normalized}`;
-    }
-
-    // Validate URL format
+  async logout(): Promise<void> {
     try {
-      const urlObj = new URL(normalized);
-      if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-        throw new Error('Invalid protocol');
-      }
-      return normalized;
+      // Clear API client
+      apiClient.setToken(null);
+
+      // Clear stored data
+      await this.clearStorage();
     } catch (error) {
-      throw new Error('Invalid server URL format. Use: http://server:port or https://server:port');
+      console.error('Logout failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify if current token is still valid
+   */
+  async verifyToken(): Promise<boolean> {
+    try {
+      const token = await this.getStoredToken();
+      if (!token) {
+        return false;
+      }
+
+      // Try to fetch user's libraries as a token verification
+      await apiClient.request('/libraries');
+      return true;
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return false;
     }
   }
 }

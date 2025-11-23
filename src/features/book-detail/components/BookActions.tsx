@@ -2,12 +2,13 @@
  * src/features/book-detail/components/BookActions.tsx
  *
  * Action buttons for playing, downloading, and marking book as finished.
- * All buttons show placeholder alerts for now (Stage 5 will implement).
+ * Play button now starts actual playback using the player store.
  */
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { LibraryItem } from '@/core/types';
+import { usePlayerStore } from '@/features/player';
 
 interface BookActionsProps {
   book: LibraryItem;
@@ -17,18 +18,20 @@ interface BookActionsProps {
  * Display action buttons for the book
  */
 export function BookActions({ book }: BookActionsProps) {
+  const { loadBook } = usePlayerStore();
   const isFinished = book.userMediaProgress?.isFinished || false;
 
   /**
-   * Handle play button press
+   * Handle play button press - start actual playback
    */
-  const handlePlay = () => {
+  const handlePlay = async () => {
     console.log('Play button pressed for book:', book.id);
-    Alert.alert(
-      'Coming Soon',
-      'Audio playback will be implemented in Stage 5!',
-      [{ text: 'OK' }]
-    );
+    try {
+      await loadBook(book);
+    } catch (error) {
+      console.error('Failed to start playback:', error);
+      Alert.alert('Playback Error', 'Failed to start playback. Please try again.');
+    }
   };
 
   /**
@@ -50,7 +53,7 @@ export function BookActions({ book }: BookActionsProps) {
     console.log('Mark finished button pressed for book:', book.id);
     Alert.alert(
       'Coming Soon',
-      'Progress tracking will be fully implemented in Stage 5!',
+      'Mark as finished will be fully implemented soon!',
       [{ text: 'OK' }]
     );
   };
