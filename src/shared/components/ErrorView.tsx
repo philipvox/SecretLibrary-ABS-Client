@@ -1,30 +1,34 @@
 /**
- * src/shared/components/ErrorView.tsx
- *
- * Display error messages with optional retry functionality.
- * Used for handling API errors and other failures.
+ * Error display with retry functionality
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { theme } from '../theme';
+import { Button } from './Button';
 
 interface ErrorViewProps {
   message: string;
   onRetry?: () => void;
+  icon?: string;
 }
 
 /**
  * Display an error message with optional retry button
  */
-export function ErrorView({ message, onRetry }: ErrorViewProps) {
+export function ErrorView({ message, onRetry, icon = '⚠️' }: ErrorViewProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.errorIcon}>⚠️</Text>
+      <Text style={styles.icon}>{icon}</Text>
       <Text style={styles.message}>{message}</Text>
       {onRetry && (
-        <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <Button
+          title="Retry"
+          onPress={onRetry}
+          variant="primary"
+          size="medium"
+          style={styles.button}
+        />
       )}
     </View>
   );
@@ -35,29 +39,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
+    backgroundColor: theme.colors.background.primary,
+    padding: theme.spacing[6],
   },
-  errorIcon: {
+  icon: {
     fontSize: 48,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   message: {
-    fontSize: 16,
-    color: '#333333',
+    ...theme.textStyles.body,
+    color: theme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
+    marginBottom: theme.spacing[6],
   },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  button: {
+    minWidth: 120,
   },
 });

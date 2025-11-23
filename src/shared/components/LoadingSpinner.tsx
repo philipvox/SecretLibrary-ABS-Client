@@ -1,25 +1,28 @@
 /**
- * src/shared/components/LoadingSpinner.tsx
- *
- * Reusable loading spinner component with optional text message.
- * Used throughout the app for loading states.
+ * Loading spinner with consistent styling
  */
 
 import React from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { theme } from '../theme';
 
 interface LoadingSpinnerProps {
   text?: string;
   size?: 'small' | 'large';
+  color?: string;
 }
 
 /**
  * Display a loading spinner with optional text message
  */
-export function LoadingSpinner({ text, size = 'large' }: LoadingSpinnerProps) {
+export function LoadingSpinner({
+  text,
+  size = 'large',
+  color = theme.colors.primary[500],
+}: LoadingSpinnerProps) {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size={size} color="#007AFF" />
+      <ActivityIndicator size={size} color={color} />
       {text && <Text style={styles.text}>{text}</Text>}
     </View>
   );
@@ -30,12 +33,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.primary,
+    padding: theme.spacing[6],
   },
   text: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666666',
+    ...theme.textStyles.body,
+    color: theme.colors.text.secondary,
+    marginTop: theme.spacing[3],
     textAlign: 'center',
   },
 });

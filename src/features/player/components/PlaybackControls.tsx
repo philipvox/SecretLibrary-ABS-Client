@@ -1,17 +1,13 @@
 /**
- * src/features/player/components/PlaybackControls.tsx
- *
- * Playback control buttons: skip back 30s, play/pause, skip forward 30s.
- * Used in the full player screen.
+ * Playback controls - redesigned with proper icons
  */
 
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
+import { Icon } from '@/shared/components/Icon';
+import { theme } from '@/shared/theme';
 
-/**
- * Playback controls component
- */
 export function PlaybackControls() {
   const {
     isPlaying,
@@ -23,9 +19,6 @@ export function PlaybackControls() {
     skipForward,
   } = usePlayerStore();
 
-  /**
-   * Handle play/pause toggle
-   */
   const handlePlayPause = async () => {
     try {
       if (isPlaying) {
@@ -38,9 +31,6 @@ export function PlaybackControls() {
     }
   };
 
-  /**
-   * Handle skip backward
-   */
   const handleSkipBackward = async () => {
     try {
       await skipBackward(30);
@@ -49,9 +39,6 @@ export function PlaybackControls() {
     }
   };
 
-  /**
-   * Handle skip forward
-   */
   const handleSkipForward = async () => {
     try {
       await skipForward(30);
@@ -62,18 +49,22 @@ export function PlaybackControls() {
 
   return (
     <View style={styles.container}>
-      {/* Skip Backward 30s */}
+      {/* Skip Backward */}
       <TouchableOpacity
         style={styles.skipButton}
         onPress={handleSkipBackward}
         disabled={isLoading}
         activeOpacity={0.7}
       >
-        <Text style={styles.skipIcon}>⏪</Text>
-        <Text style={styles.skipLabel}>30s</Text>
+        <Icon 
+          name="play-back" 
+          size={32} 
+          color={theme.colors.text.primary}
+          set="ionicons"
+        />
       </TouchableOpacity>
 
-      {/* Play/Pause Button */}
+      {/* Play/Pause */}
       <TouchableOpacity
         style={styles.playButton}
         onPress={handlePlayPause}
@@ -81,21 +72,30 @@ export function PlaybackControls() {
         activeOpacity={0.8}
       >
         {isLoading || isBuffering ? (
-          <ActivityIndicator size="large" color="#FFFFFF" />
+          <ActivityIndicator size="large" color={theme.colors.text.inverse} />
         ) : (
-          <Text style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</Text>
+          <Icon 
+            name={isPlaying ? 'pause' : 'play'} 
+            size={40} 
+            color={theme.colors.text.inverse}
+            set="ionicons"
+          />
         )}
       </TouchableOpacity>
 
-      {/* Skip Forward 30s */}
+      {/* Skip Forward */}
       <TouchableOpacity
         style={styles.skipButton}
         onPress={handleSkipForward}
         disabled={isLoading}
         activeOpacity={0.7}
       >
-        <Text style={styles.skipIcon}>⏩</Text>
-        <Text style={styles.skipLabel}>30s</Text>
+        <Icon 
+          name="play-forward" 
+          size={32} 
+          color={theme.colors.text.primary}
+          set="ionicons"
+        />
       </TouchableOpacity>
     </View>
   );
@@ -106,39 +106,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: theme.spacing[8],
   },
   skipButton: {
     width: 64,
     height: 64,
-    borderRadius: 32,
-    backgroundColor: '#F0F0F0',
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.neutral[200],
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 16,
-  },
-  skipIcon: {
-    fontSize: 24,
-    color: '#333333',
-  },
-  skipLabel: {
-    fontSize: 10,
-    color: '#666666',
-    marginTop: 2,
+    marginHorizontal: theme.spacing[6],
   },
   playButton: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: '#007AFF',
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500],
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 16,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 8,
-  },
-  playIcon: {
-    fontSize: 36,
-    color: '#FFFFFF',
+    marginHorizontal: theme.spacing[2],
+    ...theme.elevation.medium,
   },
 });

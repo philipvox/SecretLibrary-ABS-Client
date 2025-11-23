@@ -1,9 +1,5 @@
 /**
- * src/navigation/AppNavigator.tsx
- *
- * Main app navigation structure with authentication flow.
- * Shows splash screen, login screen, or main app based on auth state.
- * Includes MiniPlayer overlay and PlayerScreen modal.
+ * App Navigator - updated with headerShown: false
  */
 
 import React from 'react';
@@ -22,7 +18,6 @@ const Stack = createNativeStackNavigator();
 export function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Show splash screen while checking authentication
   if (isLoading) {
     return <SplashScreen />;
   }
@@ -30,47 +25,37 @@ export function AppNavigator() {
   return (
     <>
       <NavigationContainer>
-        <Stack.Navigator>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false, // Hide default headers
+          }}
+        >
           {!isAuthenticated ? (
-            // Auth flow - show login screen
             <Stack.Screen
               name="Login"
               component={LoginScreen}
-              options={{ headerShown: false }}
             />
           ) : (
-            // Main app flow
             <>
               <Stack.Screen
                 name="Library"
                 component={LibraryItemsScreen}
-                options={{
-                  title: 'My Library',
-                  headerShown: true,
-                  headerLargeTitle: true,
-                }}
               />
               <Stack.Screen
                 name="BookDetail"
                 component={BookDetailScreen}
-                options={{
-                  title: 'Book Details',
-                  headerShown: true,
-                }}
               />
             </>
           )}
         </Stack.Navigator>
       </NavigationContainer>
 
-      {/* MiniPlayer - Shows at bottom when playing */}
       {isAuthenticated && (
         <View style={styles.miniPlayerContainer}>
           <MiniPlayer />
         </View>
       )}
 
-      {/* Full Player Modal */}
       {isAuthenticated && <PlayerScreen />}
     </>
   );

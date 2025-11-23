@@ -1,18 +1,12 @@
 /**
- * src/features/player/components/ProgressBar.tsx
- *
- * Seekable progress bar with draggable thumb.
- * Shows current time and total duration.
- * Allows user to seek to any position by dragging or tapping.
+ * Progress bar - redesigned
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, PanResponder, GestureResponderEvent } from 'react-native';
+import { View, Text, StyleSheet, PanResponder } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
+import { theme } from '@/shared/theme';
 
-/**
- * Format seconds to HH:MM:SS or MM:SS
- */
 function formatTime(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -24,21 +18,14 @@ function formatTime(seconds: number): string {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-/**
- * Progress bar component
- */
 export function ProgressBar() {
   const { position, duration, seekTo } = usePlayerStore();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(0);
 
-  // Use drag position while dragging, otherwise use actual position
   const displayPosition = isDragging ? dragPosition : position;
   const progress = duration > 0 ? (displayPosition / duration) * 100 : 0;
 
-  /**
-   * Handle seeking to position
-   */
   const handleSeek = async (newPosition: number) => {
     try {
       await seekTo(newPosition);
@@ -47,25 +34,19 @@ export function ProgressBar() {
     }
   };
 
-  /**
-   * Calculate position from touch event
-   */
   const getPositionFromEvent = (event: any, containerWidth: number): number => {
     const x = event.nativeEvent.locationX;
     const ratio = Math.max(0, Math.min(1, x / containerWidth));
     return ratio * duration;
   };
 
-  /**
-   * Pan responder for dragging
-   */
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
 
     onPanResponderGrant: (evt) => {
       setIsDragging(true);
-      const containerWidth = 350; // Approximate width
+      const containerWidth = 350;
       const newPosition = getPositionFromEvent(evt, containerWidth);
       setDragPosition(newPosition);
     },
@@ -88,20 +69,19 @@ export function ProgressBar() {
 
   return (
     <View style={styles.container}>
-      {/* Time Labels */}
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{formatTime(displayPosition)}</Text>
-        <Text style={styles.timeText}>{formatTime(duration)}</Text>
-      </View>
-
       {/* Progress Bar */}
       <View style={styles.progressContainer} {...panResponder.panHandlers}>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progress}%` }]}>
-            {/* Thumb */}
             <View style={styles.thumb} />
           </View>
         </View>
+      </View>
+
+      {/* Time Labels */}
+      <View style={styles.timeContainer}>
+        <Text style={styles.timeText}>{formatTime(displayPosition)}</Text>
+        <Text style={styles.timeText}>{formatTime(duration)}</Text>
       </View>
     </View>
   );
@@ -109,31 +89,23 @@ export function ProgressBar() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#666666',
+    paddingHorizontal: theme.spacing[8],
+    paddingVertical: theme.spacing[4],
   },
   progressContainer: {
-    paddingVertical: 8,
+    paddingVertical: theme.spacing[2],
+    marginBottom: theme.spacing[2],
   },
   progressTrack: {
     height: 4,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    overflow: 'visible', // Allow thumb to extend beyond track
+    backgroundColor: theme.colors.neutral[300],
+    borderRadius: theme.radius.small,
+    overflow: 'visible',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 2,
+    backgroundColor: theme.colors.primary[500],
+    borderRadius: theme.radius.small,
     position: 'relative',
   },
   thumb: {
@@ -142,9 +114,19 @@ const styles = StyleSheet.create({
     top: -6,
     width: 16,
     height: 16,
-    borderRadius: 8,
-    backgroundColor: '#007AFF',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 3,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500],
+    borderWidth: 3,
+    borderColor: theme.colors.background.primary,
+    ...theme.elevation.small,
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  timeText: {
+    fontSize: 13,
+    color: theme.colors.text.tertiary,
+    fontWeight: '500',
   },
 });

@@ -1,8 +1,5 @@
 /**
- * src/features/player/screens/PlayerScreen.tsx
- *
- * Full player screen displayed as a modal.
- * Shows large cover, title, playback controls, progress bar, playback rate selector, and chapter list.
+ * Player screen - complete redesign
  */
 
 import React, { useState } from 'react';
@@ -15,30 +12,24 @@ import {
   StyleSheet,
   Modal,
   SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ProgressBar } from '../components/ProgressBar';
 import { apiClient } from '@/core/api';
 import { BookChapter } from '@/core/types';
+import { Icon } from '@/shared/components/Icon';
+import { theme } from '@/shared/theme';
 
-/**
- * Playback rate options
- */
 const PLAYBACK_RATES = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
-/**
- * Format chapter duration
- */
 function formatChapterDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-/**
- * Full player screen component
- */
 export function PlayerScreen() {
   const {
     currentBook,
@@ -51,7 +42,6 @@ export function PlayerScreen() {
 
   const [showRateSelector, setShowRateSelector] = useState(false);
 
-  // Don't render if player is not visible or no book loaded
   if (!isPlayerVisible || !currentBook) {
     return null;
   }
@@ -63,9 +53,6 @@ export function PlayerScreen() {
   const chapters = currentBook.media.chapters || [];
   const coverUrl = apiClient.getItemCoverUrl(currentBook.id);
 
-  /**
-   * Handle playback rate selection
-   */
   const handleSelectRate = async (rate: number) => {
     try {
       await setPlaybackRate(rate);
@@ -75,9 +62,6 @@ export function PlayerScreen() {
     }
   };
 
-  /**
-   * Handle chapter selection
-   */
   const handleChapterPress = async (chapterIndex: number) => {
     try {
       await jumpToChapter(chapterIndex);
@@ -94,17 +78,27 @@ export function PlayerScreen() {
       onRequestClose={closePlayer}
     >
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
+        
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header with Close Button */}
           <View style={styles.header}>
             <TouchableOpacity onPress={closePlayer} style={styles.closeButton}>
-              <Text style={styles.closeIcon}>⌄</Text>
+              <Icon name="chevron-down" size={28} color={theme.colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Cover Image */}
+          {/* Cover */}
           <View style={styles.coverContainer}>
-            <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+            <Image 
+              source={{ uri: coverUrl }} 
+              style={styles.cover} 
+              resizeMode="cover" 
+            />
           </View>
 
           {/* Book Info */}
@@ -160,7 +154,7 @@ export function PlayerScreen() {
           {/* Chapters */}
           {chapters.length > 0 && (
             <View style={styles.chaptersContainer}>
-              <Text style={styles.chaptersTitle}>Chapters ({chapters.length})</Text>
+              <Text style={styles.chaptersTitle}>Chapters</Text>
 
               {chapters.map((chapter, index) => {
                 const duration = chapter.end - chapter.start;
@@ -189,7 +183,6 @@ export function PlayerScreen() {
             </View>
           )}
 
-          {/* Bottom Spacing */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </SafeAreaView>
@@ -200,148 +193,150 @@ export function PlayerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.primary,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    paddingBottom: 32,
+    paddingBottom: theme.spacing[8],
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[5],
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.background.elevated,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  closeIcon: {
-    fontSize: 32,
-    color: '#333333',
+    ...theme.elevation.small,
   },
   coverContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: theme.spacing[8],
+    paddingHorizontal: theme.spacing[8],
   },
   cover: {
     width: 280,
     height: 280,
-    borderRadius: 12,
-    backgroundColor: '#F0F0F0',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 8,
+    borderRadius: theme.radius.xlarge,
+    backgroundColor: theme.colors.neutral[200],
+    ...theme.elevation.large,
   },
   infoContainer: {
     alignItems: 'center',
-    paddingHorizontal: 32,
-    marginBottom: 16,
+    paddingHorizontal: theme.spacing[8],
+    marginBottom: theme.spacing[4],
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
+    fontWeight: '700',
+    color: theme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing[2],
+    letterSpacing: -0.5,
   },
   author: {
-    fontSize: 18,
-    color: '#666666',
+    fontSize: 17,
+    color: theme.colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   narrator: {
     fontSize: 14,
-    color: '#888888',
+    color: theme.colors.text.tertiary,
     textAlign: 'center',
   },
   rateContainer: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[4],
   },
   rateButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 16,
+    paddingHorizontal: theme.spacing[6],
+    paddingVertical: theme.spacing[3],
+    backgroundColor: theme.colors.neutral[200],
+    borderRadius: theme.radius.full,
   },
   rateText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#333333',
+    color: theme.colors.text.primary,
   },
   rateSelectorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    paddingHorizontal: 32,
-    paddingBottom: 16,
+    paddingHorizontal: theme.spacing[8],
+    paddingBottom: theme.spacing[4],
+    gap: theme.spacing[2],
   },
   rateOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    margin: 4,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 16,
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[2],
+    backgroundColor: theme.colors.neutral[200],
+    borderRadius: theme.radius.full,
   },
   rateOptionActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary[500],
   },
   rateOptionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333333',
+    color: theme.colors.text.primary,
   },
   rateOptionTextActive: {
-    color: '#FFFFFF',
+    color: theme.colors.text.inverse,
   },
   chaptersContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingHorizontal: theme.spacing[5],
+    paddingTop: theme.spacing[8],
   },
   chaptersTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[5],
   },
   chapterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border.light,
   },
   chapterNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F0F0',
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.neutral[200],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   chapterNumberText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#666666',
+    color: theme.colors.text.secondary,
   },
   chapterInfo: {
     flex: 1,
   },
   chapterTitle: {
     fontSize: 15,
-    color: '#333333',
-    marginBottom: 4,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[1],
+    fontWeight: '500',
   },
   chapterDuration: {
     fontSize: 13,
-    color: '#888888',
+    color: theme.colors.text.tertiary,
   },
   bottomSpacing: {
-    height: 32,
+    height: theme.spacing[8],
   },
 });

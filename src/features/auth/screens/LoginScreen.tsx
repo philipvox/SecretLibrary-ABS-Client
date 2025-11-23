@@ -1,7 +1,5 @@
 /**
- * src/features/auth/screens/LoginScreen.tsx
- * 
- * Login screen for entering server URL and credentials.
+ * Login screen with updated design system
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,14 +7,14 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
-  ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
 import { useAuth } from '@/core/auth';
+import { Button } from '@/shared/components';
+import { theme } from '@/shared/theme';
 
 export function LoginScreen() {
   const { login, isLoading, error, clearError } = useAuth();
@@ -45,9 +43,6 @@ export function LoginScreen() {
     }
   }, [error]);
 
-  /**
-   * Load last used server URL from storage
-   */
   const loadLastServerUrl = async () => {
     try {
       const { authService } = await import('@/core/auth');
@@ -60,31 +55,22 @@ export function LoginScreen() {
     }
   };
 
-  /**
-   * Validate inputs before submission
-   */
   const validateInputs = (): boolean => {
     if (!serverUrl.trim()) {
       setValidationError('Please enter a server URL');
       return false;
     }
-
     if (!username.trim()) {
       setValidationError('Please enter a username');
       return false;
     }
-
     if (!password) {
       setValidationError('Please enter a password');
       return false;
     }
-
     return true;
   };
 
-  /**
-   * Handle login submission
-   */
   const handleLogin = async () => {
     if (!validateInputs()) {
       return;
@@ -93,7 +79,7 @@ export function LoginScreen() {
     try {
       await login(serverUrl.trim(), username.trim(), password);
     } catch (err) {
-      // Error is handled by context and shown via Alert
+      // Error handled by context
     }
   };
 
@@ -111,13 +97,13 @@ export function LoginScreen() {
 
         {/* Form */}
         <View style={styles.form}>
-          {/* Server URL Input */}
+          {/* Server URL */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Server URL</Text>
             <TextInput
               style={styles.input}
               placeholder="http://server:13378"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.text.tertiary}
               value={serverUrl}
               onChangeText={setServerUrl}
               autoCapitalize="none"
@@ -127,13 +113,13 @@ export function LoginScreen() {
             />
           </View>
 
-          {/* Username Input */}
+          {/* Username */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Username</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter username"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.text.tertiary}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
@@ -142,13 +128,13 @@ export function LoginScreen() {
             />
           </View>
 
-          {/* Password Input */}
+          {/* Password */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Password</Text>
             <TextInput
               style={styles.input}
               placeholder="Enter password"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.text.tertiary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -164,21 +150,15 @@ export function LoginScreen() {
           ) : null}
 
           {/* Login Button */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              pressed && styles.buttonPressed,
-              isLoading && styles.buttonDisabled,
-            ]}
+          <Button
+            title="Login"
             onPress={handleLogin}
+            loading={isLoading}
             disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Login</Text>
-            )}
-          </Pressable>
+            fullWidth
+            size="large"
+            style={styles.loginButton}
+          />
         </View>
 
         {/* Help Text */}
@@ -195,79 +175,62 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background.primary,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: theme.spacing[6],
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: theme.spacing[12],
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    ...theme.textStyles.displayMedium,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[2],
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    ...theme.textStyles.body,
+    color: theme.colors.text.secondary,
   },
   form: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: theme.spacing[5],
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    ...theme.textStyles.label,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[2],
   },
   input: {
-    backgroundColor: '#fff',
+    ...theme.textStyles.body,
+    backgroundColor: theme.colors.background.primary,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 16,
-    color: '#333',
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.radius.medium,
+    padding: theme.spacing[4],
+    color: theme.colors.text.primary,
   },
-  button: {
-    backgroundColor: '#4A90E2',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonPressed: {
-    backgroundColor: '#3A7BC8',
-  },
-  buttonDisabled: {
-    backgroundColor: '#A0C4E8',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  loginButton: {
+    marginTop: theme.spacing[2],
   },
   errorText: {
-    color: '#E53935',
-    fontSize: 14,
-    marginTop: -8,
-    marginBottom: 12,
+    ...theme.textStyles.bodySmall,
+    color: theme.colors.semantic.error,
+    marginTop: -theme.spacing[3],
+    marginBottom: theme.spacing[3],
   },
   footer: {
-    marginTop: 32,
+    marginTop: theme.spacing[8],
     alignItems: 'center',
   },
   helpText: {
-    fontSize: 14,
-    color: '#666',
+    ...theme.textStyles.bodySmall,
+    color: theme.colors.text.secondary,
     textAlign: 'center',
     lineHeight: 20,
   },

@@ -1,31 +1,23 @@
 /**
- * src/features/book-detail/components/BookActions.tsx
- *
- * Action buttons for playing, downloading, and marking book as finished.
- * Play button now starts actual playback using the player store.
+ * Book actions with updated design
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import { LibraryItem } from '@/core/types';
 import { usePlayerStore } from '@/features/player';
+import { Button } from '@/shared/components';
+import { theme } from '@/shared/theme';
 
 interface BookActionsProps {
   book: LibraryItem;
 }
 
-/**
- * Display action buttons for the book
- */
 export function BookActions({ book }: BookActionsProps) {
   const { loadBook } = usePlayerStore();
   const isFinished = book.userMediaProgress?.isFinished || false;
 
-  /**
-   * Handle play button press - start actual playback
-   */
   const handlePlay = async () => {
-    console.log('Play button pressed for book:', book.id);
     try {
       await loadBook(book);
     } catch (error) {
@@ -34,11 +26,7 @@ export function BookActions({ book }: BookActionsProps) {
     }
   };
 
-  /**
-   * Handle download button press
-   */
   const handleDownload = () => {
-    console.log('Download button pressed for book:', book.id);
     Alert.alert(
       'Coming Soon',
       'Offline downloads will be implemented in a future update!',
@@ -46,11 +34,7 @@ export function BookActions({ book }: BookActionsProps) {
     );
   };
 
-  /**
-   * Handle mark as finished button press
-   */
   const handleMarkFinished = () => {
-    console.log('Mark finished button pressed for book:', book.id);
     Alert.alert(
       'Coming Soon',
       'Mark as finished will be fully implemented soon!',
@@ -60,37 +44,32 @@ export function BookActions({ book }: BookActionsProps) {
 
   return (
     <View style={styles.container}>
-      {/* Primary Action: Play */}
-      <TouchableOpacity
-        style={styles.primaryButton}
+      <Button
+        title={isFinished ? '▶ Play Again' : '▶ Play'}
         onPress={handlePlay}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.primaryButtonText}>
-          {isFinished ? '▶ Play Again' : '▶ Play'}
-        </Text>
-      </TouchableOpacity>
+        variant="primary"
+        size="large"
+        fullWidth
+        style={styles.primaryButton}
+      />
 
-      {/* Secondary Actions */}
       <View style={styles.secondaryActions}>
-        {/* Download Button */}
-        <TouchableOpacity
-          style={styles.secondaryButton}
+        <Button
+          title="⬇ Download"
           onPress={handleDownload}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.secondaryButtonText}>⬇ Download</Text>
-        </TouchableOpacity>
+          variant="secondary"
+          size="medium"
+          style={styles.secondaryButton}
+        />
 
-        {/* Mark Finished Button */}
         {!isFinished && (
-          <TouchableOpacity
-            style={styles.secondaryButton}
+          <Button
+            title="✓ Finished"
             onPress={handleMarkFinished}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.secondaryButtonText}>✓ Mark Finished</Text>
-          </TouchableOpacity>
+            variant="secondary"
+            size="medium"
+            style={styles.secondaryButton}
+          />
         )}
       </View>
     </View>
@@ -99,42 +78,18 @@ export function BookActions({ book }: BookActionsProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: theme.spacing[5],
     paddingTop: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.primary,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
+    marginBottom: theme.spacing[3],
   },
   secondaryActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: theme.spacing[3],
   },
   secondaryButton: {
     flex: 1,
-    backgroundColor: '#F0F0F0',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#333333',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

@@ -190,13 +190,10 @@ class AuthService {
   ): Promise<User> {
     try {
       // Configure API client with server URL
-      apiClient.setServerUrl(serverUrl);
+      apiClient.configure({ baseURL: serverUrl });
 
-      // Make login request
-      const response = await apiClient.request<{ user: User }>('/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      });
+      // Make login request using the API client's login method
+      const response = await apiClient.login(username, password);
 
       if (!response.user) {
         throw new Error('Invalid response from server');
@@ -208,9 +205,6 @@ class AuthService {
       await this.storeToken(user.token);
       await this.storeServerUrl(serverUrl);
       await this.storeUser(user);
-
-      // Set token in API client
-      apiClient.setToken(user.token);
 
       return user;
     } catch (error) {
@@ -232,9 +226,11 @@ class AuthService {
       const user = await this.getStoredUser();
 
       if (token && serverUrl && user) {
-        // Configure API client
-        apiClient.setServerUrl(serverUrl);
-        apiClient.setToken(token);
+        // Configure API client with stored credentials
+        apiClient.configure({ 
+          baseURL: serverUrl,
+          token: token 
+        });
 
         return { user, serverUrl };
       }
@@ -251,8 +247,15 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      // Clear API client
-      apiClient.setToken(null);
+      // Try to notify server (best effort)
+      try {
+        await apiClient.logout();
+      } catch (err) {
+        console.warn('Failed to notify server of logout:', err);
+      }
+
+      // Clear API client token
+      apiClient.clearAuthToken();
 
       // Clear stored data
       await this.clearStorage();
@@ -272,8 +275,8 @@ class AuthService {
         return false;
       }
 
-      // Try to fetch user's libraries as a token verification
-      await apiClient.request('/libraries');
+      // Try to fetch current user as token verification
+      await apiClient.getCurrentUser();
       return true;
     } catch (error) {
       console.error('Token verification failed:', error);

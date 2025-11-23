@@ -2,7 +2,7 @@
  * src/features/player/stores/playerStore.ts
  *
  * Zustand store for managing audio player state.
- * Handles current book, playback status, and player actions.
+ * Optimized to use the correct AudiobookShelf streaming endpoint.
  */
 
 import { create } from 'zustand';
@@ -45,6 +45,19 @@ interface PlayerState {
 }
 
 /**
+ * Get authentication token from stored credentials
+ */
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const { authService } = await import('@/core/auth');
+    return await authService.getStoredToken();
+  } catch (error) {
+    console.error('Failed to get auth token:', error);
+    return null;
+  }
+}
+
+/**
  * Create player store with Zustand
  */
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -65,9 +78,28 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     try {
       set({ isLoading: true });
 
-      // Get audio URL
+      // Get auth token
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Check if book has audio files
+      if (!book.media.audioFiles || book.media.audioFiles.length === 0) {
+        throw new Error('No audio files found in book');
+      }
+
+      // Get server URL
       const serverUrl = apiClient.getBaseURL();
-      const audioUrl = `${serverUrl}/api/items/${book.id}/play`;
+      
+      // Get first audio file
+      const firstAudioFile = book.media.audioFiles[0];
+      
+      // Build audio URL using the working endpoint format:
+      // /api/items/{itemId}/file/{audioFileIno}?token={token}
+      const audioUrl = `${serverUrl}/api/items/${book.id}/file/${firstAudioFile.ino}?token=${token}`;
+      
+      console.log('[PlayerStore] Loading audio from first file:', firstAudioFile.metadata.filename);
 
       // Get last saved position if not provided
       let position = startPosition;
@@ -99,7 +131,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       // Auto-play
       await get().play();
     } catch (error) {
-      console.error('Failed to load book:', error);
+      console.error('[PlayerStore] Failed to load book:', error);
       set({ isLoading: false });
       throw error;
     }
@@ -113,7 +145,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       await audioService.play();
       set({ isPlaying: true });
     } catch (error) {
-      console.error('Failed to play:', error);
+      console.error('[PlayerStore] Failed to play:', error);
       throw error;
     }
   },
@@ -138,7 +170,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         });
       }
     } catch (error) {
-      console.error('Failed to pause:', error);
+      console.error('[PlayerStore] Failed to pause:', error);
       throw error;
     }
   },
@@ -163,7 +195,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         });
       }
     } catch (error) {
-      console.error('Failed to seek:', error);
+      console.error('[PlayerStore] Failed to seek:', error);
       throw error;
     }
   },
@@ -175,7 +207,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     try {
       await audioService.skipForward(seconds);
     } catch (error) {
-      console.error('Failed to skip forward:', error);
+      console.error('[PlayerStore] Failed to skip forward:', error);
       throw error;
     }
   },
@@ -187,7 +219,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     try {
       await audioService.skipBackward(seconds);
     } catch (error) {
-      console.error('Failed to skip backward:', error);
+      console.error('[PlayerStore] Failed to skip backward:', error);
       throw error;
     }
   },
@@ -200,7 +232,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       await audioService.setPlaybackRate(rate);
       set({ playbackRate: rate });
     } catch (error) {
-      console.error('Failed to set playback rate:', error);
+      console.error('[PlayerStore] Failed to set playback rate:', error);
       throw error;
     }
   },
@@ -293,7 +325,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         isPlayerVisible: false,
       });
     } catch (error) {
-      console.error('Failed to cleanup player:', error);
+      console.error('[PlayerStore] Failed to cleanup player:', error);
     }
   },
 }));

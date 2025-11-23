@@ -1,8 +1,5 @@
 /**
- * src/features/library/components/BookCard.tsx
- *
- * Reusable book card component displaying cover, title, author, and progress.
- * Used in library grid and list views. Navigates to book detail screen on press.
+ * Book card - redesigned
  */
 
 import React from 'react';
@@ -10,32 +7,24 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
+import { theme } from '@/shared/theme';
 
 interface BookCardProps {
   book: LibraryItem;
 }
 
-/**
- * Display a book card with cover, title, author, and progress bar
- */
 export function BookCard({ book }: BookCardProps) {
   const navigation = useNavigation();
   
-  // Extract book metadata
   const metadata = book.media.metadata;
   const title = metadata.title || 'Unknown Title';
   const author = metadata.authors?.[0]?.name || 'Unknown Author';
   
-  // Get progress (0-1)
   const progress = book.userMediaProgress?.progress || 0;
   const hasProgress = progress > 0 && progress < 1;
   
-  // Get cover URL
   const coverUrl = apiClient.getItemCoverUrl(book.id);
 
-  /**
-   * Navigate to book detail screen
-   */
   const handlePress = () => {
     navigation.navigate('BookDetail' as never, { bookId: book.id } as never);
   };
@@ -53,10 +42,9 @@ export function BookCard({ book }: BookCardProps) {
           source={{ uri: coverUrl }}
           style={styles.cover}
           resizeMode="cover"
-          // defaultSource={require('../../../../assets/placeholder-book.png')} // Placeholder for missing covers
         />
         {hasProgress && (
-          <View style={styles.progressContainer}>
+          <View style={styles.progressIndicator}>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
             </View>
@@ -78,55 +66,56 @@ export function BookCard({ book }: BookCardProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: 150,
-    marginBottom: 20,
+    width: 110,
+    marginBottom: theme.spacing[4],
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.75,
   },
   coverContainer: {
     position: 'relative',
-    width: 150,
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: '#F0F0F0',
+    width: 110,
+    height: 165,
+    borderRadius: theme.radius.large,
+    backgroundColor: theme.colors.neutral[200],
     overflow: 'hidden',
+    ...theme.elevation.small,
   },
   cover: {
     width: '100%',
     height: '100%',
   },
-  progressContainer: {
+  progressIndicator: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: theme.spacing[2],
   },
   progressBar: {
-    height: 4,
+    height: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
+    borderRadius: theme.radius.small,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary[500],
   },
   info: {
-    marginTop: 8,
-    paddingHorizontal: 4,
+    marginTop: theme.spacing[2],
   },
   title: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#333333',
-    lineHeight: 18,
-    marginBottom: 4,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[1] / 2,
+    lineHeight: 17,
   },
   author: {
-    fontSize: 12,
-    color: '#666666',
-    lineHeight: 16,
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    lineHeight: 14,
   },
 });

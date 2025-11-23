@@ -1,7 +1,5 @@
 /**
- * src/features/player/components/MiniPlayer.tsx
- *
- * Mini player component that appears at the bottom of screens when audio is playing.
+ * Mini player - redesigned
  */
 
 import React from 'react';
@@ -12,21 +10,16 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '../stores/playerStore';
+import { Icon } from '@/shared/components/Icon';
+import { theme } from '@/shared/theme';
 
-/**
- * Format seconds to MM:SS
- */
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-/**
- * Mini player component
- */
 export function MiniPlayer() {
   const {
     currentBook,
@@ -38,12 +31,12 @@ export function MiniPlayer() {
     togglePlayer,
   } = usePlayerStore();
 
-  // Don't render if no book is loaded
   if (!currentBook) {
     return null;
   }
 
-  const handlePlayPause = async () => {
+  const handlePlayPause = async (e: any) => {
+    e.stopPropagation();
     try {
       if (isPlaying) {
         await pause();
@@ -56,47 +49,51 @@ export function MiniPlayer() {
   };
 
   const progress = duration > 0 ? position / duration : 0;
+  const metadata = currentBook.media.metadata;
+  const title = metadata.title || 'Unknown Title';
+  const author = metadata.authors?.[0]?.name || 'Unknown Author';
+  const coverUrl = currentBook.media.coverPath;
 
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={togglePlayer}
-      activeOpacity={0.8}
+      activeOpacity={0.95}
     >
-      {/* Progress bar */}
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+      {/* Progress Bar */}
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
       </View>
 
       <View style={styles.content}>
-        {/* Cover image */}
+        {/* Cover */}
         <Image
-          source={{ uri: currentBook.media.coverPath }}
+          source={{ uri: coverUrl }}
           style={styles.cover}
+          resizeMode="cover"
         />
 
-        {/* Book info */}
+        {/* Book Info */}
         <View style={styles.info}>
           <Text style={styles.title} numberOfLines={1}>
-            {currentBook.media.metadata.title}
+            {title}
           </Text>
           <Text style={styles.author} numberOfLines={1}>
-            {currentBook.media.metadata.authorName}
-          </Text>
-          <Text style={styles.time}>
-            {formatTime(position)} / {formatTime(duration)}
+            {author}
           </Text>
         </View>
 
-        {/* Play/pause button */}
+        {/* Play/Pause Button */}
         <TouchableOpacity
           style={styles.playButton}
           onPress={handlePlayPause}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons
-            name={isPlaying ? 'pause' : 'play'}
-            size={28}
-            color="#000"
+          <Icon 
+            name={isPlaying ? 'pause' : 'play'} 
+            size={24} 
+            color={theme.colors.text.inverse}
+            set="ionicons"
           />
         </TouchableOpacity>
       </View>
@@ -106,57 +103,53 @@ export function MiniPlayer() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background.elevated,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    elevation: 8,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    borderTopColor: theme.colors.border.light,
+    ...theme.elevation.large,
+  },
+  progressBarContainer: {
+    height: 2,
+    backgroundColor: theme.colors.neutral[300],
   },
   progressBar: {
-    height: 3,
-    backgroundColor: '#e0e0e0',
-  },
-  progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary[500],
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: theme.spacing[3],
+    paddingHorizontal: theme.spacing[4],
   },
   cover: {
-    width: 50,
-    height: 50,
-    borderRadius: 4,
-    backgroundColor: '#f0f0f0',
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.medium,
+    backgroundColor: theme.colors.neutral[200],
   },
   info: {
     flex: 1,
-    marginLeft: 12,
-    marginRight: 12,
+    marginLeft: theme.spacing[3],
+    marginRight: theme.spacing[3],
   },
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 2,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing[1] / 2,
   },
   author: {
     fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
-  },
-  time: {
-    fontSize: 11,
-    color: '#999',
+    color: theme.colors.text.secondary,
   },
   playButton: {
     width: 44,
     height: 44,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary[500],
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 22,
+    ...theme.elevation.small,
   },
 });

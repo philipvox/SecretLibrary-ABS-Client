@@ -1,37 +1,30 @@
 /**
- * src/features/book-detail/components/BookHeader.tsx
- *
- * Hero section displaying book cover, title, author, narrator, and progress.
+ * Book header - cleaner, more spacious
  */
 
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
+import { theme } from '@/shared/theme';
 
 interface BookHeaderProps {
   book: LibraryItem;
 }
 
-/**
- * Display book cover and primary information
- */
 export function BookHeader({ book }: BookHeaderProps) {
   const metadata = book.media.metadata;
   const title = metadata.title || 'Unknown Title';
   const author = metadata.authors?.[0]?.name || 'Unknown Author';
   const narrator = metadata.narrators?.[0] || null;
   
-  // Get progress
   const progress = book.userMediaProgress?.progress || 0;
   const hasProgress = progress > 0;
   
-  // Get cover URL
   const coverUrl = apiClient.getItemCoverUrl(book.id);
 
   return (
     <View style={styles.container}>
-      {/* Cover Image */}
       <View style={styles.coverContainer}>
         <Image
           source={{ uri: coverUrl }}
@@ -40,13 +33,11 @@ export function BookHeader({ book }: BookHeaderProps) {
         />
       </View>
 
-      {/* Title and Author */}
       <View style={styles.infoContainer}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.author}>{author}</Text>
         {narrator && <Text style={styles.narrator}>Narrated by {narrator}</Text>}
 
-        {/* Progress Bar */}
         {hasProgress && (
           <View style={styles.progressSection}>
             <View style={styles.progressBar}>
@@ -62,19 +53,18 @@ export function BookHeader({ book }: BookHeaderProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: theme.spacing[6],
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.primary,
   },
   coverContainer: {
-    width: 250,
-    height: 350,
-    borderRadius: 12,
-    backgroundColor: '#F0F0F0',
+    width: 220,
+    height: 330,
+    borderRadius: theme.radius.xlarge,
+    backgroundColor: theme.colors.neutral[100],
     overflow: 'hidden',
-    marginBottom: 20,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 5,
+    marginBottom: theme.spacing[6],
+    ...theme.elevation.medium,
   },
   cover: {
     width: '100%',
@@ -83,45 +73,46 @@ const styles = StyleSheet.create({
   infoContainer: {
     width: '100%',
     alignItems: 'center',
+    paddingHorizontal: theme.spacing[4],
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
+    ...theme.textStyles.h2,
+    color: theme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 32,
+    marginBottom: theme.spacing[2],
+    fontWeight: '700',
   },
   author: {
-    fontSize: 18,
-    color: '#666666',
+    ...theme.textStyles.body,
+    color: theme.colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing[1],
   },
   narrator: {
-    fontSize: 14,
-    color: '#888888',
+    ...theme.textStyles.bodySmall,
+    color: theme.colors.text.tertiary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   progressSection: {
     width: '100%',
-    marginTop: 8,
+    marginTop: theme.spacing[3],
   },
   progressBar: {
-    height: 6,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 3,
+    height: 4,
+    backgroundColor: theme.colors.progress.background,
+    borderRadius: theme.radius.small,
     overflow: 'hidden',
-    marginBottom: 4,
+    marginBottom: theme.spacing[2],
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.progress.fill,
+    borderRadius: theme.radius.small,
   },
   progressText: {
-    fontSize: 12,
-    color: '#888888',
+    ...theme.textStyles.caption,
+    color: theme.colors.text.tertiary,
     textAlign: 'center',
   },
 });

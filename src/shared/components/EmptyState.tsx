@@ -1,26 +1,30 @@
 /**
- * src/shared/components/EmptyState.tsx
- *
- * Display an empty state with icon and message.
- * Used when there's no data to show (e.g., empty library).
+ * Empty state display
  */
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { theme } from '../theme';
 
 interface EmptyStateProps {
   message: string;
-  icon?: string; // emoji
+  icon?: string;
+  description?: string;
 }
 
 /**
- * Display an empty state with optional icon and message
+ * Display an empty state with icon and message
  */
-export function EmptyState({ message, icon = '📚' }: EmptyStateProps) {
+export function EmptyState({
+  message,
+  icon = '📚',
+  description,
+}: EmptyStateProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.icon}>{icon}</Text>
       <Text style={styles.message}>{message}</Text>
+      {description && <Text style={styles.description}>{description}</Text>}
     </View>
   );
 }
@@ -30,17 +34,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
+    backgroundColor: theme.colors.background.primary,
+    padding: theme.spacing[6],
   },
   icon: {
     fontSize: 64,
-    marginBottom: 16,
+    marginBottom: theme.spacing[4],
   },
   message: {
-    fontSize: 16,
-    color: '#666666',
+    ...theme.textStyles.h3,
+    color: theme.colors.text.primary,
     textAlign: 'center',
-    lineHeight: 24,
+    marginBottom: theme.spacing[2],
+  },
+  description: {
+    ...theme.textStyles.body,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    maxWidth: 300,
   },
 });
