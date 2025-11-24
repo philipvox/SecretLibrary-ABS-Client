@@ -1,5 +1,5 @@
 /**
- * Book card - with flexible width for proper grid spacing
+ * Book card - square covers in 3-column grid
  */
 
 import React from 'react';
@@ -17,12 +17,11 @@ const SCREEN_PADDING = theme.spacing[5];
 const CARD_GAP = theme.spacing[3];
 const NUM_COLUMNS = 3;
 
-// Calculate card width based on screen width
 const screenWidth = Dimensions.get('window').width;
 const availableWidth = screenWidth - (SCREEN_PADDING * 2);
 const totalGapWidth = CARD_GAP * (NUM_COLUMNS - 1);
 const CARD_WIDTH = (availableWidth - totalGapWidth) / NUM_COLUMNS;
-const CARD_HEIGHT = CARD_WIDTH * 1.5; // 2:3 aspect ratio
+const CARD_HEIGHT = CARD_WIDTH; // Square 1:1 aspect ratio
 
 export function BookCard({ book }: BookCardProps) {
   const navigation = useNavigation();

@@ -1,14 +1,13 @@
-// File: src/features/player/components/CoverWithProgress.tsx
 import React from 'react';
 import { View, Image, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Rect } from 'react-native-svg';
 import { theme } from '@/shared/theme';
 
 interface CoverWithProgressProps {
   coverUrl: string;
-  progress: number; // 0 to 1
+  progress: number;
   size: number;
-  borderColor: string;
+  accentColor: string;
   borderWidth?: number;
 }
 
@@ -16,50 +15,51 @@ export function CoverWithProgress({
   coverUrl,
   progress,
   size,
-  borderColor,
-  borderWidth = 4,
+  accentColor,
+  borderWidth = 5,
 }: CoverWithProgressProps) {
-  const borderRadius = theme.radius.xlarge;
-  
+  const borderRadius = 24;
+  const innerSize = size - borderWidth * 2;
+  const innerRadius = borderRadius - borderWidth;
+
   // Calculate the perimeter of the rounded rectangle
-  const straightEdges = (size - 2 * borderRadius) * 4;
+  // 4 straight sides + 4 quarter circles (= 1 full circle of radius borderRadius)
+  const straightSides = (size - 2 * borderRadius) * 4;
   const corners = 2 * Math.PI * borderRadius;
-  const totalPerimeter = straightEdges + corners;
+  const totalPerimeter = straightSides + corners;
+
+  // How much of the perimeter to fill
+  const progressLength = totalPerimeter * Math.min(Math.max(progress, 0), 1);
+
+  // SVG Rect draws starting from top-left, going clockwise: right, down, left, up
+  // We want to START from bottom-left corner, going UP (clockwise visually)
+  // 
+  // Path order from SVG start (top-left):
+  // 1. Top edge (left to right): size - 2*radius
+  // 2. Top-right corner: quarter circle
+  // 3. Right edge (top to bottom): size - 2*radius  
+  // 4. Bottom-right corner: quarter circle
+  // 5. Bottom edge (right to left): size - 2*radius
+  // 6. Bottom-left corner: quarter circle
+  // 7. Left edge (bottom to top): size - 2*radius
+  // 8. Top-left corner back to start: quarter circle
   
-  // Progress starts from bottom-left, goes clockwise
-  const progressLength = totalPerimeter * progress;
+  const edgeLength = size - 2 * borderRadius;
+  const quarterCircle = (2 * Math.PI * borderRadius) / 4;
   
-  // SVG rect uses stroke-dasharray for the progress effect
-  // We need to offset and reverse the direction
-  const strokeDasharray = `${progressLength} ${totalPerimeter}`;
+  // Distance from SVG start to bottom-left corner (where we want our progress to start):
+  // top edge + TR corner + right edge + BR corner + bottom edge + BL corner
+  const distanceToBottomLeft = edgeLength + quarterCircle + edgeLength + quarterCircle + edgeLength + quarterCircle;
   
-  // Offset to start from bottom-left
-  // Bottom-left corner starts at: left side (size - 2*radius) + bottom side (size - 2*radius) + right side (size - 2*radius) + top side (size - 2*radius) + 3 corners
-  // Actually simpler: we want to start from bottom-left going UP, then clockwise
-  // SVG rect draws: top-left -> top-right -> bottom-right -> bottom-left
-  // So we need to offset by 3/4 of the perimeter plus adjust for where we want to start
-  const startOffset = totalPerimeter * 0.625; // Start from bottom-left going clockwise
-  
+  // To make the stroke START at bottom-left and go UP (continuing the clockwise path),
+  // we offset backwards by the distance to bottom-left
+  const dashOffset = -distanceToBottomLeft;
+
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      {/* Cover Image */}
-      <Image
-        source={{ uri: coverUrl }}
-        style={[
-          styles.cover,
-          {
-            width: size - borderWidth * 2,
-            height: size - borderWidth * 2,
-            borderRadius: borderRadius - borderWidth,
-          },
-        ]}
-        resizeMode="cover"
-      />
-      
-      {/* Progress Border */}
-      <View style={styles.svgContainer}>
+      {/* Track (subtle background ring) */}
+      <View style={StyleSheet.absoluteFill}>
         <Svg width={size} height={size}>
-          {/* Background track (subtle) */}
           <Rect
             x={borderWidth / 2}
             y={borderWidth / 2}
@@ -71,8 +71,12 @@ export function CoverWithProgress({
             stroke="rgba(255,255,255,0.15)"
             strokeWidth={borderWidth}
           />
-          
-          {/* Progress stroke */}
+        </Svg>
+      </View>
+
+      {/* Progress stroke */}
+      <View style={StyleSheet.absoluteFill}>
+        <Svg width={size} height={size}>
           <Rect
             x={borderWidth / 2}
             y={borderWidth / 2}
@@ -81,14 +85,29 @@ export function CoverWithProgress({
             rx={borderRadius}
             ry={borderRadius}
             fill="none"
-            stroke={borderColor}
+            stroke={accentColor}
             strokeWidth={borderWidth}
-            strokeDasharray={strokeDasharray}
-            strokeDashoffset={startOffset}
+            strokeDasharray={`${progressLength} ${totalPerimeter}`}
+            strokeDashoffset={dashOffset}
             strokeLinecap="round"
           />
         </Svg>
       </View>
+
+      {/* Cover Image */}
+      <Image
+        source={{ uri: coverUrl }}
+        style={[
+          styles.cover,
+          {
+            width: innerSize,
+            height: innerSize,
+            borderRadius: innerRadius,
+            margin: borderWidth,
+          },
+        ]}
+        resizeMode="cover"
+      />
     </View>
   );
 }
@@ -96,16 +115,13 @@ export function CoverWithProgress({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.elevation.large,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   cover: {
-    backgroundColor: theme.colors.neutral[200],
-  },
-  svgContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
+    backgroundColor: '#333',
   },
 });

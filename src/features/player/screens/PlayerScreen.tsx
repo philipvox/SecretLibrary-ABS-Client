@@ -1,70 +1,34 @@
-// File: src/features/player/screens/PlayerScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   Modal,
   StatusBar,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getColors } from 'react-native-image-colors';
 import { usePlayerStore } from '../stores/playerStore';
+import { useImageColors } from '../hooks/useImageColors';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ProgressBar } from '../components/ProgressBar';
 import { ChapterSheet } from '../components/ChapterSheet';
 import { SpeedSelector } from '../components/SpeedSelector';
 import { CoverWithProgress } from '../components/CoverWithProgress';
+import { darkenColor } from '../utils/colorUtils';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COVER_SIZE = SCREEN_WIDTH * 0.7;
-
-function getComplementaryColor(hex: string): string {
-  // Remove # if present
-  const color = hex.replace('#', '');
-  
-  // Parse RGB
-  const r = parseInt(color.substring(0, 2), 16);
-  const g = parseInt(color.substring(2, 4), 16);
-  const b = parseInt(color.substring(4, 6), 16);
-  
-  // Get complementary (invert)
-  const compR = 255 - r;
-  const compG = 255 - g;
-  const compB = 255 - b;
-  
-  return `#${compR.toString(16).padStart(2, '0')}${compG.toString(16).padStart(2, '0')}${compB.toString(16).padStart(2, '0')}`;
-}
-
-function getLighterColor(hex: string, factor: number = 0.3): string {
-  const color = hex.replace('#', '');
-  const r = Math.min(255, parseInt(color.substring(0, 2), 16) + Math.round(255 * factor));
-  const g = Math.min(255, parseInt(color.substring(2, 4), 16) + Math.round(255 * factor));
-  const b = Math.min(255, parseInt(color.substring(4, 6), 16) + Math.round(255 * factor));
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-function isLightColor(hex: string): boolean {
-  const color = hex.replace('#', '');
-  const r = parseInt(color.substring(0, 2), 16);
-  const g = parseInt(color.substring(2, 4), 16);
-  const b = parseInt(color.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5;
-}
+const COVER_SIZE = SCREEN_WIDTH * 0.65;
 
 export function PlayerScreen() {
   const insets = useSafeAreaInsets();
   const [showChapters, setShowChapters] = useState(false);
   const [showSpeed, setShowSpeed] = useState(false);
-  const [dominantColor, setDominantColor] = useState<string>(theme.colors.background.primary);
-  const [complementaryColor, setComplementaryColor] = useState<string>(theme.colors.primary[500]);
 
   const {
     currentBook,
@@ -76,39 +40,7 @@ export function PlayerScreen() {
   } = usePlayerStore();
 
   const coverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : '';
-
-  useEffect(() => {
-    if (coverUrl) {
-      extractColors();
-    }
-  }, [coverUrl]);
-
-  const extractColors = async () => {
-    try {
-      const colors = await getColors(coverUrl, {
-        fallback: theme.colors.background.primary,
-        cache: true,
-        key: coverUrl,
-      });
-
-      let dominant = theme.colors.background.primary;
-      
-      if (colors.platform === 'android') {
-        dominant = colors.dominant || colors.average || dominant;
-      } else if (colors.platform === 'ios') {
-        dominant = colors.background || colors.primary || dominant;
-      } else {
-        dominant = (colors as any).dominant || (colors as any).vibrant || dominant;
-      }
-
-      // Make it lighter for background
-      const bgColor = getLighterColor(dominant, 0.4);
-      setDominantColor(bgColor);
-      setComplementaryColor(getComplementaryColor(dominant));
-    } catch (error) {
-      console.error('Failed to extract colors:', error);
-    }
-  };
+  const { background, accent, isLight } = useImageColors(coverUrl, currentBook?.id || '');
 
   if (!isPlayerVisible || !currentBook) {
     return null;
@@ -117,14 +49,27 @@ export function PlayerScreen() {
   const metadata = currentBook.media.metadata;
   const title = metadata.title || 'Unknown Title';
   const author = metadata.authors?.[0]?.name || 'Unknown Author';
-  const narrator = metadata.narrators?.[0] || null;
   const chapters = currentBook.media.chapters || [];
   
   const progress = duration > 0 ? position / duration : 0;
-  const isLight = isLightColor(dominantColor);
-  const textColor = isLight ? theme.colors.text.primary : theme.colors.neutral[0];
-  const secondaryTextColor = isLight ? theme.colors.text.secondary : 'rgba(255,255,255,0.7)';
-  const tertiaryTextColor = isLight ? theme.colors.text.tertiary : 'rgba(255,255,255,0.5)';
+  
+  // Find current chapter
+  const currentChapterIndex = chapters.findIndex(
+    (ch, idx) =>
+      position >= ch.start &&
+      (idx === chapters.length - 1 || position < chapters[idx + 1].start)
+  );
+  const currentChapter = chapters[currentChapterIndex];
+  const chapterTitle = currentChapter?.title || `Chapter ${currentChapterIndex + 1}`;
+
+  const textColor = '#FFFFFF';
+  const secondaryTextColor = 'rgba(255,255,255,0.7)';
+  const tertiaryTextColor = 'rgba(255,255,255,0.5)';
+
+  const gradientColors = [
+    background,
+    darkenColor(background, 0.3),
+  ];
 
   return (
     <Modal
@@ -133,80 +78,101 @@ export function PlayerScreen() {
       presentationStyle="fullScreen"
       onRequestClose={closePlayer}
     >
-      <View style={[styles.container, { backgroundColor: dominantColor }]}>
-        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} />
+      <LinearGradient colors={gradientColors} style={styles.container}>
+        <StatusBar barStyle="light-content" />
 
-        {/* Close Button */}
+        {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + theme.spacing[2] }]}>
-          <TouchableOpacity 
-            onPress={closePlayer} 
-            style={[styles.closeButton, { backgroundColor: isLight ? theme.colors.neutral[200] : 'rgba(255,255,255,0.2)' }]}
-          >
-            <Icon name="chevron-down" size={24} color={textColor} set="ionicons" />
+          <TouchableOpacity onPress={closePlayer} style={styles.headerButton}>
+            <Icon name="chevron-down" size={28} color={textColor} set="ionicons" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Now Playing</Text>
+          <TouchableOpacity style={styles.headerButton}>
+            <Icon name="ellipsis-horizontal" size={24} color={textColor} set="ionicons" />
           </TouchableOpacity>
         </View>
 
-        {/* Cover Art with Progress Border */}
-        <View style={styles.coverContainer}>
+        {/* Cover with Progress Border */}
+        <View style={styles.coverSection}>
           <CoverWithProgress
             coverUrl={coverUrl}
             progress={progress}
             size={COVER_SIZE}
-            borderColor={complementaryColor}
+            accentColor={accent}
           />
         </View>
 
-        {/* Title & Author */}
-        <View style={styles.infoContainer}>
-          <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>{title}</Text>
-          <Text style={[styles.author, { color: secondaryTextColor }]}>{author}</Text>
-          {narrator && (
-            <Text style={[styles.narrator, { color: tertiaryTextColor }]}>Narrated by {narrator}</Text>
-          )}
+        {/* Book Info */}
+        <View style={styles.infoSection}>
+          <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={[styles.author, { color: secondaryTextColor }]}>
+            {author}
+          </Text>
+          <Text style={[styles.chapterInfo, { color: tertiaryTextColor }]}>
+            {chapterTitle} • {Math.round(progress * 100)}% complete
+          </Text>
         </View>
 
         {/* Progress Bar */}
-        <ProgressBar textColor={tertiaryTextColor} trackColor={isLight ? theme.colors.neutral[300] : 'rgba(255,255,255,0.2)'} fillColor={textColor} />
+        <ProgressBar
+          textColor={tertiaryTextColor}
+          trackColor="rgba(255,255,255,0.2)"
+          fillColor={accent}
+        />
 
         {/* Playback Controls */}
-        <PlaybackControls 
-          buttonColor={isLight ? theme.colors.neutral[0] : theme.colors.neutral[0]}
-          iconColor={isLight ? theme.colors.text.primary : theme.colors.text.primary}
-          skipColor={isLight ? theme.colors.neutral[400] : 'rgba(255,255,255,0.5)'}
+        <PlaybackControls
+          buttonColor="#FFFFFF"
+          iconColor={background}
+          skipColor="rgba(255,255,255,0.6)"
         />
 
         {/* Speed Button */}
-        <View style={styles.speedContainer}>
-          <TouchableOpacity 
-            style={[styles.speedButton, { backgroundColor: isLight ? theme.colors.neutral[200] : 'rgba(255,255,255,0.2)' }]} 
+        <View style={styles.speedSection}>
+          <TouchableOpacity
+            style={[styles.speedButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
             onPress={() => setShowSpeed(true)}
           >
-            <Text style={[styles.speedText, { color: textColor }]}>{playbackRate}x</Text>
+            <Text style={[styles.speedText, { color: textColor }]}>
+              {playbackRate}×
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* Bottom Actions */}
-        <View style={[styles.bottomActions, { paddingBottom: insets.bottom + theme.spacing[4] }]}>
+        <View style={[styles.bottomActions, { paddingBottom: insets.bottom + theme.spacing[6] }]}>
+          <TouchableOpacity style={styles.actionButton}>
+            <Icon name="moon-outline" size={26} color={secondaryTextColor} set="ionicons" />
+            <Text style={[styles.actionLabel, { color: tertiaryTextColor }]}>Sleep</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.actionButton} onPress={() => setShowChapters(true)}>
-            <Icon name="list" size={22} color={secondaryTextColor} set="ionicons" />
+            <Icon name="list-outline" size={26} color={secondaryTextColor} set="ionicons" />
+            <Text style={[styles.actionLabel, { color: tertiaryTextColor }]}>Chapters</Text>
           </TouchableOpacity>
+          
           <TouchableOpacity style={styles.actionButton}>
-            <Icon name="moon-outline" size={22} color={secondaryTextColor} set="ionicons" />
+            <Icon name="bookmark-outline" size={26} color={secondaryTextColor} set="ionicons" />
+            <Text style={[styles.actionLabel, { color: tertiaryTextColor }]}>Bookmark</Text>
           </TouchableOpacity>
+          
           <TouchableOpacity style={styles.actionButton}>
-            <Icon name="bookmark-outline" size={22} color={secondaryTextColor} set="ionicons" />
+            <Icon name="share-outline" size={26} color={secondaryTextColor} set="ionicons" />
+            <Text style={[styles.actionLabel, { color: tertiaryTextColor }]}>Share</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Modals */}
         <ChapterSheet
           visible={showChapters}
           onClose={() => setShowChapters(false)}
           chapters={chapters}
           currentPosition={position}
         />
-        
         <SpeedSelector visible={showSpeed} onClose={() => setShowSpeed(false)} />
-      </View>
+      </LinearGradient>
     </Modal>
   );
 }
@@ -216,61 +182,75 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[5],
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing[4],
     paddingBottom: theme.spacing[2],
   },
-  closeButton: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  coverContainer: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing[6],
-  },
-  infoContainer: {
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing[8],
-    marginBottom: theme.spacing[4],
-  },
-  title: {
-    ...theme.textStyles.h2,
-    textAlign: 'center',
-    marginBottom: theme.spacing[2],
-  },
-  author: {
-    ...theme.textStyles.body,
-    marginBottom: theme.spacing[1],
-  },
-  narrator: {
-    ...theme.textStyles.bodySmall,
-  },
-  speedContainer: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing[3],
-  },
-  speedButton: {
-    paddingHorizontal: theme.spacing[6],
-    paddingVertical: theme.spacing[2],
-    borderRadius: theme.radius.full,
-  },
-  speedText: {
-    ...theme.textStyles.body,
-    fontWeight: '600',
-  },
-  bottomActions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: theme.spacing[8],
-    marginTop: 'auto',
-  },
-  actionButton: {
+  headerButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 0.5,
+  },
+  coverSection: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing[6],
+  },
+  infoSection: {
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing[6],
+    marginBottom: theme.spacing[4],
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: theme.spacing[1],
+    letterSpacing: -0.3,
+  },
+  author: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: theme.spacing[2],
+  },
+  chapterInfo: {
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  speedSection: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing[3],
+  },
+  speedButton: {
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[2],
+    borderRadius: theme.radius.full,
+    borderWidth: 1.5,
+  },
+  speedText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: theme.spacing[6],
+    marginTop: 'auto',
+  },
+  actionButton: {
+    alignItems: 'center',
+    gap: theme.spacing[1],
+  },
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 });
