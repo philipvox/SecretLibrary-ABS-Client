@@ -1,47 +1,114 @@
-/**
- * Player screen - complete redesign with SafeAreaView fix
- */
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import React, { useState } from 'react';
+// File: src/features/player/screens/PlayerScreen.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   Image,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   Modal,
-  SafeAreaView,
   StatusBar,
+  Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getColors } from 'react-native-image-colors';
 import { usePlayerStore } from '../stores/playerStore';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { ProgressBar } from '../components/ProgressBar';
+import { ChapterSheet } from '../components/ChapterSheet';
+import { SpeedSelector } from '../components/SpeedSelector';
+import { CoverWithProgress } from '../components/CoverWithProgress';
 import { apiClient } from '@/core/api';
-import { BookChapter } from '@/core/types';
 import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
 
-const PLAYBACK_RATES = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COVER_SIZE = SCREEN_WIDTH * 0.7;
 
-function formatChapterDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+function getComplementaryColor(hex: string): string {
+  // Remove # if present
+  const color = hex.replace('#', '');
+  
+  // Parse RGB
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+  
+  // Get complementary (invert)
+  const compR = 255 - r;
+  const compG = 255 - g;
+  const compB = 255 - b;
+  
+  return `#${compR.toString(16).padStart(2, '0')}${compG.toString(16).padStart(2, '0')}${compB.toString(16).padStart(2, '0')}`;
 }
+
+function getLighterColor(hex: string, factor: number = 0.3): string {
+  const color = hex.replace('#', '');
+  const r = Math.min(255, parseInt(color.substring(0, 2), 16) + Math.round(255 * factor));
+  const g = Math.min(255, parseInt(color.substring(2, 4), 16) + Math.round(255 * factor));
+  const b = Math.min(255, parseInt(color.substring(4, 6), 16) + Math.round(255 * factor));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+function isLightColor(hex: string): boolean {
+  const color = hex.replace('#', '');
+  const r = parseInt(color.substring(0, 2), 16);
+  const g = parseInt(color.substring(2, 4), 16);
+  const b = parseInt(color.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5;
+}
+
 export function PlayerScreen() {
   const insets = useSafeAreaInsets();
+  const [showChapters, setShowChapters] = useState(false);
+  const [showSpeed, setShowSpeed] = useState(false);
+  const [dominantColor, setDominantColor] = useState<string>(theme.colors.background.primary);
+  const [complementaryColor, setComplementaryColor] = useState<string>(theme.colors.primary[500]);
+
   const {
     currentBook,
     isPlayerVisible,
+    position,
+    duration,
     playbackRate,
     closePlayer,
-    setPlaybackRate,
-    jumpToChapter,
   } = usePlayerStore();
 
-  const [showRateSelector, setShowRateSelector] = useState(false);
+  const coverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : '';
+
+  useEffect(() => {
+    if (coverUrl) {
+      extractColors();
+    }
+  }, [coverUrl]);
+
+  const extractColors = async () => {
+    try {
+      const colors = await getColors(coverUrl, {
+        fallback: theme.colors.background.primary,
+        cache: true,
+        key: coverUrl,
+      });
+
+      let dominant = theme.colors.background.primary;
+      
+      if (colors.platform === 'android') {
+        dominant = colors.dominant || colors.average || dominant;
+      } else if (colors.platform === 'ios') {
+        dominant = colors.background || colors.primary || dominant;
+      } else {
+        dominant = (colors as any).dominant || (colors as any).vibrant || dominant;
+      }
+
+      // Make it lighter for background
+      const bgColor = getLighterColor(dominant, 0.4);
+      setDominantColor(bgColor);
+      setComplementaryColor(getComplementaryColor(dominant));
+    } catch (error) {
+      console.error('Failed to extract colors:', error);
+    }
+  };
 
   if (!isPlayerVisible || !currentBook) {
     return null;
@@ -52,24 +119,12 @@ export function PlayerScreen() {
   const author = metadata.authors?.[0]?.name || 'Unknown Author';
   const narrator = metadata.narrators?.[0] || null;
   const chapters = currentBook.media.chapters || [];
-  const coverUrl = apiClient.getItemCoverUrl(currentBook.id);
-
-  const handleSelectRate = async (rate: number) => {
-    try {
-      await setPlaybackRate(rate);
-      setShowRateSelector(false);
-    } catch (error) {
-      console.error('Failed to set playback rate:', error);
-    }
-  };
-
-  const handleChapterPress = async (chapterIndex: number) => {
-    try {
-      await jumpToChapter(chapterIndex);
-    } catch (error) {
-      console.error('Failed to jump to chapter:', error);
-    }
-  };
+  
+  const progress = duration > 0 ? position / duration : 0;
+  const isLight = isLightColor(dominantColor);
+  const textColor = isLight ? theme.colors.text.primary : theme.colors.neutral[0];
+  const secondaryTextColor = isLight ? theme.colors.text.secondary : 'rgba(255,255,255,0.7)';
+  const tertiaryTextColor = isLight ? theme.colors.text.tertiary : 'rgba(255,255,255,0.5)';
 
   return (
     <Modal
@@ -78,156 +133,103 @@ export function PlayerScreen() {
       presentationStyle="fullScreen"
       onRequestClose={closePlayer}
     >
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
+      <View style={[styles.container, { backgroundColor: dominantColor }]}>
+        <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} />
+
+        {/* Close Button */}
+        <View style={[styles.header, { paddingTop: insets.top + theme.spacing[2] }]}>
+          <TouchableOpacity 
+            onPress={closePlayer} 
+            style={[styles.closeButton, { backgroundColor: isLight ? theme.colors.neutral[200] : 'rgba(255,255,255,0.2)' }]}
+          >
+            <Icon name="chevron-down" size={24} color={textColor} set="ionicons" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Cover Art with Progress Border */}
+        <View style={styles.coverContainer}>
+          <CoverWithProgress
+            coverUrl={coverUrl}
+            progress={progress}
+            size={COVER_SIZE}
+            borderColor={complementaryColor}
+          />
+        </View>
+
+        {/* Title & Author */}
+        <View style={styles.infoContainer}>
+          <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>{title}</Text>
+          <Text style={[styles.author, { color: secondaryTextColor }]}>{author}</Text>
+          {narrator && (
+            <Text style={[styles.narrator, { color: tertiaryTextColor }]}>Narrated by {narrator}</Text>
+          )}
+        </View>
+
+        {/* Progress Bar */}
+        <ProgressBar textColor={tertiaryTextColor} trackColor={isLight ? theme.colors.neutral[300] : 'rgba(255,255,255,0.2)'} fillColor={textColor} />
+
+        {/* Playback Controls */}
+        <PlaybackControls 
+          buttonColor={isLight ? theme.colors.neutral[0] : theme.colors.neutral[0]}
+          iconColor={isLight ? theme.colors.text.primary : theme.colors.text.primary}
+          skipColor={isLight ? theme.colors.neutral[400] : 'rgba(255,255,255,0.5)'}
+        />
+
+        {/* Speed Button */}
+        <View style={styles.speedContainer}>
+          <TouchableOpacity 
+            style={[styles.speedButton, { backgroundColor: isLight ? theme.colors.neutral[200] : 'rgba(255,255,255,0.2)' }]} 
+            onPress={() => setShowSpeed(true)}
+          >
+            <Text style={[styles.speedText, { color: textColor }]}>{playbackRate}x</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Actions */}
+        <View style={[styles.bottomActions, { paddingBottom: insets.bottom + theme.spacing[4] }]}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setShowChapters(true)}>
+            <Icon name="list" size={22} color={secondaryTextColor} set="ionicons" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton}>
+            <Icon name="moon-outline" size={22} color={secondaryTextColor} set="ionicons" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton}>
+            <Icon name="bookmark-outline" size={22} color={secondaryTextColor} set="ionicons" />
+          </TouchableOpacity>
+        </View>
+
+        <ChapterSheet
+          visible={showChapters}
+          onClose={() => setShowChapters(false)}
+          chapters={chapters}
+          currentPosition={position}
+        />
         
-        <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header with Close Button */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={closePlayer} style={styles.closeButton}>
-              <Icon name="chevron-down" size={28} color={theme.colors.text.primary} set="ionicons" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Cover */}
-          <View style={styles.coverContainer}>
-            <Image 
-              source={{ uri: coverUrl }} 
-              style={styles.cover} 
-              resizeMode="cover" 
-            />
-          </View>
-
-          {/* Book Info */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.title} numberOfLines={2}>
-              {title}
-            </Text>
-            <Text style={styles.author}>{author}</Text>
-            {narrator && <Text style={styles.narrator}>Narrated by {narrator}</Text>}
-          </View>
-
-          {/* Progress Bar */}
-          <ProgressBar />
-
-          {/* Playback Controls */}
-          <PlaybackControls />
-
-          {/* Playback Rate */}
-          <View style={styles.rateContainer}>
-            <TouchableOpacity
-              style={styles.rateButton}
-              onPress={() => setShowRateSelector(!showRateSelector)}
-            >
-              <Text style={styles.rateText}>{playbackRate}x</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Rate Selector */}
-          {showRateSelector && (
-            <View style={styles.rateSelectorContainer}>
-              {PLAYBACK_RATES.map((rate) => (
-                <TouchableOpacity
-                  key={rate}
-                  style={[
-                    styles.rateOption,
-                    playbackRate === rate && styles.rateOptionActive,
-                  ]}
-                  onPress={() => handleSelectRate(rate)}
-                >
-                  <Text
-                    style={[
-                      styles.rateOptionText,
-                      playbackRate === rate && styles.rateOptionTextActive,
-                    ]}
-                  >
-                    {rate}x
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Chapters */}
-          {chapters.length > 0 && (
-            <View style={styles.chaptersContainer}>
-              <Text style={styles.chaptersTitle}>Chapters</Text>
-
-              {chapters.map((chapter, index) => {
-                const duration = chapter.end - chapter.start;
-                return (
-                  <TouchableOpacity
-                    key={chapter.id}
-                    style={styles.chapterItem}
-                    onPress={() => handleChapterPress(index)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.chapterNumber}>
-                      <Text style={styles.chapterNumberText}>{index + 1}</Text>
-                    </View>
-
-                    <View style={styles.chapterInfo}>
-                      <Text style={styles.chapterTitle} numberOfLines={2}>
-                        {chapter.title || `Chapter ${index + 1}`}
-                      </Text>
-                      <Text style={styles.chapterDuration}>
-                        {formatChapterDuration(duration)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          <View style={styles.bottomSpacing} />
-        </ScrollView>
-      </SafeAreaView>
+        <SpeedSelector visible={showSpeed} onClose={() => setShowSpeed(false)} />
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingBottom: theme.spacing[8],
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing[3],
+    alignItems: 'center',
     paddingHorizontal: theme.spacing[5],
+    paddingBottom: theme.spacing[2],
   },
   closeButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.neutral[200],
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.elevation.small,
   },
   coverContainer: {
     alignItems: 'center',
-    paddingVertical: theme.spacing[8],
-    paddingHorizontal: theme.spacing[8],
-  },
-  cover: {
-    width: 280,
-    height: 280,
-    borderRadius: theme.radius.xlarge,
-    backgroundColor: theme.colors.neutral[200],
-    ...theme.elevation.large,
+    paddingVertical: theme.spacing[6],
   },
   infoContainer: {
     alignItems: 'center',
@@ -235,109 +237,40 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[4],
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
+    ...theme.textStyles.h2,
     textAlign: 'center',
     marginBottom: theme.spacing[2],
-    letterSpacing: -0.5,
   },
   author: {
-    fontSize: 17,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
+    ...theme.textStyles.body,
     marginBottom: theme.spacing[1],
   },
   narrator: {
-    fontSize: 14,
-    color: theme.colors.text.tertiary,
-    textAlign: 'center',
+    ...theme.textStyles.bodySmall,
   },
-  rateContainer: {
+  speedContainer: {
     alignItems: 'center',
-    paddingVertical: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
   },
-  rateButton: {
+  speedButton: {
     paddingHorizontal: theme.spacing[6],
-    paddingVertical: theme.spacing[3],
-    backgroundColor: theme.colors.neutral[200],
-    borderRadius: theme.radius.full,
-  },
-  rateText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  rateSelectorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    paddingHorizontal: theme.spacing[8],
-    paddingBottom: theme.spacing[4],
-    gap: theme.spacing[2],
-  },
-  rateOption: {
-    paddingHorizontal: theme.spacing[5],
     paddingVertical: theme.spacing[2],
-    backgroundColor: theme.colors.neutral[200],
     borderRadius: theme.radius.full,
   },
-  rateOptionActive: {
-    backgroundColor: theme.colors.primary[500],
-  },
-  rateOptionText: {
-    fontSize: 14,
+  speedText: {
+    ...theme.textStyles.body,
     fontWeight: '600',
-    color: theme.colors.text.primary,
   },
-  rateOptionTextActive: {
-    color: theme.colors.text.inverse,
-  },
-  chaptersContainer: {
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[8],
-  },
-  chaptersTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[5],
-  },
-  chapterItem: {
+  bottomActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: theme.spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    justifyContent: 'center',
+    gap: theme.spacing[8],
+    marginTop: 'auto',
   },
-  chapterNumber: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.neutral[200],
+  actionButton: {
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: theme.spacing[3],
-  },
-  chapterNumberText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text.secondary,
-  },
-  chapterInfo: {
-    flex: 1,
-  },
-  chapterTitle: {
-    fontSize: 15,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
-    fontWeight: '500',
-  },
-  chapterDuration: {
-    fontSize: 13,
-    color: theme.colors.text.tertiary,
-  },
-  bottomSpacing: {
-    height: theme.spacing[8],
   },
 });

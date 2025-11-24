@@ -1,13 +1,14 @@
-/**
- * Progress bar - redesigned
- */
-
+// File: src/features/player/components/ProgressBar.tsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, PanResponder } from 'react-native';
+import { View, Text, StyleSheet, PanResponder, Dimensions } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
 import { theme } from '@/shared/theme';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BAR_WIDTH = SCREEN_WIDTH - (theme.spacing[8] * 2);
+
 function formatTime(seconds: number): string {
+  if (!seconds || isNaN(seconds)) return '0:00';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
@@ -18,13 +19,23 @@ function formatTime(seconds: number): string {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function ProgressBar() {
+interface ProgressBarProps {
+  textColor?: string;
+  trackColor?: string;
+  fillColor?: string;
+}
+
+export function ProgressBar({ 
+  textColor = theme.colors.text.tertiary,
+  trackColor = theme.colors.neutral[300],
+  fillColor = theme.colors.text.primary,
+}: ProgressBarProps) {
   const { position, duration, seekTo } = usePlayerStore();
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(0);
 
   const displayPosition = isDragging ? dragPosition : position;
-  const progress = duration > 0 ? (displayPosition / duration) * 100 : 0;
+  const progress = duration > 0 ? displayPosition / duration : 0;
 
   const handleSeek = async (newPosition: number) => {
     try {
@@ -34,34 +45,24 @@ export function ProgressBar() {
     }
   };
 
-  const getPositionFromEvent = (event: any, containerWidth: number): number => {
-    const x = event.nativeEvent.locationX;
-    const ratio = Math.max(0, Math.min(1, x / containerWidth));
-    return ratio * duration;
-  };
-
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-
     onPanResponderGrant: (evt) => {
       setIsDragging(true);
-      const containerWidth = 350;
-      const newPosition = getPositionFromEvent(evt, containerWidth);
-      setDragPosition(newPosition);
+      const x = evt.nativeEvent.locationX;
+      const ratio = Math.max(0, Math.min(1, x / BAR_WIDTH));
+      setDragPosition(ratio * duration);
     },
-
     onPanResponderMove: (evt) => {
-      const containerWidth = 350;
-      const newPosition = getPositionFromEvent(evt, containerWidth);
-      setDragPosition(newPosition);
+      const x = evt.nativeEvent.locationX;
+      const ratio = Math.max(0, Math.min(1, x / BAR_WIDTH));
+      setDragPosition(ratio * duration);
     },
-
     onPanResponderRelease: () => {
       setIsDragging(false);
       handleSeek(dragPosition);
     },
-
     onPanResponderTerminate: () => {
       setIsDragging(false);
     },
@@ -69,19 +70,16 @@ export function ProgressBar() {
 
   return (
     <View style={styles.container}>
-      {/* Progress Bar */}
-      <View style={styles.progressContainer} {...panResponder.panHandlers}>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress}%` }]}>
-            <View style={styles.thumb} />
-          </View>
-        </View>
+      <View style={styles.timeContainer}>
+        <Text style={[styles.timeText, { color: textColor }]}>{formatTime(displayPosition)}</Text>
+        <Text style={[styles.timeText, { color: textColor }]}>{formatTime(duration)}</Text>
       </View>
 
-      {/* Time Labels */}
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{formatTime(displayPosition)}</Text>
-        <Text style={styles.timeText}>{formatTime(duration)}</Text>
+      <View style={styles.progressContainer} {...panResponder.panHandlers}>
+        <View style={[styles.progressTrack, { backgroundColor: trackColor }]}>
+          <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: fillColor }]} />
+          <View style={[styles.thumb, { left: `${progress * 100}%`, borderColor: fillColor }]} />
+        </View>
       </View>
     </View>
   );
@@ -90,43 +88,36 @@ export function ProgressBar() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: theme.spacing[8],
-    paddingVertical: theme.spacing[4],
-  },
-  progressContainer: {
     paddingVertical: theme.spacing[2],
-    marginBottom: theme.spacing[2],
-  },
-  progressTrack: {
-    height: 4,
-    backgroundColor: theme.colors.neutral[300],
-    borderRadius: theme.radius.small,
-    overflow: 'visible',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.primary[500],
-    borderRadius: theme.radius.small,
-    position: 'relative',
-  },
-  thumb: {
-    position: 'absolute',
-    right: -8,
-    top: -6,
-    width: 16,
-    height: 16,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.primary[500],
-    borderWidth: 3,
-    borderColor: theme.colors.background.primary,
-    ...theme.elevation.small,
   },
   timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: theme.spacing[2],
   },
   timeText: {
-    fontSize: 13,
-    color: theme.colors.text.tertiary,
-    fontWeight: '500',
+    ...theme.textStyles.caption,
+  },
+  progressContainer: {
+    paddingVertical: theme.spacing[3],
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: theme.radius.small,
+    position: 'relative',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: theme.radius.small,
+  },
+  thumb: {
+    position: 'absolute',
+    top: -6,
+    marginLeft: -8,
+    width: 16,
+    height: 16,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.neutral[200],
+    borderWidth: 4,
   },
 });

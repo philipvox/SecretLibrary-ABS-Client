@@ -1,39 +1,15 @@
-/**
- * Mini player - redesigned
- */
-
+// File: src/features/player/components/MiniPlayer.tsx
 import React from 'react';
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
+import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
 
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
 export function MiniPlayer() {
-  const {
-    currentBook,
-    isPlaying,
-    position,
-    duration,
-    play,
-    pause,
-    togglePlayer,
-  } = usePlayerStore();
+  const { currentBook, isPlaying, position, duration, play, pause, togglePlayer } = usePlayerStore();
 
-  if (!currentBook) {
-    return null;
-  }
+  if (!currentBook) return null;
 
   const handlePlayPause = async (e: any) => {
     e.stopPropagation();
@@ -52,49 +28,28 @@ export function MiniPlayer() {
   const metadata = currentBook.media.metadata;
   const title = metadata.title || 'Unknown Title';
   const author = metadata.authors?.[0]?.name || 'Unknown Author';
-  const coverUrl = currentBook.media.coverPath;
+  const coverUrl = apiClient.getItemCoverUrl(currentBook.id);
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={togglePlayer}
-      activeOpacity={0.95}
-    >
-      {/* Progress Bar */}
+    <TouchableOpacity style={styles.container} onPress={togglePlayer} activeOpacity={0.95}>
       <View style={styles.progressBarContainer}>
         <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
       </View>
 
       <View style={styles.content}>
-        {/* Cover */}
-        <Image
-          source={{ uri: coverUrl }}
-          style={styles.cover}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
 
-        {/* Book Info */}
         <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.author} numberOfLines={1}>
-            {author}
-          </Text>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <Text style={styles.author} numberOfLines={1}>{author}</Text>
         </View>
 
-        {/* Play/Pause Button */}
         <TouchableOpacity
           style={styles.playButton}
           onPress={handlePlayPause}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon 
-            name={isPlaying ? 'pause' : 'play'} 
-            size={24} 
-            color={theme.colors.text.inverse}
-            set="ionicons"
-          />
+          <Icon name={isPlaying ? 'pause' : 'play'} size={22} color={theme.colors.neutral[0]} set="ionicons" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -103,14 +58,14 @@ export function MiniPlayer() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.background.elevated,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border.light,
-    ...theme.elevation.large,
+    backgroundColor: theme.colors.neutral[900],
+    borderTopLeftRadius: theme.radius.large,
+    borderTopRightRadius: theme.radius.large,
+    overflow: 'hidden',
   },
   progressBarContainer: {
-    height: 2,
-    backgroundColor: theme.colors.neutral[300],
+    height: 3,
+    backgroundColor: theme.colors.neutral[700],
   },
   progressBar: {
     height: '100%',
@@ -126,7 +81,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: theme.radius.medium,
-    backgroundColor: theme.colors.neutral[200],
+    backgroundColor: theme.colors.neutral[700],
   },
   info: {
     flex: 1,
@@ -134,22 +89,21 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing[3],
   },
   title: {
-    fontSize: 14,
+    ...theme.textStyles.bodySmall,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: theme.colors.neutral[0],
     marginBottom: theme.spacing[1] / 2,
   },
   author: {
-    fontSize: 12,
-    color: theme.colors.text.secondary,
+    ...theme.textStyles.caption,
+    color: theme.colors.neutral[400],
   },
   playButton: {
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.primary[500],
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.elevation.small,
   },
 });
