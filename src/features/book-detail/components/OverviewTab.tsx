@@ -14,9 +14,9 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
   const [isExpanded, setIsExpanded] = useState(false);
   const navigation = useNavigation();
   
-  const metadata = book.media.metadata;
+  const metadata = book.media.metadata as any;
   const description = metadata.description || '';
-  const series = metadata.series?.[0];
+  const seriesName = metadata.seriesName || null;
   const publishedYear = metadata.publishedYear;
   const publisher = metadata.publisher;
   const language = metadata.language;
@@ -26,12 +26,10 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
     ? description.substring(0, 200) + '...' 
     : description;
 
-  // Mock similar books - in real app would fetch from API based on genre/author
   const similarBooks: any[] = [];
 
   return (
     <View style={styles.container}>
-      {/* Description */}
       {description ? (
         <View style={styles.section}>
           <Text style={styles.description}>{displayDescription}</Text>
@@ -43,15 +41,12 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
         </View>
       ) : null}
 
-      {/* Additional Details (for Details tab) */}
       {showFullDetails && (
         <View style={styles.detailsSection}>
-          {series && (
+          {seriesName && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Series</Text>
-              <Text style={styles.detailValue}>
-                {series.name}{series.sequence ? ` #${series.sequence}` : ''}
-              </Text>
+              <Text style={styles.detailValue}>{seriesName}</Text>
             </View>
           )}
           {publishedYear && (
@@ -75,7 +70,6 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
         </View>
       )}
 
-      {/* Similar Category - placeholder for future implementation */}
       {!showFullDetails && similarBooks.length > 0 && (
         <View style={styles.similarSection}>
           <View style={styles.similarHeader}>

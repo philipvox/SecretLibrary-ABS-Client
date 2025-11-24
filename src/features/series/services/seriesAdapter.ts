@@ -1,96 +1,76 @@
 /**
  * src/features/series/services/seriesAdapter.ts
- *
- * Adapter to convert AudiobookShelf Series to our SeriesInfo format.
+ * 
+ * Adapter for transforming series data from API.
+ * Uses metadata utility for consistent data extraction.
  */
 
-import { Series } from '@/core/types';
+import { LibraryItem } from '@/core/types';
+import { getDuration } from '@/shared/utils/metadata';
 
 export interface SeriesInfo {
   id: string;
   name: string;
+  description?: string;
   bookCount: number;
   totalDuration: number;
   coverUrl?: string;
-  description?: string;
-  addedAt: number;
+  books: LibraryItem[];
 }
 
-class SeriesAdapter {
-  /**
-   * Convert AudiobookShelf Series array to SeriesInfo array
-   */
-  adaptSeries(series: Series[]): SeriesInfo[] {
-    if (!Array.isArray(series)) {
-      console.warn('adaptSeries received non-array:', series);
-      return [];
-    }
+/**
+ * Transform API series data to SeriesInfo
+ */
+export function transformSeries(series: any): SeriesInfo {
+  const books = series.books || [];
+  
+  // Calculate total duration from all books in series
+  const totalDuration = books.reduce((sum: number, book: LibraryItem) => {
+    return sum + getDuration(book);
+  }, 0);
 
-    return series.map((s) => this.adaptSingle(s));
-  }
+  // Use first book's ID for cover URL
+  const firstBookId = books[0]?.id;
 
-  /**
-   * Convert single series
-   */
-  private adaptSingle(series: Series): SeriesInfo {
-    // Calculate total duration from books
-    const totalDuration = series.books?.reduce(
-      (sum, book) => sum + (book.media?.duration || 0),
-      0
-    ) || 0;
-
-    // Get first book's cover as series cover
-    const coverUrl = series.books?.[0]?.id;
-
-    return {
-      id: series.id,
-      name: series.name,
-      bookCount: series.books?.length || 0,
-      totalDuration,
-      coverUrl,
-      description: series.description,
-      addedAt: series.addedAt,
-    };
-  }
-
-  /**
-   * Sort series by different criteria
-   */
-  sortSeries(
-    series: SeriesInfo[],
-    sortBy: 'name' | 'bookCount' | 'recent'
-  ): SeriesInfo[] {
-    if (!Array.isArray(series)) {
-      return [];
-    }
-
-    switch (sortBy) {
-      case 'name':
-        return [...series].sort((a, b) => a.name.localeCompare(b.name));
-      case 'bookCount':
-        return [...series].sort((a, b) => b.bookCount - a.bookCount);
-      case 'recent':
-        return [...series].sort((a, b) => b.addedAt - a.addedAt);
-      default:
-        return series;
-    }
-  }
-
-  /**
-   * Filter series by search query
-   */
-  filterSeries(series: SeriesInfo[], query: string): SeriesInfo[] {
-    if (!Array.isArray(series)) {
-      return [];
-    }
-
-    if (!query.trim()) {
-      return series;
-    }
-
-    const lowerQuery = query.toLowerCase();
-    return series.filter((s) => s.name.toLowerCase().includes(lowerQuery));
-  }
+  return {
+    id: series.id,
+    name: series.name,
+    description: series.description,
+    bookCount: books.length || series.numBooks || 0,
+    totalDuration,
+    coverUrl: firstBookId,
+    books,
+  };
 }
 
-export const seriesAdapter = new SeriesAdapter();
+/**
+ * Transform array of series from API
+ */
+export function transformSeriesList(seriesList: any[]): SeriesInfo[] {
+  return seriesList.map(transformSeries);
+}
+
+/**
+ * Sort series by name or book count
+ */
+export function sortSeries(
+  series: SeriesInfo[],
+  sortBy: 'name' | 'bookCount' = 'name'
+): SeriesInfo[] {
+  return [...series].sort((a, b) => {
+    if (sortBy === 'bookCount') return b.bookCount - a.bookCount;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/**
+ * Filter series by search query
+ */
+export function filterSeries(
+  series: SeriesInfo[],
+  query: string
+): SeriesInfo[] {
+  if (!query.trim()) return series;
+  const lower = query.toLowerCase();
+  return series.filter((s) => s.name.toLowerCase().includes(lower));
+}

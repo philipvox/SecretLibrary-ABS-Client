@@ -1,18 +1,26 @@
 /**
- * src/features/authors/components/AuthorCard.tsx
- *
+ * src/features/author/components/AuthorCard.tsx
+ * 
  * Card displaying author information with book count.
  */
 
 import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { AuthorInfo } from '../services/authorAdapter';
+import { Author } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { theme } from '@/shared/theme';
 
+interface AuthorInfo {
+  id: string;
+  name: string;
+  description?: string;
+  imagePath?: string;
+  bookCount?: number;
+}
+
 interface AuthorCardProps {
-  author: AuthorInfo;
+  author: AuthorInfo | Author;
 }
 
 export function AuthorCard({ author }: AuthorCardProps) {
@@ -26,17 +34,37 @@ export function AuthorCard({ author }: AuthorCardProps) {
     ? apiClient.getAuthorImageUrl(author.id)
     : undefined;
 
+  // Generate initials for avatar
+  const initials = author.name
+    .split(' ')
+    .map((word) => word[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  // Generate a consistent color based on name
+  const colorIndex = author.name.charCodeAt(0) % 5;
+  const avatarColors = [
+    theme.colors.primary[500],
+    theme.colors.semantic.success,
+    theme.colors.semantic.warning,
+    theme.colors.semantic.info,
+    theme.colors.neutral[600],
+  ];
+
+  const bookCount = (author as AuthorInfo).bookCount;
+
   return (
     <Pressable
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
       onPress={handlePress}
     >
-      <View style={styles.imageContainer}>
+      <View style={styles.avatarContainer}>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+          <Image source={{ uri: imageUrl }} style={styles.avatar} resizeMode="cover" />
         ) : (
-          <View style={[styles.image, styles.placeholderImage]}>
-            <Text style={styles.placeholderText}>👤</Text>
+          <View style={[styles.avatar, styles.initialsAvatar, { backgroundColor: avatarColors[colorIndex] }]}>
+            <Text style={styles.initials}>{initials}</Text>
           </View>
         )}
       </View>
@@ -45,9 +73,11 @@ export function AuthorCard({ author }: AuthorCardProps) {
         <Text style={styles.name} numberOfLines={2}>
           {author.name}
         </Text>
-        <Text style={styles.bookCount} numberOfLines={1}>
-          {author.bookCount} {author.bookCount === 1 ? 'book' : 'books'}
-        </Text>
+        {bookCount !== undefined && bookCount > 0 && (
+          <Text style={styles.bookCount}>
+            {bookCount} {bookCount === 1 ? 'book' : 'books'}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -55,35 +85,34 @@ export function AuthorCard({ author }: AuthorCardProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: 160,
+    width: '48%',
     marginBottom: theme.spacing[4],
   },
   pressed: {
     opacity: 0.7,
   },
-  imageContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.neutral[200],
+  avatarContainer: {
+    aspectRatio: 1,
+    borderRadius: theme.radius.large,
     overflow: 'hidden',
+    backgroundColor: theme.colors.neutral[200],
     ...theme.elevation.small,
   },
-  image: {
+  avatar: {
     width: '100%',
     height: '100%',
   },
-  placeholderImage: {
+  initialsAvatar: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[300],
   },
-  placeholderText: {
-    fontSize: 48,
+  initials: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: theme.colors.text.inverse,
   },
   info: {
     marginTop: theme.spacing[2],
-    alignItems: 'center',
   },
   name: {
     fontSize: 15,
@@ -91,7 +120,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     marginBottom: theme.spacing[1],
     lineHeight: 20,
-    textAlign: 'center',
   },
   bookCount: {
     fontSize: 13,

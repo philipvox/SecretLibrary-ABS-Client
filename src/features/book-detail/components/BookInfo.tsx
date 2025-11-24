@@ -1,83 +1,101 @@
+/**
+ * src/features/book-detail/components/BookInfo.tsx
+ * 
+ * Displays book metadata including author, narrator, duration, description.
+ * Uses metadata utility for consistent data extraction.
+ */
+
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LibraryItem } from '@/core/types';
 import { theme } from '@/shared/theme';
+import {
+  getTitle,
+  getAuthorName,
+  getNarratorName,
+  getDescription,
+  getFormattedDuration,
+  getPublishedYear,
+  getSeriesWithSequence,
+  getGenres,
+} from '@/shared/utils/metadata';
 
 interface BookInfoProps {
   book: LibraryItem;
 }
 
-function formatDuration(seconds: number): string {
-  if (!seconds || isNaN(seconds)) return 'Unknown';
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
 export function BookInfo({ book }: BookInfoProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const metadata = book.media.metadata;
-  const duration = book.media.duration || 0;
-  const description = metadata.description || '';
-  const publishedYear = metadata.publishedYear || null;
-  const genres = metadata.genres || [];
-  const series = metadata.series?.[0];
-  
-  const needsExpansion = description.length > 150;
-  const displayDescription = needsExpansion && !isExpanded 
-    ? description.substring(0, 150) + '...' 
+  const [showFullDescription, setShowFullDescription] = useState(false);
+
+  const title = getTitle(book);
+  const author = getAuthorName(book);
+  const narrator = getNarratorName(book);
+  const description = getDescription(book);
+  const duration = getFormattedDuration(book);
+  const publishedYear = getPublishedYear(book);
+  const seriesName = getSeriesWithSequence(book);
+  const genres = getGenres(book);
+
+  const shouldTruncate = description.length > 200;
+  const displayDescription = shouldTruncate && !showFullDescription
+    ? description.slice(0, 200) + '...'
     : description;
 
   return (
     <View style={styles.container}>
+      {/* Title */}
+      <Text style={styles.title}>{title}</Text>
+
+      {/* Author */}
+      <Text style={styles.author}>{author}</Text>
+
+      {/* Narrator */}
+      {narrator && narrator !== 'Unknown Narrator' && (
+        <Text style={styles.narrator}>Narrated by {narrator}</Text>
+      )}
+
       {/* Metadata Row */}
       <View style={styles.metadataRow}>
         <View style={styles.metadataItem}>
-          <Text style={styles.metadataLabel}>DURATION</Text>
-          <Text style={styles.metadataValue}>{formatDuration(duration)}</Text>
+          <Text style={styles.metadataLabel}>Duration</Text>
+          <Text style={styles.metadataValue}>{duration}</Text>
         </View>
+        
         {publishedYear && (
           <View style={styles.metadataItem}>
-            <Text style={styles.metadataLabel}>PUBLISHED</Text>
+            <Text style={styles.metadataLabel}>Published</Text>
             <Text style={styles.metadataValue}>{publishedYear}</Text>
           </View>
         )}
-        {series && (
+        
+        {seriesName && (
           <View style={styles.metadataItem}>
-            <Text style={styles.metadataLabel}>SERIES</Text>
-            <Text style={styles.metadataValue} numberOfLines={1}>
-              {series.name}{series.sequence ? ` #${series.sequence}` : ''}
-            </Text>
+            <Text style={styles.metadataLabel}>Series</Text>
+            <Text style={styles.metadataValue} numberOfLines={1}>{seriesName}</Text>
           </View>
         )}
       </View>
 
-      {/* Genre Tags */}
+      {/* Genres */}
       {genres.length > 0 && (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          style={styles.genresScroll}
-          contentContainerStyle={styles.genresContainer}
-        >
+        <View style={styles.genresContainer}>
           {genres.map((genre, index) => (
             <View key={index} style={styles.genreTag}>
               <Text style={styles.genreText}>{genre}</Text>
             </View>
           ))}
-        </ScrollView>
+        </View>
       )}
 
-      {/* About Section */}
+      {/* Description */}
       {description ? (
-        <View style={styles.aboutSection}>
+        <View style={styles.descriptionContainer}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.description}>{displayDescription}</Text>
-          {needsExpansion && (
-            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
-              <Text style={styles.readMoreButton}>
-                {isExpanded ? 'Read Less' : 'Read More'}
+          {shouldTruncate && (
+            <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
+              <Text style={styles.readMore}>
+                {showFullDescription ? 'Show Less' : 'Read More'}
               </Text>
             </TouchableOpacity>
           )}
@@ -90,21 +108,47 @@ export function BookInfo({ book }: BookInfoProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: theme.spacing[5],
+    paddingTop: theme.spacing[4],
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[2],
+  },
+  author: {
+    fontSize: 16,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[1],
+  },
+  narrator: {
+    fontSize: 14,
+    color: theme.colors.text.tertiary,
+    textAlign: 'center',
+    marginBottom: theme.spacing[4],
   },
   metadataRow: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.radius.large,
-    padding: theme.spacing[4],
+    justifyContent: 'center',
+    paddingVertical: theme.spacing[4],
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border.light,
     marginBottom: theme.spacing[4],
   },
   metadataItem: {
-    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing[4],
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.border.light,
   },
   metadataLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
     color: theme.colors.text.tertiary,
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: theme.spacing[1],
   },
@@ -113,44 +157,42 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
-  genresScroll: {
-    marginBottom: theme.spacing[4],
-    marginHorizontal: -theme.spacing[5],
-  },
   genresContainer: {
-    paddingHorizontal: theme.spacing[5],
-    gap: theme.spacing[2],
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: theme.spacing[4],
+    gap: theme.spacing[2],
   },
   genreTag: {
-    backgroundColor: theme.colors.primary[50],
+    backgroundColor: theme.colors.primary[100],
     paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
     borderRadius: theme.radius.full,
   },
   genreText: {
     fontSize: 13,
+    color: theme.colors.primary[700],
     fontWeight: '500',
-    color: theme.colors.primary[600],
   },
-  aboutSection: {
+  descriptionContainer: {
     marginBottom: theme.spacing[4],
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '600',
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing[3],
+    marginBottom: theme.spacing[2],
   },
   description: {
     fontSize: 15,
     color: theme.colors.text.secondary,
-    lineHeight: 24,
+    lineHeight: 22,
   },
-  readMoreButton: {
+  readMore: {
     fontSize: 15,
-    fontWeight: '600',
     color: theme.colors.primary[500],
+    fontWeight: '600',
     marginTop: theme.spacing[2],
   },
 });

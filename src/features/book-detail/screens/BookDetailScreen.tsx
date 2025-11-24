@@ -47,17 +47,24 @@ export function BookDetailScreen() {
     return <ErrorView message="Failed to load book details" onRetry={refetch} />;
   }
 
-  const metadata = book.media.metadata;
-  const title = metadata.title || 'Unknown Title';
-  const author = metadata.authors?.[0]?.name || 'Unknown Author';
-  const narrator = metadata.narrators?.[0] || null;
-  const genres = metadata.genres || [];
-  const coverUrl = apiClient.getItemCoverUrl(book.id);
-  const chapters = book.media.chapters || [];
-  const currentPosition = book.userMediaProgress?.currentTime || 0;
-  const duration = book.media.duration || 0;
-  const progress = book.userMediaProgress?.progress || 0;
-  const hasProgress = progress > 0 && progress < 1;
+  const metadata = book.media.metadata as any;
+    const title = metadata.title || 'Unknown Title';
+    const author = metadata.authorName || 'Unknown Author';
+    const rawNarrator = metadata.narratorName || '';
+    const narrator = rawNarrator.replace(/^Narrated by\s*/i, '').trim() || null;
+    const genres = metadata.genres || [];
+    const coverUrl = apiClient.getItemCoverUrl(book.id);
+    const chapters = book.media.chapters || [];
+    const currentPosition = book.userMediaProgress?.currentTime || 0;
+    
+    // Duration: try media.duration first, then sum audioFiles
+    let duration = book.media.duration || 0;
+    if (!duration && book.media.audioFiles?.length) {
+      duration = book.media.audioFiles.reduce((sum: number, f: any) => sum + (f.duration || 0), 0);
+    }
+    
+    const progress = book.userMediaProgress?.progress || 0;
+    const hasProgress = progress > 0 && progress < 1;
 
   const handlePlay = async () => {
     try {

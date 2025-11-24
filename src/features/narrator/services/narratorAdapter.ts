@@ -1,58 +1,75 @@
-// import { LibraryItem } from '@/core/types';
+/**
+ * src/features/narrator/services/narratorAdapter.ts
+ * 
+ * Adapter for extracting narrator information from library items.
+ * Uses the narratorName field from API metadata.
+ */
 
-// export interface NarratorInfo {
-//   id: string;
-//   name: string;
-//   bookCount: number;
-//   books: LibraryItem[];
-// }
+import { LibraryItem } from '@/core/types';
+import { getNarratorNames } from '@/shared/utils/metadata';
 
-// export function extractNarrators(items: LibraryItem[]): NarratorInfo[] {
-//   const narratorMap = new Map<string, NarratorInfo>();
+export interface NarratorInfo {
+  id: string;
+  name: string;
+  bookCount: number;
+  books: LibraryItem[];
+}
 
-//   items.forEach((item) => {
-//     const narrators = item.media?.metadata?.narrators || [];
+/**
+ * Extract unique narrators from library items
+ */
+export function extractNarrators(items: LibraryItem[]): NarratorInfo[] {
+  const narratorMap = new Map<string, NarratorInfo>();
 
-//     narrators.forEach((name: string) => {
-//       if (!name || typeof name !== 'string') return;
-//       const trimmed = name.trim();
-//       if (!trimmed) return;
+  items.forEach((item) => {
+    const narratorNames = getNarratorNames(item);
 
-//       const id = trimmed.toLowerCase().replace(/\s+/g, '-');
-//       const existing = narratorMap.get(id);
+    narratorNames.forEach((name: string) => {
+      if (!name || typeof name !== 'string') return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
 
-//       if (existing) {
-//         existing.bookCount++;
-//         existing.books.push(item);
-//       } else {
-//         narratorMap.set(id, {
-//           id,
-//           name: trimmed,
-//           bookCount: 1,
-//           books: [item],
-//         });
-//       }
-//     });
-//   });
+      const id = trimmed.toLowerCase().replace(/\s+/g, '-');
+      const existing = narratorMap.get(id);
 
-//   return Array.from(narratorMap.values());
-// }
+      if (existing) {
+        existing.bookCount++;
+        existing.books.push(item);
+      } else {
+        narratorMap.set(id, {
+          id,
+          name: trimmed,
+          bookCount: 1,
+          books: [item],
+        });
+      }
+    });
+  });
 
-// export function sortNarrators(
-//   narrators: NarratorInfo[],
-//   sortBy: 'name' | 'bookCount' = 'name'
-// ): NarratorInfo[] {
-//   return [...narrators].sort((a, b) => {
-//     if (sortBy === 'bookCount') return b.bookCount - a.bookCount;
-//     return a.name.localeCompare(b.name);
-//   });
-// }
+  return Array.from(narratorMap.values());
+}
 
-// export function filterNarrators(
-//   narrators: NarratorInfo[],
-//   query: string
-// ): NarratorInfo[] {
-//   if (!query.trim()) return narrators;
-//   const lower = query.toLowerCase();
-//   return narrators.filter((n) => n.name.toLowerCase().includes(lower));
-// }
+/**
+ * Sort narrators by name or book count
+ */
+export function sortNarrators(
+  narrators: NarratorInfo[],
+  sortBy: 'name' | 'bookCount' = 'name'
+): NarratorInfo[] {
+  return [...narrators].sort((a, b) => {
+    if (sortBy === 'bookCount') return b.bookCount - a.bookCount;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/**
+ * Filter narrators by search query
+ */
+export function filterNarrators(
+  narrators: NarratorInfo[],
+  query: string
+): NarratorInfo[] {
+  if (!query.trim()) return narrators;
+  const lower = query.toLowerCase();
+  return narrators.filter((n) => n.name.toLowerCase().includes(lower));
+}
