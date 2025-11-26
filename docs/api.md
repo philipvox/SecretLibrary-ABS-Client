@@ -30,6 +30,7 @@ GET /api/libraries/{id}/search?q=     # Search library
 ```
 GET /api/items/{id}                   # Get item details
 GET /api/items/{id}/cover             # Get cover image
+GET /api/items/{id}/file/{ino}        # Download audio file (used for offline)
 ```
 
 ### Authors
@@ -41,6 +42,12 @@ GET /api/authors/{id}/image           # Get author image
 ### Series
 ```
 GET /api/series/{id}                  # Get series details
+```
+
+### Collections
+```
+GET /api/collections                  # List all collections
+GET /api/collections/{id}             # Get collection with items
 ```
 
 ### Progress
@@ -89,6 +96,21 @@ interface PaginatedResponse<T> {
 }
 ```
 
+## Download URLs
+
+For offline downloads, construct URLs with token param:
+```ts
+// Audio file download
+const audioUrl = `${serverUrl}/api/items/${itemId}/file/${audioFile.ino}?token=${token}`;
+
+// Cover image download
+const coverUrl = `${serverUrl}/api/items/${itemId}/cover?token=${token}`;
+```
+
 ## Narrator Note
 
 No dedicated narrator endpoint. Narrators are in `item.media.metadata.narratorName` as comma-separated string. Extract and count from library items.
+
+## Collections Note
+
+Collections endpoint returns items with full media data. Use `apiClient.getCollections()` for list and `apiClient.getCollection(id)` for detail with books.

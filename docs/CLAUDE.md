@@ -2,7 +2,7 @@
 
 React Native/Expo app for AudiobookShelf server.
 
-## Current Status (Stage 7 Complete)
+## Current Status (Stage 8 Complete)
 
 **Complete:**
 - ✅ Auth (login, token storage, context)
@@ -18,11 +18,17 @@ React Native/Expo app for AudiobookShelf server.
 - ✅ Browse tab (top tabs: Series | Authors | Narrators | Collections)
 - ✅ Profile tab (user info, server URL, logout)
 - ✅ 4 bottom tabs: Library, Search, Browse, Profile
+- ✅ Offline downloads (expo-file-system)
+- ✅ Download button on BookDetail header & Player menu
+- ✅ Downloads screen (Profile > Storage > Downloads)
+- ✅ Offline playback detection
+- ✅ Streaming/Downloaded indicator in player
 
-**Next (Stage 8):**
-- 🎯 Offline downloads
-- 🎯 Background download manager
-- 🎯 Local storage with expo-file-system
+**Next (Stage 9):**
+- 🎯 Polish and animations
+- 🎯 Error boundaries
+- 🎯 Skeleton loaders
+- 🎯 Pull to refresh everywhere
 
 ## Tech Stack
 
@@ -30,8 +36,9 @@ React Native/Expo app for AudiobookShelf server.
 - TypeScript
 - React Navigation (bottom tabs + stack + top tabs)
 - TanStack Query (data fetching/caching)
-- Zustand (player state)
+- Zustand (player state, download state)
 - expo-av (audio playback)
+- expo-file-system/legacy (offline downloads)
 
 ## Project Structure
 ```
@@ -41,12 +48,13 @@ src/
 │   ├── auth/
 │   ├── authors/
 │   ├── book-detail/
-│   ├── browse/       # NEW: Top tabs for Series/Authors/Narrators/Collections
-│   ├── collections/  # NEW: User collections
+│   ├── browse/
+│   ├── collections/
+│   ├── downloads/    # NEW: Offline download management
 │   ├── library/
-│   ├── narrators/    # NEW: Extracted from library items
+│   ├── narrators/
 │   ├── player/
-│   ├── profile/      # NEW: User profile and settings
+│   ├── profile/
 │   ├── search/
 │   └── series/
 ├── navigation/     # AppNavigator, routes
@@ -74,7 +82,34 @@ Stack Navigator (root)
     ├── AuthorDetail (modal)
     ├── NarratorDetail (modal)
     ├── CollectionDetail (modal)
+    ├── Downloads (modal)
     └── PlayerScreen (fullscreen modal)
+```
+
+## Downloads Feature
+
+**Storage location:** `{documentDirectory}/downloads/{libraryItemId}/`
+**Metadata storage:** AsyncStorage (`downloads_metadata`)
+
+```
+src/features/downloads/
+├── services/downloadService.ts   # File download/storage
+├── stores/downloadStore.ts       # Zustand state
+├── hooks/useDownloads.ts         # React hooks
+├── components/
+│   ├── DownloadButton.tsx        # Progress indicator button
+│   └── DownloadItem.tsx          # List item component
+├── screens/DownloadsScreen.tsx   # Management screen
+└── index.ts
+```
+
+**Usage:**
+```tsx
+import { DownloadButton, useBookDownload } from '@/features/downloads';
+
+// In component
+const { downloaded, downloading, progress } = useBookDownload(bookId);
+<DownloadButton item={book} />
 ```
 
 ## Key Patterns
@@ -86,11 +121,12 @@ features/{name}/
 ├── hooks/         # Data fetching hooks
 ├── screens/       # Screen components
 ├── services/      # Adapters, business logic
+├── stores/        # Zustand stores (if needed)
 └── index.ts       # Public exports
 ```
 
 **Data fetching:** TanStack Query with staleTime caching
-**State:** Zustand for player, React Query for server state
+**State:** Zustand for player + downloads, React Query for server state
 **Navigation:** Type-safe with stack and tab navigators
 
 ## Rules
@@ -99,16 +135,12 @@ features/{name}/
 - No cross-feature imports (use shared/)
 - TypeScript strict mode
 - Export via index.ts barrel files
+- Use expo-file-system/legacy (new API has deprecated methods)
 
 ## Commands
 ```bash
-npm install        # Install dependencies (includes new top-tabs packages)
+npm install        # Install dependencies
 npm start          # Start Expo dev server
-npm run ios        # Run on iOS simulator
+npx expo run:ios   # Run on iOS (native build required for image-colors)
 npm run android    # Run on Android emulator
-```
-
-## New Dependencies (Stage 7)
-```bash
-npm install @react-navigation/material-top-tabs react-native-tab-view react-native-pager-view
 ```
