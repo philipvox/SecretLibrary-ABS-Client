@@ -1,14 +1,16 @@
-// File: src/features/library/screens/LibraryItemsScreen.tsx
+/**
+ * src/features/library/screens/LibraryItemsScreen.tsx
+ */
+
 import React from 'react';
 import {
   View,
-  Text,
   FlatList,
   StyleSheet,
   RefreshControl,
   StatusBar,
 } from 'react-native';
-import { useAuth } from '@/core/auth';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryPrefetch } from '@/core/hooks';
 import { BookCard } from '../components/BookCard';
 import { useDefaultLibrary } from '../hooks/useDefaultLibrary';
@@ -18,39 +20,15 @@ import { LoadingSpinner, ErrorView, EmptyState } from '@/shared/components';
 import { LibraryItem } from '@/core/types';
 import { theme } from '@/shared/theme';
 
-const SCREEN_PADDING = theme.spacing[5];
 const NUM_COLUMNS = 3;
 
-function GreetingHeader() {
-  const { user } = useAuth();
-  
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    
-    if (hour < 12) {
-      return 'Good morning';
-    } else if (hour < 18) {
-      return 'Good afternoon';
-    } else {
-      return 'Good evening';
-    }
-  };
-
-  return (
-    <View style={styles.greetingContainer}>
-      <Text style={styles.greeting}>{getGreeting()}</Text>
-      <Text style={styles.subGreeting}>We have some fantastic books for you.</Text>
-    </View>
-  );
-}
-
 export function LibraryItemsScreen() {
+  const insets = useSafeAreaInsets();
   const { library, isLoading: isLoadingLibrary, error: libraryError } = useDefaultLibrary();
-  const { items, isLoading: isLoadingItems, error: itemsError, refetch } = useLibraryItems(library?.id || '', {
+  const { items, isLoading: isLoadingItems, error: itemsError, refetch, isRefetching } = useLibraryItems(library?.id || '', {
     limit: 50,
   });
 
-  // Prefetch all data for other tabs
   useLibraryPrefetch(library?.id);
 
   const renderItem = ({ item }: { item: LibraryItem }) => (
@@ -92,27 +70,20 @@ export function LibraryItemsScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
-      <TopNavBar />
+      <View style={{ paddingTop: insets.top }}>
+        <TopNavBar />
+      </View>
       <FlatList
         data={items}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
-        columnWrapperStyle={styles.row}
         contentContainerStyle={styles.listContent}
-        ListHeaderComponent={<GreetingHeader />}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoadingItems}
-            onRefresh={refetch}
-            tintColor={theme.colors.primary[500]}
-          />
-        }
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={12}
-        updateCellsBatchingPeriod={50}
-        windowSize={10}
+        columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+        }
       />
     </View>
   );
@@ -124,27 +95,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.primary,
   },
   listContent: {
-    paddingHorizontal: SCREEN_PADDING,
-    paddingTop: theme.spacing[2],
-    paddingBottom: theme.spacing[32] + 80,
+    paddingHorizontal: theme.spacing[4],
+    paddingTop: theme.spacing[3],
+    paddingBottom: 120,
   },
-  greetingContainer: {
-    paddingBottom: theme.spacing[5],
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
-    letterSpacing: -0.5,
-  },
-  subGreeting: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
-    fontWeight: '400',
-  },
-  row: {
-    justifyContent: 'space-between',
-    paddingBottom: theme.spacing[3],
+  columnWrapper: {
+    justifyContent: 'flex-start',
+    gap: theme.spacing[3],
+    marginBottom: theme.spacing[4],
   },
 });

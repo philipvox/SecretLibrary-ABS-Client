@@ -1,4 +1,7 @@
-// File: src/navigation/components/FloatingTabBar.tsx
+/**
+ * src/navigation/components/FloatingTabBar.tsx
+ */
+
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,18 +11,16 @@ import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
 
 const TAB_ICONS: Record<string, { active: string; inactive: string }> = {
-  LibraryTab: { active: 'flame', inactive: 'flame-outline' },
-  BrowseTab: { active: 'home', inactive: 'home-outline' },
-  ProfileTab: { active: 'bookmark', inactive: 'bookmark-outline' },
+  HomeTab: { active: 'home', inactive: 'home-outline' },
+  LibraryTab: { active: 'library', inactive: 'library-outline' },
+  DiscoverTab: { active: 'compass', inactive: 'compass-outline' },
+  ProfileTab: { active: 'person', inactive: 'person-outline' },
 };
 
 export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { currentBook } = usePlayerStore();
   const hasPlayer = !!currentBook;
-
-  // Filter to only show 3 tabs (exclude SearchTab - it's in top bar now)
-  const visibleRoutes = state.routes.filter(r => r.name !== 'SearchTab');
 
   return (
     <View style={[
@@ -28,9 +29,8 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
       hasPlayer && styles.containerWithPlayer,
     ]}>
       <View style={styles.pill}>
-        {visibleRoutes.map((route, index) => {
-          const originalIndex = state.routes.findIndex(r => r.key === route.key);
-          const isFocused = state.index === originalIndex;
+        {state.routes.map((route, index) => {
+          const isFocused = state.index === index;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -49,7 +49,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
 
           return (
             <React.Fragment key={route.key}>
-              {/* Divider line before non-first items */}
               {index > 0 && <View style={styles.divider} />}
               
               <TouchableOpacity
@@ -59,7 +58,6 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
                 style={styles.tab}
                 activeOpacity={0.7}
               >
-                {/* Selection indicator notch */}
                 {isFocused && <View style={styles.indicator} />}
                 
                 <Icon
@@ -85,7 +83,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   containerWithPlayer: {
-    right:10,
+    right: 60,
   },
   pill: {
     flexDirection: 'row',
@@ -95,9 +93,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 30 },
-    shadowOpacity: 0.35,
-    shadowRadius: 54,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
     elevation: 12,
   },
   tab: {

@@ -23,6 +23,7 @@ import { Icon } from '@/shared/components/Icon';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { DownloadButton } from '@/features/downloads';
+import { LibraryHeartButton } from '@/features/library';
 import { theme } from '@/shared/theme';
 
 type BookDetailRouteParams = {
@@ -91,24 +92,13 @@ export function BookDetailScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.headerButton} 
-          onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.goBack();
-            } else {
-              navigation.navigate('Main' as never);
-            }
-          }}
-        >
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={22} color={theme.colors.text.primary} set="ionicons" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Book Details</Text>
         <View style={styles.headerActions}>
           <DownloadButton item={book} size={22} color={theme.colors.text.secondary} />
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="heart-outline" size={22} color={theme.colors.primary[500]} set="ionicons" />
-          </TouchableOpacity>
+          <LibraryHeartButton bookId={book.id} size="large" variant="plain" />
         </View>
       </View>
 
@@ -253,11 +243,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
   },
   headerButton: {
-    padding: theme.spacing[1],
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 17,
@@ -267,21 +258,28 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.spacing[2],
   },
   scrollView: {
     flex: 1,
   },
   topSection: {
     flexDirection: 'row',
-    padding: theme.spacing[5],
-    gap: theme.spacing[4],
+    paddingHorizontal: theme.spacing[5],
+    paddingTop: theme.spacing[4],
+    paddingBottom: theme.spacing[5],
   },
   coverContainer: {
     width: COVER_SIZE,
-    height: COVER_SIZE,
+    height: COVER_SIZE * 1.1,
     borderRadius: theme.radius.medium,
     overflow: 'hidden',
-    ...theme.elevation.medium,
+    backgroundColor: theme.colors.neutral[200],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   cover: {
     width: '100%',
@@ -289,14 +287,15 @@ const styles = StyleSheet.create({
   },
   infoSide: {
     flex: 1,
-    justifyContent: 'center',
+    marginLeft: theme.spacing[4],
+    paddingTop: theme.spacing[1],
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing[2],
     lineHeight: 26,
+    marginBottom: theme.spacing[2],
   },
   authorLabel: {
     fontSize: 14,
@@ -304,25 +303,24 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing[1],
   },
   authorName: {
+    fontWeight: '600',
     color: theme.colors.text.primary,
-    fontWeight: '500',
   },
   narratorLabel: {
     fontSize: 14,
     color: theme.colors.text.secondary,
-    marginBottom: theme.spacing[2],
   },
   narratorName: {
+    fontWeight: '600',
     color: theme.colors.text.primary,
-    fontWeight: '500',
   },
   tagsSection: {
-    marginTop: 'auto',
+    marginTop: theme.spacing[3],
   },
   tagsLabel: {
     fontSize: 12,
     color: theme.colors.text.tertiary,
-    marginBottom: theme.spacing[1],
+    marginBottom: theme.spacing[2],
   },
   tagsRow: {
     flexDirection: 'row',

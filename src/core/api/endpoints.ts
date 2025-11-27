@@ -19,8 +19,7 @@ export const endpoints = {
   user: {
     me: '/api/me',
     progress: (progressId: string) => `/api/me/progress/${progressId}`,
-    progressAll: '/api/me/progress',
-    listening: '/api/me/listening-sessions',
+    itemsInProgress: '/api/me/items-in-progress',
     listeningStats: '/api/me/listening-stats',
   },
 

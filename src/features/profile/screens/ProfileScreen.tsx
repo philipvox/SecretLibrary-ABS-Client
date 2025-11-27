@@ -20,6 +20,14 @@ import { Button, Card } from '@/shared/components';
 import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
 
+// Safe import - store may not exist yet
+let usePreferencesStore: any;
+try {
+  usePreferencesStore = require('@/features/recommendations').usePreferencesStore;
+} catch {
+  usePreferencesStore = null;
+}
+
 interface SettingsRowProps {
   icon: string;
   label: string;
@@ -61,6 +69,9 @@ export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, serverUrl, logout, isLoading } = useAuth();
   const { downloads, totalStorageUsed, loadDownloads } = useDownloads();
+  
+  // Safe access to preferences store
+  const hasCompletedOnboarding = usePreferencesStore?.() ?.hasCompletedOnboarding ?? false;
 
   useEffect(() => {
     loadDownloads();
@@ -87,6 +98,10 @@ export function ProfileScreen() {
     navigation.navigate('Downloads');
   };
 
+  const handlePreferencesPress = () => {
+    navigation.navigate('Preferences');
+  };
+
   const initials = user?.username
     ? user.username
         .split(' ')
@@ -97,19 +112,15 @@ export function ProfileScreen() {
     : '?';
 
   const formatAccountType = (type?: string) => {
-    if (!type) return 'Unknown';
+    if (!type) return 'User';
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
@@ -118,31 +129,32 @@ export function ProfileScreen() {
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <Text style={styles.username}>{user?.username || 'Unknown User'}</Text>
+          <Text style={styles.username}>{user?.username}</Text>
           <Text style={styles.accountType}>{formatAccountType(user?.type)}</Text>
         </View>
 
         <Card variant="elevated" padding={5} style={styles.card}>
           <Text style={styles.cardTitle}>Account</Text>
+          <SettingsRow icon="server-outline" label="Server" value={serverUrl || ''} />
           <SettingsRow icon="person-outline" label="Username" value={user?.username} />
-          {user?.email && <SettingsRow icon="mail-outline" label="Email" value={user.email} />}
-          <SettingsRow
-            icon="shield-checkmark-outline"
-            label="Account Type"
-            value={formatAccountType(user?.type)}
-          />
         </Card>
 
         <Card variant="elevated" padding={5} style={styles.card}>
-          <Text style={styles.cardTitle}>Server</Text>
-          <SettingsRow icon="server-outline" label="Server URL" value={serverUrl || 'Not connected'} />
-          <SettingsRow icon="checkmark-circle-outline" label="Status" value="Connected" valueColor={theme.colors.status.success} />
+          <Text style={styles.cardTitle}>Recommendations</Text>
+          <SettingsRow 
+            icon="sparkles-outline" 
+            label="Reading Preferences" 
+            value={hasCompletedOnboarding ? 'Configured' : 'Set up'}
+            valueColor={hasCompletedOnboarding ? theme.colors.success?.[500] || '#22c55e' : theme.colors.primary[500]}
+            onPress={handlePreferencesPress}
+            showChevron
+          />
         </Card>
 
         <Card variant="elevated" padding={5} style={styles.card}>
           <Text style={styles.cardTitle}>Storage</Text>
           <SettingsRow
-            icon="cloud-download-outline"
+            icon="download-outline"
             label="Downloads"
             value={`${downloads.length} book${downloads.length !== 1 ? 's' : ''}`}
             onPress={handleDownloadsPress}

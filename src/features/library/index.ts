@@ -1,10 +1,7 @@
-/**
- * src/features/library/index.ts
- *
- * Public API exports for the library feature.
- */
-
-export { LibraryItemsScreen } from './screens/LibraryItemsScreen';
-export { BookCard } from './components/BookCard';
-export { useLibraryItems } from './hooks/useLibraryItems';
+export { MyLibraryScreen } from './screens/MyLibraryScreen';
+export { LibraryBookCard } from './components/LibraryBookCard';
+export { AddToLibraryButton } from './components/AddToLibraryButton';
+export { LibraryHeartButton } from './components/LibraryHeartButton';
+export { useMyLibraryStore } from './stores/myLibraryStore';
 export { useDefaultLibrary } from './hooks/useDefaultLibrary';
+export { useLibraryItems } from './hooks/useLibraryItems';

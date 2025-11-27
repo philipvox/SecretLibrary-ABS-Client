@@ -8,7 +8,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '@/core/auth';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
-import { LibraryItemsScreen } from '@/features/library';
+import { MyLibraryScreen } from '@/features/library';
+import { HomeScreen } from '@/features/home';
 import { BookDetailScreen } from '@/features/book-detail';
 import { SearchScreen } from '@/features/search';
 import { BrowseScreen } from '@/features/browse';
@@ -18,6 +19,7 @@ import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { ProfileScreen } from '@/features/profile';
 import { DownloadsScreen } from '@/features/downloads';
+import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
 import { MiniPlayer, PlayerScreen } from '@/features/player';
 import { SplashScreen } from '@/shared/components/SplashScreen';
 import { FloatingTabBar } from './components/FloatingTabBar';
@@ -33,10 +35,11 @@ function MainTabs() {
         headerShown: false,
         tabBarStyle: { display: 'none' },
       }}
+      initialRouteName="HomeTab"
     >
-      <Tab.Screen name="LibraryTab" component={LibraryItemsScreen} />
-      <Tab.Screen name="SearchTab" component={SearchScreen} />
-      <Tab.Screen name="BrowseTab" component={BrowseScreen} />
+      <Tab.Screen name="HomeTab" component={HomeScreen} />
+      <Tab.Screen name="LibraryTab" component={MyLibraryScreen} />
+      <Tab.Screen name="DiscoverTab" component={BrowseScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -59,11 +62,18 @@ export function AppNavigator() {
             <>
               <Stack.Screen name="Main" component={MainTabs} />
               <Stack.Screen name="BookDetail" component={BookDetailScreen} />
+              <Stack.Screen name="Search" component={SearchScreen} />
               <Stack.Screen name="SeriesDetail" component={SeriesDetailScreen} />
               <Stack.Screen name="AuthorDetail" component={AuthorDetailScreen} />
               <Stack.Screen name="NarratorDetail" component={NarratorDetailScreen} />
               <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
               <Stack.Screen name="Downloads" component={DownloadsScreen} />
+              <Stack.Screen name="Preferences" component={PreferencesScreen} />
+              <Stack.Screen 
+                name="PreferencesOnboarding" 
+                component={PreferencesOnboardingScreen}
+                options={{ presentation: 'modal' }}
+              />
             </>
           )}
         </Stack.Navigator>

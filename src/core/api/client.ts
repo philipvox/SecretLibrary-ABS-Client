@@ -55,11 +55,11 @@ class ApiClient extends BaseApiClient {
     return this.get<User>(endpoints.user.me);
   }
 
-  async getUserProgress(): Promise<MediaProgress[]> {
-    const response = await this.get<{ libraryItemsInProgress: MediaProgress[] }>(
-      endpoints.user.progressAll
+  async getItemsInProgress(): Promise<LibraryItem[]> {
+    const response = await this.get<{ libraryItems: LibraryItem[] }>(
+      endpoints.user.itemsInProgress
     );
-    return response.libraryItemsInProgress || [];
+    return response.libraryItems || [];
   }
 
   // ==================== Libraries ====================
