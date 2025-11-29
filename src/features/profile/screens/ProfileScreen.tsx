@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@/core/auth';
-import { useDownloads, formatBytes } from '@/features/downloads';
+// import { useDownloads, formatBytes } from '@/features/downloads';
 import { Button, Card } from '@/shared/components';
 import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';

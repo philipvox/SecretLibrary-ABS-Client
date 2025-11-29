@@ -20,7 +20,7 @@ export const COLOR_PALETTE = [
   { name: 'Bright Amber', hex: '#FED132', rgb: [254, 209, 50] },
   { name: 'Dark Goldenrod', hex: '#AE8946', rgb: [174, 137, 70] },
   { name: 'Plum', hex: '#EEB1E6', rgb: [238, 177, 230] },
-  { name: 'Black', hex: '#020005', rgb: [2, 0, 5] },
+  { name: 'white', hex: '#fff', rgb: [255, 255, 255] },
   { name: 'Burgundy', hex: '#8B3D3D', rgb: [139, 61, 61] },
   { name: 'Sage', hex: '#A09A78', rgb: [160, 154, 120] },
   { name: 'Steel Blue', hex: '#3D7A9C', rgb: [61, 122, 156] },

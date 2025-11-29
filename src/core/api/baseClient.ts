@@ -80,7 +80,12 @@ export class BaseApiClient {
   getBaseURL(): string {
     return this.baseURL;
   }
-
+    /**
+   * Get current auth token
+   */
+  getAuthToken(): string {
+    return this.authToken;
+  }
   /**
    * Handle API errors and format them consistently
    */

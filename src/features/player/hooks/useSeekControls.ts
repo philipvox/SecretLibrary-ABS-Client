@@ -1,126 +1,206 @@
 /**
  * src/features/player/hooks/useSeekControls.ts
  * 
- * Hook to manage tape-recorder style hold-to-seek behavior
- * With bulletproof cleanup to prevent runaway seeking
+ * Bulletproof hold-to-seek with failsafe cleanup
+ * Fixes Android issues where onPressOut doesn't fire
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
+import { REWIND_STEP, REWIND_INTERVAL, FF_STEP } from '../constants';
 
-interface UseSeekControlsOptions {
-  skipAmount?: number;
-  seekSpeed?: number;
-  seekInterval?: number;
+interface UseSeekControlsReturn {
+  isRewinding: boolean;
+  isFastForwarding: boolean;
+  seekDelta: number;
+  
+  // Tap handlers (for chapter mode)
+  onPrevChapter: () => void;
+  onNextChapter: () => void;
+  
+  // Press handlers (for rewind mode)
+  onRewindPressIn: () => void;
+  onRewindPressOut: () => void;
+  onFFPressIn: () => void;
+  onFFPressOut: () => void;
+  
+  // Emergency stop (call if gesture gets stuck)
+  forceStop: () => void;
 }
 
-export function useSeekControls(options: UseSeekControlsOptions = {}) {
-  const {
-    skipAmount = 30,
-    seekSpeed = 2,
-    seekInterval = 100,
-  } = options;
-
+export function useSeekControls(): UseSeekControlsReturn {
+  const [isRewinding, setIsRewinding] = useState(false);
+  const [isFastForwarding, setIsFastForwarding] = useState(false);
+  const [seekDelta, setSeekDelta] = useState(0);
+  
+  // Store refs
   const position = usePlayerStore(s => s.position);
   const duration = usePlayerStore(s => s.duration);
   const isPlaying = usePlayerStore(s => s.isPlaying);
   const seekTo = usePlayerStore(s => s.seekTo);
   const pause = usePlayerStore(s => s.pause);
   const play = usePlayerStore(s => s.play);
+  const prevChapter = usePlayerStore(s => s.prevChapter);
+  const nextChapter = usePlayerStore(s => s.nextChapter);
   
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekDelta, setSeekDelta] = useState(0);
-  
-  // All mutable state in refs to avoid closure issues
+  // Refs for tracking state without re-renders
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const failsafeRef = useRef<NodeJS.Timeout | null>(null);
   const seekDeltaRef = useRef(0);
   const startPositionRef = useRef(0);
   const wasPlayingRef = useRef(false);
-  const directionRef = useRef<'back' | 'forward'>('forward');
   const durationRef = useRef(duration);
-
-  // Keep duration ref updated
+  const isMountedRef = useRef(true);
+  
+  // Keep duration up to date
   useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
+  
+  // Mark unmounted
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  // Cleanup function
-  const stopSeeking = useCallback(() => {
+  // Force stop everything
+  const forceStop = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (failsafeRef.current) {
+      clearTimeout(failsafeRef.current);
+      failsafeRef.current = null;
+    }
+    
+    if (isMountedRef.current) {
+      setIsRewinding(false);
+      setIsFastForwarding(false);
+      setSeekDelta(0);
+    }
+    
+    seekDeltaRef.current = 0;
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
-    return stopSeeking;
-  }, [stopSeeking]);
+    return forceStop;
+  }, [forceStop]);
 
-  const onSkipBack = useCallback(() => {
-    const newPos = Math.max(0, position - skipAmount);
-    seekTo(newPos);
-  }, [position, skipAmount, seekTo]);
-
-  const onSkipForward = useCallback(() => {
-    const newPos = Math.min(duration, position + skipAmount);
-    seekTo(newPos);
-  }, [position, duration, skipAmount, seekTo]);
-
-  const onSeekStart = useCallback((direction: 'back' | 'forward') => {
-    // Always stop any existing interval first
-    stopSeeking();
+  // Stop seeking if app goes to background
+  useEffect(() => {
+    const handleAppState = (state: AppStateStatus) => {
+      if (state !== 'active') {
+        forceStop();
+      }
+    };
     
-    // Initialize
-    directionRef.current = direction;
-    seekDeltaRef.current = 0;
-    startPositionRef.current = position;
+    const subscription = AppState.addEventListener('change', handleAppState);
+    return () => subscription.remove();
+  }, [forceStop]);
+
+  // Start seeking in a direction
+  const startSeeking = useCallback(async (direction: 'back' | 'forward') => {
+    // Stop any existing seek
+    forceStop();
+    
+    // Save state
     wasPlayingRef.current = isPlaying;
+    startPositionRef.current = position;
+    seekDeltaRef.current = 0;
     
-    setIsSeeking(true);
+    if (direction === 'back') {
+      setIsRewinding(true);
+    } else {
+      setIsFastForwarding(true);
+    }
     setSeekDelta(0);
     
     // Pause during seek
-    pause();
+    await pause();
     
-    // Create new interval
+    const step = direction === 'forward' ? FF_STEP : -REWIND_STEP;
+    
+    // Start interval
     intervalRef.current = setInterval(() => {
-      const delta = directionRef.current === 'forward' ? seekSpeed : -seekSpeed;
-      seekDeltaRef.current += delta;
+      seekDeltaRef.current += step;
       
-      const newPosition = Math.max(0, Math.min(durationRef.current, startPositionRef.current + seekDeltaRef.current));
+      const newPosition = Math.max(0, Math.min(
+        durationRef.current,
+        startPositionRef.current + seekDeltaRef.current
+      ));
       
-      setSeekDelta(seekDeltaRef.current);
+      if (isMountedRef.current) {
+        setSeekDelta(seekDeltaRef.current);
+      }
+      
       seekTo(newPosition);
-    }, seekInterval);
+      
+      // Stop at boundaries
+      if (newPosition <= 0 || newPosition >= durationRef.current) {
+        forceStop();
+      }
+    }, REWIND_INTERVAL);
     
-  }, [position, isPlaying, pause, seekTo, seekSpeed, seekInterval, stopSeeking]);
+    // Failsafe: auto-stop after 60 seconds max
+    failsafeRef.current = setTimeout(() => {
+      console.warn('[SeekControls] Failsafe triggered - stopping seek');
+      forceStop();
+    }, 60000);
+    
+  }, [isPlaying, position, pause, seekTo, forceStop]);
 
-  const onSeekEnd = useCallback(() => {
-    // Stop the interval
-    stopSeeking();
-    
-    const finalPosition = Math.max(0, Math.min(durationRef.current, startPositionRef.current + seekDeltaRef.current));
+  // Stop seeking
+  const stopSeeking = useCallback(async () => {
+    const wasSeeking = isRewinding || isFastForwarding;
     const shouldResume = wasPlayingRef.current;
     
-    // Reset
-    setIsSeeking(false);
-    setSeekDelta(0);
-    seekDeltaRef.current = 0;
+    forceStop();
     
-    // Final seek and resume
-    seekTo(finalPosition);
-    if (shouldResume) {
-      play();
+    if (wasSeeking && shouldResume) {
+      await play();
     }
-  }, [seekTo, play, stopSeeking]);
+  }, [isRewinding, isFastForwarding, play, forceStop]);
+
+  // Handler functions
+  const onRewindPressIn = useCallback(() => {
+    startSeeking('back');
+  }, [startSeeking]);
+
+  const onRewindPressOut = useCallback(() => {
+    stopSeeking();
+  }, [stopSeeking]);
+
+  const onFFPressIn = useCallback(() => {
+    startSeeking('forward');
+  }, [startSeeking]);
+
+  const onFFPressOut = useCallback(() => {
+    stopSeeking();
+  }, [stopSeeking]);
+
+  const onPrevChapter = useCallback(() => {
+    prevChapter();
+  }, [prevChapter]);
+
+  const onNextChapter = useCallback(() => {
+    nextChapter();
+  }, [nextChapter]);
 
   return {
-    isSeeking,
+    isRewinding,
+    isFastForwarding,
     seekDelta,
-    onSkipBack,
-    onSkipForward,
-    onSeekStart,
-    onSeekEnd,
+    onPrevChapter,
+    onNextChapter,
+    onRewindPressIn,
+    onRewindPressOut,
+    onFFPressIn,
+    onFFPressOut,
+    forceStop,
   };
 }

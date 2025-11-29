@@ -1,339 +1,442 @@
 /**
- * src/features/player/components/liquid-glass/LiquidGlassSlider.tsx
- * iOS 26 Liquid Glass slider with visible refraction distortion
+ * src/features/player/components/LiquidSlider.tsx
+ * 
+ * Cross-platform liquid glass slider that recreates the Apple aesthetic
+ * without relying on complex SVG tiling.
+ * 
+ * Architecture:
+ * - Single rounded rect track with layered effects
+ * - Native shadows + gradients for the liquid look
+ * - Gesture handler for smooth cross-platform touch
  */
 
-import React, { useCallback } from 'react';
-import { StyleSheet, View, Text, LayoutChangeEvent } from 'react-native';
-import {
-  Canvas,
-  RoundedRect,
-  vec,
-  LinearGradient,
-  Group,
-  BackdropFilter,
-  RuntimeShader,
-  Skia,
-} from '@shopify/react-native-skia';
+import React, { useCallback, useEffect } from 'react';
+import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  useDerivedValue,
   withSpring,
   runOnJS,
+  interpolate,
   clamp,
+  Extrapolation,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Svg, {
+  Defs,
+  LinearGradient,
+  RadialGradient,
+  Stop,
+  Rect,
+  G,
+} from 'react-native-svg';
 
-// Liquid Glass Refraction Shader with visible distortion
-const LIQUID_GLASS_SHADER = Skia.RuntimeEffect.Make(`
-uniform shader image;
-uniform vec2 uSize;
-uniform float uRadius;
-uniform float uRefraction;
-uniform float uAberration;
+// =============================================================================
+// CONSTANTS
+// =============================================================================
 
-// SDF for rounded rectangle / pill
-float sdRoundedBox(vec2 p, vec2 b, float r) {
-  vec2 q = abs(p) - b + r;
-  return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
+const THUMB_WIDTH = 72;
+const THUMB_HEIGHT = 48;
+const TRACK_HEIGHT = THUMB_HEIGHT;
+const TRACK_BORDER_RADIUS = TRACK_HEIGHT / 2;
+const THUMB_BORDER_RADIUS = (THUMB_HEIGHT - 8) / 2;
 
-half4 main(vec2 xy) {
-  vec2 uv = xy / uSize;
-  vec2 center = vec2(0.5, 0.5);
-  vec2 p = uv - center;
-  
-  // Pill shape
-  float r = uRadius;
-  vec2 boxSize = vec2(0.5 - r, 0.5 - r);
-  float d = sdRoundedBox(p, boxSize, r);
-  
-  // Inside mask
-  float inside = 1.0 - smoothstep(-0.005, 0.005, d);
-  
-  // Distance from center (0 at center, 1 at edge)
-  float distFromCenter = length(p) * 2.0;
-  
-  // Lens distortion - parabolic falloff creates magnification
-  // Stronger at edges, pulling inward (barrel distortion)
-  float lensStrength = (1.0 - distFromCenter * distFromCenter) * uRefraction;
-  
-  // Direction from center
-  vec2 dir = normalize(p + 0.0001);
-  
-  // Offset pulls samples toward center = magnification effect
-  vec2 offset = dir * lensStrength * 0.08;
-  
-  // Chromatic aberration - split RGB
-  vec2 offsetR = offset * (1.0 + uAberration * 0.5);
-  vec2 offsetG = offset;
-  vec2 offsetB = offset * (1.0 - uAberration * 0.5);
-  
-  // Sample backdrop with distortion
-  vec2 sampleR = xy - offsetR * uSize;
-  vec2 sampleG = xy - offsetG * uSize;
-  vec2 sampleB = xy - offsetB * uSize;
-  
-  float red = image.eval(sampleR).r;
-  float green = image.eval(sampleG).g;
-  float blue = image.eval(sampleB).b;
-  
-  vec3 col = vec3(red, green, blue);
-  
-  // Brightness boost in center (light focusing)
-  float centerBright = (1.0 - distFromCenter * 0.5) * inside * 0.12;
-  col += centerBright;
-  
-  // Edge fresnel highlight
-  float edge = smoothstep(0.1, 0.0, abs(d)) * inside;
-  float fresnel = pow(edge, 1.5) * 0.2;
-  col += fresnel;
-  
-  // Top specular highlight
-  float topLight = smoothstep(0.2, -0.25, p.y) * inside * 0.12;
-  col += topLight;
-  
-  return half4(col, 1.0);
-}
-`)!;
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 300,
+  mass: 0.8,
+};
 
-interface LiquidGlassSliderProps {
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface LiquidSliderProps {
   value: number;
-  onValueChange: (value: number) => void;
-  minimumValue?: number;
-  maximumValue?: number;
+  min: number;
+  max: number;
   step?: number;
-  thumbWidth?: number;
-  thumbHeight?: number;
-  trackHeight?: number;
-  tint?: 'light' | 'dark';
-  labels?: { value: number; label: string }[];
+  onValueChange: (value: number) => void;
+  onSlidingStart?: () => void;
+  onSlidingComplete?: (value: number) => void;
+  isDark?: boolean;
+  disabled?: boolean;
+  width?: number;
 }
 
-const THUMB_WIDTH = 48;
-const THUMB_HEIGHT = 32;
-const TRACK_HEIGHT = 4;
+// =============================================================================
+// SUB-COMPONENTS
+// =============================================================================
 
-export function LiquidGlassSlider({
-  value,
-  onValueChange,
-  minimumValue = 0,
-  maximumValue = 1,
-  step = 0.05,
-  thumbWidth = THUMB_WIDTH,
-  thumbHeight = THUMB_HEIGHT,
-  trackHeight = TRACK_HEIGHT,
-  tint = 'light',
-  labels,
-}: LiquidGlassSliderProps) {
-  const isLight = tint === 'light';
-  const trackWidth = useSharedValue(280);
-  const thumbX = useSharedValue(0);
-  const pressed = useSharedValue(false);
-  const thumbScale = useSharedValue(1);
-  const startX = useSharedValue(0);
-
-  const trackBg = isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)';
-  const trackFill = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
-  const labelColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
-
-  const updateValue = useCallback((newValue: number) => {
-    onValueChange(newValue);
-  }, [onValueChange]);
-
-  const valueToPosition = (val: number, width: number) => {
-    'worklet';
-    const percent = (val - minimumValue) / (maximumValue - minimumValue);
-    return percent * (width - thumbWidth);
-  };
-
-  const positionToValue = (pos: number, width: number) => {
-    'worklet';
-    const percent = clamp(pos / (width - thumbWidth), 0, 1);
-    const rawValue = minimumValue + percent * (maximumValue - minimumValue);
-    return Math.round(rawValue / step) * step;
-  };
-
-  React.useEffect(() => {
-    const newPos = valueToPosition(value, trackWidth.value);
-    thumbX.value = withSpring(newPos, { damping: 20, stiffness: 300 });
-  }, [value]);
-
-  const gesture = Gesture.Pan()
-    .onBegin(() => {
-      pressed.value = true;
-      thumbScale.value = withSpring(1.05, { damping: 15, stiffness: 400 });
-      startX.value = thumbX.value;
-    })
-    .onUpdate((e) => {
-      const newX = clamp(
-        startX.value + e.translationX,
-        0,
-        trackWidth.value - thumbWidth
-      );
-      thumbX.value = newX;
-      const newValue = positionToValue(newX, trackWidth.value);
-      runOnJS(updateValue)(newValue);
-    })
-    .onEnd(() => {
-      pressed.value = false;
-      thumbScale.value = withSpring(1, { damping: 15, stiffness: 400 });
-    });
-
-  const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: thumbX.value },
-      { scale: thumbScale.value },
-    ],
-  }));
-
-  const fillWidth = useDerivedValue(() => thumbX.value + thumbWidth / 2);
-
-  const onLayout = (e: LayoutChangeEvent) => {
-    const width = e.nativeEvent.layout.width;
-    trackWidth.value = width;
-    thumbX.value = valueToPosition(value, width);
-  };
-
-  const pillRadius = thumbHeight / 2;
-
-  // Shader uniforms - increased refraction for visible effect
-  const shaderUniforms = {
-    uSize: vec(thumbWidth, thumbHeight),
-    uRadius: pillRadius / thumbHeight,
-    uRefraction: 1.0,      // Lens strength
-    uAberration: 0.4,      // Chromatic aberration
-  };
-
+/**
+ * Track background with liquid glass effect
+ * Recreates the layered look from the SVGs using native gradients
+ */
+function TrackBackground({ 
+  width, 
+  height, 
+  isDark 
+}: { 
+  width: number; 
+  height: number; 
+  isDark: boolean;
+}) {
+  const trackBg = isDark 
+    ? 'rgba(255,255,255,0.12)' 
+    : 'rgba(0,0,0,0.08)';
+  
   return (
-    <View style={styles.container} onLayout={onLayout}>
-      {/* Track */}
-      <View style={[styles.trackContainer, { height: thumbHeight }]}>
-        <Canvas style={[styles.track, { height: trackHeight }]}>
-          <RoundedRect
+    <View style={[styles.trackContainer, { width, height }]}>
+      {/* Base track fill */}
+      <View 
+        style={[
+          styles.trackBase, 
+          { 
+            backgroundColor: trackBg,
+            borderRadius: height / 2,
+          }
+        ]} 
+      />
+      
+      {/* Gradient overlay for liquid sheen */}
+      <Svg 
+        width={width} 
+        height={height} 
+        style={StyleSheet.absoluteFill}
+      >
+        <Defs>
+          {/* Top-left highlight (simulates light reflection) */}
+          <RadialGradient
+            id="topHighlight"
+            cx="0.3"
+            cy="0"
+            rx="0.5"
+            ry="1"
+          >
+            <Stop offset="0" stopColor="white" stopOpacity={isDark ? 0.08 : 0.15} />
+            <Stop offset="1" stopColor="white" stopOpacity="0" />
+          </RadialGradient>
+          
+          {/* Bottom-right subtle glow */}
+          <LinearGradient
+            id="bottomGlow"
+            x1="1"
+            y1="1"
+            x2="0.5"
+            y2="0.3"
+          >
+            <Stop offset="0" stopColor="white" stopOpacity={isDark ? 0.04 : 0.08} />
+            <Stop offset="1" stopColor="white" stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        
+        <G>
+          <Rect
             x={0}
             y={0}
-            width={trackWidth}
-            height={trackHeight}
-            r={trackHeight / 2}
-            color={trackBg}
+            width={width}
+            height={height}
+            rx={height / 2}
+            ry={height / 2}
+            fill="url(#topHighlight)"
           />
-          <RoundedRect
+          <Rect
             x={0}
             y={0}
-            width={fillWidth}
-            height={trackHeight}
-            r={trackHeight / 2}
-            color={trackFill}
+            width={width}
+            height={height}
+            rx={height / 2}
+            ry={height / 2}
+            fill="url(#bottomGlow)"
           />
-        </Canvas>
-
-        {/* Liquid Glass Thumb */}
-        <GestureDetector gesture={gesture}>
-          <Animated.View style={[styles.thumbWrapper, thumbAnimatedStyle]}>
-            <View style={[styles.thumbOuter, { width: thumbWidth, height: thumbHeight }]}>
-              <Canvas style={StyleSheet.absoluteFill}>
-                {/* BackdropFilter with refraction shader */}
-                <BackdropFilter
-                  clip={{ x: 0, y: 0, width: thumbWidth, height: thumbHeight }}
-                  filter={
-                    <RuntimeShader
-                      source={LIQUID_GLASS_SHADER}
-                      uniforms={shaderUniforms}
-                    />
-                  }
-                >
-                  <RoundedRect
-                    x={0}
-                    y={0}
-                    width={thumbWidth}
-                    height={thumbHeight}
-                    r={pillRadius}
-                    color="rgba(255,255,255,0.01)"
-                  />
-                </BackdropFilter>
-
-                {/* Top highlight arc */}
-                <RoundedRect
-                  x={3}
-                  y={1.5}
-                  width={thumbWidth - 6}
-                  height={thumbHeight * 0.38}
-                  r={(thumbHeight * 0.38) / 2}
-                >
-                  <LinearGradient
-                    start={vec(thumbWidth / 2, 0)}
-                    end={vec(thumbWidth / 2, thumbHeight * 0.38)}
-                    colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']}
-                  />
-                </RoundedRect>
-
-                {/* Subtle edge border */}
-                <RoundedRect
-                  x={0.5}
-                  y={0.5}
-                  width={thumbWidth - 1}
-                  height={thumbHeight - 1}
-                  r={pillRadius - 0.5}
-                  style="stroke"
-                  strokeWidth={0.5}
-                  color="rgba(255,255,255,0.35)"
-                />
-              </Canvas>
-            </View>
-          </Animated.View>
-        </GestureDetector>
-      </View>
-
-      {/* Labels */}
-      {labels && (
-        <View style={styles.labelsContainer}>
-          {labels.map((item) => (
-            <Text key={item.value} style={[styles.label, { color: labelColor }]}>
-              {item.label}
-            </Text>
-          ))}
-        </View>
-      )}
+        </G>
+      </Svg>
+      
+      {/* Inner shadow effect (inset appearance) */}
+      <View 
+        style={[
+          styles.trackInnerShadow, 
+          { 
+            borderRadius: height / 2,
+            shadowColor: isDark ? '#000' : '#000',
+            shadowOpacity: isDark ? 0.4 : 0.15,
+          }
+        ]} 
+      />
     </View>
   );
 }
 
+/**
+ * Thumb component with liquid glass pill styling
+ */
+function ThumbPill({ isDark }: { isDark: boolean }) {
+  const bgColor = isDark 
+    ? 'rgba(60,60,60,0.95)' 
+    : 'rgba(255,255,255,0.98)';
+  
+  const innerBarColor = isDark
+    ? 'rgba(255,255,255,0.3)'
+    : 'rgba(0,0,0,0.15)';
+    
+  const shadowColor = isDark ? '#000' : '#000';
+  const shadowOpacity = isDark ? 0.5 : 0.2;
+
+  return (
+    <View
+      style={[
+        styles.thumb,
+        {
+          backgroundColor: bgColor,
+          shadowColor,
+          shadowOpacity,
+        },
+      ]}
+    >
+      {/* Inner grip bar */}
+      <View style={[styles.thumbGrip, { backgroundColor: innerBarColor }]} />
+      
+      {/* Top highlight for 3D effect */}
+      <View style={[styles.thumbHighlight, { opacity: isDark ? 0.1 : 0.5 }]} />
+    </View>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+export function LiquidSlider({
+  value,
+  min,
+  max,
+  step = 0.05,
+  onValueChange,
+  onSlidingStart,
+  onSlidingComplete,
+  isDark = false,
+  disabled = false,
+  width: propWidth,
+}: LiquidSliderProps) {
+  // Layout state
+  const trackWidth = useSharedValue(propWidth ?? 300);
+  const maxTranslateX = useSharedValue((propWidth ?? 300) - THUMB_WIDTH);
+  
+  // Gesture state
+  const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
+  const isDragging = useSharedValue(false);
+
+  // ==========================================================================
+  // HELPERS
+  // ==========================================================================
+
+  const valueToPosition = useCallback((val: number, width: number): number => {
+    'worklet';
+    const range = max - min;
+    const normalized = (val - min) / range;
+    const maxX = width - THUMB_WIDTH;
+    return normalized * maxX;
+  }, [min, max]);
+
+  const positionToValue = useCallback((pos: number, width: number): number => {
+    'worklet';
+    const maxX = width - THUMB_WIDTH;
+    const normalized = pos / maxX;
+    const range = max - min;
+    const raw = min + normalized * range;
+    // Snap to step
+    const stepped = Math.round(raw / step) * step;
+    // Clamp to range
+    return Math.min(max, Math.max(min, stepped));
+  }, [min, max, step]);
+
+  // ==========================================================================
+  // SYNC VALUE -> POSITION
+  // ==========================================================================
+
+  useEffect(() => {
+    const pos = valueToPosition(value, trackWidth.value);
+    translateX.value = withSpring(pos, SPRING_CONFIG);
+  }, [value, trackWidth.value]);
+
+  // ==========================================================================
+  // LAYOUT
+  // ==========================================================================
+
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    const newWidth = e.nativeEvent.layout.width;
+    trackWidth.value = newWidth;
+    maxTranslateX.value = newWidth - THUMB_WIDTH;
+    // Update position for current value
+    translateX.value = valueToPosition(value, newWidth);
+  }, [value, valueToPosition]);
+
+  // ==========================================================================
+  // GESTURES
+  // ==========================================================================
+
+  const panGesture = Gesture.Pan()
+    .enabled(!disabled)
+    .onStart(() => {
+      isDragging.value = true;
+      startX.value = translateX.value;
+      if (onSlidingStart) {
+        runOnJS(onSlidingStart)();
+      }
+    })
+    .onUpdate((event) => {
+      const newX = clamp(
+        startX.value + event.translationX,
+        0,
+        maxTranslateX.value
+      );
+      translateX.value = newX;
+      
+      const newValue = positionToValue(newX, trackWidth.value);
+      runOnJS(onValueChange)(newValue);
+    })
+    .onEnd(() => {
+      isDragging.value = false;
+      const finalValue = positionToValue(translateX.value, trackWidth.value);
+      // Snap to final position
+      translateX.value = withSpring(
+        valueToPosition(finalValue, trackWidth.value),
+        SPRING_CONFIG
+      );
+      if (onSlidingComplete) {
+        runOnJS(onSlidingComplete)(finalValue);
+      }
+    });
+
+  // Tap gesture for direct positioning
+  const tapGesture = Gesture.Tap()
+    .enabled(!disabled)
+    .onEnd((event) => {
+      const tapX = event.x - THUMB_WIDTH / 2;
+      const clampedX = clamp(tapX, 0, maxTranslateX.value);
+      
+      if (onSlidingStart) {
+        runOnJS(onSlidingStart)();
+      }
+      
+      translateX.value = withSpring(clampedX, SPRING_CONFIG);
+      const newValue = positionToValue(clampedX, trackWidth.value);
+      runOnJS(onValueChange)(newValue);
+      
+      if (onSlidingComplete) {
+        runOnJS(onSlidingComplete)(newValue);
+      }
+    });
+
+  const composedGesture = Gesture.Race(panGesture, tapGesture);
+
+  // ==========================================================================
+  // ANIMATED STYLES
+  // ==========================================================================
+
+  const thumbAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const thumbScaleStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: isDragging.value ? 1.05 : 1 },
+    ],
+  }));
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  return (
+    <View 
+      style={[styles.container, propWidth ? { width: propWidth } : undefined]}
+      onLayout={propWidth ? undefined : handleLayout}
+    >
+      <GestureDetector gesture={composedGesture}>
+        <View style={styles.touchArea}>
+          {/* Track background */}
+          <TrackBackground 
+            width={propWidth ?? trackWidth.value} 
+            height={TRACK_HEIGHT} 
+            isDark={isDark} 
+          />
+          
+          {/* Animated thumb */}
+          <Animated.View style={[styles.thumbContainer, thumbAnimatedStyle]}>
+            <Animated.View style={thumbScaleStyle}>
+              <ThumbPill isDark={isDark} />
+            </Animated.View>
+          </Animated.View>
+        </View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+// =============================================================================
+// STYLES
+// =============================================================================
+
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-  },
-  trackContainer: {
+    height: TRACK_HEIGHT + 16, // Extra padding for touch
     justifyContent: 'center',
   },
-  track: {
+  touchArea: {
+    height: TRACK_HEIGHT,
+    justifyContent: 'center',
+  },
+  trackContainer: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: '50%',
-    marginTop: -TRACK_HEIGHT / 2,
   },
-  thumbWrapper: {
+  trackBase: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  trackInnerShadow: {
+    ...StyleSheet.absoluteFillObject,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    // Note: Inner shadows aren't native in RN, this creates a subtle top shadow
+    // For true inner shadow, would need additional overlays
+  },
+  thumbContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  thumb: {
+    width: THUMB_WIDTH,
+    height: THUMB_HEIGHT - 8,
+    borderRadius: THUMB_BORDER_RADIUS,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  thumbGrip: {
+    width: THUMB_WIDTH - 24,
+    height: 4,
+    borderRadius: 2,
+  },
+  thumbHighlight: {
     position: 'absolute',
     top: 0,
-  },
-  thumbOuter: {
-    borderRadius: THUMB_HEIGHT / 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  labelsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '500',
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'white',
+    borderTopLeftRadius: THUMB_BORDER_RADIUS,
+    borderTopRightRadius: THUMB_BORDER_RADIUS,
   },
 });
+
+export default LiquidSlider;

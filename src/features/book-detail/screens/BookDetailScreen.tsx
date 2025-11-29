@@ -22,7 +22,7 @@ import { LoadingSpinner, ErrorView } from '@/shared/components';
 import { Icon } from '@/shared/components/Icon';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
-import { DownloadButton } from '@/features/downloads';
+// import { DownloadButton } from '@/features/downloads';
 import { LibraryHeartButton } from '@/features/library';
 import { theme } from '@/shared/theme';
 

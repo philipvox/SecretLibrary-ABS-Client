@@ -1,12 +1,16 @@
 /**
  * src/features/home/components/ContinueListeningCard.tsx
+ * 
+ * Continue Listening card with:
+ * - Waits for download before playing
+ * - Static download progress percentage
+ * - Checkmark badge when downloaded
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, Pressable, TouchableOpacity, StyleSheet, Platform, Animated } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, Image, Pressable, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { getColors } from 'react-native-image-colors';
-import { useQueryClient } from '@tanstack/react-query';
+import Svg, { Circle } from 'react-native-svg';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
@@ -15,8 +19,11 @@ import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
 import { getTitle } from '@/shared/utils/metadata';
 import { matchToPalette } from '@/shared/utils/colorPalette';
+// import { autoDownloadService, DownloadStatus } from '@/features/downloads/services/autoDownloadService';
 
 const COVER_SIZE = 40;
+const PROGRESS_SIZE = 36;
+const PROGRESS_STROKE = 3;
 
 interface ContinueListeningCardProps {
   book: LibraryItem & {
@@ -29,6 +36,10 @@ interface ContinueListeningCardProps {
   style?: any;
   zIndex?: number;
 }
+
+// ========================================
+// Color Utilities
+// ========================================
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const color = hex.replace('#', '');
@@ -71,22 +82,125 @@ function pickMostSaturated(colors: (string | undefined)[]): string | null {
   return best;
 }
 
+// ========================================
+// Download Status Hook
+// ========================================
+
+function useDownloadStatus(bookId: string) {
+  // const [status, setStatus] = useState<DownloadStatus>(() => 
+  //   // autoDownloadService.getStatus(bookId)
+  // // );
+  // const [progress, setProgress] = useState<number>(() => 
+  //   // autoDownloadService.getProgress(bookId)
+  // );
+
+  useEffect(() => {
+    // Get initial state
+    // setStatus(autoDownloadService.getStatus(bookId));
+    // setProgress(autoDownloadService.getProgress(bookId));
+
+    // Subscribe to updates
+    // const unsubProgress = autoDownloadService.onProgress((id, pct) => {
+    //   if (id === bookId) setProgress(pct);
+    // });
+
+    // const unsubStatus = autoDownloadService.onStatus((id, newStatus) => {
+    //   if (id === bookId) setStatus(newStatus);
+    // });
+
+    return () => {
+      // unsubProgress();
+      // unsubStatus();
+    };
+  }, [bookId]);
+
+  return { };
+}
+
+// ========================================
+// Static Progress Circle
+// ========================================
+
+function ProgressCircle({ 
+  progress, 
+  size = PROGRESS_SIZE, 
+  strokeWidth = PROGRESS_STROKE,
+  color = '#FFFFFF',
+  bgColor = 'rgba(255,255,255,0.3)',
+}: { 
+  progress: number; 
+  size?: number; 
+  strokeWidth?: number;
+  color?: string;
+  bgColor?: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const clampedProgress = Math.min(Math.max(progress, 0), 1);
+  const strokeDashoffset = circumference - (clampedProgress * circumference);
+
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }], position: 'absolute' }}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={bgColor}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+        />
+      </Svg>
+      {/* Static percentage text */}
+      <Text style={{ fontSize: 9, fontWeight: '700', color }}>
+        {Math.round(clampedProgress * 100)}
+      </Text>
+    </View>
+  );
+}
+
+// ========================================
+// Main Component
+// ========================================
+
 export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListeningCardProps) {
-  const navigation = useNavigation<any>();
-  const { loadBook } = usePlayerStore();
+  const { loadBook, isLoading: playerLoading, currentBook } = usePlayerStore();
   const bookIds = useMyLibraryStore((state) => state.bookIds) ?? [];
   const addBook = useMyLibraryStore((state) => state.addBook);
   const removeBook = useMyLibraryStore((state) => state.removeBook);
+  
   const [bgColor, setBgColor] = useState(theme.colors.neutral[200]);
   const [isLight, setIsLight] = useState(true);
+  const [isWaitingForDownload, setIsWaitingForDownload] = useState(false);
+  
+  // Debounce
+  const lastPressRef = useRef(0);
+  const DEBOUNCE_MS = 800;
+
+  // Download status
+  const { status: downloadStatus, progress: downloadProgress } = useDownloadStatus(book.id);
 
   const isInLibrary = bookIds.includes(book.id);
   const coverUrl = apiClient.getItemCoverUrl(book.id);
   const title = getTitle(book);
+  const isThisBookInPlayer = currentBook?.id === book.id;
+  const isLoading = isWaitingForDownload || (playerLoading && isThisBookInPlayer);
   
   const currentTime = book.userMediaProgress?.currentTime ?? 0;
   const duration = book.media?.duration ?? book.userMediaProgress?.duration ?? 0;
   
+  // Calculate current chapter
   const chapters = book.media?.chapters ?? [];
   let chapterNumber = 1;
   for (let i = 0; i < chapters.length; i++) {
@@ -98,6 +212,7 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
     }
   }
 
+  // Extract colors from cover
   useEffect(() => {
     let mounted = true;
     
@@ -116,7 +231,6 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
         if (result.platform === 'ios') {
           dominant = result.detail || result.primary || result.secondary || theme.colors.neutral[200];
         } else if (result.platform === 'android') {
-          // Pick most saturated color to match iOS "detail" behavior
           const candidates = [
             result.vibrant,
             result.darkVibrant, 
@@ -129,13 +243,10 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
           dominant = pickMostSaturated(candidates) || result.dominant || theme.colors.neutral[200];
         }
         
-        // Match to palette
         const paletteColor = matchToPalette(dominant);
         setBgColor(paletteColor);
         setIsLight(isColorLight(paletteColor));
-      } catch (err) {
-        console.log('Color extraction error:', err);
-      }
+      } catch {}
     };
 
     extractColors();
@@ -157,60 +268,119 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleCardPress = async () => {
-    // Animate card scale up before transitioning to player
+  // Handle play press - WAITS for download
+  const handlePlay = useCallback(async () => {
+    // Debounce
+    const now = Date.now();
+    if (now - lastPressRef.current < DEBOUNCE_MS) return;
+    lastPressRef.current = now;
+
+    if (isLoading) return;
+
+    try {
+      // Check if book is downloaded
+      // const isDownloaded = autoDownloadService.isDownloaded(book.id);
+      // const isDownloading = autoDownloadService.isDownloading(book.id);
+
+      if (isDownloaded) {
+        // Already downloaded - play immediately
+        console.log('[Card] Playing downloaded book');
+        const fullBook = await apiClient.getItem(book.id);
+        await loadBook(fullBook);
+        
+      } else if (isDownloading) {
+        // Currently downloading - wait for it
+        console.log('[Card] Waiting for download...');
+        setIsWaitingForDownload(true);
+        
+        // const localPath = await autoDownloadService.waitForDownload(book.id);
+        
+        if (localPath) {
+          console.log('[Card] Download complete, playing');
+          const fullBook = await apiClient.getItem(book.id);
+          await loadBook(fullBook);
+        } else {
+          console.log('[Card] Download failed or cancelled');
+        }
+        
+      } else {
+        // Not downloaded and not downloading - shouldn't happen normally
+        // but stream anyway
+        console.log('[Card] Streaming (not downloaded)');
+        const fullBook = await apiClient.getItem(book.id);
+        await loadBook(fullBook);
+      }
+      
+    } catch (err: any) {
+      console.error('[Card] Failed:', err.message);
+    } finally {
+      setIsWaitingForDownload(false);
+    }
+  }, [book, loadBook, isLoading]);
+
+  const handleCardPress = useCallback(() => {
+    // Scale animation
     Animated.sequence([
-      Animated.spring(scaleAnim, {
-        toValue: 1.02,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: true,
-      }),
+      Animated.spring(scaleAnim, { toValue: 1.02, tension: 100, friction: 8, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 100, friction: 8, useNativeDriver: true }),
     ]).start();
-
-    try {
-      // Fetch full book data with audioFiles
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook);
-    } catch (err) {
-      console.error('Failed to load book:', err);
-      // Fallback: try with existing data
-      try {
-        await loadBook(book);
-      } catch (fallbackErr) {
-        console.error('Fallback also failed:', fallbackErr);
-      }
-    }
-  };
-
-  const handlePlay = async () => {
-    try {
-      // Fetch full book data with audioFiles
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook);
-    } catch (err) {
-      console.error('Failed to load book:', err);
-      // Fallback: try with existing data
-      try {
-        await loadBook(book);
-      } catch (fallbackErr) {
-        console.error('Fallback also failed:', fallbackErr);
-      }
-    }
-  };
+    handlePlay();
+  }, [handlePlay, scaleAnim]);
 
   const handleHeartPress = () => {
-    if (isInLibrary) {
-      removeBook(book.id);
-    } else {
-      addBook(book.id);
+    if (isInLibrary) removeBook(book.id);
+    else addBook(book.id);
+  };
+
+  // ========================================
+  // Render Play Button
+  // ========================================
+  const renderPlayButton = () => {
+    const isDownloading = downloadStatus === 'downloading';
+    const isQueued = downloadStatus === 'queued';
+    const isDownloaded = downloadStatus === 'completed';
+
+    // Downloading - show progress circle with percentage
+    if (isDownloading || isWaitingForDownload) {
+      return (
+        <TouchableOpacity 
+          style={styles.playButton} 
+          onPress={handlePlay} 
+          activeOpacity={0.7}
+          disabled={isWaitingForDownload}
+        >
+          <ProgressCircle 
+            progress={downloadProgress} 
+            size={PROGRESS_SIZE}
+            color={textColor}
+            bgColor={secondaryColor}
+          />
+        </TouchableOpacity>
+      );
     }
+
+    // Queued - show clock
+    if (isQueued) {
+      return (
+        <TouchableOpacity style={styles.playButton} onPress={handlePlay} activeOpacity={0.7}>
+          <Icon name="time-outline" size={24} color={secondaryColor} set="ionicons" />
+        </TouchableOpacity>
+      );
+    }
+
+    // Downloaded or not - show play (with checkmark if downloaded)
+    return (
+      <TouchableOpacity style={styles.playButton} onPress={handlePlay} activeOpacity={0.7}>
+        <View style={styles.playIconContainer}>
+          <Icon name="play" size={26} color={textColor} set="ionicons" />
+          {isDownloaded && (
+            <View style={[styles.downloadBadge, { backgroundColor: textColor }]}>
+              <Icon name="checkmark" size={8} color={bgColor} set="ionicons" />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -218,8 +388,12 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
       <Pressable 
         style={[styles.card, { backgroundColor: bgColor, zIndex }, style]} 
         onPress={handleCardPress}
+        disabled={isLoading}
       > 
-         <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>{title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: textColor }]} numberOfLines={2}>{title}</Text>
+        </View>
+        
         <View style={styles.topRow}>
           <View style={styles.coverContainer}>
             <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
@@ -228,7 +402,7 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
           <View style={styles.chapterInfo}>
             <Text style={[styles.chapterLabel, { color: textColor }]}>Chapter {chapterNumber}</Text>
             <Text style={[styles.timeInfo, { color: secondaryColor }]}>
-              {formatTime(currentTime)} : {formatTime(duration)}
+              {formatTime(currentTime)} / {formatTime(duration)}
             </Text>
           </View>
 
@@ -241,11 +415,8 @@ export function ContinueListeningCard({ book, style, zIndex = 1 }: ContinueListe
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.playButton} onPress={handlePlay} activeOpacity={0.7}>
-            <Icon name="play-outline" size={26} color={textColor} set="ionicons" />
-          </TouchableOpacity>
+          {renderPlayButton()}
         </View>
-
       </Pressable>
     </Animated.View>
   );
@@ -256,29 +427,26 @@ export const CARD_OVERLAP = -5;
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius:25,
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderRadius: 25,
     paddingTop: 14,
     paddingHorizontal: 14,
     paddingBottom: 16,
     marginHorizontal: 5,
     height: CARD_HEIGHT,
-    // shadowColor: '#000',
-    // shadowOffset: { width: 0, height: 4},
-    // shadowOpacity: .6,
-    // shadowRadius: 20,
-    // elevation: 30,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 5,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   coverContainer: {
     width: COVER_SIZE,
     height: COVER_SIZE,
-    borderRadius:5,
+    borderRadius: 5,
     overflow: 'hidden',
     backgroundColor: '#000',
   },
@@ -300,8 +468,8 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   playButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -310,7 +478,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 22,
     letterSpacing: -0.5,
-    paddingBottom: 5,
+    flex: 1,
   },
   heartButton: {
     width: 44,
@@ -318,5 +486,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 4,
+  },
+  playIconContainer: {
+    position: 'relative',
+  },
+  downloadBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

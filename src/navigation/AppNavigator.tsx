@@ -18,7 +18,7 @@ import { AuthorDetailScreen } from '@/features/author';
 import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { ProfileScreen } from '@/features/profile';
-import { DownloadsScreen } from '@/features/downloads';
+// import { DownloadsScreen } from '@/features/downloads';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
 import { MiniPlayer, PlayerScreen } from '@/features/player';
 import { SplashScreen } from '@/shared/components/SplashScreen';
@@ -67,7 +67,7 @@ export function AppNavigator() {
               <Stack.Screen name="AuthorDetail" component={AuthorDetailScreen} />
               <Stack.Screen name="NarratorDetail" component={NarratorDetailScreen} />
               <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
-              <Stack.Screen name="Downloads" component={DownloadsScreen} />
+              {/*<Stack.Screen name="Downloads" component={DownloadsScreen} />*/}
               <Stack.Screen name="Preferences" component={PreferencesScreen} />
               <Stack.Screen 
                 name="PreferencesOnboarding" 

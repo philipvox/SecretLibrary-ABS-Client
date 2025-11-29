@@ -2,22 +2,13 @@
  * src/features/player/panels/SpeedPanel.tsx
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  runOnJS,
-  clamp,
-} from 'react-native-reanimated';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { LiquidSlider } from '../components/LiquidSlider';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const THUMB_WIDTH = 58;
-const THUMB_HEIGHT = 38;
-const TRACK_HEIGHT = THUMB_HEIGHT;
-const TRACK_PADDING = 4;
+// =============================================================================
+// TYPES
+// =============================================================================
 
 interface SpeedPanelColors {
   text: string;
@@ -33,6 +24,10 @@ interface SpeedPanelProps {
   colors?: SpeedPanelColors;
 }
 
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
 const DEFAULT_COLORS: SpeedPanelColors = {
   text: '#000000',
   textSecondary: 'rgba(0,0,0,0.5)',
@@ -43,20 +38,11 @@ const DEFAULT_COLORS: SpeedPanelColors = {
 const SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 2];
 const MIN_SPEED = 0.75;
 const MAX_SPEED = 2;
+const SPEED_STEP = 0.05;
 
-function valueToPosition(value: number, trackWidth: number): number {
-  'worklet';
-  const usableWidth = trackWidth - THUMB_WIDTH;
-  const progress = (value - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
-  return progress * usableWidth;
-}
-
-function positionToValue(position: number, trackWidth: number): number {
-  'worklet';
-  const usableWidth = trackWidth - THUMB_WIDTH;
-  const progress = position / usableWidth;
-  return MIN_SPEED + progress * (MAX_SPEED - MIN_SPEED);
-}
+// =============================================================================
+// COMPONENT
+// =============================================================================
 
 export function SpeedPanel({ 
   currentSpeed = 1, 
@@ -65,10 +51,6 @@ export function SpeedPanel({
   colors = DEFAULT_COLORS 
 }: SpeedPanelProps) {
   const [tempSpeed, setTempSpeed] = useState(currentSpeed);
-  const [trackWidth, setTrackWidth] = useState(SCREEN_WIDTH - 48);
-  
-  const translateX = useSharedValue(valueToPosition(currentSpeed, trackWidth));
-  const isDragging = useSharedValue(false);
   
   const isLight = !colors.isDark;
   const textColor = colors.text;
@@ -76,212 +58,143 @@ export function SpeedPanel({
   const buttonBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
   const activeButtonBg = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
   const activeButtonText = colors.surface;
-  const trackBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)';
-  const thumbBg = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(40,40,40,0.95)';
-  const thumbShadowColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.4)';
 
-  useEffect(() => {
-    setTempSpeed(currentSpeed);
-    translateX.value = withSpring(valueToPosition(currentSpeed, trackWidth), {
-      damping: 20,
-      stiffness: 300,
-    });
-  }, [currentSpeed, trackWidth]);
+  // ===========================================================================
+  // HANDLERS
+  // ===========================================================================
 
-  const updateSpeed = useCallback((value: number) => {
-    const snapped = Math.round(value * 20) / 20;
-    setTempSpeed(snapped);
+  const handleSliderChange = useCallback((value: number) => {
+    setTempSpeed(value);
   }, []);
 
-  const handleTrackLayout = useCallback((e: LayoutChangeEvent) => {
-    const width = e.nativeEvent.layout.width;
-    setTrackWidth(width);
-    translateX.value = valueToPosition(tempSpeed, width);
-  }, [tempSpeed]);
-
-  const panGesture = Gesture.Pan()
-    .onStart(() => {
-      isDragging.value = true;
-    })
-    .onUpdate((event) => {
-      const maxX = trackWidth - THUMB_WIDTH;
-      translateX.value = clamp(event.translationX + valueToPosition(tempSpeed, trackWidth), 0, maxX);
-      const newValue = positionToValue(translateX.value, trackWidth);
-      runOnJS(updateSpeed)(newValue);
-    })
-    .onEnd(() => {
-      isDragging.value = false;
-      const currentValue = positionToValue(translateX.value, trackWidth);
-      const snapped = Math.round(currentValue * 20) / 20;
-      translateX.value = withSpring(valueToPosition(snapped, trackWidth), {
-        damping: 20,
-        stiffness: 300,
-      });
-    });
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  const handlePresetPress = (speed: number) => {
+  const handlePresetPress = useCallback((speed: number) => {
     setTempSpeed(speed);
-    translateX.value = withSpring(valueToPosition(speed, trackWidth), {
-      damping: 20,
-      stiffness: 300,
-    });
-  };
+  }, []);
 
-  const handleApply = () => {
+  const handleApply = useCallback(() => {
     onSpeedChange(tempSpeed);
     onClose();
+  }, [tempSpeed, onSpeedChange, onClose]);
+
+  // ===========================================================================
+  // HELPERS
+  // ===========================================================================
+
+  const formatSpeed = (speed: number): string => {
+    if (Number.isInteger(speed)) return `${speed}x`;
+    // Remove trailing zeros
+    const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
+    return `${formatted}x`;
   };
 
-  const formatSpeed = (speed: number) => {
-    if (Number.isInteger(speed)) return `${speed}x`;
-    return `${speed.toFixed(2)}x`;
+  const isPresetActive = (preset: number): boolean => {
+    return Math.abs(tempSpeed - preset) < 0.01;
   };
+
+  // ===========================================================================
+  // RENDER
+  // ===========================================================================
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={[styles.label, { color: secondaryColor }]}>PLAYBACK SPEED</Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Text style={[styles.closeIcon, { color: secondaryColor }]}>✕</Text>
-        </TouchableOpacity>
-      </View>
-      
+      {/* Speed Value Display */}
       <Text style={[styles.valueText, { color: textColor }]}>
         {formatSpeed(tempSpeed)}
       </Text>
 
-      <View style={styles.sliderContainer} onLayout={handleTrackLayout}>
-        <View style={[styles.track, { backgroundColor: trackBg }]}>
-          <GestureDetector gesture={panGesture}>
-            <Animated.View 
-              style={[
-                styles.thumb, 
-                thumbStyle,
-                { 
-                  backgroundColor: thumbBg,
-                  shadowColor: thumbShadowColor,
-                }
-              ]}
-            >
-              <View style={[styles.thumbInner, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)' }]} />
-            </Animated.View>
-          </GestureDetector>
-        </View>
+      {/* Slider */}
+      <View style={styles.sliderSection}>
+        <LiquidSlider
+          value={tempSpeed}
+          min={MIN_SPEED}
+          max={MAX_SPEED}
+          step={SPEED_STEP}
+          onValueChange={handleSliderChange}
+          isDark={colors.isDark}
+        />
         
+        {/* Slider Labels */}
         <View style={styles.sliderLabels}>
-          {SPEED_PRESETS.map((speed) => (
-            <Text key={speed} style={[styles.sliderLabel, { color: secondaryColor }]}>
-              {speed}x
+          {SPEED_PRESETS.map((preset) => (
+            <Text 
+              key={preset} 
+              style={[styles.sliderLabel, { color: secondaryColor }]}
+            >
+              {formatSpeed(preset)}
             </Text>
           ))}
         </View>
       </View>
 
+      {/* Preset Buttons */}
       <View style={styles.presetRow}>
-        {SPEED_PRESETS.map((speed) => {
-          const isActive = Math.abs(tempSpeed - speed) < 0.01;
+        {SPEED_PRESETS.map((preset) => {
+          const isActive = isPresetActive(preset);
           return (
             <TouchableOpacity
-              key={speed}
+              key={preset}
               style={[
                 styles.presetButton,
-                { 
-                  backgroundColor: isActive ? activeButtonBg : buttonBg,
-                  borderWidth: isActive ? 0 : 1,
-                  borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)',
-                }
+                { backgroundColor: isActive ? activeButtonBg : buttonBg },
               ]}
-              onPress={() => handlePresetPress(speed)}
+              onPress={() => handlePresetPress(preset)}
+              activeOpacity={0.7}
             >
-              <Text style={[
-                styles.presetText,
-                { color: isActive ? activeButtonText : textColor }
-              ]}>
-                {speed}x
+              <Text
+                style={[
+                  styles.presetText,
+                  { color: isActive ? activeButtonText : textColor },
+                ]}
+              >
+                {formatSpeed(preset)}
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      <View style={styles.applyContainer}>
+      {/* Action Buttons */}
+      <View style={styles.actionRow}>
         <TouchableOpacity
           style={[styles.cancelButton, { backgroundColor: buttonBg }]}
           onPress={onClose}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.cancelButtonText, { color: textColor }]}>Cancel</Text>
+          <Text style={[styles.cancelButtonText, { color: textColor }]}>
+            Cancel
+          </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.applyButton, { backgroundColor: activeButtonBg }]}
           onPress={handleApply}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.applyButtonText, { color: activeButtonText }]}>Apply</Text>
+          <Text style={[styles.applyButtonText, { color: activeButtonText }]}>
+            Apply
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
+// =============================================================================
+// STYLES
+// =============================================================================
+
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    marginHorizontal: -8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeIcon: {
-    fontSize: 18,
-    fontWeight: '400',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   valueText: {
-    fontSize: 56,
+    fontSize: 64,
     fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    marginBottom: 24,
-    marginLeft: -4,
-  },
-  sliderContainer: {
     marginBottom: 24,
   },
-  track: {
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_HEIGHT / 2,
-    justifyContent: 'center',
-    paddingHorizontal: TRACK_PADDING,
-  },
-  thumb: {
-    position: 'absolute',
-    width: THUMB_WIDTH,
-    height: THUMB_HEIGHT - 8,
-    borderRadius: (THUMB_HEIGHT - 8) / 2,
-    marginLeft: TRACK_PADDING,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  thumbInner: {
-    width: THUMB_WIDTH - 16,
-    height: 4,
-    borderRadius: 2,
+  sliderSection: {
+    marginBottom: 24,
   },
   sliderLabels: {
     flexDirection: 'row',
@@ -295,23 +208,22 @@ const styles = StyleSheet.create({
   },
   presetRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 24,
   },
   presetButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   presetText: {
     fontSize: 15,
     fontWeight: '600',
   },
-  applyContainer: {
+  actionRow: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'center',
   },
   cancelButton: {
     paddingVertical: 16,
@@ -333,3 +245,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default SpeedPanel;

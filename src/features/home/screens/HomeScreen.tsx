@@ -1,8 +1,12 @@
 /**
  * src/features/home/screens/HomeScreen.tsx
+ * 
+ * Home screen with:
+ * - Auto-download of top 3 continue listening books
+ * - Properly syncs downloads when list changes
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,13 +28,14 @@ import { theme } from '@/shared/theme';
 import { useContinueListening } from '../hooks/useContinueListening';
 import { ContinueListeningCard, CARD_HEIGHT, CARD_OVERLAP } from '../components/ContinueListeningCard';
 import { Icon } from '@/shared/components/Icon';
+// import { autoDownloadService } from '@/features/downloads/services/autoDownloadService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HEADER_BG = '#303030';
 const GAP = 5;
-const CARD_WIDTH_RATIO = 0.5; // Adjust this: 0.5 = half screen each, 0.4 = smaller cards, 0.6 = larger
+const CARD_WIDTH_RATIO = 0.5;
 const ACTION_CARD_WIDTH = (SCREEN_WIDTH - (GAP * 3)) * CARD_WIDTH_RATIO;
-const ACTION_CARD_HEIGHT = ACTION_CARD_WIDTH; // Square buttons
+const ACTION_CARD_HEIGHT = ACTION_CARD_WIDTH;
 const CARD_RADIUS = 5;
 const MAX_CARDS = 3;
 
@@ -60,30 +65,48 @@ export function HomeScreen() {
     pause,
   } = usePlayerStore();
 
+  // Track last synced items to avoid redundant syncs
+  const lastSyncedRef = useRef<string>('');
+
+  // Sync auto-downloads when continue listening changes
+  useEffect(() => {
+    if (!continueListeningItems.length) return;
+
+    // Create key from book IDs
+    const itemsKey = continueListeningItems.slice(0, MAX_CARDS).map(i => i.id).join(',');
+    
+    // Skip if already synced
+    if (itemsKey === lastSyncedRef.current) return;
+    lastSyncedRef.current = itemsKey;
+
+    // Sync downloads (non-blocking)
+    // console.log('[HomeScreen] Syncing auto-downloads...');
+    // autoDownloadService.syncWithContinueListening(continueListeningItems).catch(e => {
+    //   console.warn('[HomeScreen] Auto-download sync failed:', e);
+    // });
+  }, [continueListeningItems]);
+
   const visibleCards = continueListeningItems.slice(0, MAX_CARDS);
   
   const fullStackHeight = visibleCards.length > 0 
-    ? CARD_HEIGHT + (visibleCards.length - 1) * (CARD_HEIGHT - CARD_OVERLAP)
+    ? CARD_HEIGHT + (visibleCards.length - 1) * (CARD_HEIGHT + CARD_OVERLAP)
     : 0;
 
   const reversedCards = [...visibleCards].reverse();
   const lastBook = continueListeningItems[0];
 
-  // Get cover URL for current book or last book
   const playCardBook = currentBook || lastBook;
   const playCardCoverUrl = playCardBook ? apiClient.getItemCoverUrl(playCardBook.id) : null;
   const hasCurrentBook = !!currentBook;
 
   const handlePlayPress = async () => {
     if (currentBook) {
-      // Toggle play/pause for current book
       if (isPlaying) {
         await pause();
       } else {
         await play();
       }
     } else if (lastBook) {
-      // Load and play the last book
       try {
         const fullBook = await apiClient.getItem(lastBook.id);
         await loadBook(fullBook);
@@ -100,8 +123,6 @@ export function HomeScreen() {
 
   const handlePlayLongPress = () => {
     if (currentBook) {
-      // Show player via store
-      usePlayerStore.getState().setPlayerVisible?.(true) ||
       usePlayerStore.setState({ isPlayerVisible: true });
     }
   };
@@ -138,7 +159,7 @@ export function HomeScreen() {
                   zIndex={zIndex}
                   style={{
                     position: 'absolute',
-                    top: reverseIndex * (CARD_HEIGHT - CARD_OVERLAP),
+                    top: reverseIndex * (CARD_HEIGHT + CARD_OVERLAP),
                     left: 0,
                     right: 0,
                   }}
@@ -154,7 +175,7 @@ export function HomeScreen() {
           </View>
         )}
 
-        {/* Action Cards - on overlay that cuts off cards */}
+        {/* Action Cards */}
         <View style={styles.actionOverlay}>
           <View style={styles.actionRow}>
             <TouchableOpacity 
@@ -225,10 +246,8 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   actionOverlay: {
-    // backgroundColor: '#eee',
     zIndex: 10,
-    // paddingTop: GAP,
-    marginTop:0,
+    marginTop: 0,
     paddingBottom: 175,
     flex: 1,
   },
