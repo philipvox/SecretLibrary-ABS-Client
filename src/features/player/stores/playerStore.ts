@@ -309,8 +309,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         const token = await getAuthToken();
         if (!token) throw new Error('No authentication token');
 
-        const serverUrl = await getServerUrl();
-        if (!serverUrl) throw new Error('No server URL configured');
+        const rawServerUrl = await getServerUrl();
+        if (!rawServerUrl) throw new Error('No server URL configured');
+        const serverUrl = rawServerUrl.replace(/\/+$/, '');
         
         const audioFile = audioFiles[0];
         
@@ -321,7 +322,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           throw new Error('Cannot determine audio file ID');
         }
         
-        audioUrl = `${serverUrl}/api/items/${book.id}/file/${fileId}?token=${token}`;
+        audioUrl = `${serverUrl}/api/items/${book.id}/file/${fileId}?token=${token}`.replace(/([^:]\/)\/+/g, '$1');
         log('Streaming URL:', audioUrl.substring(0, 80) + '...');
       }
 

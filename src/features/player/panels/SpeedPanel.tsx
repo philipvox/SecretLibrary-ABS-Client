@@ -2,9 +2,22 @@
  * src/features/player/panels/SpeedPanel.tsx
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Slider from '@react-native-community/slider';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  runOnJS,
+  clamp,
+} from 'react-native-reanimated';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const THUMB_WIDTH = 58;
+const THUMB_HEIGHT = 38;
+const TRACK_HEIGHT = THUMB_HEIGHT;
+const TRACK_PADDING = 4;
 
 interface SpeedPanelColors {
   text: string;
@@ -28,6 +41,22 @@ const DEFAULT_COLORS: SpeedPanelColors = {
 };
 
 const SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 2];
+const MIN_SPEED = 0.75;
+const MAX_SPEED = 2;
+
+function valueToPosition(value: number, trackWidth: number): number {
+  'worklet';
+  const usableWidth = trackWidth - THUMB_WIDTH;
+  const progress = (value - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+  return progress * usableWidth;
+}
+
+function positionToValue(position: number, trackWidth: number): number {
+  'worklet';
+  const usableWidth = trackWidth - THUMB_WIDTH;
+  const progress = position / usableWidth;
+  return MIN_SPEED + progress * (MAX_SPEED - MIN_SPEED);
+}
 
 export function SpeedPanel({ 
   currentSpeed = 1, 
@@ -35,7 +64,11 @@ export function SpeedPanel({
   onClose, 
   colors = DEFAULT_COLORS 
 }: SpeedPanelProps) {
-  const [tempSpeed, setTempSpeed] = React.useState(currentSpeed);
+  const [tempSpeed, setTempSpeed] = useState(currentSpeed);
+  const [trackWidth, setTrackWidth] = useState(SCREEN_WIDTH - 48);
+  
+  const translateX = useSharedValue(valueToPosition(currentSpeed, trackWidth));
+  const isDragging = useSharedValue(false);
   
   const isLight = !colors.isDark;
   const textColor = colors.text;
@@ -43,14 +76,59 @@ export function SpeedPanel({
   const buttonBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
   const activeButtonBg = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
   const activeButtonText = colors.surface;
-  const thumbColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.4)';
+  const trackBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)';
+  const thumbBg = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(40,40,40,0.95)';
+  const thumbShadowColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.4)';
 
-  React.useEffect(() => {
+  useEffect(() => {
     setTempSpeed(currentSpeed);
-  }, [currentSpeed]);
+    translateX.value = withSpring(valueToPosition(currentSpeed, trackWidth), {
+      damping: 20,
+      stiffness: 300,
+    });
+  }, [currentSpeed, trackWidth]);
 
-  const handleSliderChange = (value: number) => {
-    setTempSpeed(Math.round(value * 20) / 20);
+  const updateSpeed = useCallback((value: number) => {
+    const snapped = Math.round(value * 20) / 20;
+    setTempSpeed(snapped);
+  }, []);
+
+  const handleTrackLayout = useCallback((e: LayoutChangeEvent) => {
+    const width = e.nativeEvent.layout.width;
+    setTrackWidth(width);
+    translateX.value = valueToPosition(tempSpeed, width);
+  }, [tempSpeed]);
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      isDragging.value = true;
+    })
+    .onUpdate((event) => {
+      const maxX = trackWidth - THUMB_WIDTH;
+      translateX.value = clamp(event.translationX + valueToPosition(tempSpeed, trackWidth), 0, maxX);
+      const newValue = positionToValue(translateX.value, trackWidth);
+      runOnJS(updateSpeed)(newValue);
+    })
+    .onEnd(() => {
+      isDragging.value = false;
+      const currentValue = positionToValue(translateX.value, trackWidth);
+      const snapped = Math.round(currentValue * 20) / 20;
+      translateX.value = withSpring(valueToPosition(snapped, trackWidth), {
+        damping: 20,
+        stiffness: 300,
+      });
+    });
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const handlePresetPress = (speed: number) => {
+    setTempSpeed(speed);
+    translateX.value = withSpring(valueToPosition(speed, trackWidth), {
+      damping: 20,
+      stiffness: 300,
+    });
   };
 
   const handleApply = () => {
@@ -58,25 +136,42 @@ export function SpeedPanel({
     onClose();
   };
 
+  const formatSpeed = (speed: number) => {
+    if (Number.isInteger(speed)) return `${speed}x`;
+    return `${speed.toFixed(2)}x`;
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: secondaryColor }]}>PLAYBACK SPEED</Text>
+      <View style={styles.header}>
+        <Text style={[styles.label, { color: secondaryColor }]}>PLAYBACK SPEED</Text>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Text style={[styles.closeIcon, { color: secondaryColor }]}>✕</Text>
+        </TouchableOpacity>
+      </View>
+      
       <Text style={[styles.valueText, { color: textColor }]}>
-        {tempSpeed.toFixed(2)}x
+        {formatSpeed(tempSpeed)}
       </Text>
 
-      <View style={styles.sliderContainer}>
-        <Slider
-          style={styles.slider}
-          value={tempSpeed}
-          onValueChange={handleSliderChange}
-          minimumValue={0.75}
-          maximumValue={2}
-          step={0.05}
-          minimumTrackTintColor={textColor}
-          maximumTrackTintColor={secondaryColor}
-          thumbTintColor={thumbColor}
-        />
+      <View style={styles.sliderContainer} onLayout={handleTrackLayout}>
+        <View style={[styles.track, { backgroundColor: trackBg }]}>
+          <GestureDetector gesture={panGesture}>
+            <Animated.View 
+              style={[
+                styles.thumb, 
+                thumbStyle,
+                { 
+                  backgroundColor: thumbBg,
+                  shadowColor: thumbShadowColor,
+                }
+              ]}
+            >
+              <View style={[styles.thumbInner, { backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)' }]} />
+            </Animated.View>
+          </GestureDetector>
+        </View>
+        
         <View style={styles.sliderLabels}>
           {SPEED_PRESETS.map((speed) => (
             <Text key={speed} style={[styles.sliderLabel, { color: secondaryColor }]}>
@@ -94,9 +189,13 @@ export function SpeedPanel({
               key={speed}
               style={[
                 styles.presetButton,
-                { backgroundColor: isActive ? activeButtonBg : buttonBg }
+                { 
+                  backgroundColor: isActive ? activeButtonBg : buttonBg,
+                  borderWidth: isActive ? 0 : 1,
+                  borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)',
+                }
               ]}
-              onPress={() => setTempSpeed(speed)}
+              onPress={() => handlePresetPress(speed)}
             >
               <Text style={[
                 styles.presetText,
@@ -132,34 +231,67 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: -8,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   label: {
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.5,
-    marginBottom: 4,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  closeIcon: {
+    fontSize: 18,
+    fontWeight: '400',
   },
   valueText: {
     fontSize: 56,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-    marginBottom: 16,
+    marginBottom: 24,
     marginLeft: -4,
   },
   sliderContainer: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
-  slider: {
-    width: '100%',
-    height: 40,
+  track: {
+    height: TRACK_HEIGHT,
+    borderRadius: TRACK_HEIGHT / 2,
+    justifyContent: 'center',
+    paddingHorizontal: TRACK_PADDING,
+  },
+  thumb: {
+    position: 'absolute',
+    width: THUMB_WIDTH,
+    height: THUMB_HEIGHT - 8,
+    borderRadius: (THUMB_HEIGHT - 8) / 2,
+    marginLeft: TRACK_PADDING,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  thumbInner: {
+    width: THUMB_WIDTH - 16,
+    height: 4,
+    borderRadius: 2,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
-    paddingHorizontal: 10,
+    marginTop: 12,
+    paddingHorizontal: 4,
   },
   sliderLabel: {
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '500',
   },
   presetRow: {
     flexDirection: 'row',
@@ -169,37 +301,35 @@ const styles = StyleSheet.create({
   },
   presetButton: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   presetText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   applyContainer: {
-    marginTop: -10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
     alignItems: 'center',
-    paddingBottom: 10,
   },
   cancelButton: {
-    paddingVertical: 26,
-    paddingHorizontal: 40,
-    borderRadius: 100,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 24,
   },
   cancelButtonText: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '600',
   },
   applyButton: {
-    paddingVertical: 50,
-    paddingHorizontal: 37,
-    borderRadius: 100,
-    transform: [{ rotate: '-5deg' }],
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 24,
+    alignItems: 'center',
   },
   applyButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
   },
 });

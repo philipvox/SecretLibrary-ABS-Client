@@ -14,7 +14,7 @@ export const COVER_SIZE = CARD_WIDTH - 20;
 export const RADIUS = 5;
 export const WAVEFORM_WIDTH = CARD_WIDTH - 20;
 export const WAVEFORM_HEIGHT = 35;
-export const NUM_POINTS = 16;
+export const NUM_POINTS = 10;
 
 export const REWIND_STEP = 2; // seconds per tick
 export const REWIND_INTERVAL = 80; // ms between ticks

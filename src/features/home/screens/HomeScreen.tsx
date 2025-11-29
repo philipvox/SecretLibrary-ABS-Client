@@ -31,7 +31,7 @@ const GAP = 5;
 const CARD_WIDTH_RATIO = 0.5; // Adjust this: 0.5 = half screen each, 0.4 = smaller cards, 0.6 = larger
 const ACTION_CARD_WIDTH = (SCREEN_WIDTH - (GAP * 3)) * CARD_WIDTH_RATIO;
 const ACTION_CARD_HEIGHT = ACTION_CARD_WIDTH; // Square buttons
-const CARD_RADIUS = 10;
+const CARD_RADIUS = 5;
 const MAX_CARDS = 3;
 
 function ArrowUpRight({ size = 32, color = '#000000' }: { size?: number; color?: string }) {
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     gap: GAP,
   },
   justForYouCard: {
-    backgroundColor: '#FFE959',
+    backgroundColor: '#CEFF00',
     borderRadius: CARD_RADIUS,
     padding: 14,
     justifyContent: 'space-between',
