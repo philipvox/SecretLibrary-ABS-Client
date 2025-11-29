@@ -2,7 +2,7 @@
  * src/features/player/services/audioService.ts
  * 
  * Audio playback service using expo-audio
- * Exposes player instance for waveform visualization
+ * Optimized for fast streaming playback
  */
 
 import { 
@@ -11,14 +11,14 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 
-interface PlaybackStatus {
+export interface PlaybackState {
   isPlaying: boolean;
   position: number;
   duration: number;
   isBuffering: boolean;
 }
 
-type StatusCallback = (status: PlaybackStatus) => void;
+type StatusCallback = (status: PlaybackState) => void;
 
 class AudioService {
   private player: AudioPlayer | null = null;
@@ -45,61 +45,45 @@ class AudioService {
     }
   }
 
-  /**
-   * Get the player instance for waveform visualization
-   */
   getPlayer(): AudioPlayer | null {
     return this.player;
   }
 
-  /**
-   * Load audio from URL or local file path
-   */
   async loadAudio(url: string, startPosition: number = 0): Promise<void> {
     console.log('[AudioService] Loading:', url.substring(0, 80) + '...');
 
     try {
       await this.unloadAudio();
 
-      // Create player with source
       this.player = createAudioPlayer({ uri: url });
       this.currentUrl = url;
+      this.isLoaded = true;
 
-      // Wait for load via status
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Load timeout')), 30000);
-        
-        this.statusSubscription = this.player!.addListener('playbackStatusUpdate', (status) => {
-          if (status.isLoaded && !this.isLoaded) {
-            this.isLoaded = true;
-            clearTimeout(timeout);
-            
-            // Seek to start position
-            if (startPosition > 0) {
-              this.player?.seekTo(startPosition);
-            }
-            
-            // Apply pending rate
-            if (this.pendingPlaybackRate !== 1.0) {
-              this.player?.setPlaybackRate(this.pendingPlaybackRate);
-            }
-            
-            resolve();
-          }
-          
-          // Forward status updates
-          if (this.isLoaded && this.statusCallback) {
-            this.statusCallback({
-              isPlaying: status.playing,
-              position: status.currentTime,
-              duration: status.duration,
-              isBuffering: status.isBuffering,
-            });
-          }
-        });
+      // Set up status listener
+      this.statusSubscription = this.player.addListener('playbackStatusUpdate', (status) => {
+        if (this.statusCallback) {
+          this.statusCallback({
+            isPlaying: status.playing,
+            position: status.currentTime,
+            duration: status.duration,
+            isBuffering: status.isBuffering,
+          });
+        }
       });
 
-      console.log('[AudioService] Loaded, duration:', this.player?.duration);
+      // Apply playback rate
+      if (this.pendingPlaybackRate !== 1.0) {
+        try {
+          this.player.setPlaybackRate(this.pendingPlaybackRate);
+        } catch {}
+      }
+
+      // Seek if needed
+      if (startPosition > 0) {
+        this.player.seekTo(startPosition);
+      }
+
+      console.log('[AudioService] Ready to play');
     } catch (error) {
       console.error('[AudioService] Load failed:', error);
       this.isLoaded = false;
