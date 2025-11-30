@@ -181,6 +181,51 @@ export function PlayerScreen() {
     seekingPos.current = position;
   }, [position]);
 
+  // ===========================================================================
+  // HANDLERS (must be defined before early return to maintain hooks order)
+  // ===========================================================================
+
+  const handleClose = useCallback(() => {
+    if (rewindInterval.current) clearInterval(rewindInterval.current);
+    if (ffInterval.current) clearInterval(ffInterval.current);
+    setIsRewinding(false);
+    setIsFastForwarding(false);
+    setSeekDelta(0);
+
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 100,
+      useNativeDriver: true,
+    }).start(() => {
+      closePlayer();
+      setIsFlipped(false);
+      setFlipMode('details');
+      flipAnim.setValue(0);
+    });
+  }, [closePlayer, slideAnim, flipAnim]);
+
+  // Navigation handlers for DetailsPanel
+  const handleNavigateToAuthor = useCallback((authorName: string) => {
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate('AuthorDetail' as never, { authorName } as never);
+    }, 150);
+  }, [navigation, handleClose]);
+
+  const handleNavigateToNarrator = useCallback((narratorName: string) => {
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate('NarratorDetail' as never, { narratorName } as never);
+    }, 150);
+  }, [navigation, handleClose]);
+
+  const handleNavigateToSeries = useCallback((seriesName: string) => {
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate('SeriesDetail' as never, { seriesName } as never);
+    }, 150);
+  }, [navigation, handleClose]);
+
   if (!isPlayerVisible || !currentBook) return null;
 
   // Derived values
@@ -213,49 +258,8 @@ export function PlayerScreen() {
   const waveColor = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
 
   // ===========================================================================
-  // HANDLERS
+  // OTHER HANDLERS (after early return)
   // ===========================================================================
-
-  const handleClose = () => {
-    if (rewindInterval.current) clearInterval(rewindInterval.current);
-    if (ffInterval.current) clearInterval(ffInterval.current);
-    setIsRewinding(false);
-    setIsFastForwarding(false);
-    setSeekDelta(0);
-    
-    Animated.timing(slideAnim, {
-      toValue: SCREEN_HEIGHT,
-      duration: 100,
-      useNativeDriver: true,
-    }).start(() => {
-      closePlayer();
-      setIsFlipped(false);
-      setFlipMode('details');
-      flipAnim.setValue(0);
-    });
-  };
-
-  // Navigation handlers for DetailsPanel
-  const handleNavigateToAuthor = useCallback((authorName: string) => {
-    handleClose();
-    setTimeout(() => {
-      navigation.navigate('AuthorDetail' as never, { authorName } as never);
-    }, 150);
-  }, [navigation]);
-
-  const handleNavigateToNarrator = useCallback((narratorName: string) => {
-    handleClose();
-    setTimeout(() => {
-      navigation.navigate('NarratorDetail' as never, { narratorName } as never);
-    }, 150);
-  }, [navigation]);
-
-  const handleNavigateToSeries = useCallback((seriesName: string) => {
-    handleClose();
-    setTimeout(() => {
-      navigation.navigate('SeriesDetail' as never, { seriesName } as never);
-    }, 150);
-  }, [navigation]);
 
   const handleFlip = (mode: FlipMode = 'details') => {
     if (isFlipped && flipMode === mode) {
