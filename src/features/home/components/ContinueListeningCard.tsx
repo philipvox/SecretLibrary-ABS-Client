@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ImageBackground, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, ImageBackground, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { getColors } from 'react-native-image-colors';
 import Svg, { Circle } from 'react-native-svg';
@@ -378,14 +378,23 @@ export function ContinueListeningCard({ book, style, zIndex = 1, onRemove, onPre
     );
   };
 
-  // Top right button - just play/pause
+  // Top right button - play/pause/loading
   const renderTopRightButton = () => {
+    // Show loading indicator when this book is loading
+    if (isLoading) {
+      return (
+        <View style={styles.playButton}>
+          <ActivityIndicator size="small" color={textColor} />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.playButton}>
-        <Icon 
-          name={isThisBookInPlayer && isPlaying ? 'pause' : 'play'} 
-          size={28} 
-          color={textColor} 
+        <Icon
+          name={isThisBookInPlayer && isPlaying ? 'pause' : 'play'}
+          size={28}
+          color={textColor}
         />
       </View>
     );

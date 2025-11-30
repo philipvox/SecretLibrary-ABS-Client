@@ -27,7 +27,7 @@ import { LibraryHeartButton } from '@/features/library';
 import { theme } from '@/shared/theme';
 
 type BookDetailRouteParams = {
-  BookDetail: { bookId: string };
+  BookDetail: { id: string };
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -38,9 +38,9 @@ type TabType = 'overview' | 'chapters' | 'details';
 export function BookDetailScreen() {
   const route = useRoute<RouteProp<BookDetailRouteParams, 'BookDetail'>>();
   const navigation = useNavigation();
-  const { bookId } = route.params;
+  const { id: bookId } = route.params;
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  
+
   const { book, isLoading, error, refetch } = useBookDetails(bookId);
   const { loadBook } = usePlayerStore();
 
