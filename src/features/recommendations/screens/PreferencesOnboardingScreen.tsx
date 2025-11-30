@@ -34,27 +34,27 @@ interface Question {
 }
 
 const MOOD_OPTIONS = [
-  { label: 'Adventurous', value: 'Adventurous', emoji: '🗺️' },
-  { label: 'Relaxing', value: 'Relaxing', emoji: '😌' },
-  { label: 'Thoughtful', value: 'Thoughtful', emoji: '🤔' },
-  { label: 'Escapist', value: 'Escapist', emoji: '🚀' },
-  { label: 'Suspenseful', value: 'Suspenseful', emoji: '😱' },
-  { label: 'Romantic', value: 'Romantic', emoji: '💕' },
-  { label: 'Educational', value: 'Educational', emoji: '📚' },
-  { label: 'Funny', value: 'Funny', emoji: '😂' },
+  { label: 'Adventurous', value: 'Adventurous' },
+  { label: 'Relaxing', value: 'Relaxing' },
+  { label: 'Thoughtful', value: 'Thoughtful' },
+  { label: 'Escapist', value: 'Escapist' },
+  { label: 'Suspenseful', value: 'Suspenseful' },
+  { label: 'Romantic', value: 'Romantic' },
+  { label: 'Educational', value: 'Educational' },
+  { label: 'Funny', value: 'Funny' },
 ];
 
 const LENGTH_OPTIONS = [
-  { label: 'Quick listens (under 8 hours)', value: 'short', emoji: '⚡' },
-  { label: 'Medium (8-20 hours)', value: 'medium', emoji: '📖' },
-  { label: 'Epic journeys (20+ hours)', value: 'long', emoji: '🏔️' },
-  { label: 'No preference', value: 'any', emoji: '🎲' },
+  { label: 'Quick listens (under 8 hours)', value: 'short' },
+  { label: 'Medium (8-20 hours)', value: 'medium' },
+  { label: 'Epic journeys (20+ hours)', value: 'long' },
+  { label: 'No preference', value: 'any' },
 ];
 
 const SERIES_OPTIONS = [
-  { label: 'Yes, I love getting invested!', value: 'true', emoji: '📚' },
-  { label: 'No, standalones for me', value: 'false', emoji: '📕' },
-  { label: 'Both are great', value: 'null', emoji: '🤷' },
+  { label: 'Yes, I love getting invested!', value: 'true' },
+  { label: 'No, standalones for me', value: 'false' },
+  { label: 'Both are great', value: 'null' },
 ];
 
 export function PreferencesOnboardingScreen() {
@@ -128,7 +128,11 @@ export function PreferencesOnboardingScreen() {
   const handleNext = () => {
     if (isLastStep) {
       completeOnboarding();
-      navigation.goBack();
+      // Navigate to recommendations after completing preferences
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }, { name: 'Browse' }],
+      });
     } else {
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
@@ -250,18 +254,15 @@ export function PreferencesOnboardingScreen() {
                 onPress={() => handleOptionPress(option.value)}
                 activeOpacity={0.7}
               >
-                {option.emoji && (
-                  <Text style={styles.optionEmoji}>{option.emoji}</Text>
-                )}
                 <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>
                   {option.label}
                 </Text>
                 {selected && (
-                  <Icon 
-                    name="checkmark-circle" 
-                    size={20} 
-                    color={theme.colors.primary[500]} 
-                    set="ionicons" 
+                  <Icon
+                    name="checkmark-circle"
+                    size={20}
+                    color={theme.colors.primary[500]}
+                    set="ionicons"
                   />
                 )}
               </TouchableOpacity>
@@ -369,10 +370,6 @@ const styles = StyleSheet.create({
   optionSelected: {
     borderColor: theme.colors.primary[500],
     backgroundColor: theme.colors.primary[50],
-  },
-  optionEmoji: {
-    fontSize: 24,
-    marginRight: theme.spacing[3],
   },
   optionLabel: {
     flex: 1,

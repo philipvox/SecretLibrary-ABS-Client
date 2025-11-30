@@ -58,7 +58,7 @@ export function PreferencesScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {!preferences.hasCompletedOnboarding ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>✨</Text>
+            <Icon name="sparkles" size={48} color={theme.colors.primary[400]} set="ionicons" />
             <Text style={styles.emptyTitle}>Set up your preferences</Text>
             <Text style={styles.emptySubtitle}>
               Answer a few questions to get personalized recommendations
@@ -163,11 +163,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 80,
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: theme.spacing[4],
-  },
   emptyTitle: {
+    marginTop: theme.spacing[4],
     fontSize: 20,
     fontWeight: '700',
     color: theme.colors.text.primary,
