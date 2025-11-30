@@ -12,11 +12,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ACCENT = '#CCFF00';
 const BG_COLOR = '#1a1a1a';
+const LOADING_BAR_WIDTH = SCREEN_WIDTH * 0.5;
 
 export function SplashScreen() {
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
-  const dotAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Pulse animation for the logo
@@ -35,20 +36,27 @@ export function SplashScreen() {
       ])
     ).start();
 
-    // Loading dots animation
+    // Progress bar animation (use native driver for better performance)
     Animated.loop(
-      Animated.timing(dotAnim, {
-        toValue: 3,
-        duration: 1500,
-        useNativeDriver: false,
-      })
+      Animated.sequence([
+        Animated.timing(progressAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(progressAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+      ])
     ).start();
   }, []);
 
-  // Loading dots
-  const dots = dotAnim.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: ['', '.', '..', '...'],
+  // Interpolate to actual pixel width
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [LOADING_BAR_WIDTH * 0.2, LOADING_BAR_WIDTH * 0.8],
   });
 
   return (
@@ -67,12 +75,7 @@ export function SplashScreen() {
           <Animated.View
             style={[
               styles.loadingProgress,
-              {
-                width: pulseAnim.interpolate({
-                  inputRange: [0.3, 1],
-                  outputRange: ['20%', '80%'],
-                }),
-              },
+              { width: progressWidth },
             ]}
           />
         </View>
@@ -113,7 +116,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     alignItems: 'center',
-    width: SCREEN_WIDTH * 0.5,
+    width: LOADING_BAR_WIDTH,
   },
   loadingBar: {
     width: '100%',
