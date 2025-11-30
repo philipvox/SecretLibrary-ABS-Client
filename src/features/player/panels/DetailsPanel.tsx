@@ -4,12 +4,13 @@
 
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { formatTime } from '../utils';
 import {
   getAuthorName,
   getNarratorName,
   getDescription,
   getSeriesWithSequence,
+  getPublishedYear,
+  getGenres,
 } from '@/shared/utils/metadata';
 import type { LibraryItem } from '@/core/api';
 
@@ -24,12 +25,18 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
   const textColor = isLight ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)';
   const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
   const descColor = isLight ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.85)';
+  const tagBgColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)';
 
   // Extract metadata using utilities
   const author = getAuthorName(book);
   const narrator = getNarratorName(book);
   const description = getDescription(book);
   const series = getSeriesWithSequence(book);
+  const publishedYear = getPublishedYear(book);
+  const genres = getGenres(book);
+  const metadata = (book?.media?.metadata as any) || {};
+  const publisher = metadata.publisher || null;
+  const language = metadata.language || null;
 
   // Format duration nicely
   const formatDurationLong = (seconds: number): string => {
@@ -42,7 +49,7 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.scroll}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
@@ -71,6 +78,14 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
         </View>
       )}
 
+      {/* Publisher */}
+      {publisher && (
+        <View style={styles.row}>
+          <Text style={[styles.label, { color: secondaryColor }]}>PUBLISHER</Text>
+          <Text style={[styles.value, { color: textColor }]}>{publisher}</Text>
+        </View>
+      )}
+
       {/* Stats Row */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
@@ -83,7 +98,35 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
           <Text style={[styles.label, { color: secondaryColor }]}>CHAPTERS</Text>
           <Text style={[styles.statValue, { color: textColor }]}>{chaptersCount}</Text>
         </View>
+        {publishedYear && (
+          <View style={styles.statItem}>
+            <Text style={[styles.label, { color: secondaryColor }]}>YEAR</Text>
+            <Text style={[styles.statValue, { color: textColor }]}>{publishedYear}</Text>
+          </View>
+        )}
       </View>
+
+      {/* Language */}
+      {language && (
+        <View style={styles.row}>
+          <Text style={[styles.label, { color: secondaryColor }]}>LANGUAGE</Text>
+          <Text style={[styles.value, { color: textColor }]}>{language}</Text>
+        </View>
+      )}
+
+      {/* Genres/Tags */}
+      {genres.length > 0 && (
+        <View style={styles.tagsSection}>
+          <Text style={[styles.label, { color: secondaryColor }]}>GENRES</Text>
+          <View style={styles.tagsRow}>
+            {genres.slice(0, 4).map((genre: string, idx: number) => (
+              <View key={idx} style={[styles.tag, { backgroundColor: tagBgColor }]}>
+                <Text style={[styles.tagText, { color: textColor }]}>{genre}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Description */}
       {description && (
@@ -124,7 +167,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 8,
     marginBottom: 16,
-    gap: 32,
+    gap: 24,
   },
   statItem: {
     flex: 0,
@@ -132,6 +175,24 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: '700',
+  },
+  tagsSection: {
+    marginBottom: 12,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 5,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   descriptionContainer: {
     marginTop: 4,
