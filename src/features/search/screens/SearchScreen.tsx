@@ -1,13 +1,14 @@
 /**
  * src/features/search/screens/SearchScreen.tsx
  *
- * Simplified, fast search screen using library cache
- * - Instant search results from cache
- * - Smart filtering and sorting
- * - Clean, minimal UI
+ * Enhanced search screen with:
+ * - Instant search from library cache
+ * - Previous searches history
+ * - Authors, narrators, series results
+ * - Pre-search filters (expanded by default)
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,9 +21,10 @@ import {
   Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useLibraryCache, getAllGenres, getAllAuthors, getAllSeries, type FilterOptions } from '@/core/cache';
+import { useLibraryCache, getAllGenres, getAllAuthors, getAllSeries, getAllNarrators, type FilterOptions } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
@@ -35,8 +37,12 @@ const ACCENT = '#CCFF00';
 const GAP = 5;
 const CARD_RADIUS = 5;
 
+const SEARCH_HISTORY_KEY = 'search_history_v1';
+const MAX_HISTORY = 10;
+
 type SortOption = 'title' | 'author' | 'dateAdded' | 'duration';
 type FilterTab = 'all' | 'genres' | 'authors' | 'series' | 'duration';
+type ResultTab = 'books' | 'authors' | 'narrators' | 'series';
 
 // Quick duration filters
 const DURATION_FILTERS = [
@@ -55,8 +61,12 @@ export function SearchScreen() {
 
   // Search state
   const [query, setQuery] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true); // Expanded by default
   const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>('all');
+  const [activeResultTab, setActiveResultTab] = useState<ResultTab>('books');
+
+  // Previous searches
+  const [previousSearches, setPreviousSearches] = useState<string[]>([]);
 
   // Filter state
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
@@ -69,12 +79,59 @@ export function SearchScreen() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Get cached data
-  const { filterItems, genres, isLoaded } = useLibraryCache();
+  const { filterItems, isLoaded } = useLibraryCache();
 
   // Get filter options from cache
   const allGenres = useMemo(() => getAllGenres(), [isLoaded]);
-  const allAuthors = useMemo(() => getAllAuthors().slice(0, 50), [isLoaded]);
-  const allSeries = useMemo(() => getAllSeries().slice(0, 50), [isLoaded]);
+  const allAuthors = useMemo(() => getAllAuthors(), [isLoaded]);
+  const allNarrators = useMemo(() => getAllNarrators(), [isLoaded]);
+  const allSeries = useMemo(() => getAllSeries(), [isLoaded]);
+
+  // Load previous searches on mount
+  useEffect(() => {
+    loadPreviousSearches();
+  }, []);
+
+  const loadPreviousSearches = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(SEARCH_HISTORY_KEY);
+      if (stored) {
+        setPreviousSearches(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error('Failed to load search history:', err);
+    }
+  };
+
+  const saveSearch = async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+    try {
+      const updated = [searchQuery, ...previousSearches.filter(s => s !== searchQuery)].slice(0, MAX_HISTORY);
+      setPreviousSearches(updated);
+      await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to save search:', err);
+    }
+  };
+
+  const clearSearchHistory = async () => {
+    try {
+      setPreviousSearches([]);
+      await AsyncStorage.removeItem(SEARCH_HISTORY_KEY);
+    } catch (err) {
+      console.error('Failed to clear search history:', err);
+    }
+  };
+
+  const removeFromHistory = async (searchToRemove: string) => {
+    try {
+      const updated = previousSearches.filter(s => s !== searchToRemove);
+      setPreviousSearches(updated);
+      await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to remove from history:', err);
+    }
+  };
 
   // Build filter options
   const filters: FilterOptions = useMemo(() => ({
@@ -88,14 +145,51 @@ export function SearchScreen() {
     sortOrder,
   }), [query, selectedGenres, selectedAuthors, selectedSeries, durationFilter, sortBy, sortOrder]);
 
-  // Filter results - instant from cache!
-  const results = useMemo(() => {
-    if (!query.trim() && selectedGenres.length === 0 && selectedAuthors.length === 0 &&
-        selectedSeries.length === 0 && !durationFilter.min && !durationFilter.max) {
-      return [];
-    }
+  // Check if we have any active search/filters
+  const hasActiveSearch = query.trim().length > 0 || selectedGenres.length > 0 ||
+    selectedAuthors.length > 0 || selectedSeries.length > 0 ||
+    durationFilter.min !== undefined || durationFilter.max !== undefined;
+
+  // Filter book results - instant from cache!
+  const bookResults = useMemo(() => {
+    if (!hasActiveSearch) return [];
     return filterItems(filters).slice(0, 100);
-  }, [filterItems, filters]);
+  }, [filterItems, filters, hasActiveSearch]);
+
+  // Filter authors matching query
+  const authorResults = useMemo(() => {
+    if (!query.trim()) return [];
+    const lowerQuery = query.toLowerCase();
+    return allAuthors
+      .filter(a => a.name.toLowerCase().includes(lowerQuery))
+      .slice(0, 20);
+  }, [query, allAuthors]);
+
+  // Filter narrators matching query
+  const narratorResults = useMemo(() => {
+    if (!query.trim()) return [];
+    const lowerQuery = query.toLowerCase();
+    return allNarrators
+      .filter(n => n.name.toLowerCase().includes(lowerQuery))
+      .slice(0, 20);
+  }, [query, allNarrators]);
+
+  // Filter series matching query
+  const seriesResults = useMemo(() => {
+    if (!query.trim()) return [];
+    const lowerQuery = query.toLowerCase();
+    return allSeries
+      .filter(s => s.name.toLowerCase().includes(lowerQuery))
+      .slice(0, 20);
+  }, [query, allSeries]);
+
+  // Result counts for tabs
+  const resultCounts = useMemo(() => ({
+    books: bookResults.length,
+    authors: authorResults.length,
+    narrators: narratorResults.length,
+    series: seriesResults.length,
+  }), [bookResults, authorResults, narratorResults, seriesResults]);
 
   // Active filter count
   const activeFilterCount = useMemo(() => {
@@ -120,15 +214,46 @@ export function SearchScreen() {
     inputRef.current?.focus();
   };
 
+  const handleSearch = () => {
+    if (query.trim()) {
+      saveSearch(query.trim());
+      Keyboard.dismiss();
+    }
+  };
+
+  const handlePreviousSearchPress = (search: string) => {
+    setQuery(search);
+    saveSearch(search);
+  };
+
   const handleBookPress = useCallback(async (book: LibraryItem) => {
     Keyboard.dismiss();
+    if (query.trim()) saveSearch(query.trim());
     try {
       const fullBook = await apiClient.getItem(book.id);
       await loadBook(fullBook, { autoPlay: false });
     } catch {
       await loadBook(book, { autoPlay: false });
     }
-  }, [loadBook]);
+  }, [loadBook, query]);
+
+  const handleAuthorPress = (authorName: string) => {
+    Keyboard.dismiss();
+    if (query.trim()) saveSearch(query.trim());
+    navigation.navigate('AuthorDetail', { authorName });
+  };
+
+  const handleNarratorPress = (narratorName: string) => {
+    Keyboard.dismiss();
+    if (query.trim()) saveSearch(query.trim());
+    navigation.navigate('NarratorDetail', { narratorName });
+  };
+
+  const handleSeriesPress = (seriesName: string) => {
+    Keyboard.dismiss();
+    if (query.trim()) saveSearch(query.trim());
+    navigation.navigate('SeriesDetail', { seriesName });
+  };
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres(prev =>
@@ -157,8 +282,10 @@ export function SearchScreen() {
     }
   };
 
-  // Get metadata helper
   const getMetadata = (item: LibraryItem) => (item.media?.metadata as any) || {};
+
+  // Get initials for avatar
+  const getInitials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
   return (
     <View style={styles.container}>
@@ -179,6 +306,7 @@ export function SearchScreen() {
             placeholderTextColor="rgba(255,255,255,0.4)"
             value={query}
             onChangeText={setQuery}
+            onSubmitEditing={handleSearch}
             autoFocus
             returnKeyType="search"
             autoCapitalize="none"
@@ -204,10 +332,9 @@ export function SearchScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Filter Panel */}
+      {/* Filter Panel - expanded by default */}
       {showFilters && (
         <View style={styles.filterPanel}>
-          {/* Filter Tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterTabs}>
             {(['all', 'genres', 'authors', 'series', 'duration'] as FilterTab[]).map(tab => (
               <TouchableOpacity
@@ -222,7 +349,6 @@ export function SearchScreen() {
             ))}
           </ScrollView>
 
-          {/* Sort Options */}
           {activeFilterTab === 'all' && (
             <View style={styles.sortSection}>
               <Text style={styles.sortLabel}>Sort by:</Text>
@@ -237,12 +363,7 @@ export function SearchScreen() {
                       {option === 'dateAdded' ? 'Date' : option.charAt(0).toUpperCase() + option.slice(1)}
                     </Text>
                     {sortBy === option && (
-                      <Icon
-                        name={sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'}
-                        size={12}
-                        color="#000"
-                        set="ionicons"
-                      />
+                      <Icon name={sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'} size={12} color="#000" set="ionicons" />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -250,7 +371,6 @@ export function SearchScreen() {
             </View>
           )}
 
-          {/* Genre Filter */}
           {activeFilterTab === 'genres' && (
             <ScrollView style={styles.filterContent} showsVerticalScrollIndicator={false}>
               <View style={styles.chipGrid}>
@@ -269,11 +389,10 @@ export function SearchScreen() {
             </ScrollView>
           )}
 
-          {/* Author Filter */}
           {activeFilterTab === 'authors' && (
             <ScrollView style={styles.filterContent} showsVerticalScrollIndicator={false}>
               <View style={styles.chipGrid}>
-                {allAuthors.map(author => (
+                {allAuthors.slice(0, 50).map(author => (
                   <TouchableOpacity
                     key={author.name}
                     style={[styles.chip, selectedAuthors.includes(author.name) && styles.chipActive]}
@@ -288,11 +407,10 @@ export function SearchScreen() {
             </ScrollView>
           )}
 
-          {/* Series Filter */}
           {activeFilterTab === 'series' && (
             <ScrollView style={styles.filterContent} showsVerticalScrollIndicator={false}>
               <View style={styles.chipGrid}>
-                {allSeries.map(series => (
+                {allSeries.slice(0, 50).map(series => (
                   <TouchableOpacity
                     key={series.name}
                     style={[styles.chip, selectedSeries.includes(series.name) && styles.chipActive]}
@@ -307,7 +425,6 @@ export function SearchScreen() {
             </ScrollView>
           )}
 
-          {/* Duration Filter */}
           {activeFilterTab === 'duration' && (
             <View style={styles.durationFilters}>
               {DURATION_FILTERS.map((df, idx) => {
@@ -329,6 +446,30 @@ export function SearchScreen() {
         </View>
       )}
 
+      {/* Result type tabs - only show when we have results */}
+      {hasActiveSearch && query.trim().length > 0 && (
+        <View style={styles.resultTabs}>
+          {(['books', 'authors', 'narrators', 'series'] as ResultTab[]).map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.resultTab, activeResultTab === tab && styles.resultTabActive]}
+              onPress={() => setActiveResultTab(tab)}
+            >
+              <Text style={[styles.resultTabText, activeResultTab === tab && styles.resultTabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+              {resultCounts[tab] > 0 && (
+                <View style={[styles.resultTabBadge, activeResultTab === tab && styles.resultTabBadgeActive]}>
+                  <Text style={[styles.resultTabBadgeText, activeResultTab === tab && styles.resultTabBadgeTextActive]}>
+                    {resultCounts[tab]}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Results */}
       <ScrollView
         style={styles.results}
@@ -336,17 +477,65 @@ export function SearchScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Empty state */}
-        {results.length === 0 && query.length === 0 && activeFilterCount === 0 && (
-          <View style={styles.emptyState}>
-            <Icon name="search" size={48} color="rgba(255,255,255,0.2)" set="ionicons" />
-            <Text style={styles.emptyTitle}>Search your library</Text>
-            <Text style={styles.emptySubtitle}>Find books by title, author, or narrator</Text>
+        {/* Empty state - show previous searches */}
+        {!hasActiveSearch && (
+          <View style={styles.emptyStateContainer}>
+            {previousSearches.length > 0 ? (
+              <View style={styles.previousSearches}>
+                <View style={styles.previousSearchesHeader}>
+                  <Text style={styles.previousSearchesTitle}>Recent Searches</Text>
+                  <TouchableOpacity onPress={clearSearchHistory}>
+                    <Text style={styles.clearHistoryText}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+                {previousSearches.map((search, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.previousSearchItem}
+                    onPress={() => handlePreviousSearchPress(search)}
+                  >
+                    <Icon name="time-outline" size={18} color="rgba(255,255,255,0.4)" set="ionicons" />
+                    <Text style={styles.previousSearchText}>{search}</Text>
+                    <TouchableOpacity
+                      style={styles.removeSearchButton}
+                      onPress={() => removeFromHistory(search)}
+                    >
+                      <Icon name="close" size={16} color="rgba(255,255,255,0.3)" set="ionicons" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Icon name="search" size={48} color="rgba(255,255,255,0.2)" set="ionicons" />
+                <Text style={styles.emptyTitle}>Search your library</Text>
+                <Text style={styles.emptySubtitle}>Find books by title, author, narrator, or series</Text>
+              </View>
+            )}
+
+            {/* Quick browse section */}
+            <View style={styles.quickBrowse}>
+              <Text style={styles.quickBrowseTitle}>Quick Browse</Text>
+              <View style={styles.quickBrowseRow}>
+                <TouchableOpacity style={styles.quickBrowseItem} onPress={() => setActiveFilterTab('genres')}>
+                  <Icon name="albums-outline" size={24} color={ACCENT} set="ionicons" />
+                  <Text style={styles.quickBrowseItemText}>Genres</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBrowseItem} onPress={() => setActiveFilterTab('authors')}>
+                  <Icon name="person-outline" size={24} color={ACCENT} set="ionicons" />
+                  <Text style={styles.quickBrowseItemText}>Authors</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBrowseItem} onPress={() => setActiveFilterTab('series')}>
+                  <Icon name="library-outline" size={24} color={ACCENT} set="ionicons" />
+                  <Text style={styles.quickBrowseItemText}>Series</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         )}
 
         {/* No results */}
-        {results.length === 0 && (query.length > 0 || activeFilterCount > 0) && (
+        {hasActiveSearch && activeResultTab === 'books' && bookResults.length === 0 && (
           <View style={styles.emptyState}>
             <Icon name="book-outline" size={48} color="rgba(255,255,255,0.2)" set="ionicons" />
             <Text style={styles.emptyTitle}>No books found</Text>
@@ -354,38 +543,124 @@ export function SearchScreen() {
           </View>
         )}
 
-        {/* Results count */}
-        {results.length > 0 && (
-          <Text style={styles.resultsCount}>{results.length} books</Text>
+        {/* Book Results */}
+        {activeResultTab === 'books' && bookResults.length > 0 && (
+          <>
+            <Text style={styles.resultsCount}>{bookResults.length} books</Text>
+            <View style={styles.grid}>
+              {bookResults.map(book => {
+                const metadata = getMetadata(book);
+                return (
+                  <TouchableOpacity
+                    key={book.id}
+                    style={styles.bookCard}
+                    onPress={() => handleBookPress(book)}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={apiClient.getItemCoverUrl(book.id)}
+                      style={styles.bookCover}
+                      contentFit="cover"
+                      transition={150}
+                    />
+                    <Text style={styles.bookTitle} numberOfLines={2}>
+                      {metadata.title || 'Unknown'}
+                    </Text>
+                    <Text style={styles.bookAuthor} numberOfLines={1}>
+                      {metadata.authorName || 'Unknown'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
         )}
 
-        {/* Results grid */}
-        <View style={styles.grid}>
-          {results.map(book => {
-            const metadata = getMetadata(book);
-            return (
+        {/* Author Results */}
+        {activeResultTab === 'authors' && authorResults.length > 0 && (
+          <View style={styles.entityList}>
+            {authorResults.map(author => (
               <TouchableOpacity
-                key={book.id}
-                style={styles.bookCard}
-                onPress={() => handleBookPress(book)}
-                activeOpacity={0.8}
+                key={author.name}
+                style={styles.entityItem}
+                onPress={() => handleAuthorPress(author.name)}
               >
-                <Image
-                  source={apiClient.getItemCoverUrl(book.id)}
-                  style={styles.bookCover}
-                  contentFit="cover"
-                  transition={150}
-                />
-                <Text style={styles.bookTitle} numberOfLines={2}>
-                  {metadata.title || 'Unknown'}
-                </Text>
-                <Text style={styles.bookAuthor} numberOfLines={1}>
-                  {metadata.authorName || 'Unknown'}
-                </Text>
+                <View style={[styles.entityAvatar, { backgroundColor: ACCENT }]}>
+                  <Text style={styles.entityAvatarText}>{getInitials(author.name)}</Text>
+                </View>
+                <View style={styles.entityInfo}>
+                  <Text style={styles.entityName}>{author.name}</Text>
+                  <Text style={styles.entityMeta}>{author.bookCount} books</Text>
+                </View>
+                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" set="ionicons" />
               </TouchableOpacity>
-            );
-          })}
-        </View>
+            ))}
+          </View>
+        )}
+
+        {/* Narrator Results */}
+        {activeResultTab === 'narrators' && narratorResults.length > 0 && (
+          <View style={styles.entityList}>
+            {narratorResults.map(narrator => (
+              <TouchableOpacity
+                key={narrator.name}
+                style={styles.entityItem}
+                onPress={() => handleNarratorPress(narrator.name)}
+              >
+                <View style={[styles.entityAvatar, { backgroundColor: '#4A90D9' }]}>
+                  <Text style={styles.entityAvatarText}>{getInitials(narrator.name)}</Text>
+                </View>
+                <View style={styles.entityInfo}>
+                  <Text style={styles.entityName}>{narrator.name}</Text>
+                  <Text style={styles.entityMeta}>{narrator.bookCount} books narrated</Text>
+                </View>
+                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" set="ionicons" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Series Results */}
+        {activeResultTab === 'series' && seriesResults.length > 0 && (
+          <View style={styles.entityList}>
+            {seriesResults.map(series => (
+              <TouchableOpacity
+                key={series.name}
+                style={styles.entityItem}
+                onPress={() => handleSeriesPress(series.name)}
+              >
+                <View style={[styles.entityAvatar, { backgroundColor: '#9B59B6' }]}>
+                  <Icon name="library" size={20} color="#FFF" set="ionicons" />
+                </View>
+                <View style={styles.entityInfo}>
+                  <Text style={styles.entityName}>{series.name}</Text>
+                  <Text style={styles.entityMeta}>{series.bookCount} books in series</Text>
+                </View>
+                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" set="ionicons" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Empty states for other tabs */}
+        {activeResultTab === 'authors' && authorResults.length === 0 && hasActiveSearch && (
+          <View style={styles.emptyState}>
+            <Icon name="person-outline" size={48} color="rgba(255,255,255,0.2)" set="ionicons" />
+            <Text style={styles.emptyTitle}>No authors found</Text>
+          </View>
+        )}
+        {activeResultTab === 'narrators' && narratorResults.length === 0 && hasActiveSearch && (
+          <View style={styles.emptyState}>
+            <Icon name="mic-outline" size={48} color="rgba(255,255,255,0.2)" set="ionicons" />
+            <Text style={styles.emptyTitle}>No narrators found</Text>
+          </View>
+        )}
+        {activeResultTab === 'series' && seriesResults.length === 0 && hasActiveSearch && (
+          <View style={styles.emptyState}>
+            <Icon name="library-outline" size={48} color="rgba(255,255,255,0.2)" set="ionicons" />
+            <Text style={styles.emptyTitle}>No series found</Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -568,6 +843,53 @@ const styles = StyleSheet.create({
     color: '#000',
   },
 
+  // Result tabs
+  resultTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: BG_COLOR,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  resultTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 6,
+    borderRadius: 14,
+  },
+  resultTabActive: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  resultTabText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  resultTabTextActive: {
+    color: '#FFFFFF',
+  },
+  resultTabBadge: {
+    marginLeft: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  resultTabBadgeActive: {
+    backgroundColor: ACCENT,
+  },
+  resultTabBadgeText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  resultTabBadgeTextActive: {
+    color: '#000',
+  },
+
   // Results
   results: {
     flex: 1,
@@ -582,9 +904,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: GAP,
   },
+  emptyStateContainer: {
+    paddingHorizontal: 12,
+  },
   emptyState: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: 60,
   },
   emptyTitle: {
     color: '#FFFFFF',
@@ -596,7 +921,74 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     fontSize: 14,
     marginTop: 4,
+    textAlign: 'center',
   },
+
+  // Previous searches
+  previousSearches: {
+    marginBottom: 24,
+  },
+  previousSearchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  previousSearchesTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  clearHistoryText: {
+    color: ACCENT,
+    fontSize: 14,
+  },
+  previousSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  previousSearchText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 15,
+    marginLeft: 12,
+  },
+  removeSearchButton: {
+    padding: 4,
+  },
+
+  // Quick browse
+  quickBrowse: {
+    marginTop: 8,
+  },
+  quickBrowseTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  quickBrowseRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickBrowseItem: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: CARD_COLOR,
+    borderRadius: CARD_RADIUS,
+    paddingVertical: 16,
+    marginHorizontal: 4,
+  },
+  quickBrowseItemText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    marginTop: 8,
+  },
+
+  // Grid
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -621,6 +1013,45 @@ const styles = StyleSheet.create({
   bookAuthor: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 11,
+    marginTop: 2,
+  },
+
+  // Entity list (authors, narrators, series)
+  entityList: {
+    paddingHorizontal: 8,
+  },
+  entityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_COLOR,
+    borderRadius: CARD_RADIUS,
+    padding: 12,
+    marginBottom: 8,
+  },
+  entityAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  entityAvatarText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  entityInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  entityName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  entityMeta: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
     marginTop: 2,
   },
 });
