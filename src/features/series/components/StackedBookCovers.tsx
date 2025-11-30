@@ -1,6 +1,7 @@
 // File: src/features/series/components/StackedBookCovers.tsx
 import React from 'react';
-import { View, Image, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { apiClient } from '@/core/api';
 import { theme } from '@/shared/theme';
 
@@ -102,7 +103,7 @@ export function StackedBookCovers({ bookIds, size }: StackedBookCoversProps) {
           ]}
         >
           <View style={styles.imageWrapper}>
-            <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+            <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={150} />
           </View>
         </View>
       );

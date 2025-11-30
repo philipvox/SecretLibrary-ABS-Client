@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
@@ -86,10 +87,11 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
                 style={styles.similarBook}
                 onPress={() => navigation.navigate('BookDetail' as never, { bookId: item.id } as never)}
               >
-                <Image 
-                  source={{ uri: apiClient.getItemCoverUrl(item.id) }} 
-                  style={styles.similarCover} 
-                  resizeMode="cover"
+                <Image
+                  source={apiClient.getItemCoverUrl(item.id)}
+                  style={styles.similarCover}
+                  contentFit="cover"
+                  transition={200}
                 />
               </TouchableOpacity>
             )}

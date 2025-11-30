@@ -2,14 +2,14 @@
  * src/features/library/screens/LibraryItemsScreen.tsx
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
-  FlatList,
   StyleSheet,
   RefreshControl,
   StatusBar,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryPrefetch } from '@/core/hooks';
 import { BookCard } from '../components/BookCard';
@@ -31,9 +31,13 @@ export function LibraryItemsScreen() {
 
   useLibraryPrefetch(library?.id);
 
-  const renderItem = ({ item }: { item: LibraryItem }) => (
-    <BookCard book={item} />
-  );
+  const renderItem = useCallback(({ item }: { item: LibraryItem }) => (
+    <View style={styles.itemWrapper}>
+      <BookCard book={item} />
+    </View>
+  ), []);
+
+  const keyExtractor = useCallback((item: LibraryItem) => item.id, []);
 
   if (isLoadingLibrary || (isLoadingItems && items.length === 0)) {
     return <LoadingSpinner text="Loading library..." />;
@@ -73,13 +77,13 @@ export function LibraryItemsScreen() {
       <View style={{ paddingTop: insets.top }}>
         <TopNavBar />
       </View>
-      <FlatList
+      <FlashList
         data={items}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         numColumns={NUM_COLUMNS}
+        estimatedItemSize={180}
         contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
@@ -99,9 +103,9 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing[3],
     paddingBottom: 120,
   },
-  columnWrapper: {
-    justifyContent: 'flex-start',
-    gap: theme.spacing[3],
-    marginBottom: theme.spacing[4],
+  itemWrapper: {
+    flex: 1,
+    paddingHorizontal: theme.spacing[1],
+    paddingBottom: theme.spacing[4],
   },
 });

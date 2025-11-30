@@ -3,7 +3,8 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Image, Pressable, Animated, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
@@ -193,10 +194,11 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
               delayLongPress={300}
             >
               {coverUrl && (
-                <Image 
-                  source={{ uri: coverUrl }} 
+                <Image
+                  source={coverUrl}
                   style={styles.playerCover}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  transition={150}
                 />
               )}
               <View style={styles.playerOverlay}>

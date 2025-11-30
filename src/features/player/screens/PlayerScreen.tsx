@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
-  Image,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
@@ -13,6 +12,7 @@ import {
   Text,
   Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getColors } from 'react-native-image-colors';
 import { usePlayerStore } from '../stores/playerStore';
@@ -440,7 +440,7 @@ export function PlayerScreen() {
               pointerEvents={isFlipped ? 'none' : 'auto'}
             >
               <TouchableOpacity onPress={() => handleFlip('details')} activeOpacity={0.9}>
-                <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+                <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={300} />
               </TouchableOpacity>
             </Animated.View>
 

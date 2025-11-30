@@ -5,8 +5,9 @@
  * Uses metadata utility for consistent data extraction.
  */
 
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
@@ -33,7 +34,7 @@ export function SearchResultItem({ item }: SearchResultItemProps) {
     <TouchableOpacity style={styles.container} onPress={handlePress} activeOpacity={0.7}>
       <View style={styles.coverContainer}>
         {coverUrl ? (
-          <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+          <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.cover, styles.placeholderCover]}>
             <Text style={styles.placeholderText}>📖</Text>

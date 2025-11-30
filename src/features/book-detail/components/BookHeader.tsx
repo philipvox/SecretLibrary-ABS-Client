@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { theme } from '@/shared/theme';
@@ -22,7 +23,7 @@ export function BookHeader({ book }: BookHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.coverContainer}>
-        <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+        <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={300} />
       </View>
       
       <Text style={styles.title} numberOfLines={3}>{title}</Text>

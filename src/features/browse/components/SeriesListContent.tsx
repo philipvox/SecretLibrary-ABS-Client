@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, RefreshControl } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { SeriesCard } from '@/features/series';
 import { useSeries } from '@/features/series';
 import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
@@ -45,12 +46,16 @@ export function SeriesListContent() {
         />
       </View>
 
-      <FlatList
+      <FlashList
         data={series}
-        renderItem={({ item }) => <SeriesCard series={item} />}
+        renderItem={({ item }) => (
+          <View style={styles.itemWrapper}>
+            <SeriesCard series={item} />
+          </View>
+        )}
         keyExtractor={(item: SeriesInfo) => item.id}
         numColumns={2}
-        columnWrapperStyle={styles.row}
+        estimatedItemSize={200}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -85,7 +90,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing[5],
     paddingBottom: theme.spacing[32] + 60,
   },
-  row: {
-    justifyContent: 'space-between',
+  itemWrapper: {
+    flex: 1,
+    paddingHorizontal: theme.spacing[1],
   },
 });
