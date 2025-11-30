@@ -1,23 +1,29 @@
 /**
  * src/core/hooks/useAppBootstrap.ts
- * 
- * App startup hook - loads critical data, prefetches rest in background
+ *
+ * App startup hook - cache-first architecture for instant UI
+ * 1. Hydrate from SQLite cache (instant)
+ * 2. Fetch fresh data from network (background)
+ * 3. Update cache with new data
  */
 
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/core/api';
 import { prefetchService } from '@/core/services/prefetchService';
+import { sqliteCache } from '@/core/services/sqliteCache';
 import { LibraryItem } from '@/core/types';
 
 interface BootstrapResult {
   isReady: boolean;
+  isHydrated: boolean;
   error: Error | null;
 }
 
 export function useAppBootstrap(libraryId: string | undefined): BootstrapResult {
   const queryClient = useQueryClient();
   const [isReady, setIsReady] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
@@ -28,10 +34,28 @@ export function useAppBootstrap(libraryId: string | undefined): BootstrapResult 
 
     const bootstrap = async () => {
       try {
-        const staleTime = 10 * 60 * 1000;
+        console.log('[Bootstrap] Starting...');
+        const startTime = Date.now();
 
-        // Load only essential data first (fast)
-        await Promise.all([
+        // ====================================================================
+        // PHASE 1: Hydrate from SQLite cache (instant UI)
+        // ====================================================================
+        const cachedItems = await prefetchService.hydrateFromCache(libraryId);
+
+        if (cachedItems.length > 0) {
+          // We have cached data - show UI immediately!
+          setIsHydrated(true);
+          setIsReady(true);
+          console.log(`[Bootstrap] Hydrated from cache in ${Date.now() - startTime}ms`);
+        }
+
+        // ====================================================================
+        // PHASE 2: Fetch fresh data from network (background)
+        // ====================================================================
+        const staleTime = 30 * 60 * 1000; // 30 minutes
+
+        // Fetch essential data from network
+        const [seriesData, authorsData, collectionsData] = await Promise.all([
           queryClient.fetchQuery({
             queryKey: ['series', libraryId],
             queryFn: () => apiClient.getLibrarySeries(libraryId),
@@ -49,14 +73,33 @@ export function useAppBootstrap(libraryId: string | undefined): BootstrapResult 
           }),
         ]);
 
-        // Mark ready immediately - don't wait for all items
-        setIsReady(true);
+        // Cache series, authors, and collections to SQLite
+        if (seriesData) {
+          await sqliteCache.setSeries(libraryId, seriesData);
+        }
+        if (authorsData) {
+          await sqliteCache.setAuthors(libraryId, authorsData);
+        }
+        if (collectionsData) {
+          await sqliteCache.setCollections(collectionsData);
+        }
 
-        // Prefetch all items in background (non-blocking)
-        prefetchService.prefetchLibrary(libraryId).then((allItems) => {
+        // Mark ready if not already (first run with no cache)
+        if (!isReady) {
+          setIsReady(true);
+        }
+
+        // ====================================================================
+        // PHASE 3: Prefetch all items in background (non-blocking)
+        // ====================================================================
+        prefetchService.prefetchLibrary(libraryId).then(async (allItems) => {
           if (allItems && allItems.length > 0) {
             // Extract and cache narrators from items
-            const narratorMap = new Map<string, { id: string; name: string; bookCount: number; books: LibraryItem[] }>();
+            const narratorMap = new Map<
+              string,
+              { id: string; name: string; bookCount: number; books: LibraryItem[] }
+            >();
+
             allItems.forEach((item) => {
               const narrators = (item.media?.metadata as any)?.narrators || [];
               narrators.forEach((name: string) => {
@@ -73,19 +116,36 @@ export function useAppBootstrap(libraryId: string | undefined): BootstrapResult 
                 }
               });
             });
-            queryClient.setQueryData(['narrators', libraryId], Array.from(narratorMap.values()));
+
+            const narratorsArray = Array.from(narratorMap.values());
+            queryClient.setQueryData(['narrators', libraryId], narratorsArray);
+
+            // Cache narrators to SQLite
+            await sqliteCache.setNarrators(
+              libraryId,
+              narratorsArray.map((n) => ({ id: n.id, name: n.name, bookCount: n.bookCount }))
+            );
           }
         });
 
+        console.log(`[Bootstrap] Complete in ${Date.now() - startTime}ms`);
       } catch (err) {
-        console.error('Bootstrap failed:', err);
+        console.error('[Bootstrap] Failed:', err);
         setError(err as Error);
-        setIsReady(true);
+
+        // Even on error, try to show cached data if available
+        if (!isReady) {
+          const cachedItems = await prefetchService.hydrateFromCache(libraryId);
+          if (cachedItems.length > 0) {
+            setIsHydrated(true);
+          }
+          setIsReady(true);
+        }
       }
     };
 
     bootstrap();
   }, [libraryId, queryClient]);
 
-  return { isReady, error };
+  return { isReady, isHydrated, error };
 }
