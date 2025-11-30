@@ -18,8 +18,8 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/core/api';
+import { useLibraryCache } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
 import { usePreferencesStore } from '@/features/recommendations';
 import { useContinueListening } from '@/features/home/hooks/useContinueListening';
@@ -215,12 +215,8 @@ export function BrowseScreen() {
   // Get continue listening for history context
   const { items: continueItems } = useContinueListening();
 
-  // Fetch all library items
-  const { data: libraryData, isLoading } = useQuery({
-    queryKey: ['library-items-browse'],
-    queryFn: () => apiClient.getLibraryItems(),
-    staleTime: 5 * 60 * 1000,
-  });
+  // Use library cache (already loaded on app startup)
+  const { items: libraryItems, isLoaded, isLoading } = useLibraryCache();
 
   // Extract history context from continue listening
   const historyContext = useMemo(() => {
@@ -247,10 +243,10 @@ export function BrowseScreen() {
 
   // Score and sort all items based on preferences
   const scoredItems = useMemo(() => {
-    const items = libraryData?.results || [];
+    if (!isLoaded || !libraryItems.length) return [];
     const preferences = { favoriteGenres, favoriteAuthors, favoriteNarrators, prefersSeries, preferredLength };
 
-    const scored: ScoredBook[] = items.map((item: LibraryItem) => ({
+    const scored: ScoredBook[] = libraryItems.map((item: LibraryItem) => ({
       item,
       score: scoreBook(
         item,
@@ -266,7 +262,7 @@ export function BrowseScreen() {
     scored.sort((a, b) => b.score - a.score);
 
     return scored;
-  }, [libraryData, favoriteGenres, favoriteAuthors, favoriteNarrators, prefersSeries, preferredLength, historyContext]);
+  }, [libraryItems, isLoaded, favoriteGenres, favoriteAuthors, favoriteNarrators, prefersSeries, preferredLength, historyContext]);
 
   // Filter based on category
   const filteredItems = useMemo(() => {
@@ -341,11 +337,11 @@ export function BrowseScreen() {
     { key: 'long', label: 'Epic' },
   ];
 
-  if (isLoading) {
+  if (isLoading || !isLoaded) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" backgroundColor={BG_COLOR} />
-        <LoadingSpinner text="Finding recommendations..." />
+        <LoadingSpinner text="Loading recommendations..." />
       </View>
     );
   }
@@ -383,7 +379,7 @@ export function BrowseScreen() {
       >
         {processedItems.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📚</Text>
+            <Icon name="library-outline" size={48} color="rgba(255,255,255,0.3)" set="ionicons" />
             <Text style={styles.emptyTitle}>No recommendations yet</Text>
             <Text style={styles.emptySubtitle}>
               Start listening to some books and we'll personalize your recommendations
@@ -503,11 +499,8 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 40,
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
   emptyTitle: {
+    marginTop: 16,
     fontSize: 20,
     fontWeight: '600',
     color: '#FFFFFF',

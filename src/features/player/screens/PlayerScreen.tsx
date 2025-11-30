@@ -2,7 +2,7 @@
  * src/features/player/screens/PlayerScreen.tsx
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { getColors } from 'react-native-image-colors';
 import { usePlayerStore } from '../stores/playerStore';
 import { apiClient } from '@/core/api';
@@ -62,7 +63,8 @@ type FlipMode = 'details' | 'speed' | 'sleep' | 'chapters' | 'settings';
 
 export function PlayerScreen() {
   const insets = useSafeAreaInsets();
-  
+  const navigation = useNavigation();
+
   // UI state
   const [cardColor, setCardColor] = useState(theme.colors.neutral[300]);
   const [isLight, setIsLight] = useState(true);
@@ -232,6 +234,28 @@ export function PlayerScreen() {
       flipAnim.setValue(0);
     });
   };
+
+  // Navigation handlers for DetailsPanel
+  const handleNavigateToAuthor = useCallback((authorName: string) => {
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate('AuthorDetail' as never, { authorName } as never);
+    }, 150);
+  }, [navigation]);
+
+  const handleNavigateToNarrator = useCallback((narratorName: string) => {
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate('NarratorDetail' as never, { narratorName } as never);
+    }, 150);
+  }, [navigation]);
+
+  const handleNavigateToSeries = useCallback((seriesName: string) => {
+    handleClose();
+    setTimeout(() => {
+      navigation.navigate('SeriesDetail' as never, { seriesName } as never);
+    }, 150);
+  }, [navigation]);
 
   const handleFlip = (mode: FlipMode = 'details') => {
     if (isFlipped && flipMode === mode) {
@@ -471,6 +495,9 @@ export function PlayerScreen() {
                   duration={bookDuration}
                   chaptersCount={chapters.length}
                   isLight={isLight}
+                  onNavigateToAuthor={handleNavigateToAuthor}
+                  onNavigateToNarrator={handleNavigateToNarrator}
+                  onNavigateToSeries={handleNavigateToSeries}
                 />
               )}
 
