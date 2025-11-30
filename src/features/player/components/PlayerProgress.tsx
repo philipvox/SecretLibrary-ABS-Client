@@ -2,11 +2,10 @@
  * src/features/player/components/PlayerProgress.tsx
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, Pressable, StyleSheet } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Icon } from '@/shared/components/Icon';
 import { formatSleepTimer } from '../utils';
-import { SCREEN_WIDTH } from '../constants';
 
 interface PlayerProgressProps {
   progress: number;
@@ -37,11 +36,13 @@ export function PlayerProgress({
   onChapterScrub,
   bottomInset,
 }: PlayerProgressProps) {
-  const containerWidth = SCREEN_WIDTH - 32 - 88; // minus padding and buttons
+  const [barWidth, setBarWidth] = useState(200);
+  const currentProgress = progressMode === 'bar' ? progress : chapterProgress;
 
-  const handleProgressPress = (e: any) => {
-    const { locationX } = e.nativeEvent;
-    const percent = Math.max(0, Math.min(1, locationX / containerWidth));
+  const handlePress = (e: any) => {
+    const x = e.nativeEvent.locationX;
+    const percent = Math.max(0, Math.min(1, x / barWidth));
+    
     if (progressMode === 'bar') {
       onProgressScrub(percent);
     } else {
@@ -51,48 +52,34 @@ export function PlayerProgress({
 
   return (
     <View style={[styles.container, { paddingBottom: bottomInset + 8 }]}>
-      {/* Sleep button / countdown */}
-      <TouchableOpacity 
-        style={styles.sideButton}
-        onPress={onSleepPress}
-      >
+      {/* Sleep button */}
+      <TouchableOpacity style={styles.sideButton} onPress={onSleepPress}>
         {sleepTimer !== null ? (
-          <Text style={styles.sleepCountdown}>
-            {formatSleepTimer(sleepTimer)}
-          </Text>
+          <Text style={styles.sleepCountdown}>{formatSleepTimer(sleepTimer)}</Text>
         ) : (
           <Icon name="moon" size={24} color="rgba(255,255,255,0.7)" set="ionicons" />
         )}
       </TouchableOpacity>
 
       {/* Progress bar */}
-      <Pressable 
+      <Pressable
         style={styles.progressContainer}
-        onPress={handleProgressPress}
+        onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+        onPress={handlePress}
       >
-        {/* Background track */}
         <View style={styles.progressTrack} />
-        
-        {/* Filled progress */}
         <View 
           style={[
             styles.progressFill, 
-            { 
-              width: `${(progressMode === 'bar' ? progress : chapterProgress) * 100}%`,
-              backgroundColor: cardColor,
-            }
+            { width: `${currentProgress * 100}%`, backgroundColor: cardColor }
           ]} 
         />
-        
-        {/* Red marker */}
         <View 
           style={[
             styles.progressMarker,
-            { left: `${(progressMode === 'bar' ? progress : chapterProgress) * 100}%` }
+            { left: `${currentProgress * 100}%` }
           ]} 
         />
-
-        {/* Chapter indicator (only in chapter mode) */}
         {progressMode === 'chapters' && (
           <View style={styles.chapterIndicator}>
             <Text style={styles.chapterIndicatorText}>
@@ -103,10 +90,7 @@ export function PlayerProgress({
       </Pressable>
 
       {/* Settings button */}
-      <TouchableOpacity 
-        style={styles.sideButton}
-        onPress={onSettingsPress}
-      >
+      <TouchableOpacity style={styles.sideButton} onPress={onSettingsPress}>
         <Icon name="settings" size={24} color="rgba(255,255,255,0.7)" set="ionicons" />
       </TouchableOpacity>
     </View>
@@ -138,9 +122,8 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     flex: 1,
-    height: 24,
+    height: 44,
     justifyContent: 'center',
-    position: 'relative',
   },
   progressTrack: {
     position: 'absolute',
@@ -163,11 +146,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF3B30',
     borderRadius: 2,
     marginLeft: -2,
+    top: 10,
   },
   chapterIndicator: {
     position: 'absolute',
     right: 0,
-    top: -16,
+    top: -2,
   },
   chapterIndicatorText: {
     fontSize: 10,
@@ -175,3 +159,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default PlayerProgress;

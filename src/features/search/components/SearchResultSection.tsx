@@ -1,8 +1,10 @@
 /**
  * src/features/search/components/SearchResultSection.tsx
+ * 
+ * Search result components with colored card design
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,20 +14,81 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { getColors } from 'react-native-image-colors';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { LibraryHeartButton } from '@/features/library';
+import { usePlayerStore } from '@/features/player';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
 import { getTitle, getAuthorName } from '@/shared/utils/metadata';
+import { matchToPalette } from '@/shared/utils/colorPalette';
+import { isColorLight, pickMostSaturated } from '@/features/player/utils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_SIZE = (SCREEN_WIDTH - 60) / 3;
+const GAP = 5;
+const CARD_SIZE = (SCREEN_WIDTH - GAP * 4) / 3;
+const CARD_RADIUS = 5;
+
+// ========================================
+// Color extraction hook
+// ========================================
+
+function useExtractedColor(imageUrl: string, id: string) {
+  const [bgColor, setBgColor] = useState('#2a2a3e');
+  const [textIsLight, setTextIsLight] = useState(false);
+  
+  useEffect(() => {
+    if (!imageUrl || !id) return;
+    let mounted = true;
+    
+    const extractColors = async () => {
+      try {
+        const result = await getColors(imageUrl, { 
+          fallback: '#2a2a3e', 
+          cache: true, 
+          key: id 
+        });
+        
+        if (!mounted) return;
+        
+        let dominant = '#2a2a3e';
+        
+        if (result.platform === 'ios') {
+          dominant = result.detail || result.primary || result.secondary || '#2a2a3e';
+        } else if (result.platform === 'android') {
+          const candidates = [
+            result.vibrant,
+            result.darkVibrant, 
+            result.lightVibrant,
+            result.muted,
+            result.darkMuted,
+            result.lightMuted,
+            result.dominant,
+          ];
+          dominant = pickMostSaturated(candidates) || result.dominant || '#2a2a3e';
+        }
+        
+        const paletteHex = matchToPalette(dominant);
+        setBgColor(paletteHex);
+        setTextIsLight(isColorLight(paletteHex));
+      } catch (err) {
+        // Silent fail
+      }
+    };
+      
+    extractColors();
+    return () => { mounted = false; };
+  }, [imageUrl, id]);
+  
+  return { bgColor, textIsLight };
+}
+
+// ========================================
+// Section Header
+// ========================================
 
 interface SearchResultSectionProps {
   title: string;
-  count: number;
+  count?: number;
   onViewAll?: () => void;
   children: React.ReactNode;
 }
@@ -41,11 +104,13 @@ export function SearchResultSection({
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
           <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionCount}>{count} results</Text>
+          {count !== undefined && (
+            <Text style={styles.sectionCount}>{count}</Text>
+          )}
         </View>
         {onViewAll && (
           <TouchableOpacity onPress={onViewAll}>
-            <Text style={styles.viewAllLink}>View Results</Text>
+            <Text style={styles.viewAllLink}>View All</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -54,33 +119,73 @@ export function SearchResultSection({
   );
 }
 
+// ========================================
+// Book Result Card (New colored design)
+// ========================================
+
 interface BookResultCardProps {
   book: LibraryItem;
 }
 
 export function BookResultCard({ book }: BookResultCardProps) {
-  const navigation = useNavigation<any>();
+  const { loadBook, currentBook, isPlaying } = usePlayerStore();
   const coverUrl = apiClient.getItemCoverUrl(book.id);
   const title = getTitle(book);
   const author = getAuthorName(book);
+  const isThisPlaying = currentBook?.id === book.id && isPlaying;
 
-  const handlePress = () => {
-    navigation.navigate('BookDetail', { bookId: book.id });
+  const { bgColor, textIsLight } = useExtractedColor(coverUrl, book.id);
+  const textColor = textIsLight ? '#000000' : '#FFFFFF';
+  const secondaryColor = textIsLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+
+  const handlePress = async () => {
+    try {
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook);
+    } catch (err) {
+      console.error('Failed to load book:', err);
+    }
   };
 
   return (
-    <TouchableOpacity style={styles.bookCard} onPress={handlePress} activeOpacity={0.7}>
-      <View style={styles.bookCoverContainer}>
-        <Image source={{ uri: coverUrl }} style={styles.bookCover} resizeMode="cover" />
-        <View style={styles.heartPosition}>
-          <LibraryHeartButton bookId={book.id} size="small" />
+    <TouchableOpacity 
+      style={[styles.bookCard, { backgroundColor: bgColor }]} 
+      onPress={handlePress} 
+      activeOpacity={0.9}
+    >
+      {/* Cover at top */}
+      <View style={styles.bookCardCoverRow}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.bookCardCover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.bookCardCover, styles.bookCardCoverPlaceholder]} />
+        )}
+        <View style={styles.bookCardPlay}>
+          <Icon 
+            name={isThisPlaying ? 'pause' : 'play'} 
+            size={20} 
+            color={textColor} 
+            set="ionicons"
+          />
         </View>
       </View>
-      <Text style={styles.bookTitle} numberOfLines={1}>{title}</Text>
-      <Text style={styles.bookAuthor} numberOfLines={1}>{author}</Text>
+      
+      {/* Text below */}
+      <View style={styles.bookCardText}>
+        <Text style={[styles.bookCardAuthor, { color: secondaryColor }]} numberOfLines={1}>
+          {author}
+        </Text>
+        <Text style={[styles.bookCardTitle, { color: textColor }]} numberOfLines={2}>
+          {title}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
+
+// ========================================
+// Book Results Row (Horizontal)
+// ========================================
 
 interface BookResultsRowProps {
   books: LibraryItem[];
@@ -100,6 +205,10 @@ export function BookResultsRow({ books }: BookResultsRowProps) {
   );
 }
 
+// ========================================
+// Series Card
+// ========================================
+
 interface SeriesCardProps {
   name: string;
   bookCount: number;
@@ -111,19 +220,41 @@ export function SeriesCard({ name, bookCount, books, onPress }: SeriesCardProps)
   const firstBook = books[0];
   const coverUrl = firstBook ? apiClient.getItemCoverUrl(firstBook.id) : '';
 
+  const { bgColor, textIsLight } = useExtractedColor(coverUrl, name);
+  const textColor = textIsLight ? '#000000' : '#FFFFFF';
+  const secondaryColor = textIsLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+
   return (
-    <TouchableOpacity style={styles.bookCard} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.bookCoverContainer}>
-        <Image source={{ uri: coverUrl }} style={styles.bookCover} resizeMode="cover" />
-        <View style={styles.seriesBadge}>
-          <Text style={styles.seriesBadgeText}>{bookCount}</Text>
-        </View>
+    <TouchableOpacity 
+      style={[styles.bookCard, { backgroundColor: bgColor }]} 
+      onPress={onPress} 
+      activeOpacity={0.9}
+    >
+      {/* Cover at top */}
+      <View style={styles.bookCardCoverRow}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.bookCardCover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.bookCardCover, styles.bookCardCoverPlaceholder]} />
+        )}
       </View>
-      <Text style={styles.bookTitle} numberOfLines={1}>{name}</Text>
-      <Text style={styles.bookAuthor} numberOfLines={1}>{bookCount} books</Text>
+      
+      {/* Text below */}
+      <View style={styles.bookCardText}>
+        <Text style={[styles.bookCardAuthor, { color: secondaryColor }]} numberOfLines={1}>
+          {bookCount} books
+        </Text>
+        <Text style={[styles.bookCardTitle, { color: textColor }]} numberOfLines={2}>
+          {name}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
+
+// ========================================
+// Series Results Row
+// ========================================
 
 interface SeriesResultsRowProps {
   series: { name: string; bookCount: number; books: LibraryItem[] }[];
@@ -150,6 +281,10 @@ export function SeriesResultsRow({ series, onPress }: SeriesResultsRowProps) {
   );
 }
 
+// ========================================
+// Group Result Card (Authors/Narrators)
+// ========================================
+
 interface GroupResultCardProps {
   name: string;
   bookCount: number;
@@ -159,54 +294,68 @@ interface GroupResultCardProps {
 }
 
 export function GroupResultCard({ name, bookCount, books, onPress, compact }: GroupResultCardProps) {
-  const previewCovers = books.slice(0, 3);
+  const firstBook = books[0];
+  const coverUrl = firstBook ? apiClient.getItemCoverUrl(firstBook.id) : '';
+
+  const { bgColor, textIsLight } = useExtractedColor(coverUrl, name);
+  const textColor = textIsLight ? '#000000' : '#FFFFFF';
+  const secondaryColor = textIsLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
 
   if (compact) {
     return (
-      <TouchableOpacity style={styles.groupCardCompact} onPress={onPress} activeOpacity={0.7}>
-        <View style={styles.groupCoversCompact}>
-          {previewCovers.map((book, index) => (
-            <Image
-              key={book.id}
-              source={{ uri: apiClient.getItemCoverUrl(book.id) }}
-              style={[
-                styles.groupCoverCompact,
-                { left: index * 10, zIndex: 3 - index },
-              ]}
-              resizeMode="cover"
-            />
-          ))}
-        </View>
-        <View style={styles.groupInfoCompact}>
-          <Text style={styles.groupNameCompact} numberOfLines={1}>{name}</Text>
-          <Text style={styles.groupCountCompact}>{bookCount} books</Text>
+      <TouchableOpacity 
+        style={[styles.groupCardCompact, { backgroundColor: bgColor }]} 
+        onPress={onPress} 
+        activeOpacity={0.9}
+      >
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.groupCardCover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.groupCardCover, styles.bookCardCoverPlaceholder]} />
+        )}
+        <View style={styles.groupCardContent}>
+          <Text style={[styles.groupCardName, { color: textColor }]} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={[styles.groupCardCount, { color: secondaryColor }]}>
+            {bookCount} books
+          </Text>
         </View>
       </TouchableOpacity>
     );
   }
 
   return (
-    <TouchableOpacity style={styles.groupCard} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.groupCoverContainer}>
-        <View style={styles.groupCovers}>
-          {previewCovers.map((book, index) => (
-            <Image
-              key={book.id}
-              source={{ uri: apiClient.getItemCoverUrl(book.id) }}
-              style={[
-                styles.groupCover,
-                { left: index * 16, zIndex: 3 - index },
-              ]}
-              resizeMode="cover"
-            />
-          ))}
-        </View>
+    <TouchableOpacity 
+      style={[styles.bookCard, { backgroundColor: bgColor }]} 
+      onPress={onPress} 
+      activeOpacity={0.9}
+    >
+      {/* Cover at top */}
+      <View style={styles.bookCardCoverRow}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.bookCardCover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.bookCardCover, styles.bookCardCoverPlaceholder]} />
+        )}
       </View>
-      <Text style={styles.groupName} numberOfLines={1}>{name}</Text>
-      <Text style={styles.groupCount}>{bookCount} books</Text>
+      
+      {/* Text below */}
+      <View style={styles.bookCardText}>
+        <Text style={[styles.bookCardAuthor, { color: secondaryColor }]} numberOfLines={1}>
+          {bookCount} books
+        </Text>
+        <Text style={[styles.bookCardTitle, { color: textColor }]} numberOfLines={2}>
+          {name}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
+
+// ========================================
+// Group Results Row
+// ========================================
 
 interface GroupResultsRowProps {
   groups: { name: string; bookCount: number; books: LibraryItem[] }[];
@@ -215,8 +364,29 @@ interface GroupResultsRowProps {
 }
 
 export function GroupResultsRow({ groups, onPress, compact }: GroupResultsRowProps) {
+  if (compact) {
+    return (
+      <View style={styles.groupRowCompact}>
+        {groups.map((group) => (
+          <GroupResultCard
+            key={group.name}
+            name={group.name}
+            bookCount={group.bookCount}
+            books={group.books}
+            onPress={() => onPress(group.name)}
+            compact
+          />
+        ))}
+      </View>
+    );
+  }
+
   return (
-    <View style={compact ? styles.groupRowCompact : styles.groupRow}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.horizontalList}
+    >
       {groups.map((group) => (
         <GroupResultCard
           key={group.name}
@@ -224,19 +394,22 @@ export function GroupResultsRow({ groups, onPress, compact }: GroupResultsRowPro
           bookCount={group.bookCount}
           books={group.books}
           onPress={() => onPress(group.name)}
-          compact={compact}
         />
       ))}
-    </View>
+    </ScrollView>
   );
 }
+
+// ========================================
+// Book List Item (for All Results)
+// ========================================
 
 interface BookListItemProps {
   book: LibraryItem;
 }
 
 export function BookListItem({ book }: BookListItemProps) {
-  const navigation = useNavigation<any>();
+  const { loadBook, currentBook, isPlaying } = usePlayerStore();
   const coverUrl = apiClient.getItemCoverUrl(book.id);
   const title = getTitle(book);
   const author = getAuthorName(book);
@@ -244,25 +417,60 @@ export function BookListItem({ book }: BookListItemProps) {
   const hours = Math.floor(duration / 3600);
   const minutes = Math.floor((duration % 3600) / 60);
   const durationText = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  const isThisPlaying = currentBook?.id === book.id && isPlaying;
 
-  const handlePress = () => {
-    navigation.navigate('BookDetail', { bookId: book.id });
+  const { bgColor, textIsLight } = useExtractedColor(coverUrl, book.id);
+  const textColor = textIsLight ? '#000000' : '#FFFFFF';
+  const secondaryColor = textIsLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+
+  const handlePress = async () => {
+    try {
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook);
+    } catch (err) {
+      console.error('Failed to load book:', err);
+    }
   };
 
   return (
-    <TouchableOpacity style={styles.listItem} onPress={handlePress} activeOpacity={0.7}>
-      <View style={styles.listItemCoverContainer}>
-        <Image source={{ uri: coverUrl }} style={styles.listItemCover} resizeMode="cover" />
+    <TouchableOpacity 
+      style={[styles.listItem, { backgroundColor: bgColor }]} 
+      onPress={handlePress} 
+      activeOpacity={0.9}
+    >
+      <View style={styles.listItemContent}>
+        {/* Cover thumbnail */}
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.listItemCover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.listItemCover, styles.bookCardCoverPlaceholder]} />
+        )}
+        
+        <View style={styles.listItemText}>
+          <Text style={[styles.listItemTitle, { color: textColor }]} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={[styles.listItemSubtitle, { color: secondaryColor }]} numberOfLines={1}>
+            {author} • {durationText}
+          </Text>
+        </View>
+        
+        <View style={styles.listItemPlay}>
+          <Icon 
+            name={isThisPlaying ? 'pause' : 'play'} 
+            size={22} 
+            color={textColor} 
+            set="ionicons"
+          />
+        </View>
       </View>
-      <View style={styles.listItemInfo}>
-        <Text style={styles.listItemTitle} numberOfLines={2}>{title}</Text>
-        <Text style={styles.listItemSubtitle} numberOfLines={1}>{author}</Text>
-        <Text style={styles.listItemMeta}>{durationText}</Text>
-      </View>
-      <LibraryHeartButton bookId={book.id} size="large" variant="plain" />
     </TouchableOpacity>
   );
 }
+
+// ========================================
+// All Results List
+// ========================================
 
 interface AllResultsListProps {
   books: LibraryItem[];
@@ -278,195 +486,157 @@ export function AllResultsList({ books }: AllResultsListProps) {
   );
 }
 
+// ========================================
+// Styles
+// ========================================
+
 const styles = StyleSheet.create({
+  // Section
   section: {
-    marginBottom: theme.spacing[5],
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing[5],
-    marginBottom: theme.spacing[3],
+    paddingHorizontal: GAP,
+    marginBottom: 12,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: theme.spacing[2],
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
   },
   sectionCount: {
     fontSize: 13,
-    color: theme.colors.text.tertiary,
+    color: 'rgba(255,255,255,0.5)',
   },
   viewAllLink: {
     fontSize: 14,
-    color: theme.colors.primary[500],
-    fontWeight: '500',
+    color: '#007AFF',
   },
+
+  // Horizontal list
   horizontalList: {
-    paddingHorizontal: theme.spacing[5],
-    gap: theme.spacing[3],
+    paddingHorizontal: GAP,
+    gap: GAP,
   },
+
+  // Book Card (cover on top, text below)
   bookCard: {
     width: CARD_SIZE,
-  },
-  bookCoverContainer: {
-    width: CARD_SIZE,
-    height: CARD_SIZE,
-    borderRadius: theme.radius.medium,
+    height: CARD_SIZE * 1.4,
+    borderRadius: CARD_RADIUS,
     overflow: 'hidden',
-    backgroundColor: theme.colors.neutral[200],
-    marginBottom: theme.spacing[2],
+    padding: 10,
   },
-  bookCover: {
-    width: '100%',
-    height: '100%',
-  },
-  heartPosition: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-  },
-  seriesBadge: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  seriesBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  bookTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  bookAuthor: {
-    fontSize: 11,
-    color: theme.colors.text.secondary,
-    marginTop: 2,
-  },
-  groupRow: {
+  bookCardCoverRow: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing[5],
-    gap: theme.spacing[3],
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
-  groupRowCompact: {
-    gap: theme.spacing[2],
-  },
-  groupCard: {
-    flex: 1,
-  },
-  groupCardCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing[2],
-    paddingVertical: theme.spacing[1],
-  },
-  groupCoverContainer: {
+  bookCardCover: {
+    width: 60,
     height: 60,
-    marginBottom: theme.spacing[2],
-  },
-  groupCovers: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-  },
-  groupCoversCompact: {
-    position: 'relative',
-    width: 50,
-    height: 36,
-  },
-  groupCover: {
-    position: 'absolute',
-    width: 45,
-    height: 60,
-    borderRadius: theme.radius.small,
-    backgroundColor: theme.colors.neutral[200],
-    borderWidth: 2,
-    borderColor: theme.colors.background.primary,
-  },
-  groupCoverCompact: {
-    position: 'absolute',
-    width: 26,
-    height: 36,
     borderRadius: 4,
-    backgroundColor: theme.colors.neutral[200],
-    borderWidth: 1.5,
-    borderColor: theme.colors.background.primary,
   },
-  groupName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
+  bookCardCoverPlaceholder: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  groupCount: {
-    fontSize: 11,
-    color: theme.colors.text.tertiary,
+  bookCardPlay: {
     marginTop: 2,
   },
-  groupInfoCompact: {
+  bookCardText: {
     flex: 1,
   },
-  groupNameCompact: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
+  bookCardAuthor: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 2,
   },
-  groupCountCompact: {
-    fontSize: 10,
-    color: theme.colors.text.tertiary,
-    marginTop: 1,
+  bookCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 16,
   },
-  allResultsList: {
-    paddingHorizontal: theme.spacing[5],
-  },
-  listItem: {
+
+  // Group card compact
+  groupCardCompact: {
+    flex: 1,
+    height: 70,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+    marginHorizontal: GAP / 2,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    padding: 10,
   },
-  listItemCoverContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: theme.radius.small,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.neutral[200],
+  groupCardCover: {
+    width: 44,
+    height: 44,
+    borderRadius: 4,
+    marginRight: 10,
   },
-  listItemCover: {
-    width: '100%',
-    height: '100%',
-  },
-  listItemInfo: {
+  groupCardContent: {
     flex: 1,
-    marginLeft: theme.spacing[3],
     justifyContent: 'center',
   },
+  groupCardName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  groupCardCount: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  groupRowCompact: {
+    flexDirection: 'row',
+    paddingHorizontal: GAP / 2,
+  },
+
+  // List item
+  listItem: {
+    height: 72,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+    marginHorizontal: GAP,
+    marginBottom: GAP,
+  },
+  listItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  listItemCover: {
+    width: 48,
+    height: 48,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  listItemText: {
+    flex: 1,
+  },
   listItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
   },
   listItemSubtitle: {
     fontSize: 12,
-    color: theme.colors.text.secondary,
-    marginTop: 2,
   },
-  listItemMeta: {
-    fontSize: 11,
-    color: theme.colors.text.tertiary,
-    marginTop: 2,
+  listItemPlay: {
+    marginLeft: 12,
+  },
+
+  // All results
+  allResultsList: {
+    gap: 0,
   },
 });

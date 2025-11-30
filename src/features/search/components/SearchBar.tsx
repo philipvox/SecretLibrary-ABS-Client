@@ -1,11 +1,12 @@
 /**
  * src/features/search/components/SearchBar.tsx
+ * 
+ * Search input with dark theme support
  */
 
 import React from 'react';
 import { View, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
 
 interface SearchBarProps {
   value: string;
@@ -13,6 +14,7 @@ interface SearchBarProps {
   onClear?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
+  dark?: boolean;
 }
 
 export function SearchBar({
@@ -21,26 +23,32 @@ export function SearchBar({
   onClear,
   placeholder = 'Search...',
   autoFocus = false,
+  dark = true,
 }: SearchBarProps) {
   const handleClear = () => {
     onChangeText('');
     onClear?.();
   };
 
+  const bgColor = dark ? 'rgba(255,255,255,0.1)' : '#F0F0F0';
+  const textColor = dark ? '#FFFFFF' : '#000000';
+  const placeholderColor = dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+  const iconColor = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: bgColor }]}>
       <Icon
         name="search"
         size={20}
-        color={theme.colors.text.tertiary}
+        color={iconColor}
         set="ionicons"
       />
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: textColor }]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.text.tertiary}
+        placeholderTextColor={placeholderColor}
         autoFocus={autoFocus}
         autoCapitalize="none"
         autoCorrect={false}
@@ -51,7 +59,7 @@ export function SearchBar({
           <Icon
             name="close-circle"
             size={20}
-            color={theme.colors.text.tertiary}
+            color={iconColor}
             set="ionicons"
           />
         </TouchableOpacity>
@@ -64,17 +72,15 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background.secondary,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2],
-    gap: theme.spacing[2],
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: theme.colors.text.primary,
-    paddingVertical: theme.spacing[1],
+    paddingVertical: 4,
   },
   clearButton: {
     padding: 4,

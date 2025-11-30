@@ -1,8 +1,10 @@
 /**
  * src/features/search/screens/SearchScreen.tsx
+ * 
+ * Search screen with dark theme and colored result cards
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,11 +13,10 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
-  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
 import { SearchBar } from '../components/SearchBar';
 import { 
   SearchResultSection, 
@@ -24,17 +25,15 @@ import {
   GroupResultsRow,
   AllResultsList,
   BookListItem,
+  GroupResultCard,
 } from '../components/SearchResultSection';
-import { useSearch } from '../hooks/useSearch';
-import { useAllLibraryItems } from '../hooks/useAllLibraryItems';
+import { useServerSearch } from '../hooks/useServerSearch';
 import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
-import { useLibrarySeries } from '@/features/series/hooks/useLibrarySeries';
-import { useLibraryAuthors } from '@/features/author/hooks/useLibraryAuthors';
 import { Icon } from '@/shared/components/Icon';
-import { LoadingSpinner } from '@/shared/components';
-import { apiClient } from '@/core/api';
-import { theme } from '@/shared/theme';
 import { LibraryItem } from '@/core/types';
+
+const HEADER_BG = '#303030';
+const GAP = 5;
 
 type ViewMode = 'default' | 'books' | 'series' | 'authors' | 'narrators';
 
@@ -48,163 +47,101 @@ export function SearchScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [viewMode, setViewMode] = useState<ViewMode>('default');
-  
-  const { library } = useDefaultLibrary();
-  const { items, isLoading } = useAllLibraryItems(library?.id || '');
-  const { series: allSeries } = useLibrarySeries(library?.id || '');
-  const { authors: allAuthors } = useLibraryAuthors(library?.id || '');
 
-  const { query, setQuery, clearSearch, results, hasSearched } = useSearch(items);
+  const { library } = useDefaultLibrary();
+  
+  // Server-side search - fast!
+  const { query, setQuery, clearSearch, results, isSearching, hasSearched } = useServerSearch(library?.id || '');
+
+  // Use results directly from server
+  const seriesData = useMemo(() => {
+    return results.series.map(s => ({
+      name: s.name,
+      bookCount: s.books?.length || 0,
+      books: s.books || [],
+    }));
+  }, [results.series]);
+
+  const authorsData = useMemo(() => {
+    return results.authors.map(a => ({
+      name: a.name,
+      bookCount: a.books?.length || 0,
+      books: a.books || [],
+    }));
+  }, [results.authors]);
+
+  const narratorsData = useMemo(() => {
+    return results.narrators.map(n => ({
+      name: n.name,
+      bookCount: n.books?.length || 0,
+      books: n.books || [],
+    }));
+  }, [results.narrators]);
+
+  const handleClearSearch = () => {
+    clearSearch();
+    setViewMode('default');
+  };
 
   const handleBack = () => {
     if (viewMode !== 'default') {
       setViewMode('default');
-      return;
-    }
-    if (navigation.canGoBack()) {
-      navigation.goBack();
     } else {
-      navigation.navigate('Main');
+      navigation.goBack();
     }
   };
 
   const handleSeriesPress = (seriesName: string) => {
-    // Look up series ID from library series data
-    const series = allSeries.find(s => 
-      s.name?.toLowerCase().trim() === seriesName?.toLowerCase().trim()
-    );
-    
-    if (series?.id) {
-      console.log('Navigating to series:', series.id, series.name);
-      navigation.navigate('SeriesDetail', { seriesId: series.id });
-    } else {
-      console.log('Series not found:', seriesName);
-    }
+    navigation.navigate('SeriesDetail', { seriesName });
   };
 
   const handleAuthorPress = (authorName: string) => {
-    // Look up author ID from library authors data
-    const author = allAuthors.find(a => 
-      a.name?.toLowerCase().trim() === authorName?.toLowerCase().trim()
-    );
-    
-    if (author?.id) {
-      console.log('Navigating to author:', author.id, author.name);
-      navigation.navigate('AuthorDetail', { authorId: author.id });
-    } else {
-      console.log('Author not found:', authorName);
-    }
+    navigation.navigate('AuthorDetail', { authorName });
   };
 
   const handleNarratorPress = (narratorName: string) => {
-    console.log('Navigating to narrator:', narratorName);
     navigation.navigate('NarratorDetail', { narratorName });
   };
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Icon name="arrow-back" size={24} color={theme.colors.text.primary} set="ionicons" />
-          </TouchableOpacity>
-          <View style={styles.searchBarContainer}>
-            <SearchBar
-              value={query}
-              onChangeText={setQuery}
-              onClear={clearSearch}
-              autoFocus={false}
-            />
-          </View>
-        </View>
-        <LoadingSpinner text="Loading library..." />
-      </View>
-    );
-  }
+  const hasResults = results.books.length > 0 || 
+    results.series.length > 0 || 
+    results.authors.length > 0 || 
+    results.narrators.length > 0;
 
   const showBooks = results.books.length > 0;
-  const showSeries = results.series.length > 0;
-  const showAuthors = results.authors.length > 0;
-  const showNarrators = results.narrators.length > 0;
-  const hasResults = showBooks || showSeries || showAuthors || showNarrators;
+  const showSeries = seriesData.length > 0;
+  const showAuthors = authorsData.length > 0;
+  const showNarrators = narratorsData.length > 0;
 
-  const seriesData = results.series.map(s => ({ 
-    name: s.name, 
-    bookCount: s.books.length, 
-    books: s.books 
-  }));
+  // View mode list rendering
+  const renderGroupListItem = ({ item }: { item: GroupData }) => (
+    <GroupResultCard
+      name={item.name}
+      bookCount={item.bookCount}
+      books={item.books}
+      onPress={() => {
+        if (viewMode === 'series') handleSeriesPress(item.name);
+        else if (viewMode === 'authors') handleAuthorPress(item.name);
+        else handleNarratorPress(item.name);
+      }}
+    />
+  );
 
-  const authorsData = results.authors.map(a => ({ 
-    name: a.name, 
-    bookCount: a.books.length, 
-    books: a.books 
-  }));
+  // View mode screens
+  if (viewMode !== 'default') {
+    const viewTitle = viewMode === 'books' ? 'Books' : 
+      viewMode === 'series' ? 'Series' : 
+      viewMode === 'authors' ? 'Authors' : 'Narrators';
 
-  const narratorsData = results.narrators.map(n => ({ 
-    name: n.name, 
-    bookCount: n.books.length, 
-    books: n.books 
-  }));
-
-  const getViewTitle = () => {
-    switch (viewMode) {
-      case 'books': return `Books (${results.books.length})`;
-      case 'series': return `Series (${results.series.length})`;
-      case 'authors': return `Authors (${results.authors.length})`;
-      case 'narrators': return `Narrators (${results.narrators.length})`;
-      default: return '';
-    }
-  };
-
-  const renderGroupListItem = ({ item }: { item: GroupData }) => {
-    const previewBooks = item.books.slice(0, 4);
-    
-    const handlePress = () => {
-      if (viewMode === 'series') {
-        handleSeriesPress(item.name);
-      } else if (viewMode === 'authors') {
-        handleAuthorPress(item.name);
-      } else if (viewMode === 'narrators') {
-        handleNarratorPress(item.name);
-      }
-    };
-
-    return (
-      <TouchableOpacity style={styles.groupListItem} onPress={handlePress} activeOpacity={0.7}>
-        <View style={styles.groupListCovers}>
-          {previewBooks.map((book, index) => (
-            <Image
-              key={book.id}
-              source={{ uri: apiClient.getItemCoverUrl(book.id) }}
-              style={[
-                styles.groupListCover,
-                { left: index * 20, zIndex: 4 - index },
-              ]}
-              resizeMode="cover"
-            />
-          ))}
-        </View>
-        <View style={styles.groupListInfo}>
-          <Text style={styles.groupListName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.groupListCount}>{item.bookCount} {item.bookCount === 1 ? 'book' : 'books'}</Text>
-        </View>
-        <Icon name="chevron-forward" size={20} color={theme.colors.text.tertiary} set="ionicons" />
-      </TouchableOpacity>
-    );
-  };
-
-  // List view for specific category
-  if (viewMode !== 'default' && hasSearched) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
+        <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
         
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Icon name="arrow-back" size={24} color={theme.colors.text.primary} set="ionicons" />
+            <Icon name="arrow-back" size={24} color="#FFFFFF" set="ionicons" />
           </TouchableOpacity>
-          <Text style={styles.viewTitle}>{getViewTitle()}</Text>
+          <Text style={styles.viewTitle}>{viewTitle}</Text>
           <View style={styles.backButton} />
         </View>
 
@@ -214,20 +151,32 @@ export function SearchScreen() {
             renderItem={({ item }) => <BookListItem book={item} />}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
           />
         ) : (
-          <FlatList
-            data={
-              viewMode === 'series' ? seriesData :
-              viewMode === 'authors' ? authorsData :
-              narratorsData
-            }
-            renderItem={renderGroupListItem}
-            keyExtractor={(item, index) => `${item.name}-${index}`}
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
+          <ScrollView 
+            contentContainerStyle={styles.gridContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.grid}>
+              {(viewMode === 'series' ? seriesData :
+                viewMode === 'authors' ? authorsData :
+                narratorsData
+              ).map((item) => (
+                <View key={item.name} style={styles.gridItem}>
+                  <GroupResultCard
+                    name={item.name}
+                    bookCount={item.bookCount}
+                    books={item.books}
+                    onPress={() => {
+                      if (viewMode === 'series') handleSeriesPress(item.name);
+                      else if (viewMode === 'authors') handleAuthorPress(item.name);
+                      else handleNarratorPress(item.name);
+                    }}
+                  />
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         )}
       </View>
     );
@@ -235,18 +184,18 @@ export function SearchScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Icon name="arrow-back" size={24} color={theme.colors.text.primary} set="ionicons" />
+          <Icon name="arrow-back" size={24} color="#FFFFFF" set="ionicons" />
         </TouchableOpacity>
         <View style={styles.searchBarContainer}>
           <SearchBar
             value={query}
             onChangeText={setQuery}
-            onClear={clearSearch}
+            onClear={handleClearSearch}
             autoFocus={true}
           />
         </View>
@@ -259,27 +208,37 @@ export function SearchScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {!hasSearched && (
+        {/* Initial State */}
+        {!hasSearched && !isSearching && (
           <View style={styles.initialState}>
             <Icon
               name="search"
               size={64}
-              color={theme.colors.neutral[300]}
+              color="rgba(255,255,255,0.3)"
               set="ionicons"
             />
             <Text style={styles.initialTitle}>Search your library</Text>
             <Text style={styles.initialSubtitle}>
-              {items.length} books available
+              Type to start searching
             </Text>
           </View>
         )}
 
-        {hasSearched && !hasResults && (
+        {/* Loading */}
+        {isSearching && (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>Searching...</Text>
+          </View>
+        )}
+
+        {/* No Results */}
+        {hasSearched && !isSearching && !hasResults && (
           <View style={styles.emptyState}>
             <Icon
               name="search"
               size={48}
-              color={theme.colors.neutral[300]}
+              color="rgba(255,255,255,0.3)"
               set="ionicons"
             />
             <Text style={styles.emptyTitle}>No results found</Text>
@@ -290,7 +249,7 @@ export function SearchScreen() {
         )}
 
         {/* Books Section */}
-        {showBooks && (
+        {showBooks && !isSearching && (
           <SearchResultSection 
             title="Books" 
             count={results.books.length}
@@ -301,10 +260,10 @@ export function SearchScreen() {
         )}
 
         {/* Series Section */}
-        {showSeries && (
+        {showSeries && !isSearching && (
           <SearchResultSection 
             title="Series" 
-            count={results.series.length}
+            count={seriesData.length}
             onViewAll={() => setViewMode('series')}
           >
             <SeriesResultsRow 
@@ -315,7 +274,7 @@ export function SearchScreen() {
         )}
 
         {/* Authors & Narrators Row */}
-        {(showAuthors || showNarrators) && (
+        {(showAuthors || showNarrators) && !isSearching && (
           <View style={styles.sideBySideRow}>
             {/* Authors */}
             {showAuthors && (
@@ -354,7 +313,7 @@ export function SearchScreen() {
         )}
 
         {/* All Results List */}
-        {hasResults && (
+        {hasResults && !isSearching && (
           <SearchResultSection 
             title="All Results" 
             count={results.books.length}
@@ -371,14 +330,14 @@ export function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: HEADER_BG,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2],
-    gap: theme.spacing[2],
+    paddingHorizontal: GAP,
+    paddingVertical: 10,
+    gap: 8,
   },
   backButton: {
     width: 40,
@@ -393,64 +352,81 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: theme.spacing[3],
+    paddingTop: 12,
     paddingBottom: 120,
   },
   listContent: {
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[2],
+    paddingTop: 8,
     paddingBottom: 120,
   },
-  separator: {
-    height: 1,
-    backgroundColor: theme.colors.border.light,
-    marginVertical: theme.spacing[1],
+  gridContent: {
+    paddingHorizontal: GAP,
+    paddingTop: 8,
+    paddingBottom: 120,
   },
-  groupListItem: {
+  grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  gridItem: {
+    width: '33.33%',
+    padding: GAP / 2,
+  },
+
+  // Initial/Empty states
+  initialState: {
     alignItems: 'center',
-    paddingVertical: theme.spacing[3],
+    paddingTop: 80,
   },
-  groupListCovers: {
-    width: 100,
-    height: 60,
-    position: 'relative',
-  },
-  groupListCover: {
-    position: 'absolute',
-    width: 40,
-    height: 60,
-    borderRadius: theme.radius.small,
-    backgroundColor: theme.colors.neutral[200],
-    borderWidth: 2,
-    borderColor: theme.colors.background.primary,
-  },
-  groupListInfo: {
-    flex: 1,
-    marginLeft: theme.spacing[4],
-  },
-  groupListName: {
-    fontSize: 16,
+  initialTitle: {
+    fontSize: 20,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
+    marginTop: 16,
   },
-  groupListCount: {
-    fontSize: 13,
-    color: theme.colors.text.tertiary,
+  initialSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
     marginTop: 4,
   },
+  loadingState: {
+    alignItems: 'center',
+    paddingTop: 80,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 16,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 4,
+  },
+
+  // Side by side row
   sideBySideRow: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing[5],
-    gap: theme.spacing[3],
-    marginBottom: theme.spacing[5],
+    paddingHorizontal: GAP,
+    gap: GAP,
+    marginBottom: 20,
   },
   halfSection: {
     flex: 1,
@@ -459,53 +435,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing[2],
+    marginBottom: 8,
   },
   halfSectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
   },
   viewAll: {
     fontSize: 13,
-    color: theme.colors.primary[500],
-    fontWeight: '500',
-  },
-  initialState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing[8],
-    paddingTop: 100,
-  },
-  initialTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginTop: theme.spacing[4],
-    marginBottom: theme.spacing[2],
-  },
-  initialSubtitle: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing[8],
-    paddingTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginTop: theme.spacing[3],
-    marginBottom: theme.spacing[1],
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
+    color: '#007AFF',
   },
 });

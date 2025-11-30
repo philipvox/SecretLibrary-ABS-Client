@@ -1,26 +1,24 @@
 /**
  * src/core/api/index.ts
  * 
- * Public API exports for the API client layer.
+ * API module public exports
  */
 
-// Export the singleton API client instance
-export { apiClient, ApiClient } from './client.ts';
-// Export endpoints for direct usage if needed
-export { endpoints, buildQueryString } from './endpoints';
+export { apiClient } from './apiClient';
+export type { ApiClient } from './apiClient';
 
-// Re-export API-specific types for convenience
-export type {
-  ApiClientConfig,
-  LoginRequest,
-  LoginResponse,
-  PaginationParams,
-  PaginatedResponse,
-  LibraryItemsQuery,
-  SearchQuery,
-  SearchResults,
-  ProgressUpdateRequest,
-  CreateSessionRequest,
-  ApiResponse,
-  ApiError,
-} from '../types/api';
+// Playback session API
+export {
+  startPlaybackSession,
+  syncSessionProgress,
+  closePlaybackSession,
+  buildStreamUrl,
+  getMediaProgress,
+  updateMediaProgress,
+  hideFromContinueListening,
+} from './playbackApi';
+export type { 
+  PlaybackSession, 
+  AudioTrack, 
+  PlaybackChapter 
+} from './playbackApi';

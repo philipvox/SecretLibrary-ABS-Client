@@ -1,152 +1,252 @@
 /**
  * src/features/player/services/audioService.ts
  * 
- * Audio playback service using expo-audio
- * Optimized for fast streaming playback
+ * Audio playback using react-native-track-player
  */
 
-import { 
-  AudioPlayer, 
-  createAudioPlayer, 
-  setAudioModeAsync,
-} from 'expo-audio';
+import TrackPlayer, {
+  State,
+  Capability,
+  AppKilledPlaybackBehavior,
+  RepeatMode,
+} from 'react-native-track-player';
 
 export interface PlaybackState {
   isPlaying: boolean;
   position: number;
   duration: number;
   isBuffering: boolean;
+  didJustFinish: boolean;
 }
 
 type StatusCallback = (status: PlaybackState) => void;
 
+const DEBUG = __DEV__;
+const log = (...args: any[]) => DEBUG && console.log('[Audio]', ...args);
+
 class AudioService {
-  private player: AudioPlayer | null = null;
+  private isSetup = false;
   private statusCallback: StatusCallback | null = null;
-  private statusSubscription: { remove: () => void } | null = null;
-  private isLoaded = false;
   private currentUrl: string | null = null;
-  private pendingPlaybackRate = 1.0;
+  private isLoaded = false;
+  private progressInterval: NodeJS.Timeout | null = null;
+  private setupPromise: Promise<void> | null = null;
+  private loadId = 0; // Track load requests to cancel stale ones
 
   constructor() {
-    this.configureAudioMode();
+    // Pre-warm on construction
+    this.setupPromise = this.setup();
   }
 
-  private async configureAudioMode(): Promise<void> {
-    try {
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        shouldPlayInBackground: true,
-        interruptionMode: 'doNotMix',
-        interruptionModeAndroid: 'doNotMix',
-      });
-    } catch (error) {
-      console.error('[AudioService] Failed to configure audio mode:', error);
-    }
-  }
-
-  getPlayer(): AudioPlayer | null {
-    return this.player;
-  }
-
-  async loadAudio(url: string, startPosition: number = 0): Promise<void> {
-    console.log('[AudioService] Loading:', url.substring(0, 80) + '...');
+  async setup(): Promise<void> {
+    if (this.isSetup) return;
 
     try {
-      await this.unloadAudio();
-
-      this.player = createAudioPlayer({ uri: url });
-      this.currentUrl = url;
-      this.isLoaded = true;
-
-      // Set up status listener
-      this.statusSubscription = this.player.addListener('playbackStatusUpdate', (status) => {
-        if (this.statusCallback) {
-          this.statusCallback({
-            isPlaying: status.playing,
-            position: status.currentTime,
-            duration: status.duration,
-            isBuffering: status.isBuffering,
-          });
-        }
+      log('Setting up TrackPlayer...');
+      
+      await TrackPlayer.setupPlayer({
+        autoHandleInterruptions: true,
       });
 
-      // Apply playback rate
-      if (this.pendingPlaybackRate !== 1.0) {
-        try {
-          this.player.setPlaybackRate(this.pendingPlaybackRate);
-        } catch {}
+      await TrackPlayer.updateOptions({
+        capabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SeekTo,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+          Capability.JumpForward,
+          Capability.JumpBackward,
+        ],
+        compactCapabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SeekTo,
+        ],
+        forwardJumpInterval: 30,
+        backwardJumpInterval: 30,
+        progressUpdateEventInterval: 1,
+        android: {
+          appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
+        },
+      });
+
+      await TrackPlayer.setRepeatMode(RepeatMode.Off);
+
+      this.isSetup = true;
+      log('✓ TrackPlayer ready');
+    } catch (error: any) {
+      if (error.message?.includes('already been initialized')) {
+        this.isSetup = true;
+        log('TrackPlayer already initialized');
+      } else {
+        console.error('[Audio] Setup failed:', error);
+        throw error;
       }
-
-      // Seek if needed
-      if (startPosition > 0) {
-        this.player.seekTo(startPosition);
-      }
-
-      console.log('[AudioService] Ready to play');
-    } catch (error) {
-      console.error('[AudioService] Load failed:', error);
-      this.isLoaded = false;
-      throw error;
     }
-  }
-
-  setStatusUpdateCallback(callback: StatusCallback): void {
-    this.statusCallback = callback;
-  }
-
-  async play(): Promise<void> {
-    if (!this.player || !this.isLoaded) {
-      throw new Error('No audio loaded');
-    }
-    this.player.play();
-  }
-
-  async pause(): Promise<void> {
-    this.player?.pause();
-  }
-
-  async seekTo(positionSeconds: number): Promise<void> {
-    this.player?.seekTo(positionSeconds);
-  }
-
-  async setPlaybackRate(rate: number): Promise<void> {
-    this.pendingPlaybackRate = rate;
-    if (this.player && this.isLoaded) {
-      this.player.setPlaybackRate(rate);
-    }
-  }
-
-  async getPosition(): Promise<number> {
-    return this.player?.currentTime ?? 0;
-  }
-
-  async getDuration(): Promise<number> {
-    return this.player?.duration ?? 0;
   }
 
   getIsLoaded(): boolean {
-    return this.isLoaded && this.player !== null;
+    return this.isLoaded;
   }
 
   getCurrentUrl(): string | null {
     return this.currentUrl;
   }
 
-  async unloadAudio(): Promise<void> {
-    if (this.statusSubscription) {
-      this.statusSubscription.remove();
-      this.statusSubscription = null;
+  setStatusUpdateCallback(callback: StatusCallback | null): void {
+    this.statusCallback = callback;
+    
+    if (callback) {
+      this.startProgressUpdates();
+    } else {
+      this.stopProgressUpdates();
     }
-    if (this.player) {
+  }
+
+  private startProgressUpdates(): void {
+    this.stopProgressUpdates();
+    
+    this.progressInterval = setInterval(async () => {
+      if (!this.isLoaded) return;
+      
       try {
-        this.player.pause();
-        this.player.release();
-      } catch {}
-      this.player = null;
+        const progress = await TrackPlayer.getProgress();
+        const playbackState = await TrackPlayer.getPlaybackState();
+
+        const isPlaying = playbackState.state === State.Playing;
+        const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
+        const didJustFinish = playbackState.state === State.Ended;
+
+        this.statusCallback?.({
+          isPlaying,
+          position: progress.position,
+          duration: progress.duration,
+          isBuffering,
+          didJustFinish,
+        });
+      } catch (e) {
+        // Ignore errors
+      }
+    }, 500);
+  }
+
+  private stopProgressUpdates(): void {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
     }
-    this.isLoaded = false;
+  }
+
+  async loadAudio(
+    url: string, 
+    startPositionSec: number = 0,
+    metadata?: { title?: string; artist?: string; artwork?: string }
+  ): Promise<void> {
+    const thisLoadId = ++this.loadId;
+    const t0 = Date.now();
+    const t = (label: string) => log(`⏱ [${Date.now() - t0}ms] ${label}`);
+    
+    log(`Loading: ${url.substring(0, 80)}...`);
+
+    // Ensure setup is done first
+    if (this.setupPromise) {
+      t('Waiting for setup...');
+      await this.setupPromise;
+      t('Setup done');
+    }
+
+    // Check if cancelled
+    if (this.loadId !== thisLoadId) {
+      t('Cancelled - newer load started');
+      return;
+    }
+
+    try {
+      t('Resetting...');
+      await TrackPlayer.reset();
+      
+      if (this.loadId !== thisLoadId) {
+        t('Cancelled after reset');
+        return;
+      }
+      t('Reset done');
+
+      t('Adding track...');
+      await TrackPlayer.add({
+        id: 'current-track',
+        url: url,
+        title: metadata?.title || 'Audiobook',
+        artist: metadata?.artist || 'Author',
+        artwork: metadata?.artwork,
+      });
+      
+      if (this.loadId !== thisLoadId) {
+        t('Cancelled after add');
+        return;
+      }
+      t('Track added');
+
+      this.currentUrl = url;
+      this.isLoaded = true;
+
+      if (startPositionSec > 0) {
+        t(`Seeking to ${startPositionSec}s`);
+        await TrackPlayer.seekTo(startPositionSec);
+      }
+      
+      if (this.loadId !== thisLoadId) {
+        t('Cancelled after seek');
+        return;
+      }
+
+      t('Playing...');
+      await TrackPlayer.play();
+      t('Done');
+    } catch (error) {
+      if (this.loadId === thisLoadId) {
+        console.error('[Audio] Load failed:', error);
+        this.isLoaded = false;
+      }
+    }
+  }
+
+  async play(): Promise<void> {
+    log('▶ Play');
+    await TrackPlayer.play();
+  }
+
+  async pause(): Promise<void> {
+    log('⏸ Pause');
+    await TrackPlayer.pause();
+  }
+
+  async seekTo(positionSec: number): Promise<void> {
+    log(`⏩ Seek to ${positionSec.toFixed(1)}s`);
+    await TrackPlayer.seekTo(positionSec);
+  }
+
+  async setPlaybackRate(rate: number): Promise<void> {
+    log(`Speed: ${rate}x`);
+    await TrackPlayer.setRate(rate);
+  }
+
+  async getPosition(): Promise<number> {
+    const progress = await TrackPlayer.getProgress();
+    return progress.position;
+  }
+
+  async getDuration(): Promise<number> {
+    const progress = await TrackPlayer.getProgress();
+    return progress.duration;
+  }
+
+  async unloadAudio(): Promise<void> {
+    this.loadId++; // Cancel any pending loads
+    this.stopProgressUpdates();
+    await TrackPlayer.reset();
     this.currentUrl = null;
+    this.isLoaded = false;
   }
 }
 

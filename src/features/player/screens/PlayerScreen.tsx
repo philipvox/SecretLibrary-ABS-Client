@@ -11,6 +11,7 @@ import {
   StatusBar,
   Animated,
   Text,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getColors } from 'react-native-image-colors';
@@ -46,6 +47,17 @@ import {
   SettingsPanel,
 } from '../panels';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// =============================================================================
+// PANEL CONFIGURATION - Customize panel sizes here
+// =============================================================================
+const PANEL_CONFIG = {
+  marginHorizontal: 5,
+  borderRadius: 5,
+  innerPadding: 10,
+};
+
 type FlipMode = 'details' | 'speed' | 'sleep' | 'chapters' | 'settings';
 
 export function PlayerScreen() {
@@ -62,7 +74,7 @@ export function PlayerScreen() {
   const [tempSleepMins, setTempSleepMins] = useState(15);
   const [sleepInputValue, setSleepInputValue] = useState('15');
   const [controlMode, setControlMode] = useState<'rewind' | 'chapter'>('rewind');
-  const [progressMode, setProgressMode] = useState<'bar' | 'chapters'>('bar');
+  const [progressMode, setProgressMode] = useState<'bar' | 'chapters'>('chapters');
   
   // Rewind/FF state
   const [isRewinding, setIsRewinding] = useState(false);
@@ -198,7 +210,10 @@ export function PlayerScreen() {
   const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)';
   const waveColor = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
 
-  // Handlers
+  // ===========================================================================
+  // HANDLERS
+  // ===========================================================================
+
   const handleClose = () => {
     if (rewindInterval.current) clearInterval(rewindInterval.current);
     if (ffInterval.current) clearInterval(ffInterval.current);
@@ -220,12 +235,15 @@ export function PlayerScreen() {
 
   const handleFlip = (mode: FlipMode = 'details') => {
     if (isFlipped && flipMode === mode) {
+      // Same mode - flip back
       setIsFlipped(false);
       Animated.timing(flipAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     } else if (isFlipped && flipMode !== mode) {
+      // Different mode - just switch panel
       setFlipMode(mode);
       if (mode === 'speed') setTempSpeed(playbackRate);
     } else {
+      // Not flipped - flip to panel
       setFlipMode(mode);
       if (mode === 'speed') setTempSpeed(playbackRate);
       setIsFlipped(true);
@@ -244,16 +262,48 @@ export function PlayerScreen() {
   };
 
   const handlePrevChapter = async () => {
-    if (chapters.length === 0) return;
-    const currentIdx = currentChapter ? chapters.indexOf(currentChapter) : 0;
-    await seekTo(currentIdx > 0 ? chapters[currentIdx - 1].start : 0);
+    // Get chapters from store or book
+    const storeChapters = usePlayerStore.getState().chapters;
+    const chapterList = storeChapters.length > 0 ? storeChapters : chapters;
+    
+    if (chapterList.length === 0) return;
+    
+    // Find current chapter index
+    let currentIdx = 0;
+    for (let i = chapterList.length - 1; i >= 0; i--) {
+      if (position >= chapterList[i].start) {
+        currentIdx = i;
+        break;
+      }
+    }
+    
+    // If we're more than 3 seconds into the chapter, restart it
+    // Otherwise go to previous chapter
+    const currentChapterStart = chapterList[currentIdx]?.start || 0;
+    const targetIdx = (position - currentChapterStart > 3) ? currentIdx : Math.max(0, currentIdx - 1);
+    
+    await seekTo(chapterList[targetIdx].start);
   };
 
   const handleNextChapter = async () => {
-    if (chapters.length === 0) return;
-    const currentIdx = currentChapter ? chapters.indexOf(currentChapter) : 0;
-    if (currentIdx < chapters.length - 1) {
-      await seekTo(chapters[currentIdx + 1].start);
+    // Get chapters from store or book
+    const storeChapters = usePlayerStore.getState().chapters;
+    const chapterList = storeChapters.length > 0 ? storeChapters : chapters;
+    
+    if (chapterList.length === 0) return;
+    
+    // Find current chapter index
+    let currentIdx = 0;
+    for (let i = chapterList.length - 1; i >= 0; i--) {
+      if (position >= chapterList[i].start) {
+        currentIdx = i;
+        break;
+      }
+    }
+    
+    // Go to next chapter if available
+    if (currentIdx < chapterList.length - 1) {
+      await seekTo(chapterList[currentIdx + 1].start);
     }
   };
 
@@ -344,16 +394,22 @@ export function PlayerScreen() {
   const handleRightPress = () => { if (controlMode === 'chapter') handleNextChapter(); };
 
   const handleProgressScrub = async (percent: number) => {
-    await seekTo(percent * bookDuration);
+    const newPosition = Math.max(0, Math.min(bookDuration, percent * bookDuration));
+    await seekTo(newPosition);
   };
 
   const handleChapterScrub = async (percent: number) => {
-    await seekTo(chapterStart + percent * chapterDuration);
+    const newPosition = Math.max(chapterStart, Math.min(chapterEnd, chapterStart + percent * chapterDuration));
+    await seekTo(newPosition);
   };
 
-  // Flip animations
+  // Flip animations - simple crossfade
   const frontOpacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const backOpacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+
+  // ===========================================================================
+  // MAIN RENDER
+  // ===========================================================================
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
@@ -375,9 +431,12 @@ export function PlayerScreen() {
 
           {/* Flippable Cover */}
           <View style={styles.coverContainer}>
-            {/* Front */}
+            {/* Front - Cover Image */}
             <Animated.View 
-              style={[styles.coverFace, { opacity: frontOpacity }]}
+              style={[
+                styles.coverFace, 
+                { opacity: frontOpacity }
+              ]}
               pointerEvents={isFlipped ? 'none' : 'auto'}
             >
               <TouchableOpacity onPress={() => handleFlip('details')} activeOpacity={0.9}>
@@ -385,26 +444,30 @@ export function PlayerScreen() {
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Back */}
-           <Animated.View 
-             style={[
-               styles.coverFace,
-               styles.coverBack,
-               { 
-                 backgroundColor: cardColor,
-                 opacity: backOpacity,
-               }
-             ]}
+            {/* Back - Panel */}
+            <Animated.View 
+              style={[
+                styles.coverFace,
+                styles.coverBack,
+                { 
+                  backgroundColor: cardColor,
+                  opacity: backOpacity,
+                }
+              ]}
               pointerEvents={isFlipped ? 'auto' : 'none'}
             >
               <TouchableOpacity style={styles.flipCloseButton} onPress={handleFlipBack}>
-                <Icon name="close" size={24} color={isLight ? '#fff' : '#000'} set="ionicons" />
+                <Icon 
+                  name="close" 
+                  size={24} 
+                  color={isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)'} 
+                  set="ionicons" 
+                />
               </TouchableOpacity>
 
               {flipMode === 'details' && (
                 <DetailsPanel
                   book={currentBook}
-                  title={title}
                   duration={bookDuration}
                   chaptersCount={chapters.length}
                   isLight={isLight}
@@ -419,6 +482,7 @@ export function PlayerScreen() {
                     usePlayerStore.getState().setPlaybackRate(tempSpeed);
                     handleFlipBack();
                   }}
+                  onClose={handleFlipBack}
                   isLight={isLight}
                 />
               )}
@@ -451,6 +515,7 @@ export function PlayerScreen() {
                     seekTo(start);
                     handleFlipBack();
                   }}
+                  onClose={handleFlipBack}
                   isLight={isLight}
                 />
               )}
@@ -556,16 +621,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: COVER_SIZE,
     height: COVER_SIZE,
-    borderRadius: RADIUS,
+    borderRadius: PANEL_CONFIG.borderRadius,
   },
   coverBack: {
-    padding: 16,
-    overflow: 'visible',  // Allow buttons to escape
+    padding: PANEL_CONFIG.innerPadding,
+    overflow: 'visible',
   },
   cover: {
     width: COVER_SIZE,
     height: COVER_SIZE,
-    borderRadius: RADIUS,
+    borderRadius: PANEL_CONFIG.borderRadius,
     backgroundColor: '#000',
   },
   flipCloseButton: {

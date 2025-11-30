@@ -2,10 +2,13 @@
  * src/features/player/panels/SleepPanel.tsx
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
-import { CustomSlider } from '../components/CustomSlider';
-import { COVER_SIZE } from '../constants';
+import React, { useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { LiquidSlider } from '../components/LiquidSlider';
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 interface SleepPanelProps {
   tempSleepMins: number;
@@ -17,7 +20,18 @@ interface SleepPanelProps {
   isLight: boolean;
 }
 
-const SLEEP_PRESETS = [5, 15, 30, 45, 60];
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const SLEEP_PRESETS = [15, 30, 45, 60, 90];
+const MIN_MINUTES = 0;
+const MAX_MINUTES = 120;
+const MINUTE_STEP = 5;
+
+// =============================================================================
+// COMPONENT
+// =============================================================================
 
 export function SleepPanel({
   tempSleepMins,
@@ -28,184 +42,208 @@ export function SleepPanel({
   onStart,
   isLight,
 }: SleepPanelProps) {
-  const textColor = isLight ? '#fff' : '#000';
-  const secondaryColor = isLight ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)';
-  const borderColor = isLight ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
-  const buttonBg = isLight ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
-  const activeBg = isLight ? '#fff' : '#000';
-  const activeText = isLight ? '#000' : '#fff';
+  const textColor = isLight ? '#000000' : '#FFFFFF';
+  const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
+  const buttonBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
+  const activeButtonBg = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
+  const activeButtonText = isLight ? '#FFFFFF' : '#000000';
 
-  const handleInputChange = (text: string) => {
-    setSleepInputValue(text);
-    const num = parseInt(text, 10);
-    if (!isNaN(num) && num >= 0 && num <= 120) {
-      setTempSleepMins(num);
-    }
+  // ===========================================================================
+  // HANDLERS
+  // ===========================================================================
+
+  const handleSliderChange = useCallback((value: number) => {
+    const rounded = Math.round(value);
+    setTempSleepMins(rounded);
+    setSleepInputValue(String(rounded));
+  }, [setTempSleepMins, setSleepInputValue]);
+
+  const handlePresetPress = useCallback((minutes: number) => {
+    setTempSleepMins(minutes);
+    setSleepInputValue(String(minutes));
+  }, [setTempSleepMins, setSleepInputValue]);
+
+  // ===========================================================================
+  // HELPERS
+  // ===========================================================================
+
+  const formatMinutes = (mins: number): string => {
+    if (mins === 0) return 'Off';
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    const remaining = mins % 60;
+    if (remaining === 0) return `${hours}h`;
+    return `${hours}h ${remaining}m`;
   };
 
-  const handleSliderChange = (val: number) => {
-    setTempSleepMins(val);
-    setSleepInputValue(String(Math.round(val)));
+  const formatPreset = (mins: number): string => {
+    if (mins < 60) return `${mins}m`;
+    const hours = mins / 60;
+    return Number.isInteger(hours) ? `${hours}h` : `${mins}m`;
   };
+
+  const isPresetActive = (preset: number): boolean => {
+    return tempSleepMins === preset;
+  };
+
+  // ===========================================================================
+  // RENDER
+  // ===========================================================================
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: textColor }]}>Sleep Timer</Text>
-      
-      {/* Current value display with input */}
-      <View style={styles.valueContainer}>
-        <TextInput
-          style={[styles.input, { color: textColor, borderColor }]}
-          value={sleepInputValue}
-          onChangeText={handleInputChange}
-          keyboardType="number-pad"
-          maxLength={3}
-          selectTextOnFocus
-        />
-        <Text style={[styles.inputLabel, { color: secondaryColor }]}>minutes</Text>
-      </View>
+      {/* Time Value Display */}
+      <Text style={[styles.valueText, { color: textColor }]}>
+        {formatMinutes(tempSleepMins)}
+      </Text>
 
       {/* Slider */}
-      <View style={styles.sliderContainer}>
-        <CustomSlider
+      <View style={styles.sliderSection}>
+        <LiquidSlider
           value={tempSleepMins}
+          min={MIN_MINUTES}
+          max={MAX_MINUTES}
+          step={MINUTE_STEP}
           onValueChange={handleSliderChange}
-          minimumValue={0}
-          maximumValue={120}
-          step={5}
-          trackColor={textColor}
-          thumbColor={textColor}
+          isDark={!isLight}
         />
+        
+        {/* Slider Labels */}
         <View style={styles.sliderLabels}>
           <Text style={[styles.sliderLabel, { color: secondaryColor }]}>Off</Text>
           <Text style={[styles.sliderLabel, { color: secondaryColor }]}>30m</Text>
           <Text style={[styles.sliderLabel, { color: secondaryColor }]}>1h</Text>
+          <Text style={[styles.sliderLabel, { color: secondaryColor }]}>1.5h</Text>
           <Text style={[styles.sliderLabel, { color: secondaryColor }]}>2h</Text>
         </View>
       </View>
 
-      {/* Presets */}
+      {/* Preset Buttons */}
       <View style={styles.presetRow}>
-        {SLEEP_PRESETS.map((mins) => (
-          <TouchableOpacity
-            key={mins}
-            style={[
-              styles.presetButton,
-              { backgroundColor: tempSleepMins === mins ? activeBg : buttonBg }
-            ]}
-            onPress={() => {
-              setTempSleepMins(mins);
-              setSleepInputValue(String(mins));
-            }}
-          >
-            <Text style={[
-              styles.presetText,
-              { color: tempSleepMins === mins ? activeText : textColor }
-            ]}>
-              {mins < 60 ? `${mins}m` : `${mins / 60}h`}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {SLEEP_PRESETS.map((preset) => {
+          const isActive = isPresetActive(preset);
+          return (
+            <TouchableOpacity
+              key={preset}
+              style={[
+                styles.presetButton,
+                { backgroundColor: isActive ? activeButtonBg : buttonBg },
+              ]}
+              onPress={() => handlePresetPress(preset)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.presetText,
+                  { color: isActive ? activeButtonText : textColor },
+                ]}
+              >
+                {formatPreset(preset)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Action buttons */}
-      <View style={styles.actions}>
+      {/* Action Buttons */}
+      <View style={styles.actionRow}>
         <TouchableOpacity
-          style={[styles.clearButton, { backgroundColor: buttonBg }]}
+          style={[styles.cancelButton, { backgroundColor: buttonBg }]}
           onPress={onClear}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.clearButtonText, { color: textColor }]}>Off</Text>
+          <Text style={[styles.cancelButtonText, { color: textColor }]}>
+            Off
+          </Text>
         </TouchableOpacity>
-        
+
+        <View style={{ flex: 1 }} />
+
         <TouchableOpacity
-          style={[styles.startButton, { backgroundColor: activeBg }]}
+          style={[styles.applyButton, { backgroundColor: activeButtonBg }]}
           onPress={onStart}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.startButtonText, { color: activeText }]}>Start Timer</Text>
+          <Text style={[styles.applyButtonText, { color: activeButtonText }]}>
+            Start
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
+// =============================================================================
+// STYLES
+// =============================================================================
+
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
   },
-  title: {
-    fontSize: 20,
+  valueText: {
+    fontSize: 64,
     fontWeight: '700',
-    marginBottom: 12,
-    textAlign: 'center',
+    marginBottom: 8,
   },
-  valueContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  input: {
-    fontSize: 48,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    textAlign: 'center',
-    borderBottomWidth: 2,
-    paddingBottom: 4,
-    minWidth: 100,
-  },
-  inputLabel: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  sliderContainer: {
-    marginBottom: 16,
-    alignItems: 'center',
+  sliderSection: {
+    marginBottom: 10,
+    width: '100%',
+    overflow: 'visible',
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: COVER_SIZE - 32,
-    marginTop: 8,
+    marginTop: -15,
   },
   sliderLabel: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '500',
   },
   presetRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 8,
     marginBottom: 16,
+    marginTop: 4,
+    width: '100%',
   },
   presetButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  presetText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  clearButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  clearButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  startButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
-  startButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
+  presetText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  cancelButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 24,
+  },
+  cancelButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  applyButton: {
+    width: 125,
+    height: 125,
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-7deg' }],
+  },
+  applyButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
   },
 });
+
+export default SleepPanel;

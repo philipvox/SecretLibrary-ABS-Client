@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { LibraryItem } from '@/core/types';
+import { apiClient } from '@/core/api';
 import { audioService, PlaybackState } from '../services/audioService';
 import { sessionService, SessionChapter } from '../services/sessionService';
 import { progressService } from '../services/progressService';
@@ -174,9 +175,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   bookmarks: [],
 
   loadBook: async (book: LibraryItem, startPosition?: number) => {
-    const { currentBook, position: prevPosition, isOffline: wasOffline } = get();
+    const { currentBook, position: prevPosition, isOffline: wasOffline, isLoading } = get();
+    
+    // Already loading?
+    if (isLoading) {
+      log('Already loading a book, skipping');
+      return;
+    }
     
     const thisLoadId = ++currentLoadId;
+    const t0 = Date.now();
+    const timing = (label: string) => log(`⏱ ${label}: ${Date.now() - t0}ms`);
     
     log('=== loadBook ===');
     log('Book:', book.id, '-', book.media?.metadata?.title);
@@ -191,12 +200,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return;
     }
 
-    set({ isLoading: true, isPlayerVisible: true });
+    // Set new book immediately to prevent UI flash
+    set({ 
+      isLoading: true, 
+      isPlayerVisible: true,
+      currentBook: book,
+      isPlaying: false,
+      isBuffering: true,
+    });
+    timing('State set');
 
     try {
-      // Save progress for previous book
+      // Save progress for previous book IN BACKGROUND (don't await)
       if (currentBook && currentBook.id !== book.id && prevPosition > 0) {
-        log('Saving progress for previous book');
         if (wasOffline) {
           progressService.saveLocalOnly({
             itemId: currentBook.id,
@@ -206,22 +222,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
             isFinished: false,
           }).catch(() => {});
         } else {
-          await sessionService.syncProgress(prevPosition);
+          sessionService.syncProgress(prevPosition);
         }
       }
 
-      // Release previous audio
-      await audioService.unloadAudio();
-
-      if (thisLoadId !== currentLoadId) {
-        log('Load cancelled - newer load started');
-        return;
-      }
+      if (thisLoadId !== currentLoadId) return;
 
       // Check for offline download
+      timing('Before getDownloadPath');
       const localPath = await getDownloadPath(book.id);
+      timing('After getDownloadPath');
       const isOffline = !!localPath;
-      log('Offline mode:', isOffline);
 
       let streamUrl: string;
       let chapters: Chapter[] = [];
@@ -229,80 +240,70 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       let totalDuration = getBookDuration(book);
 
       if (isOffline && localPath) {
-        // OFFLINE PLAYBACK - use local file
+        // OFFLINE PLAYBACK - instant
         streamUrl = localPath;
         chapters = extractChaptersFromBook(book);
-        log('Using offline path:', localPath);
+        log('Using offline path');
         
-        // Get local progress for offline playback
         if (!startPosition) {
           const localProgress = await progressService.getLocalProgress(book.id);
           if (localProgress && localProgress.currentTime > 0) {
             resumePosition = localProgress.currentTime;
-            log('Resuming from local progress:', resumePosition);
           }
         }
       } else {
-        // ONLINE PLAYBACK - use session API
-        log('Starting playback session...');
+        // ONLINE PLAYBACK - session API
+        timing('Before session start');
         
         const session = await sessionService.startSession(book.id);
+        timing('After session start');
 
-        if (thisLoadId !== currentLoadId) {
-          log('Load cancelled after session start');
-          return;
-        }
+        if (thisLoadId !== currentLoadId) return;
 
         const url = sessionService.getStreamUrl();
-        if (!url) {
-          throw new Error('No stream URL from session');
-        }
+        if (!url) throw new Error('No stream URL');
         streamUrl = url;
+        log('Stream URL:', streamUrl.substring(0, 80));
 
-        // Use chapters from session
         chapters = mapSessionChapters(session.chapters || []);
-        
-        // Use duration from session
-        if (session.duration > 0) {
-          totalDuration = session.duration;
-        }
+        if (session.duration > 0) totalDuration = session.duration;
+        if (!startPosition && session.currentTime > 0) resumePosition = session.currentTime;
 
-        // Use server's resume position if we don't have one
-        if (!startPosition && session.currentTime > 0) {
-          resumePosition = session.currentTime;
-          log('Resuming from server position:', resumePosition);
-        }
-
-        // Start auto-sync
         sessionService.startAutoSync(() => get().position);
       }
 
-      // Set state before loading audio
+      // Update state with chapters/duration before loading audio
       set({
-        currentBook: book,
         chapters,
         duration: totalDuration,
         position: resumePosition,
         isOffline,
-        isPlaying: false,
-        isBuffering: false,
       });
 
-      if (thisLoadId !== currentLoadId) {
-        log('Load cancelled before audio load');
-        return;
-      }
+      if (thisLoadId !== currentLoadId) return;
 
-      // Load audio
-      log('Loading audio from:', streamUrl.substring(0, 80) + '...');
-      await audioService.loadAudio(streamUrl, resumePosition);
+      // Get metadata for lock screen
+      const title = book.media?.metadata?.title || 'Audiobook';
+      const author = book.media?.metadata?.authorName || 
+                     book.media?.metadata?.authors?.[0]?.name || 
+                     'Unknown Author';
+      const coverUrl = apiClient.getItemCoverUrl(book.id);
+
+      // Load audio with metadata
+      timing('Before loadAudio');
+      await audioService.loadAudio(streamUrl, resumePosition, {
+        title,
+        artist: author,
+        artwork: coverUrl,
+      });
+      timing('After loadAudio');
 
       if (thisLoadId !== currentLoadId) {
         log('Load cancelled after audio load');
         return;
       }
 
-      // Set up status callback
+      // Set up status callback immediately
       audioService.setStatusUpdateCallback((state) => {
         get().updatePlaybackState(state);
       });
@@ -310,17 +311,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       // Apply playback rate
       const { playbackRate } = get();
       if (playbackRate !== 1.0) {
-        await audioService.setPlaybackRate(playbackRate);
+        audioService.setPlaybackRate(playbackRate).catch(() => {});
       }
 
-      // Load bookmarks
-      await get().loadBookmarks();
+      // Load bookmarks in BACKGROUND (don't await)
+      get().loadBookmarks().catch(() => {});
 
-      set({ isLoading: false });
-
-      // Auto-play
-      log('Starting playback');
-      await get().play();
+      set({ isLoading: false, isBuffering: true, isPlaying: true });
+      
+      log(`✓ Playback started`);
 
     } catch (error: any) {
       if (thisLoadId === currentLoadId) {
@@ -347,7 +346,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { currentBook, position, duration, isOffline } = get();
     if (!currentBook) return;
 
-    // Sync progress on pause
+    // Sync progress on pause (fire and forget)
     if (isOffline) {
       progressService.saveLocalOnly({
         itemId: currentBook.id,
@@ -357,7 +356,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         isFinished: false,
       }).catch(() => {});
     } else {
-      sessionService.syncProgress(position).catch(() => {});
+      sessionService.syncProgress(position); // Now fire-and-forget
     }
   },
 
@@ -434,17 +433,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   updatePlaybackState: (state: PlaybackState) => {
-    const { duration: storeDuration } = get();
+    const { duration: storeDuration, isLoading, isPlaying: wasPlaying } = get();
+
+    // Don't update isPlaying while loading
+    if (isLoading) {
+      set({
+        position: state.position,
+        duration: state.duration > 0 ? state.duration : storeDuration,
+        isBuffering: state.isBuffering,
+      });
+      return;
+    }
+
+    // Don't flip from playing to not-playing due to buffering
+    const newIsPlaying = state.isBuffering ? wasPlaying : state.isPlaying;
 
     set({
-      isPlaying: state.isPlaying,
+      isPlaying: newIsPlaying,
       position: state.position,
       duration: state.duration > 0 ? state.duration : storeDuration,
       isBuffering: state.isBuffering,
     });
 
     // Handle track finished
-    if ((state as any).didJustFinish) {
+    if (state.didJustFinish) {
       log('Track finished');
       set({ isPlaying: false });
     }

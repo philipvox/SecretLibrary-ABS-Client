@@ -1,7 +1,10 @@
 /**
  * src/features/library/screens/MyLibraryScreen.tsx
  * 
- * User's personal library with selection and removal
+ * User's library with:
+ * - Grid of books with extracted color backgrounds
+ * - Selection mode for removal
+ * - Category cards row (Series, Authors, Narrators)
  */
 
 import React, { useMemo } from 'react';
@@ -9,13 +12,15 @@ import {
   View,
   Text,
   FlatList,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TopNavBar } from '@/navigation/components/TopNavBar';
+import { useNavigation } from '@react-navigation/native';
 import { LibraryBookCard } from '../components/LibraryBookCard';
 import { useMyLibraryStore } from '../stores/myLibraryStore';
 import { useAllLibraryItems } from '@/features/search/hooks/useAllLibraryItems';
@@ -23,12 +28,43 @@ import { useDefaultLibrary } from '../hooks/useDefaultLibrary';
 import { Icon } from '@/shared/components/Icon';
 import { LoadingSpinner, EmptyState } from '@/shared/components';
 import { LibraryItem } from '@/core/types';
-import { theme } from '@/shared/theme';
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GAP = 5;
 const NUM_COLUMNS = 3;
+const HEADER_BG = '#303030';
+const CATEGORY_CARD_WIDTH = (SCREEN_WIDTH - GAP * 4) / 2.5;
+const CATEGORY_CARD_HEIGHT = CATEGORY_CARD_WIDTH * 0.7;
+
+// Category card colors
+const CATEGORY_COLORS = [
+  { name: 'Series', color: '#FED132', textColor: '#000' },
+  { name: 'Authors', color: '#9FDACC', textColor: '#000' },
+  { name: 'Narrators', color: '#E94D59', textColor: '#FFF' },
+];
+
+interface CategoryCardProps {
+  name: string;
+  color: string;
+  textColor: string;
+  onPress: () => void;
+}
+
+function CategoryCard({ name, color, textColor, onPress }: CategoryCardProps) {
+  return (
+    <TouchableOpacity 
+      style={[styles.categoryCard, { backgroundColor: color }]}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <Text style={[styles.categoryTitle, { color: textColor }]}>{name}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export function MyLibraryScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { library } = useDefaultLibrary();
   const { items: allItems, isLoading } = useAllLibraryItems(library?.id || '');
   
@@ -76,76 +112,121 @@ export function MyLibraryScreen() {
     stopSelecting();
   };
 
+  const handleCategoryPress = (category: string) => {
+    switch (category) {
+      case 'Series':
+        navigation.navigate('DiscoverTab', { screen: 'Series' });
+        break;
+      case 'Authors':
+        navigation.navigate('DiscoverTab', { screen: 'Authors' });
+        break;
+      case 'Narrators':
+        navigation.navigate('DiscoverTab', { screen: 'Narrators' });
+        break;
+    }
+  };
+
   const renderItem = ({ item }: { item: LibraryItem }) => (
     <LibraryBookCard book={item} />
   );
 
-  if (isLoading) {
-    return <LoadingSpinner text="Loading library..." />;
-  }
-
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
-      
-      <View style={{ paddingTop: insets.top }}>
-        {isSelecting ? (
-          <View style={styles.selectionHeader}>
-            <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.selectionCount}>
-              {selectedIds.length} selected
-            </Text>
-            
-            <TouchableOpacity onPress={handleSelectAll} style={styles.headerButton}>
-              <Text style={styles.selectAllText}>
-                {selectedIds.length === libraryItems.length ? 'Deselect All' : 'Select All'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TopNavBar />
-        )}
-      </View>
-
-      {/* Header */}
+  const renderHeader = () => (
+    <View>
+      {/* Title */}
       {!isSelecting && (
-        <View style={styles.header}>
+        <View style={styles.headerSection}>
           <Text style={styles.headerTitle}>Your Library</Text>
           <Text style={styles.headerSubtitle}>
             {libraryItems.length} {libraryItems.length === 1 ? 'book' : 'books'}
           </Text>
         </View>
       )}
+    </View>
+  );
+
+  const renderFooter = () => (
+    <View style={styles.categorySection}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryScroll}
+      >
+        {CATEGORY_COLORS.map((cat) => (
+          <CategoryCard
+            key={cat.name}
+            name={cat.name}
+            color={cat.color}
+            textColor={cat.textColor}
+            onPress={() => handleCategoryPress(cat.name)}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <LoadingSpinner text="Loading library..." />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
+      
+      {/* Selection Header */}
+      {isSelecting && (
+        <View style={[styles.selectionHeader, { paddingTop: insets.top + 10 }]}>
+          <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.selectionCount}>
+            {selectedIds.length} selected
+          </Text>
+          
+          <View style={styles.selectionActions}>
+            <TouchableOpacity onPress={handleSelectAll} style={styles.headerButton}>
+              <Text style={styles.selectAllText}>
+                {selectedIds.length === libraryItems.length ? 'None' : 'All'}
+              </Text>
+            </TouchableOpacity>
+            
+            {selectedIds.length > 0 && (
+              <TouchableOpacity onPress={handleRemove} style={styles.headerButton}>
+                <Icon name="trash-outline" size={22} color="#FF4444" set="ionicons" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       {libraryItems.length === 0 ? (
-        <EmptyState
-          icon="📚"
-          message="Your library is empty"
-          description="Add books from Browse or Search to build your collection"
-        />
+        <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
+          <EmptyState
+            message="Your library is empty"
+            description="Add books from Browse to build your collection"
+            icon="📚"
+          />
+          {renderFooter()}
+        </View>
       ) : (
         <FlatList
           data={libraryItems}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           numColumns={NUM_COLUMNS}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent, 
+            { paddingTop: isSelecting ? 10 : insets.top + 10 }
+          ]}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
         />
-      )}
-
-      {/* Selection footer */}
-      {isSelecting && selectedIds.length > 0 && (
-        <View style={[styles.selectionFooter, { paddingBottom: insets.bottom + 100 }]}>
-          <TouchableOpacity style={styles.removeButton} onPress={handleRemove}>
-            <Icon name="trash-outline" size={20} color="#FFFFFF" set="ionicons" />
-            <Text style={styles.removeButtonText}>Remove</Text>
-          </TouchableOpacity>
-        </View>
       )}
     </View>
   );
@@ -154,80 +235,81 @@ export function MyLibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: HEADER_BG,
   },
   selectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: HEADER_BG,
   },
   headerButton: {
-    paddingHorizontal: theme.spacing[2],
-    paddingVertical: theme.spacing[1],
+    padding: 8,
   },
   cancelText: {
     fontSize: 16,
-    color: theme.colors.text.primary,
-  },
-  selectAllText: {
-    fontSize: 14,
-    color: theme.colors.primary[500],
-    fontWeight: '500',
+    color: '#FFFFFF',
   },
   selectionCount: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
   },
-  header: {
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[2],
-    paddingBottom: theme.spacing[4],
+  selectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  headerTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
-    marginTop: 4,
+  selectAllText: {
+    fontSize: 16,
+    color: '#007AFF',
   },
   listContent: {
-    paddingHorizontal: theme.spacing[4],
+    paddingHorizontal: GAP,
     paddingBottom: 120,
   },
   columnWrapper: {
-    justifyContent: 'flex-start',
-    gap: theme.spacing[3],
-    marginBottom: theme.spacing[4],
+    gap: GAP,
   },
-  selectionFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.colors.background.primary,
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border.light,
+  headerSection: {
+    paddingHorizontal: GAP,
+    paddingBottom: 16,
   },
-  removeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#DC2626',
-    borderRadius: theme.radius.medium,
-    paddingVertical: theme.spacing[3],
-    gap: theme.spacing[2],
-  },
-  removeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
     color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  categorySection: {
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  categoryScroll: {
+    paddingHorizontal: GAP,
+    gap: GAP,
+  },
+  categoryCard: {
+    width: CATEGORY_CARD_WIDTH,
+    height: CATEGORY_CARD_HEIGHT,
+    borderRadius: 5,
+    padding: 14,
+    justifyContent: 'flex-end',
+  },
+  categoryTitle: {
+    fontSize: 22,
+    fontWeight: '700',
   },
 });
+
+export default MyLibraryScreen;

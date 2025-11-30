@@ -2,7 +2,7 @@
  * src/features/player/panels/SpeedPanel.tsx
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LiquidSlider } from '../components/LiquidSlider';
 
@@ -10,30 +10,17 @@ import { LiquidSlider } from '../components/LiquidSlider';
 // TYPES
 // =============================================================================
 
-interface SpeedPanelColors {
-  text: string;
-  textSecondary: string;
-  surface: string;
-  isDark: boolean;
-}
-
 interface SpeedPanelProps {
-  currentSpeed?: number;
-  onSpeedChange: (speed: number) => void;
+  tempSpeed: number;
+  setTempSpeed: (speed: number) => void;
+  onApply: () => void;
   onClose: () => void;
-  colors?: SpeedPanelColors;
+  isLight: boolean;
 }
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
-
-const DEFAULT_COLORS: SpeedPanelColors = {
-  text: '#000000',
-  textSecondary: 'rgba(0,0,0,0.5)',
-  surface: '#FFFFFF',
-  isDark: false,
-};
 
 const SPEED_PRESETS = [0.75, 1, 1.25, 1.5, 2];
 const MIN_SPEED = 0.75;
@@ -45,19 +32,17 @@ const SPEED_STEP = 0.05;
 // =============================================================================
 
 export function SpeedPanel({ 
-  currentSpeed = 1, 
-  onSpeedChange, 
-  onClose, 
-  colors = DEFAULT_COLORS 
+  tempSpeed, 
+  setTempSpeed, 
+  onApply,
+  onClose,
+  isLight,
 }: SpeedPanelProps) {
-  const [tempSpeed, setTempSpeed] = useState(currentSpeed);
-  
-  const isLight = !colors.isDark;
-  const textColor = colors.text;
-  const secondaryColor = colors.textSecondary;
+  const textColor = isLight ? '#000000' : '#FFFFFF';
+  const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
   const buttonBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
   const activeButtonBg = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
-  const activeButtonText = colors.surface;
+  const activeButtonText = isLight ? '#FFFFFF' : '#000000';
 
   // ===========================================================================
   // HANDLERS
@@ -65,16 +50,11 @@ export function SpeedPanel({
 
   const handleSliderChange = useCallback((value: number) => {
     setTempSpeed(value);
-  }, []);
+  }, [setTempSpeed]);
 
   const handlePresetPress = useCallback((speed: number) => {
     setTempSpeed(speed);
-  }, []);
-
-  const handleApply = useCallback(() => {
-    onSpeedChange(tempSpeed);
-    onClose();
-  }, [tempSpeed, onSpeedChange, onClose]);
+  }, [setTempSpeed]);
 
   // ===========================================================================
   // HELPERS
@@ -82,7 +62,6 @@ export function SpeedPanel({
 
   const formatSpeed = (speed: number): string => {
     if (Number.isInteger(speed)) return `${speed}x`;
-    // Remove trailing zeros
     const formatted = speed.toFixed(2).replace(/\.?0+$/, '');
     return `${formatted}x`;
   };
@@ -110,7 +89,7 @@ export function SpeedPanel({
           max={MAX_SPEED}
           step={SPEED_STEP}
           onValueChange={handleSliderChange}
-          isDark={colors.isDark}
+          isDark={!isLight}
         />
         
         {/* Slider Labels */}
@@ -169,7 +148,7 @@ export function SpeedPanel({
 
         <TouchableOpacity
           style={[styles.applyButton, { backgroundColor: activeButtonBg }]}
-          onPress={handleApply}
+          onPress={onApply}
           activeOpacity={0.7}
         >
           <Text style={[styles.applyButtonText, { color: activeButtonText }]}>
@@ -187,25 +166,23 @@ export function SpeedPanel({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    alignItems: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 0,
   },
   valueText: {
     fontSize: 64,
     fontWeight: '700',
-    marginBottom: 24,
-    alignSelf: 'flex-start',
+    marginBottom: 8,
   },
   sliderSection: {
-    marginBottom: 24,
+    marginBottom: 10,
     width: '100%',
+    overflow: 'visible',
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingHorizontal: 4,
+    marginTop: -15,
   },
   sliderLabel: {
     fontSize: 13,
@@ -214,7 +191,8 @@ const styles = StyleSheet.create({
   presetRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 16,
+    marginTop: 4,
     width: '100%',
   },
   presetButton: {
@@ -242,12 +220,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   applyButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 125,
+    height: 125,
+    borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ rotate: '5deg' }],
+    transform: [{ rotate: '-7deg' }],
   },
   applyButtonText: {
     fontSize: 17,

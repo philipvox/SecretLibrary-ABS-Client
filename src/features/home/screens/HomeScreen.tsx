@@ -3,10 +3,10 @@
  * 
  * Home screen with:
  * - Auto-download of top 3 continue listening books
- * - Properly syncs downloads when list changes
+ * - Stacked continue listening cards
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -21,23 +21,22 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { theme } from '@/shared/theme';
 import { useContinueListening } from '../hooks/useContinueListening';
-import { ContinueListeningCard, CARD_HEIGHT, CARD_OVERLAP } from '../components/ContinueListeningCard';
+import { ContinueListeningCard, CARD_HEIGHT, CARD_OVERLAP, CARD_MARGIN_BOTTOM } from '../components/ContinueListeningCard';
 import { Icon } from '@/shared/components/Icon';
 import { autoDownloadService } from '@/features/downloads';
-
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HEADER_BG = '#303030';
 const GAP = 5;
 const CARD_WIDTH_RATIO = 0.5;
-const ACTION_CARD_WIDTH = (SCREEN_WIDTH - (GAP * 3)) * CARD_WIDTH_RATIO;
+const ACTION_CARD_WIDTH = (SCREEN_WIDTH - 10) * CARD_WIDTH_RATIO; // 2.5 margin each side + 5 gap
 const ACTION_CARD_HEIGHT = ACTION_CARD_WIDTH;
-const CARD_RADIUS = 5;
 const MAX_CARDS = 3;
 
 function ArrowUpRight({ size = 32, color = '#000000' }: { size?: number; color?: string }) {
@@ -57,7 +56,8 @@ function ArrowUpRight({ size = 32, color = '#000000' }: { size?: number; color?:
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { items: continueListeningItems, isLoading: isLoadingContinue } = useContinueListening();
+  const queryClient = useQueryClient();
+  const { items: continueListeningItems, isLoading: isLoadingContinue, refetch } = useContinueListening();
   const { 
     currentBook, 
     isPlaying, 
@@ -68,21 +68,45 @@ export function HomeScreen() {
 
   // Track last synced items to avoid redundant syncs
   const lastSyncedRef = useRef<string>('');
-
-  useEffect(() => {
-    if (continueListeningItems?.length) {
-      autoDownloadService.syncWithContinueListening(continueListeningItems);
-    }
-  }, [continueListeningItems]);
-
-  const visibleCards = continueListeningItems.slice(0, MAX_CARDS);
   
+  // Track locally hidden items for immediate UI feedback
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+
+  // Handle removing a book from continue listening
+  const handleRemoveFromContinue = useCallback((bookId: string) => {
+    // Immediately hide locally
+    setHiddenIds(prev => new Set(prev).add(bookId));
+    
+    // Clear sync ref to force re-sync when new data arrives
+    lastSyncedRef.current = '';
+    
+    // Refetch from server
+    refetch();
+  }, [refetch]);
+  
+  // Filter out hidden items
+  const visibleItems = continueListeningItems.filter(item => !hiddenIds.has(item.id));
+
+  // Auto-download disabled - manual download buttons used instead
+  // useEffect(() => {
+  //   if (!visibleItems.length) return;
+  //   const itemsKey = visibleItems.slice(0, MAX_CARDS).map(i => i.id).join(',');
+  //   if (itemsKey === lastSyncedRef.current) return;
+  //   lastSyncedRef.current = itemsKey;
+  //   console.log('[HomeScreen] Syncing auto-downloads:', itemsKey);
+  //   autoDownloadService.syncWithContinueListening(visibleItems).catch(e => {
+  //     console.warn('[HomeScreen] Auto-download sync failed:', e);
+  //   });
+  // }, [visibleItems]);
+
+  const visibleCards = visibleItems.slice(0, MAX_CARDS);
+
   const fullStackHeight = visibleCards.length > 0 
     ? CARD_HEIGHT + (visibleCards.length - 1) * (CARD_HEIGHT + CARD_OVERLAP)
     : 0;
 
   const reversedCards = [...visibleCards].reverse();
-  const lastBook = continueListeningItems[0];
+  const lastBook = visibleItems[0];
 
   const playCardBook = currentBook || lastBook;
   const playCardCoverUrl = playCardBook ? apiClient.getItemCoverUrl(playCardBook.id) : null;
@@ -122,7 +146,7 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={HEADER_BG} />
+      <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
       
       <ScrollView
         style={styles.scrollView}
@@ -132,13 +156,13 @@ export function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Card Stack */}
+        {/* Continue Listening Card Stack */}
         {isLoadingContinue ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={theme.colors.primary[500]} />
           </View>
         ) : visibleCards.length > 0 ? (
-          <View style={[styles.cardStack, { height: fullStackHeight }]}>
+          <View style={[styles.cardStack, { height: fullStackHeight, marginBottom: CARD_MARGIN_BOTTOM }]}>
             {reversedCards.map((book, reverseIndex) => {
               const zIndex = MAX_CARDS - reverseIndex;
               return (
@@ -146,6 +170,8 @@ export function HomeScreen() {
                   key={book.id} 
                   book={book}
                   zIndex={zIndex}
+                  onRemove={handleRemoveFromContinue}
+                  onPress={() => navigation.navigate('BookDetail', { id: book.id })}
                   style={{
                     position: 'absolute',
                     top: reverseIndex * (CARD_HEIGHT + CARD_OVERLAP),
@@ -165,48 +191,46 @@ export function HomeScreen() {
         )}
 
         {/* Action Cards */}
-        <View style={styles.actionOverlay}>
-          <View style={styles.actionRow}>
-            <TouchableOpacity 
-              style={[styles.justForYouCard, { width: ACTION_CARD_WIDTH, height: ACTION_CARD_HEIGHT }]} 
-              onPress={handleJustForYou}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.justForYouTitle}>Just for{'\n'}You</Text>
-              <View style={styles.justForYouBottom}>
-                <Text style={styles.justForYouSubtitle}>your{'\n'}recommendations</Text>
-                <ArrowUpRight size={32} color="#000000" />
-              </View>
-            </TouchableOpacity>
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={[styles.justForYouCard, { width: ACTION_CARD_WIDTH, height: ACTION_CARD_HEIGHT }]} 
+            onPress={handleJustForYou}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.justForYouTitle}>Just for{'\n'}You</Text>
+            <View style={styles.justForYouBottom}>
+              <Text style={styles.justForYouSubtitle}>your{'\n'}recommendations</Text>
+              <ArrowUpRight size={32} color="#000000" />
+            </View>
+          </TouchableOpacity>
 
-            <Pressable 
-              style={[
-                styles.playCard, 
-                { width: ACTION_CARD_WIDTH, height: ACTION_CARD_HEIGHT },
-                !playCardBook && styles.playCardDisabled
-              ]} 
-              onPress={handlePlayPress}
-              onLongPress={handlePlayLongPress}
-              delayLongPress={300}
-              disabled={!playCardBook}
-            >
-              {playCardCoverUrl ? (
-                <Image 
-                  source={{ uri: playCardCoverUrl }} 
-                  style={styles.playCardCover}
-                  resizeMode="cover"
-                />
-              ) : null}
-              <View style={styles.playCardOverlay}>
-                <Icon 
-                  name={hasCurrentBook && isPlaying ? 'pause' : 'play'} 
-                  size={56} 
-                  color="#FFFFFF" 
-                  set="ionicons" 
-                />
-              </View>
-            </Pressable>
-          </View>
+          <Pressable 
+            style={[
+              styles.playCard, 
+              { width: ACTION_CARD_WIDTH, height: ACTION_CARD_HEIGHT },
+              !playCardBook && styles.playCardDisabled
+            ]} 
+            onPress={handlePlayPress}
+            onLongPress={handlePlayLongPress}
+            delayLongPress={300}
+            disabled={!playCardBook}
+          >
+            {playCardCoverUrl ? (
+              <Image 
+                source={{ uri: playCardCoverUrl }} 
+                style={styles.playCardCover}
+                resizeMode="cover"
+              />
+            ) : null}
+            <View style={styles.playCardOverlay}>
+              <Icon 
+                name={hasCurrentBook && isPlaying ? 'pause' : 'play'} 
+                size={48} 
+                color="#FFFFFF" 
+                set="ionicons"
+              />
+            </View>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
@@ -222,29 +246,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    minHeight: '100%',
+    paddingHorizontal: 0,
   },
   loadingContainer: {
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 2.5,
   },
   cardStack: {
-    marginBottom: GAP,
-    zIndex: 1,
-  },
-  actionOverlay: {
-    zIndex: 10,
-    marginTop: 0,
-    paddingBottom: 175,
-    flex: 1,
+    position: 'relative',
   },
   emptyStack: {
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: GAP,
+    marginBottom: CARD_MARGIN_BOTTOM,
+    marginHorizontal: 2.5,
   },
   emptyEmoji: {
     fontSize: 48,
@@ -253,27 +271,28 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   emptySubtitle: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
+    fontSize: 14,
+    color: '#AAAAAA',
   },
   actionRow: {
     flexDirection: 'row',
-    paddingHorizontal: GAP,
+    justifyContent: 'space-between',
     gap: GAP,
+    marginHorizontal: 2.5,
   },
   justForYouCard: {
-    backgroundColor: '#CEFF00',
-    borderRadius: CARD_RADIUS,
-    padding: 14,
+    backgroundColor: '#CCFF00',
+    borderRadius: 5,
+    padding: 16,
     justifyContent: 'space-between',
   },
   justForYouTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#000000',
     lineHeight: 32,
   },
@@ -289,24 +308,20 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   playCard: {
-    backgroundColor: '#333333',
-    borderRadius: CARD_RADIUS,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 5,
     overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+  },
+  playCardDisabled: {
+    opacity: 0.5,
   },
   playCardCover: {
     ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
   },
   playCardOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  playCardDisabled: {
-    opacity: 0.5,
   },
 });

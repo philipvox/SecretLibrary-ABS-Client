@@ -4,18 +4,19 @@
  * Library book card with:
  * - Extracted palette color background
  * - Cover image at low opacity
- * - Author at top, title below, play button bottom right
+ * - Author, title, play button
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  Image,
+  ImageBackground,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { getColors } from 'react-native-image-colors';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
@@ -87,6 +88,7 @@ function useExtractedColor(imageUrl: string, bookId: string) {
 }
 
 export function LibraryBookCard({ book }: LibraryBookCardProps) {
+  const navigation = useNavigation<any>();
   const { loadBook, currentBook, isPlaying } = usePlayerStore();
   const { isSelecting, selectedIds, toggleSelection, startSelecting } = useMyLibraryStore();
 
@@ -98,19 +100,13 @@ export function LibraryBookCard({ book }: LibraryBookCardProps) {
 
   const { bgColor, textIsLight } = useExtractedColor(coverUrl, book.id);
   const textColor = textIsLight ? '#000000' : '#FFFFFF';
-  const secondaryColor = textIsLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+  const secondaryColor = textIsLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
 
-  const handlePress = async () => {
+  const handlePress = () => {
     if (isSelecting) {
       toggleSelection(book.id);
     } else {
-      // Load book directly into player
-      try {
-        const fullBook = await apiClient.getItem(book.id);
-        await loadBook(fullBook);
-      } catch (err) {
-        console.error('Failed to load book:', err);
-      }
+      navigation.navigate('BookDetail', { bookId: book.id });
     }
   };
 
@@ -121,6 +117,15 @@ export function LibraryBookCard({ book }: LibraryBookCardProps) {
     }
   };
 
+  const handlePlayPress = useCallback(async () => {
+    try {
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook);
+    } catch (err) {
+      console.error('Failed to load book:', err);
+    }
+  }, [book.id, loadBook]);
+
   return (
     <TouchableOpacity
       style={styles.container}
@@ -130,25 +135,22 @@ export function LibraryBookCard({ book }: LibraryBookCardProps) {
       delayLongPress={300}
     >
       <View style={[styles.card, { backgroundColor: bgColor }]}>
-        {/* Cover image as background at low opacity */}
-        <Image 
-          source={{ uri: coverUrl }} 
-          style={styles.coverBackground}
-          resizeMode="cover"
-        />
+        <ImageBackground
+          source={{ uri: coverUrl }}
+          style={styles.imageBackground}
+          imageStyle={styles.cardImage}
+        >
+          {/* Selection checkbox */}
+          {isSelecting && (
+            <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+              {isSelected && (
+                <Icon name="checkmark" size={12} color="#FFFFFF" set="ionicons" />
+              )}
+            </View>
+          )}
 
-        {/* Selection checkbox */}
-        {isSelecting && (
-          <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-            {isSelected && (
-              <Icon name="checkmark" size={12} color="#FFFFFF" set="ionicons" />
-            )}
-          </View>
-        )}
-
-        {/* Content overlay */}
-        <View style={styles.content}>
-          <View style={styles.textContent}>
+          {/* Content */}
+          <View style={styles.content}>
             <Text style={[styles.author, { color: secondaryColor }]} numberOfLines={1}>
               {author}
             </Text>
@@ -157,16 +159,20 @@ export function LibraryBookCard({ book }: LibraryBookCardProps) {
             </Text>
           </View>
 
-          {/* Play icon indicator */}
-          <View style={styles.playIcon}>
+          {/* Play button */}
+          <TouchableOpacity 
+            style={styles.playButton} 
+            onPress={handlePlayPress}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Icon 
               name={isThisPlaying ? 'pause' : 'play'} 
-              size={20} 
+              size={18} 
               color={textColor} 
               set="ionicons"
             />
-          </View>
-        </View>
+          </TouchableOpacity>
+        </ImageBackground>
       </View>
     </TouchableOpacity>
   );
@@ -179,13 +185,18 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_SIZE,
-    height: CARD_SIZE * 1.15,
+    height: CARD_SIZE * 1.1,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
   },
-  coverBackground: {
-    ...StyleSheet.absoluteFillObject,
+  imageBackground: {
+    flex: 1,
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  cardImage: {
     opacity: 0.3,
+    borderRadius: CARD_RADIUS,
   },
   checkbox: {
     position: 'absolute',
@@ -199,7 +210,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
   },
   checkboxSelected: {
     backgroundColor: '#007AFF',
@@ -207,24 +217,22 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 10,
-    justifyContent: 'space-between',
-  },
-  textContent: {
-    flex: 1,
+    justifyContent: 'flex-start',
   },
   author: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   title: {
     fontSize: 14,
     fontWeight: '700',
-    lineHeight: 17,
+    lineHeight: 18,
   },
-  playIcon: {
-    alignSelf: 'flex-end',
+  playButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
   },
 });
 

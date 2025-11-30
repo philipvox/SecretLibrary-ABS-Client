@@ -1,8 +1,9 @@
 /**
  * src/features/player/services/sessionService.ts
  * 
- * ABS Playback Session API
- * CORRECT endpoint: POST /api/items/{libraryItemId}/play
+ * OPTIMIZED for instant streaming
+ * - Non-blocking session close
+ * - Faster session start
  */
 
 import { apiClient } from '@/core/api';
@@ -46,17 +47,19 @@ class SessionService {
 
   /**
    * Start a new playback session
-   * CORRECT endpoint: POST /api/items/{libraryItemId}/play
+   * NON-BLOCKING: closes old session in background
    */
   async startSession(libraryItemId: string): Promise<PlaybackSession> {
-    console.log('[Session] Starting session for:', libraryItemId);
-    const startTime = Date.now();
+    const t0 = Date.now();
+    const t = (label: string) => console.log(`[Session] ⏱ [${Date.now() - t0}ms] ${label}`);
+    
+    t('startSession called');
 
-    // Close any existing session first
-    await this.closeSession();
+    // Close old session in BACKGROUND (don't await)
+    this.closeSessionAsync();
 
     try {
-      // CORRECT ENDPOINT - was using /api/session which is wrong
+      t('Starting API call...');
       const session = await apiClient.post<PlaybackSession>(
         `/api/items/${libraryItemId}/play`,
         {
@@ -80,20 +83,16 @@ class SessionService {
           mediaPlayer: 'expo-audio',
         }
       );
+      t('API call returned');
 
       this.currentSession = session;
+      t('Session stored');
 
-      const elapsed = Date.now() - startTime;
-      console.log('[Session] ✓ Session started in', elapsed, 'ms');
-      console.log('[Session] ID:', session.id);
-      console.log('[Session] Duration:', session.duration, 'sec');
-      console.log('[Session] Tracks:', session.audioTracks?.length);
-      console.log('[Session] Chapters:', session.chapters?.length);
-      console.log('[Session] Resume at:', session.currentTime, 'sec');
+      console.log('[Session] Duration:', session.duration, 'Resume:', session.currentTime);
 
       return session;
     } catch (error: any) {
-      console.error('[Session] ❌ Failed to start:', error.message);
+      console.error('[Session] ❌ Failed:', error.message);
       throw error;
     }
   }
@@ -108,7 +107,7 @@ class SessionService {
     const baseUrl = apiClient.getBaseURL().replace(/\/+$/, '');
     const track = tracks[trackIndex];
     
-    // Get token - try multiple approaches for compatibility
+    // Get token
     let token = '';
     if (typeof (apiClient as any).getAuthToken === 'function') {
       token = (apiClient as any).getAuthToken() || '';
@@ -118,7 +117,6 @@ class SessionService {
       token = (apiClient as any).token;
     }
     
-    // contentUrl might already have token
     if (track.contentUrl.includes('token=')) {
       return `${baseUrl}${track.contentUrl}`;
     }
@@ -126,31 +124,36 @@ class SessionService {
     const separator = track.contentUrl.includes('?') ? '&' : '?';
     return `${baseUrl}${track.contentUrl}${separator}token=${token}`;
   }
-  /**
-   * Get current session
-   */
+
   getCurrentSession(): PlaybackSession | null {
     return this.currentSession;
   }
 
-  /**
-   * Get chapters from current session
-   */
   getChapters(): SessionChapter[] {
     return this.currentSession?.chapters || [];
   }
 
-  /**
-   * Get session start time (where to resume)
-   */
   getStartTime(): number {
     return this.currentSession?.currentTime || 0;
   }
 
   /**
-   * Sync progress with server
+   * Sync progress - fire and forget (non-blocking)
    */
-  async syncProgress(currentTime: number): Promise<void> {
+  syncProgress(currentTime: number): void {
+    if (!this.currentSession) return;
+
+    // Fire and forget - don't await
+    apiClient.post(`/api/session/${this.currentSession.id}/sync`, {
+      currentTime,
+      timeListened: 0,
+    }).catch(() => {}); // Silently ignore errors
+  }
+
+  /**
+   * Sync progress and wait (for important saves)
+   */
+  async syncProgressAsync(currentTime: number): Promise<void> {
     if (!this.currentSession) return;
 
     try {
@@ -163,22 +166,16 @@ class SessionService {
     }
   }
 
-  /**
-   * Start auto-sync interval (every 30 seconds)
-   */
   startAutoSync(getCurrentTime: () => number): void {
     this.stopAutoSync();
     this.syncIntervalId = setInterval(() => {
       const time = getCurrentTime();
       if (time > 0) {
-        this.syncProgress(time);
+        this.syncProgress(time); // Non-blocking
       }
     }, 30000);
   }
 
-  /**
-   * Stop auto-sync interval
-   */
   stopAutoSync(): void {
     if (this.syncIntervalId) {
       clearInterval(this.syncIntervalId);
@@ -187,7 +184,25 @@ class SessionService {
   }
 
   /**
-   * Close the current session
+   * Close session - NON-BLOCKING (fire and forget)
+   */
+  closeSessionAsync(finalTime?: number): void {
+    this.stopAutoSync();
+
+    if (!this.currentSession) return;
+
+    const sessionId = this.currentSession.id;
+    this.currentSession = null;
+
+    // Fire and forget
+    apiClient.post(`/api/session/${sessionId}/close`, {
+      currentTime: finalTime,
+      timeListened: 0,
+    }).catch(() => {});
+  }
+
+  /**
+   * Close session and wait (for app shutdown)
    */
   async closeSession(finalTime?: number): Promise<void> {
     this.stopAutoSync();
