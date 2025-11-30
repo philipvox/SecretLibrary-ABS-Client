@@ -1,6 +1,6 @@
 /**
- * src/core/api/client.ts
- * 
+ * src/core/api/apiClient.ts
+ *
  * AudiobookShelf API client extending base client with all API operations.
  */
 
@@ -150,25 +150,10 @@ class ApiClient extends BaseApiClient {
     return this.get<FilterData>(endpoints.libraries.filterData(libraryId));
   }
   async getLibrarySeries(libraryId: string): Promise<Series[]> {
-    try {
-      // Request up to 500 series (should cover most libraries)
-      const response = await this.get<any>(
-        `${endpoints.libraries.series(libraryId)}?limit=500`
-      );
-      
-      console.log('=== SERIES API RESPONSE ===');
-      console.log('Total available:', response?.total);
-      console.log('Results returned:', response?.results?.length);
-      
-      if (response?.results && Array.isArray(response.results)) {
-        return response.results;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('getLibrarySeries error:', error);
-      throw error;
-    }
+    const response = await this.get<{ results: Series[]; total: number }>(
+      `${endpoints.libraries.series(libraryId)}?limit=500`
+    );
+    return response?.results || [];
   }
 
   async getSeries(seriesId: string): Promise<Series> {
