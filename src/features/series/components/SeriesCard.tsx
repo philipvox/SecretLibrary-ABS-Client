@@ -22,7 +22,7 @@ function SeriesCardComponent({ series }: SeriesCardProps) {
   const navigation = useNavigation();
 
   const handlePress = () => {
-    navigation.navigate('SeriesDetail' as never, { seriesId: series.id } as never);
+    navigation.navigate('SeriesDetail' as never, { seriesName: series.name } as never);
   };
 
   const coverUrl = series.coverUrl

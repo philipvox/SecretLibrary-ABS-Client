@@ -1,5 +1,11 @@
-// File: src/features/series/screens/SeriesDetailScreen.tsx
-import React, { useState, useMemo } from 'react';
+/**
+ * src/features/series/screens/SeriesDetailScreen.tsx
+ *
+ * Series detail screen using library cache for instant loading.
+ * Dark theme matching app aesthetic.
+ */
+
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,245 +13,234 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
-import { useLibrarySeries } from '../hooks/useLibrarySeries';
-import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
-import { HorizontalBookItem } from '@/features/library/components/HorizontalBookItem';
-import { StackedBookCovers } from '../components/StackedBookCovers';
-import { LoadingSpinner, EmptyState, ErrorView } from '@/shared/components';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLibraryCache } from '@/core/cache';
+import { usePlayerStore } from '@/features/player';
+import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { LibraryItem } from '@/core/types';
 
 type SeriesDetailRouteParams = {
-  SeriesDetail: { seriesId: string };
+  SeriesDetail: { seriesName: string };
 };
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const FAN_WIDTH = SCREEN_WIDTH * 0.88;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BG_COLOR = '#1a1a1a';
+const CARD_COLOR = '#2a2a2a';
+const ACCENT = '#CCFF00';
+const CARD_RADIUS = 5;
 
-type TabType = 'overview' | 'details';
-type SortType = 'series-asc' | 'series-desc';
+type SortType = 'asc' | 'desc';
 
-function getBookSequence(book: any, seriesId: string): number {
-  const metadata = book.media?.metadata;
-  if (!metadata) return 999999;
-  
-  if (metadata.series && Array.isArray(metadata.series)) {
-    const matchingSeries = metadata.series.find((s: any) => s.id === seriesId);
-    if (matchingSeries?.sequence !== undefined && matchingSeries?.sequence !== null) {
-      const parsed = parseFloat(String(matchingSeries.sequence));
-      if (!isNaN(parsed)) return parsed;
-    }
+// Get sequence from book metadata
+function getSequence(item: LibraryItem): number {
+  const metadata = (item.media?.metadata as any) || {};
+  const seriesName = metadata.seriesName || '';
+  const match = seriesName.match(/#([\d.]+)/);
+  if (match) {
+    return parseFloat(match[1]);
   }
-  
-  if (metadata.sequence !== undefined && metadata.sequence !== null) {
-    const parsed = parseFloat(String(metadata.sequence));
-    if (!isNaN(parsed)) return parsed;
+  // Try to get sequence from title
+  const titleMatch = (metadata.title || '').match(/Book\s*(\d+)/i);
+  if (titleMatch) {
+    return parseInt(titleMatch[1], 10);
   }
-  
-  const title = metadata.title || '';
-  const bookNumberMatch = title.match(/Book\s+(\d+)/i);
-  if (bookNumberMatch) {
-    return parseInt(bookNumberMatch[1], 10);
-  }
-  
-  return 999999;
+  return 999;
 }
 
 export function SeriesDetailScreen() {
   const route = useRoute<RouteProp<SeriesDetailRouteParams, 'SeriesDetail'>>();
   const navigation = useNavigation();
-  const { seriesId } = route.params;
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [sortBy, setSortBy] = useState<SortType>('series-asc');
+  const insets = useSafeAreaInsets();
+  const { seriesName } = route.params;
+  const [sortOrder, setSortOrder] = useState<SortType>('asc');
 
-  const { library } = useDefaultLibrary();
-  const { series: allSeries, isLoading, error, refetch } = useLibrarySeries(library?.id || '');
+  const { getSeries, isLoaded } = useLibraryCache();
+  const { loadBook } = usePlayerStore();
 
-  const series = allSeries.find(s => s.id === seriesId);
-  const books = series?.books || [];
+  // Get series data from cache - instant!
+  const seriesInfo = useMemo(() => {
+    if (!isLoaded || !seriesName) return null;
+    return getSeries(seriesName);
+  }, [isLoaded, seriesName, getSeries]);
 
   const sortedBooks = useMemo(() => {
-    const sorted = [...books];
-    
+    if (!seriesInfo?.books) return [];
+    const sorted = [...seriesInfo.books];
     sorted.sort((a, b) => {
-      const seqA = getBookSequence(a, seriesId);
-      const seqB = getBookSequence(b, seriesId);
-      
-      if (seqA !== seqB) {
-        return sortBy === 'series-asc' ? seqA - seqB : seqB - seqA;
-      }
-      
-      const titleA = (a.media?.metadata?.title || '').toLowerCase();
-      const titleB = (b.media?.metadata?.title || '').toLowerCase();
-      return titleA.localeCompare(titleB);
+      const seqA = getSequence(a);
+      const seqB = getSequence(b);
+      return sortOrder === 'asc' ? seqA - seqB : seqB - seqA;
     });
-    
     return sorted;
-  }, [books, sortBy, seriesId]);
+  }, [seriesInfo?.books, sortOrder]);
 
-  if (isLoading) {
-    return <LoadingSpinner text="Loading series..." />;
-  }
-
-  if (error) {
-    return <ErrorView message="Failed to load series" onRetry={refetch} />;
-  }
-
-  if (!series) {
-    return (
-      <EmptyState
-        icon="❌"
-        message="Series not found"
-        description="This series may have been removed"
-      />
-    );
-  }
-
-  const bookIds = sortedBooks.map(b => b.id);
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
-
-      <View style={styles.header}>
-        <TouchableOpacity 
-  style={styles.headerButton} 
-  onPress={() => {
+  const handleBack = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
       navigation.navigate('Main' as never);
     }
-  }}
->
-          <Icon name="arrow-back" size={22} color={theme.colors.text.primary} set="ionicons" />
+  };
+
+  const handleBookPress = useCallback(async (book: LibraryItem) => {
+    try {
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook, { autoPlay: false });
+    } catch {
+      await loadBook(book, { autoPlay: false });
+    }
+  }, [loadBook]);
+
+  const getMetadata = (item: LibraryItem) => (item.media?.metadata as any) || {};
+
+  // Loading/error states
+  if (!isLoaded) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={BG_COLOR} />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!seriesInfo) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={BG_COLOR} />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerButton} onPress={handleBack}>
+            <Icon name="chevron-back" size={24} color="#FFFFFF" set="ionicons" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Series</Text>
+          <View style={styles.headerButton} />
+        </View>
+        <View style={styles.emptyContainer}>
+          <Icon name="book-outline" size={48} color="rgba(255,255,255,0.3)" set="ionicons" />
+          <Text style={styles.emptyTitle}>Series not found</Text>
+          <Text style={styles.emptySubtitle}>This series may have been removed</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Get cover from first book
+  const firstBookId = sortedBooks[0]?.id;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={BG_COLOR} />
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.headerButton} onPress={handleBack}>
+          <Icon name="chevron-back" size={24} color="#FFFFFF" set="ionicons" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Series</Text>
-        <TouchableOpacity style={styles.headerButton}>
-          <Icon name="heart-outline" size={22} color={theme.colors.primary[500]} set="ionicons" />
-        </TouchableOpacity>
+        <View style={styles.headerButton} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.coverSection}>
-          {bookIds.length > 0 ? (
-            <StackedBookCovers bookIds={bookIds} size={FAN_WIDTH} />
-          ) : (
-            <View style={styles.placeholderCover}>
-              <Text style={styles.placeholderText}>📚</Text>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Series Info */}
+        <View style={styles.seriesHeader}>
+          {firstBookId && (
+            <Image
+              source={apiClient.getItemCoverUrl(firstBookId)}
+              style={styles.coverImage}
+              contentFit="cover"
+              transition={150}
+            />
+          )}
+          {!firstBookId && (
+            <View style={[styles.coverImage, styles.coverPlaceholder]}>
+              <Text style={styles.coverPlaceholderText}>📚</Text>
             </View>
           )}
-        </View>
-
-        <View style={styles.infoSection}>
-          <Text style={styles.name} numberOfLines={2}>{series.name}</Text>
+          <Text style={styles.seriesName}>{seriesInfo.name}</Text>
           <Text style={styles.bookCount}>
-            {books.length} {books.length === 1 ? 'book' : 'books'}
+            {seriesInfo.bookCount} {seriesInfo.bookCount === 1 ? 'book' : 'books'}
           </Text>
         </View>
 
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
-            onPress={() => setActiveTab('overview')}
-          >
-            <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
-              Overview
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'details' && styles.tabActive]}
-            onPress={() => setActiveTab('details')}
-          >
-            <Text style={[styles.tabText, activeTab === 'details' && styles.tabTextActive]}>
-              Details
-            </Text>
-          </TouchableOpacity>
+        {/* Sort Toggle */}
+        <View style={styles.sortRow}>
+          <Text style={styles.sectionTitle}>Books in Series</Text>
+          <View style={styles.sortButtons}>
+            <TouchableOpacity
+              style={[styles.sortButton, sortOrder === 'asc' && styles.sortButtonActive]}
+              onPress={() => setSortOrder('asc')}
+            >
+              <Icon name="arrow-up" size={14} color={sortOrder === 'asc' ? '#000' : 'rgba(255,255,255,0.6)'} set="ionicons" />
+              <Text style={[styles.sortButtonText, sortOrder === 'asc' && styles.sortButtonTextActive]}>1→{sortedBooks.length}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sortButton, sortOrder === 'desc' && styles.sortButtonActive]}
+              onPress={() => setSortOrder('desc')}
+            >
+              <Icon name="arrow-down" size={14} color={sortOrder === 'desc' ? '#000' : 'rgba(255,255,255,0.6)'} set="ionicons" />
+              <Text style={[styles.sortButtonText, sortOrder === 'desc' && styles.sortButtonTextActive]}>{sortedBooks.length}→1</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.tabContent}>
-          {activeTab === 'overview' && (
-            <View style={styles.overviewContent}>
-              {series.description && (
-                <Text style={styles.description}>{series.description}</Text>
-              )}
-
-              {sortedBooks.length > 0 && (
-                <View style={styles.booksSection}>
-                  <View style={styles.booksSectionHeader}>
-                    <Text style={styles.sectionTitle}>All Books</Text>
-                    <View style={styles.sortButtons}>
-                      <TouchableOpacity
-                        style={[styles.sortButton, sortBy === 'series-asc' && styles.sortButtonActive]}
-                        onPress={() => setSortBy('series-asc')}
-                      >
-                        <Icon name="arrow-up" size={14} color={sortBy === 'series-asc' ? theme.colors.text.primary : theme.colors.text.tertiary} set="ionicons" />
-                        <Text style={[styles.sortButtonText, sortBy === 'series-asc' && styles.sortButtonTextActive]}>1-{books.length}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.sortButton, sortBy === 'series-desc' && styles.sortButtonActive]}
-                        onPress={() => setSortBy('series-desc')}
-                      >
-                        <Icon name="arrow-down" size={14} color={sortBy === 'series-desc' ? theme.colors.text.primary : theme.colors.text.tertiary} set="ionicons" />
-                        <Text style={[styles.sortButtonText, sortBy === 'series-desc' && styles.sortButtonTextActive]}>{books.length}-1</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  {sortedBooks.map((book: any) => (
-                    <HorizontalBookItem key={book.id} book={book} />
-                  ))}
-                </View>
-              )}
-
-              {!series.description && sortedBooks.length === 0 && (
-                <EmptyState
-                  icon="📝"
-                  message="No information available"
-                  description="Series description and books not found"
+        {/* Book List */}
+        <View style={styles.bookList}>
+          {sortedBooks.map((book, index) => {
+            const metadata = getMetadata(book);
+            const sequence = getSequence(book);
+            return (
+              <TouchableOpacity
+                key={book.id}
+                style={styles.bookItem}
+                onPress={() => handleBookPress(book)}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={apiClient.getItemCoverUrl(book.id)}
+                  style={styles.bookCover}
+                  contentFit="cover"
+                  transition={150}
                 />
-              )}
-            </View>
-          )}
-
-          {activeTab === 'details' && (
-            <View style={styles.detailsContent}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Series Name</Text>
-                <Text style={styles.detailValue}>{series.name}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Books</Text>
-                <Text style={styles.detailValue}>{books.length}</Text>
-              </View>
-              {series.description && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Description</Text>
-                  <Text style={styles.detailValue}>{series.description}</Text>
+                <View style={styles.bookInfo}>
+                  <View style={styles.sequenceBadge}>
+                    <Text style={styles.sequenceText}>
+                      {sequence < 999 ? `#${sequence}` : `#${index + 1}`}
+                    </Text>
+                  </View>
+                  <Text style={styles.bookTitle} numberOfLines={2}>{metadata.title || 'Unknown'}</Text>
+                  <Text style={styles.bookAuthor} numberOfLines={1}>{metadata.authorName || 'Unknown Author'}</Text>
                 </View>
-              )}
-            </View>
-          )}
+                <Icon name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" set="ionicons" />
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: BG_COLOR,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
   headerButton: {
     width: 40,
@@ -256,136 +251,148 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
   },
-  scrollView: {
+  content: {
     flex: 1,
   },
-  coverSection: {
-    alignItems: 'center',
-    paddingTop: theme.spacing[2],
-    paddingBottom: theme.spacing[4],
-  },
-  placeholderCover: {
-    width: 100,
-    height: 150,
-    borderRadius: theme.radius.large,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[300],
   },
-  placeholderText: {
-    fontSize: 56,
+  loadingText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 16,
   },
-  infoSection: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[3],
+    paddingHorizontal: 40,
   },
-  name: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+  emptyTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    marginTop: 4,
     textAlign: 'center',
-    lineHeight: 26,
+  },
+  seriesHeader: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+  },
+  coverImage: {
+    width: SCREEN_WIDTH * 0.4,
+    aspectRatio: 1,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: CARD_COLOR,
+    marginBottom: 16,
+  },
+  coverPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverPlaceholderText: {
+    fontSize: 48,
+  },
+  seriesName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   bookCount: {
     fontSize: 14,
-    color: theme.colors.text.secondary,
+    color: 'rgba(255,255,255,0.5)',
   },
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[2],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.neutral[200],
-  },
-  tab: {
-    paddingVertical: theme.spacing[3],
-    marginRight: theme.spacing[6],
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: theme.colors.text.primary,
-  },
-  tabText: {
-    fontSize: 14,
-    color: theme.colors.text.tertiary,
-    fontWeight: '500',
-  },
-  tabTextActive: {
-    color: theme.colors.text.primary,
-    fontWeight: '600',
-  },
-  tabContent: {
-    paddingTop: theme.spacing[4],
-    paddingBottom: theme.spacing[32] + 80,
-  },
-  overviewContent: {
-    paddingHorizontal: theme.spacing[5],
-  },
-  description: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-    marginBottom: theme.spacing[5],
-  },
-  booksSection: {
-    marginTop: theme.spacing[2],
-  },
-  booksSectionHeader: {
+  sortRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing[3],
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: '#FFFFFF',
   },
   sortButtons: {
     flexDirection: 'row',
-    gap: theme.spacing[2],
+    gap: 8,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: theme.spacing[2],
-    paddingVertical: theme.spacing[1],
-    borderRadius: theme.radius.small,
-    backgroundColor: theme.colors.neutral[100],
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: CARD_COLOR,
   },
   sortButtonActive: {
-    backgroundColor: theme.colors.primary[100],
+    backgroundColor: ACCENT,
   },
   sortButtonText: {
     fontSize: 12,
-    color: theme.colors.text.tertiary,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
   },
   sortButtonTextActive: {
-    color: theme.colors.text.primary,
-    fontWeight: '600',
+    color: '#000',
   },
-  detailsContent: {
-    paddingHorizontal: theme.spacing[5],
+  bookList: {
+    paddingHorizontal: 16,
   },
-  detailRow: {
-    marginBottom: theme.spacing[4],
+  bookItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_COLOR,
+    borderRadius: CARD_RADIUS,
+    padding: 12,
+    marginBottom: 8,
   },
-  detailLabel: {
-    fontSize: 13,
-    color: theme.colors.text.tertiary,
-    marginBottom: theme.spacing[1],
-    fontWeight: '500',
+  bookCover: {
+    width: 60,
+    height: 60,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: '#333',
   },
-  detailValue: {
+  bookInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  sequenceBadge: {
+    backgroundColor: ACCENT,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  sequenceText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000',
+  },
+  bookTitle: {
     fontSize: 15,
-    color: theme.colors.text.primary,
-    lineHeight: 22,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  bookAuthor: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
   },
 });

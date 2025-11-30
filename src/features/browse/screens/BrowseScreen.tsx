@@ -356,10 +356,20 @@ export function BrowseScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Text style={styles.headerTitle}>Just for You</Text>
-        <Text style={styles.headerSubtitle}>
-          Based on your preferences & listening history
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Just for You</Text>
+            <Text style={styles.headerSubtitle}>
+              Based on your preferences & listening history
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.preferencesButton}
+            onPress={() => navigation.navigate('Preferences')}
+          >
+            <Icon name="options-outline" size={22} color={ACCENT} set="ionicons" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Main content */}
@@ -440,6 +450,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: PADDING + 10,
     paddingBottom: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
@@ -449,6 +467,15 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.5)',
+  },
+  preferencesButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(204, 255, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
   scrollView: {
     flex: 1,

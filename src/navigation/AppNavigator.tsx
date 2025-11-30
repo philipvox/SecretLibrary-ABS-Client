@@ -2,11 +2,15 @@
  * src/navigation/AppNavigator.tsx
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/core/auth';
+import { useLibraryCache } from '@/core/cache';
+import { useDefaultLibrary } from '@/features/library';
 import { LoginScreen } from '@/features/auth/screens/LoginScreen';
 import { MyLibraryScreen } from '@/features/library';
 import { HomeScreen } from '@/features/home';
@@ -24,6 +28,9 @@ import { FloatingTabBar } from './components/FloatingTabBar';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+const BG_COLOR = '#1a1a1a';
+const ACCENT = '#CCFF00';
 
 function MainTabs() {
   return (
@@ -43,6 +50,72 @@ function MainTabs() {
   );
 }
 
+// Loading screen while caching library
+function CacheLoadingScreen({ progress }: { progress: string }) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={[styles.cacheLoading, { paddingTop: insets.top }]}>
+      <View style={styles.cacheContent}>
+        <Text style={styles.cacheEmoji}>📚</Text>
+        <Text style={styles.cacheTitle}>Loading Library</Text>
+        <Text style={styles.cacheSubtitle}>{progress}</Text>
+        <ActivityIndicator size="large" color={ACCENT} style={styles.cacheSpinner} />
+      </View>
+    </View>
+  );
+}
+
+// Wrapper that loads cache before showing main content
+function AuthenticatedApp() {
+  const { library } = useDefaultLibrary();
+  const { loadCache, isLoaded, isLoading, items, error } = useLibraryCache();
+  const [cacheProgress, setCacheProgress] = useState('Connecting...');
+
+  useEffect(() => {
+    if (library?.id) {
+      setCacheProgress('Loading your audiobooks...');
+      loadCache(library.id).then(() => {
+        setCacheProgress('Ready!');
+      });
+    }
+  }, [library?.id, loadCache]);
+
+  // Show loading while cache is loading
+  if (!isLoaded && isLoading) {
+    return <CacheLoadingScreen progress={cacheProgress} />;
+  }
+
+  // If cache failed but we can still proceed
+  if (error && !isLoaded) {
+    console.warn('[AppNavigator] Cache error, proceeding anyway:', error);
+  }
+
+  return (
+    <>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Search" component={SearchScreen} />
+          <Stack.Screen name="SeriesDetail" component={SeriesDetailScreen} />
+          <Stack.Screen name="AuthorDetail" component={AuthorDetailScreen} />
+          <Stack.Screen name="NarratorDetail" component={NarratorDetailScreen} />
+          <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
+          <Stack.Screen name="Preferences" component={PreferencesScreen} />
+          <Stack.Screen
+            name="PreferencesOnboarding"
+            component={PreferencesOnboardingScreen}
+            options={{ presentation: 'modal' }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+
+      <MiniPlayer />
+      <PlayerScreen />
+    </>
+  );
+}
+
 export function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -50,33 +123,47 @@ export function AppNavigator() {
     return <SplashScreen />;
   }
 
-  return (
-    <>
+  if (!isAuthenticated) {
+    return (
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!isAuthenticated ? (
-            <Stack.Screen name="Login" component={LoginScreen} />
-          ) : (
-            <>
-              <Stack.Screen name="Main" component={MainTabs} />
-              <Stack.Screen name="Search" component={SearchScreen} />
-              <Stack.Screen name="SeriesDetail" component={SeriesDetailScreen} />
-              <Stack.Screen name="AuthorDetail" component={AuthorDetailScreen} />
-              <Stack.Screen name="NarratorDetail" component={NarratorDetailScreen} />
-              <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
-              <Stack.Screen name="Preferences" component={PreferencesScreen} />
-              <Stack.Screen 
-                name="PreferencesOnboarding" 
-                component={PreferencesOnboardingScreen}
-                options={{ presentation: 'modal' }}
-              />
-            </>
-          )}
+          <Stack.Screen name="Login" component={LoginScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+    );
+  }
 
-      {isAuthenticated && <MiniPlayer />}
-      {isAuthenticated && <PlayerScreen />}
-    </>
-  );
+  return <AuthenticatedApp />;
 }
+
+const styles = StyleSheet.create({
+  cacheLoading: {
+    flex: 1,
+    backgroundColor: BG_COLOR,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cacheContent: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  cacheEmoji: {
+    fontSize: 64,
+    marginBottom: 24,
+  },
+  cacheTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  cacheSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  cacheSpinner: {
+    marginTop: 8,
+  },
+});
