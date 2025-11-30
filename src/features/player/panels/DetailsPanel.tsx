@@ -3,12 +3,14 @@
  */
 
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   getAuthorName,
   getNarratorName,
   getDescription,
   getSeriesWithSequence,
+  getSeriesName,
   getPublishedYear,
   getGenres,
 } from '@/shared/utils/metadata';
@@ -22,21 +24,42 @@ interface DetailsPanelProps {
 }
 
 export function DetailsPanel({ book, duration, chaptersCount, isLight }: DetailsPanelProps) {
+  const navigation = useNavigation();
   const textColor = isLight ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)';
   const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
   const descColor = isLight ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.85)';
   const tagBgColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)';
+  const linkColor = isLight ? '#007AFF' : '#4DA3FF';
 
   // Extract metadata using utilities
   const author = getAuthorName(book);
   const narrator = getNarratorName(book);
   const description = getDescription(book);
   const series = getSeriesWithSequence(book);
+  const seriesName = getSeriesName(book);
   const publishedYear = getPublishedYear(book);
   const genres = getGenres(book);
   const metadata = (book?.media?.metadata as any) || {};
   const publisher = metadata.publisher || null;
   const language = metadata.language || null;
+
+  const handleAuthorPress = () => {
+    if (author && author !== 'Unknown Author') {
+      navigation.navigate('AuthorDetail' as never, { authorName: author } as never);
+    }
+  };
+
+  const handleNarratorPress = () => {
+    if (narrator && narrator !== 'Unknown Narrator') {
+      navigation.navigate('NarratorDetail' as never, { narratorName: narrator } as never);
+    }
+  };
+
+  const handleSeriesPress = () => {
+    if (seriesName) {
+      navigation.navigate('SeriesDetail' as never, { seriesName } as never);
+    }
+  };
 
   // Format duration nicely
   const formatDurationLong = (seconds: number): string => {
@@ -58,7 +81,9 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
       {author && author !== 'Unknown Author' && (
         <View style={styles.row}>
           <Text style={[styles.label, { color: secondaryColor }]}>AUTHOR</Text>
-          <Text style={[styles.value, { color: textColor }]}>{author}</Text>
+          <TouchableOpacity onPress={handleAuthorPress} activeOpacity={0.7}>
+            <Text style={[styles.value, styles.link, { color: linkColor }]}>{author}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -66,7 +91,9 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
       {narrator && narrator !== 'Unknown Narrator' && (
         <View style={styles.row}>
           <Text style={[styles.label, { color: secondaryColor }]}>NARRATOR</Text>
-          <Text style={[styles.value, { color: textColor }]}>{narrator}</Text>
+          <TouchableOpacity onPress={handleNarratorPress} activeOpacity={0.7}>
+            <Text style={[styles.value, styles.link, { color: linkColor }]}>{narrator}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -74,7 +101,9 @@ export function DetailsPanel({ book, duration, chaptersCount, isLight }: Details
       {series && (
         <View style={styles.row}>
           <Text style={[styles.label, { color: secondaryColor }]}>SERIES</Text>
-          <Text style={[styles.value, { color: textColor }]}>{series}</Text>
+          <TouchableOpacity onPress={handleSeriesPress} activeOpacity={0.7}>
+            <Text style={[styles.value, styles.link, { color: linkColor }]}>{series}</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -162,6 +191,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     lineHeight: 22,
+  },
+  link: {
+    textDecorationLine: 'underline',
   },
   statsRow: {
     flexDirection: 'row',
