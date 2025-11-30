@@ -224,8 +224,8 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
       }
 
       // Fetch fresh data from API
-      console.log('[LibraryCache] Fetching fresh library data...');
-      const response = await apiClient.getLibraryItems();
+      console.log('[LibraryCache] Fetching fresh library data for library:', libraryId);
+      const response = await apiClient.getLibraryItems(libraryId, { limit: 1000 });
       const items = response?.results || [];
 
       // Build indexes
