@@ -2,7 +2,7 @@
  * src/features/book-detail/screens/BookDetailScreen.tsx
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useBookDetails } from '../hooks/useBookDetails';
@@ -22,7 +23,7 @@ import { LoadingSpinner, ErrorView } from '@/shared/components';
 import { Icon } from '@/shared/components/Icon';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
-// import { DownloadButton } from '@/features/downloads';
+import { autoDownloadService, DownloadStatus } from '@/features/downloads';
 import { LibraryHeartButton } from '@/features/library';
 import { theme } from '@/shared/theme';
 
@@ -35,6 +36,35 @@ const COVER_SIZE = SCREEN_WIDTH * 0.38;
 
 type TabType = 'overview' | 'chapters' | 'details';
 
+// Hook for download status
+function useDownloadStatus(bookId: string) {
+  const [status, setStatus] = useState<DownloadStatus>(() =>
+    autoDownloadService.getStatus(bookId)
+  );
+  const [progress, setProgress] = useState<number>(() =>
+    autoDownloadService.getProgress(bookId)
+  );
+
+  useEffect(() => {
+    setStatus(autoDownloadService.getStatus(bookId));
+    setProgress(autoDownloadService.getProgress(bookId));
+
+    const unsubProgress = autoDownloadService.onProgress((id, pct) => {
+      if (id === bookId) setProgress(pct);
+    });
+    const unsubStatus = autoDownloadService.onStatus((id, newStatus) => {
+      if (id === bookId) setStatus(newStatus);
+    });
+
+    return () => {
+      unsubProgress();
+      unsubStatus();
+    };
+  }, [bookId]);
+
+  return { status, progress };
+}
+
 export function BookDetailScreen() {
   const route = useRoute<RouteProp<BookDetailRouteParams, 'BookDetail'>>();
   const navigation = useNavigation();
@@ -43,6 +73,7 @@ export function BookDetailScreen() {
 
   const { book, isLoading, error, refetch } = useBookDetails(bookId);
   const { loadBook } = usePlayerStore();
+  const { status: downloadStatus, progress: downloadProgress } = useDownloadStatus(bookId);
 
   if (isLoading) {
     return <LoadingSpinner text="Loading book details..." />;
@@ -77,6 +108,23 @@ export function BookDetailScreen() {
     }
   };
 
+  const handleDownload = useCallback(() => {
+    if (downloadStatus === 'completed' || downloadStatus === 'downloading' || downloadStatus === 'queued') {
+      return;
+    }
+    autoDownloadService.startDownload(book);
+  }, [book, downloadStatus]);
+
+  const renderDownloadIcon = () => {
+    if (downloadStatus === 'completed') {
+      return <Icon name="checkmark-circle" size={22} color={theme.colors.success?.[500] || '#22c55e'} set="ionicons" />;
+    }
+    if (downloadStatus === 'downloading' || downloadStatus === 'queued') {
+      return <ActivityIndicator size="small" color={theme.colors.text.secondary} />;
+    }
+    return <Icon name="download-outline" size={22} color={theme.colors.text.secondary} set="ionicons" />;
+  };
+
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -97,7 +145,13 @@ export function BookDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Book Details</Text>
         <View style={styles.headerActions}>
-          <DownloadButton item={book} size={22} color={theme.colors.text.secondary} />
+          <TouchableOpacity
+            onPress={handleDownload}
+            disabled={downloadStatus === 'downloading' || downloadStatus === 'queued'}
+            style={styles.headerButton}
+          >
+            {renderDownloadIcon()}
+          </TouchableOpacity>
           <LibraryHeartButton bookId={book.id} size="large" variant="plain" />
         </View>
       </View>
