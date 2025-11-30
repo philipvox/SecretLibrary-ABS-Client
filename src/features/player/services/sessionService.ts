@@ -50,51 +50,35 @@ class SessionService {
    * NON-BLOCKING: closes old session in background
    */
   async startSession(libraryItemId: string): Promise<PlaybackSession> {
-    const t0 = Date.now();
-    const t = (label: string) => console.log(`[Session] ⏱ [${Date.now() - t0}ms] ${label}`);
-    
-    t('startSession called');
-
     // Close old session in BACKGROUND (don't await)
     this.closeSessionAsync();
 
-    try {
-      t('Starting API call...');
-      const session = await apiClient.post<PlaybackSession>(
-        `/api/items/${libraryItemId}/play`,
-        {
-          deviceInfo: {
-            clientName: 'AudiobookShelf-RN',
-            clientVersion: '1.0.0',
-            deviceId: 'rn-mobile-app',
-          },
-          forceDirectPlay: true,
-          forceTranscode: false,
-          supportedMimeTypes: [
-            'audio/mpeg',
-            'audio/mp4',
-            'audio/m4b',
-            'audio/m4a',
-            'audio/flac',
-            'audio/ogg',
-            'audio/webm',
-            'audio/aac',
-          ],
-          mediaPlayer: 'expo-audio',
-        }
-      );
-      t('API call returned');
+    const session = await apiClient.post<PlaybackSession>(
+      `/api/items/${libraryItemId}/play`,
+      {
+        deviceInfo: {
+          clientName: 'AudiobookShelf-RN',
+          clientVersion: '1.0.0',
+          deviceId: 'rn-mobile-app',
+        },
+        forceDirectPlay: true,
+        forceTranscode: false,
+        supportedMimeTypes: [
+          'audio/mpeg',
+          'audio/mp4',
+          'audio/m4b',
+          'audio/m4a',
+          'audio/flac',
+          'audio/ogg',
+          'audio/webm',
+          'audio/aac',
+        ],
+        mediaPlayer: 'expo-audio',
+      }
+    );
 
-      this.currentSession = session;
-      t('Session stored');
-
-      console.log('[Session] Duration:', session.duration, 'Resume:', session.currentTime);
-
-      return session;
-    } catch (error: any) {
-      console.error('[Session] ❌ Failed:', error.message);
-      throw error;
-    }
+    this.currentSession = session;
+    return session;
   }
 
   /**
@@ -214,13 +198,13 @@ class SessionService {
         currentTime: finalTime,
         timeListened: 0,
       });
-      console.log('[Session] Closed:', this.currentSession.id);
-    } catch (error) {
-      console.warn('[Session] Close failed:', error);
+    } catch {
+      // Ignore close errors
     } finally {
       this.currentSession = null;
     }
   }
 }
+
 
 export const sessionService = new SessionService();

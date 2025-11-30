@@ -13,7 +13,7 @@ import { sessionService, SessionChapter } from '../services/sessionService';
 import { progressService } from '../services/progressService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEBUG = true;
+const DEBUG = __DEV__;
 const log = (msg: string, ...args: any[]) => {
   if (DEBUG) console.log(`[Player] ${msg}`, ...args);
 };
@@ -247,8 +247,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         
         if (!startPosition) {
           const localProgress = await progressService.getLocalProgress(book.id);
-          if (localProgress && localProgress.currentTime > 0) {
-            resumePosition = localProgress.currentTime;
+          if (localProgress > 0) {
+            resumePosition = localProgress;
           }
         }
       } else {
