@@ -1,10 +1,12 @@
 /**
  * src/core/services/prefetchService.ts
- * 
+ *
  * Background prefetch service - loads library data on app startup
+ * Uses expo-image for native image caching
  */
 
 import { QueryClient } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 
@@ -56,8 +58,8 @@ class PrefetchService {
       const elapsed = Date.now() - startTime;
       console.log(`[Prefetch] Loaded ${allItems.length} items in ${elapsed}ms`);
 
-      // Prefetch cover images (first 50)
-      this.prefetchCovers(allItems.slice(0, 50));
+      // Prefetch cover images (first 100) - expo-image handles this efficiently
+      this.prefetchCovers(allItems.slice(0, 100));
 
       return allItems;
 
@@ -69,15 +71,21 @@ class PrefetchService {
     }
   }
 
-  private prefetchCovers(items: LibraryItem[]) {
-    // Prefetch cover images using Image.prefetch
-    items.forEach(item => {
-      const coverUrl = apiClient.getItemCoverUrl(item.id);
-      if (coverUrl) {
-        // Use fetch to warm the cache
-        fetch(coverUrl, { method: 'HEAD' }).catch(() => {});
-      }
-    });
+  private async prefetchCovers(items: LibraryItem[]) {
+    // Prefetch cover images using expo-image's native caching
+    const coverUrls = items
+      .map(item => apiClient.getItemCoverUrl(item.id))
+      .filter((url): url is string => !!url);
+
+    if (coverUrls.length === 0) return;
+
+    try {
+      // expo-image prefetch uses native caching (disk + memory LRU)
+      await Image.prefetch(coverUrls);
+      console.log(`[Prefetch] Cached ${coverUrls.length} cover images`);
+    } catch (err) {
+      console.warn('[Prefetch] Cover prefetch error:', err);
+    }
   }
 
   getCachedItems(): LibraryItem[] {

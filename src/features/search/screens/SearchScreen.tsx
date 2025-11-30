@@ -4,7 +4,7 @@
  * Search screen with dark theme and colored result cards
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,9 @@ import {
   StatusBar,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { SearchBar } from '../components/SearchBar';
@@ -146,10 +146,11 @@ export function SearchScreen() {
         </View>
 
         {viewMode === 'books' ? (
-          <FlatList
+          <FlashList
             data={results.books}
             renderItem={({ item }) => <BookListItem book={item} />}
             keyExtractor={(item) => item.id}
+            estimatedItemSize={100}
             contentContainerStyle={styles.listContent}
           />
         ) : (

@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Collection } from '@/core/types';
 import { apiClient } from '@/core/api';
@@ -27,7 +28,7 @@ export function CollectionCard({ collection }: CollectionCardProps) {
     >
       <View style={styles.coverContainer}>
         {coverUrl ? (
-          <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+          <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.cover, styles.placeholderCover]}>
             <Text style={styles.placeholderText}>📚</Text>

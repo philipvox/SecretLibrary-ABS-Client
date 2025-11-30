@@ -5,8 +5,9 @@
  * Uses metadata utility for consistent data extraction.
  */
 
-import React from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
@@ -17,7 +18,7 @@ interface BookCardProps {
   book: LibraryItem;
 }
 
-export function BookCard({ book }: BookCardProps) {
+function BookCardComponent({ book }: BookCardProps) {
   const navigation = useNavigation();
 
   const handlePress = () => {
@@ -35,7 +36,7 @@ export function BookCard({ book }: BookCardProps) {
     >
       <View style={styles.coverContainer}>
         {coverUrl ? (
-          <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+          <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.cover, styles.placeholderCover]}>
             <Text style={styles.placeholderText}>📖</Text>
@@ -54,6 +55,9 @@ export function BookCard({ book }: BookCardProps) {
     </Pressable>
   );
 }
+
+// Memoize to prevent unnecessary re-renders in lists
+export const BookCard = memo(BookCardComponent);
 
 const styles = StyleSheet.create({
   container: {

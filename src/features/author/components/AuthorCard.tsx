@@ -4,8 +4,9 @@
  * Card displaying author information with book count.
  */
 
-import React from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import React, { memo } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Author } from '@/core/types';
 import { apiClient } from '@/core/api';
@@ -23,7 +24,7 @@ interface AuthorCardProps {
   author: AuthorInfo | Author;
 }
 
-export function AuthorCard({ author }: AuthorCardProps) {
+function AuthorCardComponent({ author }: AuthorCardProps) {
   const navigation = useNavigation();
 
   const handlePress = () => {
@@ -61,7 +62,7 @@ export function AuthorCard({ author }: AuthorCardProps) {
     >
       <View style={styles.avatarContainer}>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.avatar} resizeMode="cover" />
+          <Image source={imageUrl} style={styles.avatar} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.avatar, styles.initialsAvatar, { backgroundColor: avatarColors[colorIndex] }]}>
             <Text style={styles.initials}>{initials}</Text>
@@ -82,6 +83,9 @@ export function AuthorCard({ author }: AuthorCardProps) {
     </Pressable>
   );
 }
+
+// Memoize to prevent unnecessary re-renders in lists
+export const AuthorCard = memo(AuthorCardComponent);
 
 const styles = StyleSheet.create({
   container: {

@@ -1,6 +1,7 @@
 // File: src/features/player/components/CoverWithProgress.tsx
 import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 
 interface CoverWithProgressProps {
@@ -89,7 +90,7 @@ export function CoverWithProgress({
 
       {/* Cover Image */}
       <Image
-        source={{ uri: coverUrl }}
+        source={coverUrl}
         style={[
           styles.cover,
           {
@@ -99,7 +100,8 @@ export function CoverWithProgress({
             margin: borderWidth,
           },
         ]}
-        resizeMode="cover"
+        contentFit="cover"
+        transition={200}
       />
     </View>
   );
