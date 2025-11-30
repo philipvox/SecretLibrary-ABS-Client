@@ -1,14 +1,23 @@
 /**
  * src/features/recommendations/hooks/useRecommendations.ts
- * 
+ *
  * Generate personalized recommendations based on user preferences
+ * and reading history (completed books have higher weight)
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { LibraryItem } from '@/core/types';
 import { usePreferencesStore } from '../stores/preferencesStore';
 import { useMyLibraryStore } from '@/features/library';
+import { sqliteCache } from '@/core/services/sqliteCache';
 import { getGenres, getAuthorName, getNarratorName, getSeriesName, getDuration } from '@/shared/utils/metadata';
+
+interface ReadHistoryStats {
+  totalBooksRead: number;
+  favoriteAuthors: { name: string; count: number }[];
+  favoriteNarrators: { name: string; count: number }[];
+  favoriteGenres: { name: string; count: number }[];
+}
 
 interface ScoredItem {
   item: LibraryItem;
@@ -20,11 +29,35 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 20) 
   const preferences = usePreferencesStore();
   const { libraryIds } = useMyLibraryStore();
 
+  // Load read history stats for weighted scoring
+  const [historyStats, setHistoryStats] = useState<ReadHistoryStats | null>(null);
+
+  useEffect(() => {
+    sqliteCache.getReadHistoryStats().then(setHistoryStats).catch(() => {});
+  }, []);
+
   const recommendations = useMemo(() => {
     if (!allItems.length) return [];
 
     // Filter out items already in user's library
     const availableItems = allItems.filter(item => !libraryIds.includes(item.id));
+
+    // Create lookup maps for history-based scoring
+    const historyAuthorWeights = new Map<string, number>();
+    const historyNarratorWeights = new Map<string, number>();
+    const historyGenreWeights = new Map<string, number>();
+
+    if (historyStats) {
+      historyStats.favoriteAuthors.forEach(({ name, count }) => {
+        historyAuthorWeights.set(name.toLowerCase(), count);
+      });
+      historyStats.favoriteNarrators.forEach(({ name, count }) => {
+        historyNarratorWeights.set(name.toLowerCase(), count);
+      });
+      historyStats.favoriteGenres.forEach(({ name, count }) => {
+        historyGenreWeights.set(name.toLowerCase(), count);
+      });
+    }
 
     // Score each item
     const scoredItems: ScoredItem[] = availableItems.map(item => {
@@ -37,30 +70,67 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 20) 
       const series = getSeriesName(item);
       const duration = getDuration(item);
 
-      // Genre matching (highest weight)
-      const matchingGenres = genres.filter(g => 
-        preferences.favoriteGenres.some(fg => 
+      // === READ HISTORY BOOSTING (highest priority - based on completed books) ===
+
+      // Author boost from read history (weight: 40 * multiplier based on times read)
+      const authorHistoryWeight = historyAuthorWeights.get(author.toLowerCase()) || 0;
+      if (authorHistoryWeight > 0) {
+        const boost = Math.min(40 + authorHistoryWeight * 10, 80); // Cap at 80
+        score += boost;
+        reasons.push(`More by ${author} (you've read ${authorHistoryWeight} of their books)`);
+      }
+
+      // Narrator boost from read history
+      const narratorHistoryWeight = historyNarratorWeights.get(narrator.toLowerCase()) || 0;
+      if (narratorHistoryWeight > 0) {
+        const boost = Math.min(30 + narratorHistoryWeight * 8, 60); // Cap at 60
+        score += boost;
+        if (!reasons.some(r => r.includes(narrator))) {
+          reasons.push(`Narrated by ${narrator} (${narratorHistoryWeight} books you've enjoyed)`);
+        }
+      }
+
+      // Genre boost from read history
+      let genreHistoryBoost = 0;
+      genres.forEach(g => {
+        const weight = historyGenreWeights.get(g.toLowerCase()) || 0;
+        if (weight > 0) {
+          genreHistoryBoost += Math.min(weight * 5, 25); // Cap per genre at 25
+        }
+      });
+      if (genreHistoryBoost > 0) {
+        score += Math.min(genreHistoryBoost, 50); // Total cap at 50
+        if (!reasons.some(r => r.includes('interest') || r.includes('read'))) {
+          reasons.push('Similar to books you\'ve finished');
+        }
+      }
+
+      // === PREFERENCE-BASED SCORING ===
+
+      // Genre matching from preferences
+      const matchingGenres = genres.filter(g =>
+        preferences.favoriteGenres.some(fg =>
           g.toLowerCase().includes(fg.toLowerCase()) ||
           fg.toLowerCase().includes(g.toLowerCase())
         )
       );
-      if (matchingGenres.length > 0) {
+      if (matchingGenres.length > 0 && !reasons.some(r => r.includes('interest'))) {
         score += matchingGenres.length * 30;
         reasons.push(`Matches your interest in ${matchingGenres[0]}`);
       }
 
-      // Author matching
-      if (preferences.favoriteAuthors.some(a => 
+      // Author matching from preferences
+      if (preferences.favoriteAuthors.some(a =>
         author.toLowerCase().includes(a.toLowerCase())
-      )) {
+      ) && !reasons.some(r => r.includes(author))) {
         score += 25;
         reasons.push(`By ${author}`);
       }
 
-      // Narrator matching
-      if (preferences.favoriteNarrators.some(n => 
+      // Narrator matching from preferences
+      if (preferences.favoriteNarrators.some(n =>
         narrator.toLowerCase().includes(n.toLowerCase())
-      )) {
+      ) && !reasons.some(r => r.includes(narrator))) {
         score += 20;
         reasons.push(`Narrated by ${narrator}`);
       }
@@ -89,7 +159,7 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 20) 
       // Mood matching
       preferences.moods.forEach(mood => {
         const moodGenres = MOOD_GENRE_MAP[mood] || [];
-        if (genres.some(g => moodGenres.some(mg => 
+        if (genres.some(g => moodGenres.some(mg =>
           g.toLowerCase().includes(mg.toLowerCase())
         ))) {
           score += 15;
@@ -110,20 +180,24 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 20) 
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
-  }, [allItems, preferences, libraryIds, limit]);
+  }, [allItems, preferences, libraryIds, limit, historyStats]);
 
   // Group recommendations by reason
   const groupedRecommendations = useMemo(() => {
     const groups: Record<string, LibraryItem[]> = {
+      'Based on your reading history': [],
       'Based on your genres': [],
       'Authors you might like': [],
       'Great narrators': [],
     };
 
     recommendations.forEach(({ item, reasons }) => {
-      if (reasons.some(r => r.includes('interest'))) {
+      // Prioritize read history matches
+      if (reasons.some(r => r.includes("you've read") || r.includes("you've finished") || r.includes("you've enjoyed"))) {
+        groups['Based on your reading history'].push(item);
+      } else if (reasons.some(r => r.includes('interest'))) {
         groups['Based on your genres'].push(item);
-      } else if (reasons.some(r => r.startsWith('By '))) {
+      } else if (reasons.some(r => r.startsWith('By ') || r.startsWith('More by'))) {
         groups['Authors you might like'].push(item);
       } else if (reasons.some(r => r.includes('Narrated'))) {
         groups['Great narrators'].push(item);

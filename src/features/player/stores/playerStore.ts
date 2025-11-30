@@ -12,6 +12,7 @@ import { audioService, PlaybackState } from '../services/audioService';
 import { sessionService, SessionChapter } from '../services/sessionService';
 import { progressService } from '../services/progressService';
 import { backgroundSyncService } from '../services/backgroundSyncService';
+import { sqliteCache } from '@/core/services/sqliteCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DEBUG = __DEV__;
@@ -488,6 +489,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           effectiveDuration,
           session?.id
         ).catch(() => {});
+
+        // Add to read history for recommendations
+        const metadata = currentBook.media?.metadata as any;
+        if (metadata) {
+          sqliteCache.addToReadHistory({
+            itemId: currentBook.id,
+            title: metadata.title || 'Unknown Title',
+            authorName: metadata.authorName || metadata.authors?.[0]?.name || 'Unknown Author',
+            narratorName: metadata.narratorName || metadata.narrators?.[0]?.name,
+            genres: metadata.genres || [],
+          }).catch((err) => {
+            logError('Failed to add to read history:', err);
+          });
+        }
       }
     }
   },
