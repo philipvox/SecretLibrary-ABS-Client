@@ -1,21 +1,15 @@
 /**
  * src/features/player/components/PlayerControls.tsx
- *
- * Redesigned player controls with glass-like button effects
- * Button order: Rewind | Fast Forward | Play
+ * 
+ * Improved with native touch events for reliable Android support
+ * Uses View + onTouchStart/End/Cancel instead of Pressable
  */
 
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { GradientPanel } from './GradientPanel';
-import { RewindIcon, FastForwardIcon, PlayIcon, PauseIcon } from './PlayerIcons';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Icon } from '@/shared/components/Icon';
 import { formatDelta } from '../utils';
-import {
-  PLAYER_PADDING,
-  BUTTON_GAP,
-  BUTTON_WIDTH,
-  BUTTON_HEIGHT,
-} from '../constants';
+import { CARD_MARGIN, BUTTON_GAP, BUTTON_SIZE, RADIUS } from '../constants';
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -41,15 +35,15 @@ function HoldButton({
   onPressIn,
   onPressOut,
   isActive,
-  variant,
   children,
+  style,
 }: {
   onPress: () => void;
   onPressIn: () => void;
   onPressOut: () => void;
   isActive: boolean;
-  variant: 'rewind' | 'fastforward' | 'play';
   children: React.ReactNode;
+  style: any;
 }) {
   const touchActiveRef = useRef(false);
   const pressStartRef = useRef(0);
@@ -64,10 +58,10 @@ function HoldButton({
   const handleTouchEnd = useCallback(() => {
     if (!touchActiveRef.current) return;
     touchActiveRef.current = false;
-
+    
     const duration = Date.now() - pressStartRef.current;
     onPressOut();
-
+    
     // If it was a quick tap (not a hold), also fire onPress
     if (duration < HOLD_THRESHOLD) {
       onPress();
@@ -82,16 +76,12 @@ function HoldButton({
 
   return (
     <View
-      style={[styles.buttonWrapper, isActive && styles.buttonActive]}
+      style={[style, isActive && styles.buttonActive]}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
     >
-      <GradientPanel variant={variant} style={styles.button}>
-        <View style={styles.buttonContent}>
-          {children}
-        </View>
-      </GradientPanel>
+      {children}
     </View>
   );
 }
@@ -103,6 +93,8 @@ export function PlayerControls({
   isFastForwarding,
   seekDelta,
   controlMode,
+  cardColor,
+  textColor,
   onPlayPause,
   onLeftPress,
   onLeftPressIn,
@@ -115,6 +107,29 @@ export function PlayerControls({
 
   return (
     <View style={styles.controlsRow}>
+      {/* Play/Pause Button */}
+      <TouchableOpacity 
+        style={[styles.controlButton, { backgroundColor: cardColor }]}
+        onPress={onPlayPause}
+        activeOpacity={0.7}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="large" color={textColor} />
+        ) : isSeeking ? (
+          <Text style={[styles.seekDeltaText, { color: textColor }]}>
+            {formatDelta(seekDelta)}
+          </Text>
+        ) : (
+          <Icon 
+            name={isPlaying ? 'pause' : 'play'} 
+            size={45} 
+            color={textColor} 
+            set="ionicons" 
+          />
+        )}
+      </TouchableOpacity>
+
       {/* Rewind / Prev Chapter Button */}
       {controlMode === 'rewind' ? (
         <HoldButton
@@ -122,21 +137,17 @@ export function PlayerControls({
           onPressIn={onLeftPressIn}
           onPressOut={onLeftPressOut}
           isActive={isRewinding}
-          variant="rewind"
+          style={[styles.controlButton, { backgroundColor: cardColor }]}
         >
-          <RewindIcon size={56} color="white" />
+          <Icon name="play-back" size={45} color={textColor} set="ionicons" />
         </HoldButton>
       ) : (
         <TouchableOpacity
-          style={styles.buttonWrapper}
+          style={[styles.controlButton, { backgroundColor: cardColor }]}
           onPress={onLeftPress}
           activeOpacity={0.7}
         >
-          <GradientPanel variant="rewind" style={styles.button}>
-            <View style={styles.buttonContent}>
-              <RewindIcon size={56} color="white" />
-            </View>
-          </GradientPanel>
+          <Icon name="play-skip-back" size={45} color={textColor} set="ionicons" />
         </TouchableOpacity>
       )}
 
@@ -147,47 +158,19 @@ export function PlayerControls({
           onPressIn={onRightPressIn}
           onPressOut={onRightPressOut}
           isActive={isFastForwarding}
-          variant="fastforward"
+          style={[styles.controlButton, { backgroundColor: cardColor }]}
         >
-          <FastForwardIcon size={56} color="white" />
+          <Icon name="play-forward" size={45} color={textColor} set="ionicons" />
         </HoldButton>
       ) : (
         <TouchableOpacity
-          style={styles.buttonWrapper}
+          style={[styles.controlButton, { backgroundColor: cardColor }]}
           onPress={onRightPress}
           activeOpacity={0.7}
         >
-          <GradientPanel variant="fastforward" style={styles.button}>
-            <View style={styles.buttonContent}>
-              <FastForwardIcon size={56} color="white" />
-            </View>
-          </GradientPanel>
+          <Icon name="play-skip-forward" size={45} color={textColor} set="ionicons" />
         </TouchableOpacity>
       )}
-
-      {/* Play/Pause Button */}
-      <TouchableOpacity
-        style={styles.buttonWrapper}
-        onPress={onPlayPause}
-        activeOpacity={0.7}
-        disabled={isLoading}
-      >
-        <GradientPanel variant="play" style={styles.button}>
-          <View style={styles.buttonContent}>
-            {isLoading ? (
-              <ActivityIndicator size="large" color="#F55F05" />
-            ) : isSeeking ? (
-              <Text style={styles.seekDeltaText}>
-                {formatDelta(seekDelta)}
-              </Text>
-            ) : isPlaying ? (
-              <PauseIcon size={36} color="#F55F05" />
-            ) : (
-              <PlayIcon size={36} color="#F55F05" />
-            )}
-          </View>
-        </GradientPanel>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -197,19 +180,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: BUTTON_GAP,
-    marginHorizontal: PLAYER_PADDING,
-    marginTop: BUTTON_GAP,
+    marginHorizontal: CARD_MARGIN,
+    marginTop: 5,
   },
-  buttonWrapper: {
-    width: BUTTON_WIDTH,
-    height: BUTTON_HEIGHT,
-  },
-  button: {
-    width: BUTTON_WIDTH,
-    height: BUTTON_HEIGHT,
-  },
-  buttonContent: {
-    flex: 1,
+  controlButton: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: RADIUS,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -221,6 +198,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-    color: '#F55F05',
   },
 });
