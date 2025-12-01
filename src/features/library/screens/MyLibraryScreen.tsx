@@ -2,7 +2,7 @@
  * src/features/library/screens/MyLibraryScreen.tsx
  *
  * User's library with masonry grid layout
- * Redesigned to match app aesthetic
+ * Uses pre-cached library data for instant loading
  */
 
 import React, { useMemo, useCallback } from 'react';
@@ -19,13 +19,11 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMyLibraryStore } from '../stores/myLibraryStore';
-import { useAllLibraryItems } from '@/features/search/hooks/useAllLibraryItems';
-import { useDefaultLibrary } from '../hooks/useDefaultLibrary';
+import { useLibraryCache } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { LoadingSpinner, EmptyState } from '@/shared/components';
-import { LibraryItem } from '@/core/types';
+import { EmptyState } from '@/shared/components';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GAP = 5;
@@ -98,8 +96,9 @@ function computeMasonryLayout(items: BookGridItem[]): Array<{ item: BookGridItem
 
 export function MyLibraryScreen() {
   const insets = useSafeAreaInsets();
-  const { library } = useDefaultLibrary();
-  const { items: allItems, isLoading } = useAllLibraryItems(library?.id || '');
+  
+  // Use pre-cached library data - instant load!
+  const { items: cachedItems } = useLibraryCache();
   const { loadBook } = usePlayerStore();
 
   const {
@@ -116,15 +115,14 @@ export function MyLibraryScreen() {
 
   // Filter to only show books in user's library
   const libraryItems = useMemo(() => {
-    return allItems.filter(item => libraryIds.includes(item.id));
-  }, [allItems, libraryIds]);
+    return cachedItems.filter(item => libraryIds.includes(item.id));
+  }, [cachedItems, libraryIds]);
 
   // Process items for masonry grid
   const processedItems = useMemo(() => {
     return libraryItems.map((item, idx) => ({
       id: item.id,
       coverUrl: apiClient.getItemCoverUrl(item.id),
-      // Make some items large for visual interest
       size: (idx % 5 === 0 || idx % 8 === 0) ? 2 : 1,
     })) as BookGridItem[];
   }, [libraryItems]);
@@ -185,15 +183,6 @@ export function MyLibraryScreen() {
       toggleSelection(bookId);
     }
   }, [isSelecting, startSelecting, toggleSelection]);
-
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="light-content" backgroundColor={BG_COLOR} />
-        <LoadingSpinner text="Loading library..." />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>

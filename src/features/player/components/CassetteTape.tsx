@@ -30,11 +30,13 @@ const DEFAULT_COLOR = '#F55F05';
 // opacity: darkness at edge (0-1)
 // depth: how far shadow extends inward (0-1, where 0.3 = 30% of container)
 const SHADOW = {
-  top:    { opacity: 0.5, depth: 0.30 },
-  bottom: { opacity: 0.3, depth: 0.30 },
-  left:   { opacity: 0.4, depth: 0.25 },
-  right:  { opacity: 0.4, depth: 0.25 },
+  top:    { opacity: .65, depth: 0.25},
+  bottom: { opacity: .2, depth: 0.1},
+  cover: { opacity: 0.5, depth: 1 },
+  left:   { opacity: 0, depth: 0.05 },
+  right:  { opacity: 0.5, depth: 0.05 },
 };
+
 
 interface CassetteTapeProps {
   progress: number; // 0-1
@@ -155,6 +157,11 @@ export function CassetteTape({
               <Stop offset="0" stopColor="black" stopOpacity={SHADOW.bottom.opacity} />
               <Stop offset={SHADOW.bottom.depth / 2} stopColor="black" stopOpacity={SHADOW.bottom.opacity * 0.4} />
               <Stop offset={SHADOW.bottom.depth} stopColor="black" stopOpacity="0" />
+            </LinearGradient>
+             <LinearGradient id="coverShadow" x1="0" y1="0" x2="0" y2="0">
+              <Stop offset="0" stopColor="black" stopOpacity={SHADOW.bottom.opacity} />
+              <Stop offset={SHADOW.cover.depth / 2} stopColor="black" stopOpacity={SHADOW.bottom.opacity * 0.4} />
+              <Stop offset={SHADOW.cover.depth} stopColor="black" stopOpacity="0" />
             </LinearGradient>
             <LinearGradient id="leftShadow" x1="0" y1="0" x2="1" y2="0">
               <Stop offset="0" stopColor="black" stopOpacity={SHADOW.left.opacity} />
