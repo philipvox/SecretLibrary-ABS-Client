@@ -78,6 +78,7 @@ const BOOKMARKS_KEY = 'player_bookmarks';
 const PROGRESS_SAVE_INTERVAL = 30000; // Save progress every 30 seconds
 let currentLoadId = 0;
 let lastProgressSave = 0;
+let isHandlingTrackFinish = false; // Guard against multiple didJustFinish triggers
 
 async function getDownloadPath(bookId: string): Promise<string | null> {
   try {
@@ -191,6 +192,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const thisLoadId = ++currentLoadId;
     const t0 = Date.now();
     const timing = (label: string) => log(`⏱ ${label}: ${Date.now() - t0}ms`);
+
+    // Reset track finish guard for fresh book load
+    isHandlingTrackFinish = false;
 
     log('=== loadBook ===');
     log('Book:', book.id, '-', book.media?.metadata?.title, '- autoPlay:', autoPlay);
@@ -481,25 +485,31 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       ).catch(() => {});
     }
 
-    // Handle track finished
-    if (state.didJustFinish) {
+    // Handle track finished - guard against multiple rapid triggers
+    if (state.didJustFinish && !isHandlingTrackFinish) {
+      isHandlingTrackFinish = true;
       log('Track finished');
 
       // Check if there's a next chapter to auto-advance to
       const { chapters, position } = get();
       const currentChapterIndex = findChapterIndex(chapters, position);
 
-      if (currentChapterIndex < chapters.length - 1) {
+      if (chapters.length > 0 && currentChapterIndex < chapters.length - 1) {
         // There's a next chapter - auto-advance and continue playing
         log(`Auto-advancing from chapter ${currentChapterIndex + 1} to ${currentChapterIndex + 2}`);
         const nextChapter = chapters[currentChapterIndex + 1];
+
+        // Seek to next chapter and resume playback
         audioService.seekTo(nextChapter.start).then(() => {
-          set({ position: nextChapter.start });
-          audioService.play().catch((err) => {
-            logError('Failed to resume playback after chapter advance:', err);
-          });
+          set({ position: nextChapter.start, isPlaying: true });
+          return audioService.play();
+        }).then(() => {
+          // Reset guard after successful advance
+          isHandlingTrackFinish = false;
+          log('Successfully advanced to next chapter');
         }).catch((err) => {
-          logError('Failed to seek to next chapter:', err);
+          logError('Failed to advance to next chapter:', err);
+          isHandlingTrackFinish = false;
         });
         return; // Don't mark as finished or save final progress - we're continuing
       }
@@ -532,11 +542,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           });
         }
       }
+
+      // Reset guard after handling book finish
+      isHandlingTrackFinish = false;
     }
   },
 
   cleanup: async () => {
     const { currentBook, position, duration, sleepTimerInterval } = get();
+
+    // Reset track finish guard
+    isHandlingTrackFinish = false;
 
     // Clear sleep timer
     if (sleepTimerInterval) {
