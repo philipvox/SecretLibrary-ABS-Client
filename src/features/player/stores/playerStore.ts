@@ -76,11 +76,8 @@ interface PlayerState {
 
 const BOOKMARKS_KEY = 'player_bookmarks';
 const PROGRESS_SAVE_INTERVAL = 30000; // Save progress every 30 seconds
-const CHAPTER_ADVANCE_COOLDOWN = 3000; // Don't auto-advance again within 3 seconds
 let currentLoadId = 0;
 let lastProgressSave = 0;
-let isHandlingTrackFinish = false; // Guard against multiple didJustFinish triggers
-let lastChapterAdvanceTime = 0; // Debounce rapid auto-advance attempts
 
 async function getDownloadPath(bookId: string): Promise<string | null> {
   try {
@@ -194,10 +191,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const thisLoadId = ++currentLoadId;
     const t0 = Date.now();
     const timing = (label: string) => log(`⏱ ${label}: ${Date.now() - t0}ms`);
-
-    // Reset track finish guards for fresh book load
-    isHandlingTrackFinish = false;
-    lastChapterAdvanceTime = 0;
 
     log('=== loadBook ===');
     log('Book:', book.id, '-', book.media?.metadata?.title, '- autoPlay:', autoPlay);
@@ -488,46 +481,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       ).catch(() => {});
     }
 
-    // Handle track finished - guard against multiple rapid triggers
-    // Also check cooldown to prevent rapid re-triggering after seeking
-    const now = Date.now();
-    const timeSinceLastAdvance = now - lastChapterAdvanceTime;
-
-    if (state.didJustFinish && !isHandlingTrackFinish && timeSinceLastAdvance > CHAPTER_ADVANCE_COOLDOWN) {
-      isHandlingTrackFinish = true;
-      log('Track finished');
-
-      // Check if there's a next chapter to auto-advance to
-      const { chapters } = get();
-      // Use the actual position from state (where playback ended), not stored position
-      const endPosition = state.position;
-      const currentChapterIndex = findChapterIndex(chapters, endPosition);
-
-      if (chapters.length > 0 && currentChapterIndex < chapters.length - 1) {
-        // There's a next chapter - auto-advance and continue playing
-        const nextChapter = chapters[currentChapterIndex + 1];
-        log(`Auto-advancing from chapter ${currentChapterIndex + 1} to ${currentChapterIndex + 2} (seeking to ${nextChapter.start}s)`);
-
-        // Record advance time before attempting
-        lastChapterAdvanceTime = now;
-
-        // Seek to next chapter and resume playback
-        audioService.seekTo(nextChapter.start).then(() => {
-          set({ position: nextChapter.start, isPlaying: true });
-          return audioService.play();
-        }).then(() => {
-          log('Successfully advanced to next chapter');
-          // Keep guard active for a bit longer via the cooldown
-          isHandlingTrackFinish = false;
-        }).catch((err) => {
-          logError('Failed to advance to next chapter:', err);
-          isHandlingTrackFinish = false;
-        });
-        return; // Don't mark as finished or save final progress - we're continuing
-      }
-
-      // No more chapters - this is the end of the book
-      log('Book finished - no more chapters');
+    // Handle track/audio file finished (not chapter - chapters are just time markers)
+    if (state.didJustFinish) {
+      log('Audio track finished');
       set({ isPlaying: false });
 
       // Save final progress
@@ -554,18 +510,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           });
         }
       }
-
-      // Reset guard after handling book finish
-      isHandlingTrackFinish = false;
     }
   },
 
   cleanup: async () => {
     const { currentBook, position, duration, sleepTimerInterval } = get();
-
-    // Reset track finish guards
-    isHandlingTrackFinish = false;
-    lastChapterAdvanceTime = 0;
 
     // Clear sleep timer
     if (sleepTimerInterval) {
