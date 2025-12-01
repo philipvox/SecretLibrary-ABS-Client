@@ -13,10 +13,17 @@ import TrackPlayer, {
 
 export interface PlaybackState {
   isPlaying: boolean;
-  position: number;
-  duration: number;
+  position: number;       // Global position across all tracks
+  duration: number;       // Total duration of all tracks
   isBuffering: boolean;
-  didJustFinish: boolean;
+  didJustFinish: boolean; // True when last track in queue ends
+}
+
+export interface AudioTrackInfo {
+  url: string;
+  title: string;
+  startOffset: number;    // Global start position of this track
+  duration: number;
 }
 
 type StatusCallback = (status: PlaybackState) => void;
@@ -33,6 +40,8 @@ class AudioService {
   private setupPromise: Promise<void> | null = null;
   private setupAttempts = 0;
   private loadId = 0; // Track load requests to cancel stale ones
+  private tracks: AudioTrackInfo[] = []; // All tracks for multi-file books
+  private totalDuration = 0; // Total duration across all tracks
 
   constructor() {
     // Pre-warm on construction - don't await, let it run in background
@@ -141,6 +150,23 @@ class AudioService {
     }
   }
 
+  /**
+   * Calculate global position across all tracks
+   */
+  private async getGlobalPosition(): Promise<{ position: number; duration: number }> {
+    const trackIndex = await TrackPlayer.getActiveTrackIndex();
+    const progress = await TrackPlayer.getProgress();
+
+    // For multi-track: add track's startOffset to get global position
+    if (this.tracks.length > 0 && trackIndex !== undefined && trackIndex < this.tracks.length) {
+      const globalPosition = this.tracks[trackIndex].startOffset + progress.position;
+      return { position: globalPosition, duration: this.totalDuration };
+    }
+
+    // Single track or no track info
+    return { position: progress.position, duration: progress.duration || this.totalDuration };
+  }
+
   private startProgressUpdates(): void {
     this.stopProgressUpdates();
 
@@ -148,17 +174,22 @@ class AudioService {
       if (!this.isLoaded) return;
 
       try {
-        const progress = await TrackPlayer.getProgress();
+        const { position, duration } = await this.getGlobalPosition();
         const playbackState = await TrackPlayer.getPlaybackState();
+        const queue = await TrackPlayer.getQueue();
+        const trackIndex = await TrackPlayer.getActiveTrackIndex();
 
         const isPlaying = playbackState.state === State.Playing;
         const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
-        const didJustFinish = playbackState.state === State.Ended;
+
+        // Only report didJustFinish when the LAST track in queue ends
+        const isLastTrack = trackIndex === undefined || trackIndex >= queue.length - 1;
+        const didJustFinish = playbackState.state === State.Ended && isLastTrack;
 
         this.statusCallback?.({
           isPlaying,
-          position: progress.position,
-          duration: progress.duration,
+          position,
+          duration,
           isBuffering,
           didJustFinish,
         });
@@ -251,6 +282,112 @@ class AudioService {
     }
   }
 
+  /**
+   * Load multiple audio tracks (for multi-file audiobooks)
+   * Adds all tracks to the queue and seeks to the correct position
+   */
+  async loadTracks(
+    tracks: AudioTrackInfo[],
+    startPositionSec: number = 0,
+    metadata?: { title?: string; artist?: string; artwork?: string },
+    autoPlay: boolean = true
+  ): Promise<void> {
+    const thisLoadId = ++this.loadId;
+    const t0 = Date.now();
+    const t = (label: string) => log(`⏱ [${Date.now() - t0}ms] ${label}`);
+
+    log(`Loading ${tracks.length} tracks, starting at ${startPositionSec.toFixed(1)}s`);
+
+    await this.ensureSetup();
+    if (this.loadId !== thisLoadId) return;
+
+    try {
+      t('Resetting...');
+      await TrackPlayer.reset();
+      if (this.loadId !== thisLoadId) return;
+
+      // Store track info for position calculations
+      this.tracks = tracks;
+      this.totalDuration = tracks.reduce((sum, t) => sum + t.duration, 0);
+
+      // Add all tracks to queue
+      t(`Adding ${tracks.length} tracks to queue...`);
+      const queueTracks = tracks.map((track, index) => ({
+        id: `track-${index}`,
+        url: track.url,
+        title: track.title || metadata?.title || 'Audiobook',
+        artist: metadata?.artist || 'Author',
+        artwork: metadata?.artwork,
+        duration: track.duration,
+      }));
+
+      await TrackPlayer.add(queueTracks);
+      if (this.loadId !== thisLoadId) return;
+      t('All tracks added');
+
+      this.currentUrl = tracks[0]?.url || null;
+      this.isLoaded = true;
+
+      // Seek to correct track and position
+      if (startPositionSec > 0) {
+        t(`Seeking to global position ${startPositionSec.toFixed(1)}s`);
+        await this.seekToGlobal(startPositionSec);
+      }
+      if (this.loadId !== thisLoadId) return;
+
+      if (autoPlay) {
+        t('Playing...');
+        await TrackPlayer.play();
+      } else {
+        t('Ready (paused)');
+      }
+      t('Done');
+    } catch (error) {
+      if (this.loadId === thisLoadId) {
+        console.error('[Audio] Load tracks failed:', error);
+        this.isLoaded = false;
+      }
+    }
+  }
+
+  /**
+   * Seek to a global position across all tracks
+   * Finds the correct track and seeks within it
+   */
+  async seekToGlobal(globalPositionSec: number): Promise<void> {
+    if (this.tracks.length === 0) {
+      // Single track mode - just seek directly
+      await TrackPlayer.seekTo(globalPositionSec);
+      return;
+    }
+
+    // Find which track contains this position
+    let targetTrackIndex = 0;
+    let positionInTrack = globalPositionSec;
+
+    for (let i = 0; i < this.tracks.length; i++) {
+      const track = this.tracks[i];
+      if (globalPositionSec >= track.startOffset && globalPositionSec < track.startOffset + track.duration) {
+        targetTrackIndex = i;
+        positionInTrack = globalPositionSec - track.startOffset;
+        break;
+      }
+      // If we're past the last track, stay on it
+      if (i === this.tracks.length - 1) {
+        targetTrackIndex = i;
+        positionInTrack = Math.min(globalPositionSec - track.startOffset, track.duration);
+      }
+    }
+
+    log(`⏩ Global seek ${globalPositionSec.toFixed(1)}s → track ${targetTrackIndex}, pos ${positionInTrack.toFixed(1)}s`);
+
+    const currentIndex = await TrackPlayer.getActiveTrackIndex();
+    if (currentIndex !== targetTrackIndex) {
+      await TrackPlayer.skip(targetTrackIndex);
+    }
+    await TrackPlayer.seekTo(positionInTrack);
+  }
+
   async play(): Promise<void> {
     log('▶ Play');
     await TrackPlayer.play();
@@ -262,8 +399,13 @@ class AudioService {
   }
 
   async seekTo(positionSec: number): Promise<void> {
-    log(`⏩ Seek to ${positionSec.toFixed(1)}s`);
-    await TrackPlayer.seekTo(positionSec);
+    // Use global seek if we have multiple tracks
+    if (this.tracks.length > 0) {
+      await this.seekToGlobal(positionSec);
+    } else {
+      log(`⏩ Seek to ${positionSec.toFixed(1)}s`);
+      await TrackPlayer.seekTo(positionSec);
+    }
   }
 
   async setPlaybackRate(rate: number): Promise<void> {
@@ -272,11 +414,12 @@ class AudioService {
   }
 
   async getPosition(): Promise<number> {
-    const progress = await TrackPlayer.getProgress();
-    return progress.position;
+    const { position } = await this.getGlobalPosition();
+    return position;
   }
 
   async getDuration(): Promise<number> {
+    if (this.totalDuration > 0) return this.totalDuration;
     const progress = await TrackPlayer.getProgress();
     return progress.duration;
   }
@@ -287,6 +430,8 @@ class AudioService {
     await TrackPlayer.reset();
     this.currentUrl = null;
     this.isLoaded = false;
+    this.tracks = [];
+    this.totalDuration = 0;
   }
 }
 
