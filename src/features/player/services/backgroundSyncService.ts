@@ -12,9 +12,10 @@ import { AppState, AppStateStatus } from 'react-native';
 import { apiClient } from '@/core/api';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { sessionService } from './sessionService';
+import { audioLog, formatDuration, logSection } from '@/shared/utils/audioDebug';
 
 const DEBUG = __DEV__;
-const log = (...args: any[]) => DEBUG && console.log('[BackgroundSync]', ...args);
+const log = (...args: any[]) => audioLog.sync(args.join(' '));
 
 interface SyncQueueItem {
   itemId: string;
@@ -89,19 +90,25 @@ class BackgroundSyncService {
     duration: number,
     sessionId?: string
   ): Promise<void> {
+    log(`saveProgress: ${itemId} @ ${formatDuration(position)}`);
+
     // STEP 1: Write to SQLite immediately (fast, offline-capable)
+    log('  Writing to SQLite...');
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
 
     // STEP 2: Queue for server sync (batched, debounced)
     const existing = this.syncQueue.get(itemId);
 
     // Debounce: only queue if enough time has passed or position changed significantly
+    const positionDelta = existing ? Math.abs(existing.position - position) : Infinity;
+    const timeSinceLastAttempt = existing ? Date.now() - existing.lastAttempt : Infinity;
     const shouldQueue =
       !existing ||
-      Math.abs(existing.position - position) > 10 || // Position changed by 10+ seconds
-      Date.now() - existing.lastAttempt > this.MIN_SYNC_DELAY;
+      positionDelta > 10 || // Position changed by 10+ seconds
+      timeSinceLastAttempt > this.MIN_SYNC_DELAY;
 
     if (shouldQueue) {
+      log(`  Queuing for sync (delta: ${positionDelta.toFixed(1)}s, timeSince: ${timeSinceLastAttempt}ms)`);
       this.syncQueue.set(itemId, {
         itemId,
         position,
@@ -110,6 +117,9 @@ class BackgroundSyncService {
         retryCount: 0,
         lastAttempt: Date.now(),
       });
+      log(`  Queue size: ${this.syncQueue.size}`);
+    } else {
+      log('  Skipped queue (debounced)');
     }
   }
 
@@ -117,13 +127,19 @@ class BackgroundSyncService {
    * Force immediate sync for critical operations (e.g., app backgrounding)
    */
   async forceSyncAll(): Promise<void> {
-    log('Force syncing all queued items...');
+    logSection('FORCE SYNC ALL');
+    log(`Queue size: ${this.syncQueue.size}`);
 
     const items = Array.from(this.syncQueue.values());
+    log(`Syncing ${items.length} items from queue`);
+
     await Promise.all(items.map(item => this.syncToServer(item)));
 
     // Also sync any unsynced items from SQLite
+    log('Checking SQLite for unsynced items...');
     await this.syncUnsyncedFromStorage();
+
+    log('Force sync complete');
   }
 
   /**
@@ -161,39 +177,50 @@ class BackgroundSyncService {
    * Sync a single item to the server
    */
   private async syncToServer(item: SyncQueueItem): Promise<boolean> {
+    log(`syncToServer: ${item.itemId}`);
+    log(`  Position: ${formatDuration(item.position)}`);
+    log(`  Session ID: ${item.sessionId || 'none'}`);
+    log(`  Retry count: ${item.retryCount}/${this.MAX_RETRIES}`);
+
     try {
       // Try session sync first (more accurate)
       if (item.sessionId) {
+        audioLog.network('POST', `/api/session/${item.sessionId}/sync`);
         await apiClient.post(`/api/session/${item.sessionId}/sync`, {
           currentTime: item.position,
           timeListened: 0,
         });
+        log('  Session sync successful');
       } else {
         // Fallback: update item progress directly
+        audioLog.network('PATCH', `/api/me/progress/${item.itemId}`);
         await apiClient.patch(`/api/me/progress/${item.itemId}`, {
           currentTime: item.position,
           duration: item.duration,
           progress: item.duration > 0 ? item.position / item.duration : 0,
         });
+        log('  Direct progress update successful');
       }
 
       // Success - mark as synced in SQLite and remove from queue
       await sqliteCache.markProgressSynced(item.itemId);
       this.syncQueue.delete(item.itemId);
 
-      log(`Synced progress for ${item.itemId}: ${item.position.toFixed(1)}s`);
+      log(`  Synced: ${item.itemId} @ ${formatDuration(item.position)}`);
       return true;
     } catch (error: any) {
       // Handle failure
       item.retryCount++;
       item.lastAttempt = Date.now();
 
+      audioLog.warn(`Sync failed for ${item.itemId}: ${error.message}`);
+
       if (item.retryCount >= this.MAX_RETRIES) {
-        log(`Max retries reached for ${item.itemId}, keeping in SQLite`);
+        audioLog.warn(`Max retries (${this.MAX_RETRIES}) reached for ${item.itemId}, keeping in SQLite for later`);
         this.syncQueue.delete(item.itemId);
         // Keep in SQLite as unsynced for future retry
       } else {
-        log(`Sync failed for ${item.itemId}, retry ${item.retryCount}/${this.MAX_RETRIES}`);
+        log(`  Will retry (${item.retryCount}/${this.MAX_RETRIES})`);
       }
       return false;
     }
@@ -231,13 +258,17 @@ class BackgroundSyncService {
    * Handle app state changes (backgrounding/foregrounding)
    */
   private handleAppStateChange(nextState: AppStateStatus): void {
+    log(`App state change: ${nextState}`);
+
     if (nextState === 'background' || nextState === 'inactive') {
       // App going to background - force sync
-      log('App backgrounding, forcing sync...');
+      logSection('APP BACKGROUNDING');
+      log('Forcing sync before background...');
       this.forceSyncAll();
     } else if (nextState === 'active') {
       // App coming to foreground - check for unsynced
-      log('App foregrounding, checking unsynced...');
+      logSection('APP FOREGROUNDING');
+      log('Checking for unsynced progress...');
       this.syncUnsyncedFromStorage();
     }
   }
