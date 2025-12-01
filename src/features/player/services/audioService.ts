@@ -11,6 +11,15 @@ import TrackPlayer, {
   RepeatMode,
 } from 'react-native-track-player';
 
+import {
+  audioLog,
+  createTimer,
+  logSection,
+  validateUrl,
+  getStateName,
+  formatDuration,
+} from '@/shared/utils/audioDebug';
+
 export interface PlaybackState {
   isPlaying: boolean;
   position: number;       // Global position across all tracks
@@ -29,7 +38,7 @@ export interface AudioTrackInfo {
 type StatusCallback = (status: PlaybackState) => void;
 
 const DEBUG = __DEV__;
-const log = (...args: any[]) => DEBUG && console.log('[Audio]', ...args);
+const log = (...args: any[]) => audioLog.audio(args.join(' '));
 
 class AudioService {
   private isSetup = false;
@@ -54,17 +63,23 @@ class AudioService {
    * Safe to call multiple times - will reuse existing setup or retry if failed.
    */
   async ensureSetup(): Promise<void> {
+    log('ensureSetup called, isSetup:', this.isSetup);
+
     // If already set up, return immediately
-    if (this.isSetup) return;
+    if (this.isSetup) {
+      log('Already set up, returning');
+      return;
+    }
 
     // If there's an existing setup promise, wait for it
     if (this.setupPromise) {
       try {
+        log('Waiting for existing setup promise...');
         await this.setupPromise;
         return;
       } catch (error) {
         // Setup failed, will retry below
-        log('Previous setup failed, retrying...');
+        audioLog.warn('Previous setup failed, retrying...');
       }
     }
 
@@ -78,10 +93,12 @@ class AudioService {
 
     this.setupAttempts++;
     const attempt = this.setupAttempts;
+    const timing = createTimer('TrackPlayer.setup');
 
     try {
-      log(`Setting up TrackPlayer... (attempt ${attempt})`);
+      logSection(`TRACKPLAYER SETUP (attempt ${attempt})`);
 
+      timing('Start');
       await TrackPlayer.setupPlayer({
         autoHandleInterruptions: true,
         // Optimized buffering for audiobooks (longer content)
@@ -91,6 +108,9 @@ class AudioService {
         backBuffer: 60,          // Keep 60 sec behind current position
         waitForBuffer: true,     // Wait for buffer before playing
       });
+      timing('setupPlayer done');
+
+      log('Buffer config: minBuffer=60s, maxBuffer=300s, playBuffer=10s, backBuffer=60s');
 
       await TrackPlayer.updateOptions({
         capabilities: [
@@ -114,17 +134,20 @@ class AudioService {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
         },
       });
+      timing('updateOptions done');
 
       await TrackPlayer.setRepeatMode(RepeatMode.Off);
+      timing('setRepeatMode done');
 
       this.isSetup = true;
-      log('✓ TrackPlayer ready');
+      log('TrackPlayer ready');
     } catch (error: any) {
       if (error.message?.includes('already been initialized')) {
         this.isSetup = true;
-        log('TrackPlayer already initialized');
+        log('TrackPlayer already initialized (reusing)');
       } else {
-        console.error('[Audio] Setup failed:', error);
+        audioLog.error('Setup failed:', error.message);
+        audioLog.error('Stack:', error.stack);
         // Clear the promise so ensureSetup can retry
         this.setupPromise = null;
         throw error;
@@ -167,6 +190,9 @@ class AudioService {
     return { position: progress.position, duration: progress.duration || this.totalDuration };
   }
 
+  private lastLoggedState: number | null = null;
+  private lastLoggedPosition: number = 0;
+
   private startProgressUpdates(): void {
     this.stopProgressUpdates();
 
@@ -182,9 +208,31 @@ class AudioService {
         const isPlaying = playbackState.state === State.Playing;
         const isBuffering = playbackState.state === State.Buffering || playbackState.state === State.Loading;
 
+        // Log state changes
+        if (this.lastLoggedState !== playbackState.state) {
+          audioLog.state(
+            getStateName(this.lastLoggedState ?? 0),
+            getStateName(playbackState.state),
+            `track ${trackIndex}/${queue.length}`
+          );
+          this.lastLoggedState = playbackState.state;
+        }
+
+        // Log position every 30 seconds
+        if (Math.floor(position) % 30 === 0 && Math.abs(position - this.lastLoggedPosition) >= 1 && isPlaying) {
+          audioLog.progress(`${formatDuration(position)} / ${formatDuration(duration)} (buffered: ${formatDuration((await TrackPlayer.getProgress()).buffered)})`);
+          this.lastLoggedPosition = position;
+        }
+
         // Only report didJustFinish when the LAST track in queue ends
         const isLastTrack = trackIndex === undefined || trackIndex >= queue.length - 1;
         const didJustFinish = playbackState.state === State.Ended && isLastTrack;
+
+        if (didJustFinish) {
+          log('didJustFinish triggered - State.Ended on last track');
+          log(`  trackIndex: ${trackIndex}, queue length: ${queue.length}`);
+          log(`  position: ${position.toFixed(1)}s, duration: ${duration.toFixed(1)}s`);
+        }
 
         this.statusCallback?.({
           isPlaying,
@@ -193,8 +241,11 @@ class AudioService {
           isBuffering,
           didJustFinish,
         });
-      } catch (e) {
-        // Ignore errors
+      } catch (e: any) {
+        // Log errors that might indicate issues
+        if (e.message && !e.message.includes('not initialized')) {
+          audioLog.error('Progress update error:', e.message);
+        }
       }
     }, 500);
   }
@@ -213,33 +264,42 @@ class AudioService {
     autoPlay: boolean = true
   ): Promise<void> {
     const thisLoadId = ++this.loadId;
-    const t0 = Date.now();
-    const t = (label: string) => log(`⏱ [${Date.now() - t0}ms] ${label}`);
+    const timing = createTimer('loadAudio');
 
-    log(`Loading: ${url.substring(0, 80)}...`);
+    logSection('LOAD AUDIO (single track)');
+    log('URL:', url.substring(0, 100) + (url.length > 100 ? '...' : ''));
+    log('Start position:', startPositionSec.toFixed(1) + 's');
+    log('AutoPlay:', autoPlay);
+    log('Metadata:', JSON.stringify(metadata));
+
+    // Validate URL
+    if (!validateUrl(url, 'loadAudio')) {
+      audioLog.error('Invalid URL provided to loadAudio');
+      throw new Error('Invalid audio URL');
+    }
 
     // Ensure setup is done first (will retry if previous setup failed)
-    t('Ensuring setup...');
+    timing('Ensuring setup');
     await this.ensureSetup();
-    t('Setup ready');
+    timing('Setup ready');
 
     // Check if cancelled
     if (this.loadId !== thisLoadId) {
-      t('Cancelled - newer load started');
+      log('Cancelled - newer load started');
       return;
     }
 
     try {
-      t('Resetting...');
+      timing('Resetting');
       await TrackPlayer.reset();
 
       if (this.loadId !== thisLoadId) {
-        t('Cancelled after reset');
+        log('Cancelled after reset');
         return;
       }
-      t('Reset done');
+      timing('Reset done');
 
-      t('Adding track...');
+      timing('Adding track');
       await TrackPlayer.add({
         id: 'current-track',
         url: url,
@@ -249,35 +309,43 @@ class AudioService {
       });
 
       if (this.loadId !== thisLoadId) {
-        t('Cancelled after add');
+        log('Cancelled after add');
         return;
       }
-      t('Track added');
+      timing('Track added');
 
       this.currentUrl = url;
       this.isLoaded = true;
+      // Reset for single track mode
+      this.tracks = [];
+      this.totalDuration = 0;
 
       if (startPositionSec > 0) {
-        t(`Seeking to ${startPositionSec}s`);
+        log(`Seeking to ${formatDuration(startPositionSec)}`);
+        timing('Seeking');
         await TrackPlayer.seekTo(startPositionSec);
+        timing('Seek done');
       }
 
       if (this.loadId !== thisLoadId) {
-        t('Cancelled after seek');
+        log('Cancelled after seek');
         return;
       }
 
       if (autoPlay) {
-        t('Playing...');
+        timing('Starting playback');
         await TrackPlayer.play();
+        timing('Playback started');
       } else {
-        t('Ready (paused)');
+        log('Ready (paused, not auto-playing)');
       }
-      t('Done');
-    } catch (error) {
+      timing('Load complete');
+    } catch (error: any) {
       if (this.loadId === thisLoadId) {
-        console.error('[Audio] Load failed:', error);
+        audioLog.error('Load failed:', error.message);
+        audioLog.error('Stack:', error.stack);
         this.isLoaded = false;
+        throw error;
       }
     }
   }
@@ -293,25 +361,34 @@ class AudioService {
     autoPlay: boolean = true
   ): Promise<void> {
     const thisLoadId = ++this.loadId;
-    const t0 = Date.now();
-    const t = (label: string) => log(`⏱ [${Date.now() - t0}ms] ${label}`);
+    const timing = createTimer('loadTracks');
 
-    log(`Loading ${tracks.length} tracks, starting at ${startPositionSec.toFixed(1)}s`);
+    logSection('LOAD AUDIO (multi-track)');
+    log(`Track count: ${tracks.length}`);
+    log(`Start position: ${formatDuration(startPositionSec)} (${startPositionSec.toFixed(1)}s)`);
+    log('AutoPlay:', autoPlay);
+
+    // Log track details
+    tracks.forEach((track, i) => {
+      log(`  Track ${i}: offset=${formatDuration(track.startOffset)}, duration=${formatDuration(track.duration)}`);
+    });
 
     await this.ensureSetup();
     if (this.loadId !== thisLoadId) return;
 
     try {
-      t('Resetting...');
+      timing('Resetting');
       await TrackPlayer.reset();
       if (this.loadId !== thisLoadId) return;
+      timing('Reset done');
 
       // Store track info for position calculations
       this.tracks = tracks;
       this.totalDuration = tracks.reduce((sum, t) => sum + t.duration, 0);
+      log(`Total duration: ${formatDuration(this.totalDuration)}`);
 
       // Add all tracks to queue
-      t(`Adding ${tracks.length} tracks to queue...`);
+      timing('Adding tracks to queue');
       const queueTracks = tracks.map((track, index) => ({
         id: `track-${index}`,
         url: track.url,
@@ -323,29 +400,35 @@ class AudioService {
 
       await TrackPlayer.add(queueTracks);
       if (this.loadId !== thisLoadId) return;
-      t('All tracks added');
+      timing('All tracks added');
+      log(`Queue now has ${queueTracks.length} tracks`);
 
       this.currentUrl = tracks[0]?.url || null;
       this.isLoaded = true;
 
       // Seek to correct track and position
       if (startPositionSec > 0) {
-        t(`Seeking to global position ${startPositionSec.toFixed(1)}s`);
+        log(`Seeking to global position ${formatDuration(startPositionSec)}`);
+        timing('Seeking');
         await this.seekToGlobal(startPositionSec);
+        timing('Seek done');
       }
       if (this.loadId !== thisLoadId) return;
 
       if (autoPlay) {
-        t('Playing...');
+        timing('Starting playback');
         await TrackPlayer.play();
+        timing('Playback started');
       } else {
-        t('Ready (paused)');
+        log('Ready (paused, not auto-playing)');
       }
-      t('Done');
-    } catch (error) {
+      timing('Load complete');
+    } catch (error: any) {
       if (this.loadId === thisLoadId) {
-        console.error('[Audio] Load tracks failed:', error);
+        audioLog.error('Load tracks failed:', error.message);
+        audioLog.error('Stack:', error.stack);
         this.isLoaded = false;
+        throw error;
       }
     }
   }

@@ -17,13 +17,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Import audioService directly (not from barrel) to avoid circular dependency
 import { audioService, PlaybackState, AudioTrackInfo } from '@/features/player/services/audioService';
 
+// Import debug utilities
+import {
+  audioLog,
+  createTimer,
+  logSection,
+  logPositionSources,
+  logDurationSources,
+  logChapters,
+  logTracks,
+  validateUrl,
+} from '@/shared/utils/audioDebug';
+
 const DEBUG = __DEV__;
-const log = (msg: string, ...args: any[]) => {
-  if (DEBUG) console.log(`[Player] ${msg}`, ...args);
-};
-const logError = (msg: string, ...args: any[]) => {
-  console.error(`[Player] ❌ ${msg}`, ...args);
-};
+const log = (msg: string, ...args: any[]) => audioLog.store(msg, ...args);
+const logError = (msg: string, ...args: any[]) => audioLog.error(msg, ...args);
 
 export interface Chapter {
   id: number;
@@ -194,15 +202,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
 
     const thisLoadId = ++currentLoadId;
-    const t0 = Date.now();
-    const timing = (label: string) => log(`⏱ ${label}: ${Date.now() - t0}ms`);
+    const timing = createTimer('loadBook');
 
     // Reset track finish guards for fresh book load
     isHandlingTrackFinish = false;
     lastChapterAdvanceTime = 0;
 
-    log('=== loadBook ===');
-    log('Book:', book.id, '-', book.media?.metadata?.title, '- autoPlay:', autoPlay);
+    logSection('LOAD BOOK START');
+    log('Book ID:', book.id);
+    log('Title:', book.media?.metadata?.title);
+    log('Author:', book.media?.metadata?.authorName || book.media?.metadata?.authors?.[0]?.name);
+    log('Options:', JSON.stringify(options));
+    log('Duration from metadata:', book.media?.duration);
+    log('Audio files count:', book.media?.audioFiles?.length);
+    log('Chapters count:', book.media?.chapters?.length);
+    timing('Start');
 
     // Same book already loaded?
     if (currentBook?.id === book.id && audioService.getIsLoaded()) {
@@ -254,16 +268,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         // OFFLINE PLAYBACK - instant
         streamUrl = localPath;
         chapters = extractChaptersFromBook(book);
-        log('Using offline path');
-        
+        log('OFFLINE PLAYBACK MODE');
+        log('Local path:', localPath);
+        validateUrl(localPath, 'Offline path');
+
         if (!startPosition) {
           const localProgress = await progressService.getLocalProgress(book.id);
+          logPositionSources({
+            localProgress,
+            finalPosition: localProgress > 0 ? localProgress : 0,
+          });
           if (localProgress > 0) {
             resumePosition = localProgress;
           }
         }
       } else {
         // ONLINE PLAYBACK - session API
+        log('ONLINE PLAYBACK MODE');
         timing('Before session start');
 
         const session = await sessionService.startSession(book.id);
@@ -271,16 +292,33 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
         if (thisLoadId !== currentLoadId) return;
 
+        log('Session response:');
+        log('  Session ID:', session.id);
+        log('  Audio tracks:', session.audioTracks?.length);
+        log('  Chapters:', session.chapters?.length);
+        log('  Duration:', session.duration);
+        log('  Current time (resume):', session.currentTime);
+
         chapters = mapSessionChapters(session.chapters || []);
         if (session.duration > 0) totalDuration = session.duration;
+
+        // Log position sources for debugging
+        logPositionSources({
+          session: session.currentTime,
+          finalPosition: !startPosition && session.currentTime > 0 ? session.currentTime : startPosition ?? 0,
+        });
+
         if (!startPosition && session.currentTime > 0) resumePosition = session.currentTime;
 
         // Build track info for multi-file audiobooks
         const audioTracks = session.audioTracks || [];
         if (audioTracks.length > 1) {
           // Multi-file book - build track URLs
+          log('MULTI-FILE AUDIOBOOK');
           const baseUrl = apiClient.getBaseURL().replace(/\/+$/, '');
           const token = (apiClient as any).getAuthToken?.() || (apiClient as any).authToken || '';
+          log('  Base URL:', baseUrl);
+          log('  Auth token present:', !!token);
 
           audioTrackInfos = audioTracks.map((track) => {
             let trackUrl = `${baseUrl}${track.contentUrl}`;
@@ -295,13 +333,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
               duration: track.duration,
             };
           });
-          log(`Multi-file book: ${audioTrackInfos.length} tracks`);
+          log(`  Total tracks: ${audioTrackInfos.length}`);
+          logTracks(audioTrackInfos);
         } else {
           // Single-file book - use stream URL
+          log('SINGLE-FILE AUDIOBOOK');
           const url = sessionService.getStreamUrl();
-          if (!url) throw new Error('No stream URL');
+          if (!url) {
+            logError('No stream URL returned from session!');
+            throw new Error('No stream URL');
+          }
           streamUrl = url;
-          log('Stream URL:', streamUrl.substring(0, 80));
+          validateUrl(streamUrl, 'Stream URL');
+          log('Stream URL preview:', streamUrl.substring(0, 80) + '...');
         }
 
         sessionService.startAutoSync(() => get().position);
@@ -311,7 +355,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       await backgroundSyncService.init();
       backgroundSyncService.start();
 
+      // Log chapters and duration sources
+      if (chapters.length > 0) {
+        logChapters(chapters);
+      }
+      logDurationSources({
+        metadata: book.media?.duration,
+        session: totalDuration,
+        finalDuration: totalDuration,
+      });
+
       // Update state with chapters/duration before loading audio
+      log('Setting initial state:');
+      log('  Resume position:', resumePosition.toFixed(1) + 's');
+      log('  Total duration:', totalDuration.toFixed(1) + 's');
+      log('  Chapters:', chapters.length);
+      log('  Is offline:', isOffline);
+
       set({
         chapters,
         duration: totalDuration,
@@ -327,6 +387,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
                      book.media?.metadata?.authors?.[0]?.name ||
                      'Unknown Author';
       const coverUrl = apiClient.getItemCoverUrl(book.id);
+      log('Metadata for lock screen:', { title, author, coverUrl: coverUrl?.substring(0, 50) + '...' });
 
       // CRITICAL: Set up status callback BEFORE loading audio
       // This ensures we capture all playback state changes during loading
@@ -379,17 +440,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       get().loadBookmarks().catch(() => {});
 
       // Set final state - only play if autoPlay is true
+      timing('Audio loaded');
       if (autoPlay) {
         set({ isLoading: false, isBuffering: true, isPlaying: true });
-        log(`✓ Playback started`);
+        logSection('LOAD BOOK SUCCESS');
+        log('Playback started');
       } else {
         set({ isLoading: false, isBuffering: false, isPlaying: false });
-        log(`✓ Book loaded (paused)`);
+        logSection('LOAD BOOK SUCCESS');
+        log('Book loaded (paused)');
       }
 
     } catch (error: any) {
       if (thisLoadId === currentLoadId) {
-        logError('Failed to load book:', error.message);
+        logSection('LOAD BOOK FAILED');
+        logError('Error:', error.message);
+        logError('Stack:', error.stack);
         set({ isLoading: false });
       }
       throw error;
@@ -495,7 +561,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   updatePlaybackState: (state: PlaybackState) => {
-    const { currentBook, duration: storeDuration, isLoading, isPlaying: wasPlaying } = get();
+    const { currentBook, duration: storeDuration, isLoading, isPlaying: wasPlaying, position: prevPosition } = get();
 
     // For display/UI, prefer track duration if available, but fallback to store duration
     const displayDuration = state.duration > 0 ? state.duration : storeDuration;
@@ -503,6 +569,25 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     // For "book finished" detection, ALWAYS use storeDuration (total book duration from session)
     // state.duration from TrackPlayer can be unreliable for streams (may report segment duration)
     const totalBookDuration = storeDuration > 0 ? storeDuration : state.duration;
+
+    // Log significant state changes (every 10 seconds or state transitions)
+    const positionDiff = Math.abs(state.position - prevPosition);
+    const shouldLogPosition = Math.floor(state.position) % 10 === 0 && positionDiff >= 1;
+    const stateChanged = state.isPlaying !== wasPlaying || state.isBuffering !== get().isBuffering;
+
+    if (stateChanged) {
+      audioLog.state(
+        wasPlaying ? 'playing' : 'paused',
+        state.isPlaying ? 'playing' : 'paused',
+        state.isBuffering ? 'buffering' : undefined
+      );
+    }
+
+    if (shouldLogPosition && state.isPlaying) {
+      audioLog.progress(
+        `Position: ${state.position.toFixed(1)}s / ${displayDuration.toFixed(1)}s (${((state.position / displayDuration) * 100).toFixed(1)}%)`
+      );
+    }
 
     // Don't update isPlaying while loading
     if (isLoading) {
@@ -545,13 +630,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const timeSinceLastAdvance = now - lastChapterAdvanceTime;
 
       if (timeSinceLastAdvance < CHAPTER_ADVANCE_COOLDOWN) {
-        log('Ignoring didJustFinish - cooldown active');
+        log('Ignoring didJustFinish - cooldown active (' + timeSinceLastAdvance + 'ms since last)');
         return;
       }
 
       isHandlingTrackFinish = true;
       const endPosition = state.position;
-      log('Audio ended at position:', endPosition.toFixed(1), '/ total:', totalBookDuration.toFixed(1));
+
+      logSection('TRACK FINISHED EVENT');
+      log('Position at finish:', endPosition.toFixed(1) + 's');
+      log('Total book duration:', totalBookDuration.toFixed(1) + 's');
+      log('Distance from end:', (totalBookDuration - endPosition).toFixed(1) + 's');
 
       // Check if this is truly the end of the book
       // Use totalBookDuration (from session) NOT track duration
@@ -559,11 +648,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       const isNearEnd = totalBookDuration > 0 && endPosition >= totalBookDuration - 5;
 
       if (isNearEnd) {
-        log('Book finished - reached end of audio');
+        log('BOOK FINISHED - reached end of audio');
         set({ isPlaying: false });
 
         if (currentBook) {
           const session = sessionService.getCurrentSession();
+          log('Saving final progress for book:', currentBook.id);
           backgroundSyncService.saveProgress(
             currentBook.id,
             state.position,
@@ -573,6 +663,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
           const metadata = currentBook.media?.metadata as any;
           if (metadata) {
+            log('Adding to read history');
             sqliteCache.addToReadHistory({
               itemId: currentBook.id,
               title: metadata.title || 'Unknown Title',
@@ -585,7 +676,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       } else {
         // Not at end of book - this is likely end of a stream segment
         // The stream should continue automatically, just log it
-        log('Stream segment ended, not at book end - continuing playback');
+        log('NOT at book end - this may be a stream segment end');
+        log('Expected: finish near ' + totalBookDuration.toFixed(1) + 's, actual: ' + endPosition.toFixed(1) + 's');
       }
 
       isHandlingTrackFinish = false;
