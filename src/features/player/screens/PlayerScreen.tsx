@@ -1,7 +1,5 @@
 /**
  * src/features/player/screens/PlayerScreen.tsx
- *
- * Redesigned media player with dark glass-like UI
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -12,33 +10,35 @@ import {
   StatusBar,
   Animated,
   Text,
+  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import Svg, { Path } from 'react-native-svg';
+import { getColors } from 'react-native-image-colors';
 import { usePlayerStore } from '../stores/playerStore';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
+import { theme } from '@/shared/theme';
 import { getTitle } from '@/shared/utils/metadata';
+import { matchToPalette } from '@/shared/utils/colorPalette';
 
 import {
   SCREEN_HEIGHT,
-  PLAYER_PADDING,
-  BUTTON_GAP,
-  DISPLAY_WIDTH,
-  DISPLAY_PADDING,
+  CARD_MARGIN,
+  CARD_WIDTH,
   COVER_SIZE,
   RADIUS,
   REWIND_STEP,
   REWIND_INTERVAL,
   FF_STEP,
 } from '../constants';
-import { formatTime } from '../utils';
+import { isColorLight, pickMostSaturated, formatTime } from '../utils';
 import {
-  GradientPanel,
   AudioWaveform,
+  PlayerHeader,
   PlayerControls,
+  PlayerProgress,
 } from '../components';
 import {
   DetailsPanel,
@@ -48,8 +48,13 @@ import {
   SettingsPanel,
 } from '../panels';
 
-// Panel configuration
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// =============================================================================
+// PANEL CONFIGURATION - Customize panel sizes here
+// =============================================================================
 const PANEL_CONFIG = {
+  marginHorizontal: 5,
   borderRadius: 5,
   innerPadding: 10,
 };
@@ -61,21 +66,23 @@ export function PlayerScreen() {
   const navigation = useNavigation();
 
   // UI state
+  const [cardColor, setCardColor] = useState(theme.colors.neutral[300]);
+  const [isLight, setIsLight] = useState(true);
   const [isFlipped, setIsFlipped] = useState(false);
   const [flipMode, setFlipMode] = useState<FlipMode>('details');
-
+  
   // Panel state
   const [tempSpeed, setTempSpeed] = useState(1);
   const [tempSleepMins, setTempSleepMins] = useState(15);
   const [sleepInputValue, setSleepInputValue] = useState('15');
   const [controlMode, setControlMode] = useState<'rewind' | 'chapter'>('rewind');
   const [progressMode, setProgressMode] = useState<'bar' | 'chapters'>('chapters');
-
+  
   // Rewind/FF state
   const [isRewinding, setIsRewinding] = useState(false);
   const [isFastForwarding, setIsFastForwarding] = useState(false);
   const [seekDelta, setSeekDelta] = useState(0);
-
+  
   // Refs
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const flipAnim = useRef(new Animated.Value(0)).current;
@@ -104,6 +111,50 @@ export function PlayerScreen() {
 
   const coverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : '';
 
+  // Color extraction
+  useEffect(() => {
+    if (!coverUrl || !currentBook) return;
+    let mounted = true;
+
+    const extractColors = async () => {
+      try {
+        const result = await getColors(coverUrl, {
+          fallback: theme.colors.neutral[200],
+          cache: true,
+          key: currentBook.id,
+        });
+
+        if (!mounted) return;
+
+        let dominant = theme.colors.neutral[200];
+
+        if (result.platform === 'ios') {
+          dominant = result.detail || result.primary || result.secondary || theme.colors.neutral[200];
+        } else if (result.platform === 'android') {
+          const candidates = [
+            result.vibrant,
+            result.darkVibrant, 
+            result.lightVibrant,
+            result.muted,
+            result.darkMuted,
+            result.lightMuted,
+            result.dominant,
+          ];
+          dominant = pickMostSaturated(candidates) || result.dominant || theme.colors.neutral[200];
+        }
+
+        const paletteColor = matchToPalette(dominant);
+        setCardColor(paletteColor);
+        setIsLight(isColorLight(paletteColor));
+      } catch (err) {
+        console.log('Color extraction error:', err);
+      }
+    };
+
+    extractColors();
+    return () => { mounted = false; };
+  }, [coverUrl, currentBook?.id]);
+
   // Slide animation
   useEffect(() => {
     if (isPlayerVisible && currentBook) {
@@ -130,7 +181,10 @@ export function PlayerScreen() {
     seekingPos.current = position;
   }, [position]);
 
-  // Handlers
+  // ===========================================================================
+  // HANDLERS (must be defined before early return to maintain hooks order)
+  // ===========================================================================
+
   const handleClose = useCallback(() => {
     if (rewindInterval.current) clearInterval(rewindInterval.current);
     if (ffInterval.current) clearInterval(ffInterval.current);
@@ -177,7 +231,7 @@ export function PlayerScreen() {
   // Derived values
   const title = getTitle(currentBook);
   const chapters = currentBook.media?.chapters || [];
-
+  
   let bookDuration = currentBook.media?.duration || 0;
   if (bookDuration <= 0 && storeDuration > 0) bookDuration = storeDuration;
   if (bookDuration <= 0 && chapters.length > 0) {
@@ -191,15 +245,33 @@ export function PlayerScreen() {
   const chapterIndex = currentChapter ? chapters.indexOf(currentChapter) + 1 : 1;
   const chapterTitle = `Chapter ${chapterIndex}`;
 
-  // Handlers
+  const progress = bookDuration > 0 ? position / bookDuration : 0;
+  const chapterStart = currentChapter?.start || 0;
+  const chapterEnd = currentChapter?.end || bookDuration;
+  const chapterDuration = chapterEnd - chapterStart;
+  const chapterProgress = chapterDuration > 0 
+    ? Math.max(0, Math.min(1, (position - chapterStart) / chapterDuration))
+    : 0;
+
+  const textColor = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.9)';
+  const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)';
+  const waveColor = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
+
+  // ===========================================================================
+  // OTHER HANDLERS (after early return)
+  // ===========================================================================
+
   const handleFlip = (mode: FlipMode = 'details') => {
     if (isFlipped && flipMode === mode) {
+      // Same mode - flip back
       setIsFlipped(false);
       Animated.timing(flipAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     } else if (isFlipped && flipMode !== mode) {
+      // Different mode - just switch panel
       setFlipMode(mode);
       if (mode === 'speed') setTempSpeed(playbackRate);
     } else {
+      // Not flipped - flip to panel
       setFlipMode(mode);
       if (mode === 'speed') setTempSpeed(playbackRate);
       setIsFlipped(true);
@@ -218,11 +290,13 @@ export function PlayerScreen() {
   };
 
   const handlePrevChapter = async () => {
+    // Get chapters from store or book
     const storeChapters = usePlayerStore.getState().chapters;
     const chapterList = storeChapters.length > 0 ? storeChapters : chapters;
-
+    
     if (chapterList.length === 0) return;
-
+    
+    // Find current chapter index
     let currentIdx = 0;
     for (let i = chapterList.length - 1; i >= 0; i--) {
       if (position >= chapterList[i].start) {
@@ -230,19 +304,23 @@ export function PlayerScreen() {
         break;
       }
     }
-
+    
+    // If we're more than 3 seconds into the chapter, restart it
+    // Otherwise go to previous chapter
     const currentChapterStart = chapterList[currentIdx]?.start || 0;
     const targetIdx = (position - currentChapterStart > 3) ? currentIdx : Math.max(0, currentIdx - 1);
-
+    
     await seekTo(chapterList[targetIdx].start);
   };
 
   const handleNextChapter = async () => {
+    // Get chapters from store or book
     const storeChapters = usePlayerStore.getState().chapters;
     const chapterList = storeChapters.length > 0 ? storeChapters : chapters;
-
+    
     if (chapterList.length === 0) return;
-
+    
+    // Find current chapter index
     let currentIdx = 0;
     for (let i = chapterList.length - 1; i >= 0; i--) {
       if (position >= chapterList[i].start) {
@@ -250,7 +328,8 @@ export function PlayerScreen() {
         break;
       }
     }
-
+    
+    // Go to next chapter if available
     if (currentIdx < chapterList.length - 1) {
       await seekTo(chapterList[currentIdx + 1].start);
     }
@@ -266,13 +345,13 @@ export function PlayerScreen() {
     isSeeking.current = false;
     setSeekDelta(0);
     await pause();
-
+    
     const doRewind = () => {
       if (isSeeking.current) return;
       isSeeking.current = true;
       seekingPos.current = Math.max(0, seekingPos.current - REWIND_STEP);
       setSeekDelta(seekingPos.current - startPosition.current);
-
+      
       seekTo(seekingPos.current).finally(() => {
         isSeeking.current = false;
         if (seekingPos.current <= 0 && rewindInterval.current) {
@@ -283,7 +362,7 @@ export function PlayerScreen() {
         }
       });
     };
-
+    
     doRewind();
     rewindInterval.current = setInterval(doRewind, REWIND_INTERVAL);
   };
@@ -305,13 +384,13 @@ export function PlayerScreen() {
     isSeeking.current = false;
     setSeekDelta(0);
     await pause();
-
+    
     const doFF = () => {
       if (isSeeking.current) return;
       isSeeking.current = true;
       seekingPos.current = Math.min(bookDuration - 1, seekingPos.current + FF_STEP);
       setSeekDelta(seekingPos.current - startPosition.current);
-
+      
       seekTo(seekingPos.current).finally(() => {
         isSeeking.current = false;
         if (seekingPos.current >= bookDuration - 1 && ffInterval.current) {
@@ -322,7 +401,7 @@ export function PlayerScreen() {
         }
       });
     };
-
+    
     doFF();
     ffInterval.current = setInterval(doFF, REWIND_INTERVAL);
   };
@@ -342,172 +421,166 @@ export function PlayerScreen() {
   const handleRightPressOut = () => { if (controlMode === 'rewind') stopFastForward(); };
   const handleRightPress = () => { if (controlMode === 'chapter') handleNextChapter(); };
 
-  // Flip animations
+  const handleProgressScrub = async (percent: number) => {
+    const newPosition = Math.max(0, Math.min(bookDuration, percent * bookDuration));
+    await seekTo(newPosition);
+  };
+
+  const handleChapterScrub = async (percent: number) => {
+    const newPosition = Math.max(chapterStart, Math.min(chapterEnd, chapterStart + percent * chapterDuration));
+    await seekTo(newPosition);
+  };
+
+  // Flip animations - simple crossfade
   const frontOpacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const backOpacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  // Dynamic text color based on if flipped panel is visible
-  const isLight = false; // Always dark theme for the new design
+  // ===========================================================================
+  // MAIN RENDER
+  // ===========================================================================
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
 
       <View style={[styles.mainContent, { paddingTop: insets.top + 8 }]}>
-        {/* Display Panel */}
-        <View style={styles.displayContainer}>
-          <GradientPanel variant="display" style={styles.displayPanel}>
-            <View style={styles.displayContent}>
-              {/* Cover Art Container */}
-              <View style={styles.coverContainer}>
-                {/* Front - Cover Image */}
-                <Animated.View
-                  style={[styles.coverFace, { opacity: frontOpacity }]}
-                  pointerEvents={isFlipped ? 'none' : 'auto'}
-                >
-                  <TouchableOpacity onPress={() => handleFlip('details')} activeOpacity={0.9}>
-                    <View style={styles.artworkWrapper}>
-                      <Image source={coverUrl} style={styles.artwork} contentFit="cover" transition={300} />
-                      <View style={styles.artworkBorder} />
-                    </View>
-                  </TouchableOpacity>
-                </Animated.View>
+        {/* Card */}
+        <View style={[styles.card, { backgroundColor: cardColor }]}>
+          <PlayerHeader
+            title={title}
+            chapterTitle={chapterTitle}
+            position={position}
+            duration={bookDuration}
+            textColor={textColor}
+            secondaryColor={secondaryColor}
+            onChapterPress={() => handleFlip('chapters')}
+            onClose={handleClose}
+          />
 
-                {/* Back - Panel */}
-                <Animated.View
-                  style={[
-                    styles.coverFace,
-                    styles.coverBack,
-                    { opacity: backOpacity }
-                  ]}
-                  pointerEvents={isFlipped ? 'auto' : 'none'}
-                >
-                  <TouchableOpacity style={styles.flipCloseButton} onPress={handleFlipBack}>
-                    <Icon name="close" size={24} color="rgba(255,255,255,0.5)" set="ionicons" />
-                  </TouchableOpacity>
+          {/* Flippable Cover */}
+          <View style={styles.coverContainer}>
+            {/* Front - Cover Image */}
+            <Animated.View 
+              style={[
+                styles.coverFace, 
+                { opacity: frontOpacity }
+              ]}
+              pointerEvents={isFlipped ? 'none' : 'auto'}
+            >
+              <TouchableOpacity onPress={() => handleFlip('details')} activeOpacity={0.9}>
+                <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={300} />
+              </TouchableOpacity>
+            </Animated.View>
 
-                  {flipMode === 'details' && (
-                    <DetailsPanel
-                      book={currentBook}
-                      duration={bookDuration}
-                      chaptersCount={chapters.length}
-                      isLight={isLight}
-                      onNavigateToAuthor={handleNavigateToAuthor}
-                      onNavigateToNarrator={handleNavigateToNarrator}
-                      onNavigateToSeries={handleNavigateToSeries}
-                    />
-                  )}
+            {/* Back - Panel */}
+            <Animated.View 
+              style={[
+                styles.coverFace,
+                styles.coverBack,
+                { 
+                  backgroundColor: cardColor,
+                  opacity: backOpacity,
+                }
+              ]}
+              pointerEvents={isFlipped ? 'auto' : 'none'}
+            >
+              <TouchableOpacity style={styles.flipCloseButton} onPress={handleFlipBack}>
+                <Icon 
+                  name="close" 
+                  size={24} 
+                  color={isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)'} 
+                  set="ionicons" 
+                />
+              </TouchableOpacity>
 
-                  {flipMode === 'speed' && (
-                    <SpeedPanel
-                      tempSpeed={tempSpeed}
-                      setTempSpeed={setTempSpeed}
-                      onApply={() => {
-                        usePlayerStore.getState().setPlaybackRate(tempSpeed);
-                        handleFlipBack();
-                      }}
-                      onClose={handleFlipBack}
-                      isLight={isLight}
-                    />
-                  )}
+              {flipMode === 'details' && (
+                <DetailsPanel
+                  book={currentBook}
+                  duration={bookDuration}
+                  chaptersCount={chapters.length}
+                  isLight={isLight}
+                  onNavigateToAuthor={handleNavigateToAuthor}
+                  onNavigateToNarrator={handleNavigateToNarrator}
+                  onNavigateToSeries={handleNavigateToSeries}
+                />
+              )}
 
-                  {flipMode === 'sleep' && (
-                    <SleepPanel
-                      tempSleepMins={tempSleepMins}
-                      setTempSleepMins={setTempSleepMins}
-                      sleepInputValue={sleepInputValue}
-                      setSleepInputValue={setSleepInputValue}
-                      onClear={() => {
-                        usePlayerStore.getState().clearSleepTimer?.();
-                        handleFlipBack();
-                      }}
-                      onStart={() => {
-                        if (tempSleepMins > 0) {
-                          usePlayerStore.getState().setSleepTimer?.(tempSleepMins);
-                        }
-                        handleFlipBack();
-                      }}
-                      isLight={isLight}
-                    />
-                  )}
+              {flipMode === 'speed' && (
+                <SpeedPanel
+                  tempSpeed={tempSpeed}
+                  setTempSpeed={setTempSpeed}
+                  onApply={() => {
+                    usePlayerStore.getState().setPlaybackRate(tempSpeed);
+                    handleFlipBack();
+                  }}
+                  onClose={handleFlipBack}
+                  isLight={isLight}
+                />
+              )}
 
-                  {flipMode === 'chapters' && (
-                    <ChaptersPanel
-                      chapters={chapters}
-                      currentChapter={currentChapter}
-                      onChapterSelect={(start) => {
-                        seekTo(start);
-                        handleFlipBack();
-                      }}
-                      onClose={handleFlipBack}
-                      isLight={isLight}
-                    />
-                  )}
+              {flipMode === 'sleep' && (
+                <SleepPanel
+                  tempSleepMins={tempSleepMins}
+                  setTempSleepMins={setTempSleepMins}
+                  sleepInputValue={sleepInputValue}
+                  setSleepInputValue={setSleepInputValue}
+                  onClear={() => {
+                    usePlayerStore.getState().clearSleepTimer?.();
+                    handleFlipBack();
+                  }}
+                  onStart={() => {
+                    if (tempSleepMins > 0) {
+                      usePlayerStore.getState().setSleepTimer?.(tempSleepMins);
+                    }
+                    handleFlipBack();
+                  }}
+                  isLight={isLight}
+                />
+              )}
 
-                  {flipMode === 'settings' && (
-                    <SettingsPanel
-                      controlMode={controlMode}
-                      progressMode={progressMode}
-                      onControlModeChange={setControlMode}
-                      onProgressModeChange={setProgressMode}
-                      onViewChapters={() => setFlipMode('chapters')}
-                      onViewDetails={() => setFlipMode('details')}
-                      isLight={isLight}
-                    />
-                  )}
-                </Animated.View>
-              </View>
+              {flipMode === 'chapters' && (
+                <ChaptersPanel
+                  chapters={chapters}
+                  currentChapter={currentChapter}
+                  onChapterSelect={(start) => {
+                    seekTo(start);
+                    handleFlipBack();
+                  }}
+                  onClose={handleFlipBack}
+                  isLight={isLight}
+                />
+              )}
 
-              {/* Title Row */}
-              <View style={styles.titleRow}>
-                <Text style={styles.title} numberOfLines={2}>
-                  {title}
-                </Text>
-                <TouchableOpacity onPress={() => handleFlip('chapters')}>
-                  <Text style={styles.chapter}>{chapterTitle}</Text>
-                </TouchableOpacity>
-              </View>
+              {flipMode === 'settings' && (
+                <SettingsPanel
+                  controlMode={controlMode}
+                  progressMode={progressMode}
+                  onControlModeChange={setControlMode}
+                  onProgressModeChange={setProgressMode}
+                  onViewChapters={() => setFlipMode('chapters')}
+                  onViewDetails={() => setFlipMode('details')}
+                  isLight={isLight}
+                />
+              )}
+            </Animated.View>
+          </View>
 
-              {/* Waveform */}
-              <AudioWaveform color="rgba(255,255,255,0.4)" isPlaying={isPlaying} />
+          {/* Waveform */}
+          <AudioWaveform color={waveColor} isPlaying={isPlaying} />
 
-              {/* Controls Row */}
-              <View style={styles.controlsRow}>
-                <Text style={styles.time}>{formatTime(position)}</Text>
-
-                <TouchableOpacity style={styles.controlItem} onPress={() => handleFlip('sleep')}>
-                  {sleepTimer !== null ? (
-                    <Text style={styles.sleepTimer}>{Math.ceil(sleepTimer / 60)}m</Text>
-                  ) : (
-                    <>
-                      <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                        <Path
-                          d="M12 3C7.03 3 3 7.03 3 12H0L4 16L8 12H5C5 8.13 8.13 5 12 5C15.87 5 19 8.13 19 12C19 15.87 15.87 19 12 19C10.07 19 8.32 18.21 7.06 16.94L5.64 18.36C7.27 19.99 9.51 21 12 21C16.97 21 21 16.97 21 12C21 7.03 16.97 3 12 3Z"
-                          fill="rgba(255,255,255,0.5)"
-                        />
-                      </Svg>
-                      <Text style={styles.controlText}>1m</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-                <View style={styles.controlItem}>
-                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M12 21.35L10.55 20.03C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5C22 12.28 18.6 15.36 13.45 20.04L12 21.35Z"
-                      stroke="rgba(255,255,255,0.5)"
-                      strokeWidth={2}
-                      fill="none"
-                    />
-                  </Svg>
-                </View>
-
-                <TouchableOpacity onPress={() => handleFlip('speed')}>
-                  <Text style={styles.speed}>{playbackRate}x</Text>
-                </TouchableOpacity>
-              </View>
+          {/* Time row */}
+          <View style={styles.timeRow}>
+            <View style={styles.timeLeft}>
+              <TouchableOpacity 
+                style={[styles.speedButton, { backgroundColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)' }]}
+                onPress={() => handleFlip('speed')}
+              >
+                <Text style={[styles.speedLabel, { color: textColor }]}>{playbackRate}x</Text>
+              </TouchableOpacity>
+              <Text style={[styles.currentTime, { color: secondaryColor }]}>{formatTime(position)}</Text>
             </View>
-          </GradientPanel>
+            <Text style={[styles.totalTime, { color: secondaryColor }]}>{formatTime(bookDuration)}</Text>
+          </View>
         </View>
 
         {/* Controls */}
@@ -518,8 +591,8 @@ export function PlayerScreen() {
           isFastForwarding={isFastForwarding}
           seekDelta={seekDelta}
           controlMode={controlMode}
-          cardColor="#262626"
-          textColor="white"
+          cardColor={cardColor}
+          textColor={textColor}
           onPlayPause={handlePlayPause}
           onLeftPress={handleLeftPress}
           onLeftPressIn={handleLeftPressIn}
@@ -530,13 +603,21 @@ export function PlayerScreen() {
         />
       </View>
 
-      {/* Close button at bottom */}
-      <TouchableOpacity
-        style={[styles.closeButton, { bottom: insets.bottom + 16 }]}
-        onPress={handleClose}
-      >
-        <Icon name="chevron-down" size={32} color="rgba(255,255,255,0.5)" set="ionicons" />
-      </TouchableOpacity>
+      {/* Bottom progress */}
+      <PlayerProgress
+        progress={progress}
+        chapterProgress={chapterProgress}
+        chapterIndex={chapterIndex}
+        totalChapters={chapters.length}
+        progressMode={progressMode}
+        sleepTimer={sleepTimer}
+        cardColor={cardColor}
+        onSleepPress={() => handleFlip('sleep')}
+        onSettingsPress={() => handleFlip('settings')}
+        onProgressScrub={handleProgressScrub}
+        onChapterScrub={handleChapterScrub}
+        bottomInset={insets.bottom}
+      />
     </Animated.View>
   );
 }
@@ -548,25 +629,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#000000',
   },
   mainContent: {
     flex: 1,
-    justifyContent: 'center',
   },
-  displayContainer: {
-    marginHorizontal: PLAYER_PADDING,
-  },
-  displayPanel: {
-    width: DISPLAY_WIDTH,
-  },
-  displayContent: {
-    padding: DISPLAY_PADDING,
+  card: {
+    marginHorizontal: CARD_MARGIN,
+    borderRadius: RADIUS,
+    paddingTop: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
   },
   coverContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
     width: COVER_SIZE,
     height: COVER_SIZE,
-    marginBottom: 16,
+    alignSelf: 'center',
   },
   coverFace: {
     position: 'absolute',
@@ -575,29 +655,14 @@ const styles = StyleSheet.create({
     borderRadius: PANEL_CONFIG.borderRadius,
   },
   coverBack: {
-    backgroundColor: '#333',
     padding: PANEL_CONFIG.innerPadding,
     overflow: 'visible',
   },
-  artworkWrapper: {
+  cover: {
     width: COVER_SIZE,
     height: COVER_SIZE,
-    borderRadius: 11,
-    overflow: 'hidden',
-  },
-  artwork: {
-    width: '100%',
-    height: '100%',
-  },
-  artworkBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 11,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: PANEL_CONFIG.borderRadius,
+    backgroundColor: '#000',
   },
   flipCloseButton: {
     position: 'absolute',
@@ -606,59 +671,32 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 4,
   },
-  titleRow: {
+  timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginHorizontal: -14,
   },
-  title: {
-    flex: 1,
-    fontSize: 22,
-    fontWeight: '700',
-    color: 'white',
-    lineHeight: 26,
-    marginRight: 12,
-  },
-  chapter: {
-    fontFamily: 'Courier',
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
-  },
-  controlsRow: {
+  timeLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
   },
-  time: {
+  speedButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  speedLabel: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-    fontVariant: ['tabular-nums'],
-  },
-  controlItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  controlText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  sleepTimer: {
-    fontSize: 14,
-    color: '#FF9500',
     fontWeight: '600',
   },
-  speed: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.5)',
+  currentTime: {
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
   },
-  closeButton: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    padding: 8,
+  totalTime: {
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
   },
 });
