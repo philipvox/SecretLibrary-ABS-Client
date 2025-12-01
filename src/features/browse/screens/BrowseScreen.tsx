@@ -1,23 +1,34 @@
 /**
  * src/features/browse/screens/BrowseScreen.tsx
  *
- * Recommendations screen with masonry grid layout
- * Uses reading preferences and history to generate personalized recommendations
+ * Recommendations screen with interactive map-style layout
+ * Users can pan/drag around a large canvas of book covers
+ * Book sizes are based on recommendation score (bigger = more likely to enjoy)
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
-  ScrollView,
-  TouchableOpacity,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import {
+  GestureDetector,
+  Gesture,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
 import { apiClient } from '@/core/api';
 import { useLibraryCache } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
@@ -27,33 +38,48 @@ import { Icon } from '@/shared/components/Icon';
 import { LoadingSpinner } from '@/shared/components';
 import { LibraryItem } from '@/core/types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const GAP = 5;
-const PADDING = 5;
-const NUM_COLUMNS = 3;
-const CARD_SIZE = (SCREEN_WIDTH - PADDING * 2 - GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-const CARD_RADIUS = 5;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const BG_COLOR = '#1a1a1a';
+// Map canvas is larger than screen - user can pan around
+const CANVAS_WIDTH = SCREEN_WIDTH * 3;
+const CANVAS_HEIGHT = SCREEN_HEIGHT * 3;
+
+const BG_COLOR = '#0d0d0d';
 const ACCENT = '#CCFF00';
 
-type Category = 'for_you' | 'recent' | 'unstarted' | 'short' | 'long';
+// Book size ranges based on score
+const MIN_BOOK_SIZE = 70;
+const MAX_BOOK_SIZE = 180;
 
-interface BookItem {
+interface BookPosition {
   id: string;
   coverUrl: string;
   title: string;
   author: string;
-  size: 1 | 2;
+  x: number;
+  y: number;
+  size: number;
   score: number;
 }
 
-interface ScoredBook {
-  item: LibraryItem;
-  score: number;
+// Deterministic hash for stable positioning
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
 }
 
-// Score a book based on user preferences and history
+// Seeded random for stable positions based on book ID
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+// Score a book based on user preferences and history (no randomness!)
 function scoreBook(
   item: LibraryItem,
   preferences: {
@@ -137,71 +163,127 @@ function scoreBook(
     score += 10;
   }
 
-  // Add some randomness to avoid same order every time
-  score += Math.random() * 5;
-
   return score;
 }
 
-// Masonry layout computation
-function computeMasonryLayout(items: BookItem[]): Array<{ item: BookItem; x: number; y: number; w: number; h: number }> {
-  const positions: Array<{ item: BookItem; x: number; y: number; w: number; h: number }> = [];
-  const grid: boolean[][] = [];
+// Generate stable positions for books on the canvas
+function generateBookPositions(
+  items: Array<{ item: LibraryItem; score: number }>,
+  maxScore: number,
+  minScore: number
+): BookPosition[] {
+  const positions: BookPosition[] = [];
+  const occupiedAreas: Array<{ x: number; y: number; size: number }> = [];
 
-  const getCell = (row: number, col: number) => grid[row]?.[col] || false;
-  const setCell = (row: number, col: number, val: boolean) => {
-    if (!grid[row]) grid[row] = [];
-    grid[row][col] = val;
-  };
+  // Center area for highest scored books
+  const centerX = CANVAS_WIDTH / 2;
+  const centerY = CANVAS_HEIGHT / 2;
 
-  let maxRow = 0;
+  for (const { item, score } of items) {
+    // Calculate size based on score (higher score = bigger)
+    const normalizedScore = maxScore === minScore
+      ? 0.5
+      : (score - minScore) / (maxScore - minScore);
+    const size = MIN_BOOK_SIZE + (MAX_BOOK_SIZE - MIN_BOOK_SIZE) * normalizedScore;
 
-  items.forEach((item) => {
-    const cells = item.size;
-    let placed = false;
+    // Use hash for deterministic positioning
+    const hash = hashString(item.id);
 
-    for (let row = 0; row <= maxRow + 1 && !placed; row++) {
-      for (let col = 0; col <= NUM_COLUMNS - cells && !placed; col++) {
-        let canPlace = true;
-        for (let dr = 0; dr < cells && canPlace; dr++) {
-          for (let dc = 0; dc < cells && canPlace; dc++) {
-            if (getCell(row + dr, col + dc)) canPlace = false;
-          }
-        }
+    // Higher scored books closer to center
+    const distanceFromCenter = (1 - normalizedScore) * (Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) / 2 - MAX_BOOK_SIZE);
+    const angle = seededRandom(hash) * Math.PI * 2;
 
-        if (canPlace) {
-          for (let dr = 0; dr < cells; dr++) {
-            for (let dc = 0; dc < cells; dc++) {
-              setCell(row + dr, col + dc, true);
-            }
-          }
+    let x = centerX + Math.cos(angle) * distanceFromCenter * seededRandom(hash + 1);
+    let y = centerY + Math.sin(angle) * distanceFromCenter * seededRandom(hash + 2);
 
-          const w = cells * CARD_SIZE + (cells - 1) * GAP;
-          const h = cells * CARD_SIZE + (cells - 1) * GAP;
+    // Add some spread using seeded random
+    x += (seededRandom(hash + 3) - 0.5) * 300;
+    y += (seededRandom(hash + 4) - 0.5) * 300;
 
-          positions.push({
-            item,
-            x: PADDING + col * (CARD_SIZE + GAP),
-            y: row * (CARD_SIZE + GAP),
-            w,
-            h,
-          });
+    // Keep within canvas bounds
+    x = Math.max(size / 2 + 20, Math.min(CANVAS_WIDTH - size / 2 - 20, x));
+    y = Math.max(size / 2 + 20, Math.min(CANVAS_HEIGHT - size / 2 - 20, y));
 
-          maxRow = Math.max(maxRow, row + cells - 1);
-          placed = true;
-        }
+    // Simple collision avoidance - nudge if overlapping
+    for (const occupied of occupiedAreas) {
+      const dx = x - occupied.x;
+      const dy = y - occupied.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const minDist = (size + occupied.size) / 2 + 10;
+
+      if (distance < minDist && distance > 0) {
+        const pushFactor = (minDist - distance) / distance;
+        x += dx * pushFactor * 0.5;
+        y += dy * pushFactor * 0.5;
       }
     }
-  });
+
+    // Keep within bounds after collision avoidance
+    x = Math.max(size / 2 + 20, Math.min(CANVAS_WIDTH - size / 2 - 20, x));
+    y = Math.max(size / 2 + 20, Math.min(CANVAS_HEIGHT - size / 2 - 20, y));
+
+    occupiedAreas.push({ x, y, size });
+
+    const metadata = (item.media?.metadata as any) || {};
+    positions.push({
+      id: item.id,
+      coverUrl: apiClient.getItemCoverUrl(item.id),
+      title: metadata.title || 'Unknown',
+      author: metadata.authorName || 'Unknown',
+      x,
+      y,
+      size,
+      score,
+    });
+  }
 
   return positions;
 }
+
+// Individual book component with touch handling
+const BookCover = React.memo(function BookCover({
+  book,
+  onPress,
+}: {
+  book: BookPosition;
+  onPress: (id: string) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.bookCover,
+        {
+          left: book.x - book.size / 2,
+          top: book.y - book.size / 2,
+          width: book.size,
+          height: book.size,
+        },
+      ]}
+      onPress={() => onPress(book.id)}
+      activeOpacity={0.85}
+    >
+      <Image
+        source={book.coverUrl}
+        style={styles.bookImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+    </TouchableOpacity>
+  );
+});
 
 export function BrowseScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { loadBook } = usePlayerStore();
-  const [activeCategory, setActiveCategory] = useState<Category>('for_you');
+
+  // Pan/zoom state
+  const translateX = useSharedValue(-(CANVAS_WIDTH - SCREEN_WIDTH) / 2);
+  const translateY = useSharedValue(-(CANVAS_HEIGHT - SCREEN_HEIGHT) / 2);
+  const scale = useSharedValue(1);
+  const savedTranslateX = useSharedValue(-(CANVAS_WIDTH - SCREEN_WIDTH) / 2);
+  const savedTranslateY = useSharedValue(-(CANVAS_HEIGHT - SCREEN_HEIGHT) / 2);
+  const savedScale = useSharedValue(1);
 
   // Get user preferences
   const {
@@ -241,12 +323,12 @@ export function BrowseScreen() {
     return { authors, genres, narrators, listeningIds };
   }, [continueItems]);
 
-  // Score and sort all items based on preferences
+  // Score and sort all items based on preferences (stable - no randomness)
   const scoredItems = useMemo(() => {
     if (!isLoaded || !libraryItems.length) return [];
     const preferences = { favoriteGenres, favoriteAuthors, favoriteNarrators, prefersSeries, preferredLength };
 
-    const scored: ScoredBook[] = libraryItems.map((item: LibraryItem) => ({
+    const scored = libraryItems.map((item: LibraryItem) => ({
       item,
       score: scoreBook(
         item,
@@ -258,66 +340,75 @@ export function BrowseScreen() {
       ),
     }));
 
-    // Sort by score descending
-    scored.sort((a, b) => b.score - a.score);
-
-    return scored;
+    // Filter out very negative scores and sort by score descending
+    return scored
+      .filter(s => s.score > -100)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 60); // Limit for performance
   }, [libraryItems, isLoaded, favoriteGenres, favoriteAuthors, favoriteNarrators, prefersSeries, preferredLength, historyContext]);
 
-  // Filter based on category
-  const filteredItems = useMemo(() => {
-    let items = scoredItems.filter(s => s.score > -100); // Exclude very negative scores
+  // Generate stable book positions
+  const bookPositions = useMemo(() => {
+    if (scoredItems.length === 0) return [];
 
-    switch (activeCategory) {
-      case 'for_you':
-        // Top recommendations (already sorted by score)
-        break;
-      case 'recent':
-        // Sort by added date (newest first)
-        items = [...items].sort((a, b) => (b.item.addedAt || 0) - (a.item.addedAt || 0));
-        break;
-      case 'unstarted':
-        // Only unstarted books
-        items = items.filter(s => (s.item.userMediaProgress?.progress || 0) === 0);
-        break;
-      case 'short':
-        // Books under 8 hours
-        items = items.filter(s => {
-          const hours = (s.item.media?.duration || 0) / 3600;
-          return hours > 0 && hours < 8;
-        });
-        break;
-      case 'long':
-        // Books over 15 hours
-        items = items.filter(s => {
-          const hours = (s.item.media?.duration || 0) / 3600;
-          return hours > 15;
-        });
-        break;
-    }
+    const scores = scoredItems.map(s => s.score);
+    const maxScore = Math.max(...scores);
+    const minScore = Math.min(...scores);
 
-    return items.slice(0, 40);
-  }, [scoredItems, activeCategory]);
+    return generateBookPositions(scoredItems, maxScore, minScore);
+  }, [scoredItems]);
 
-  // Process items for masonry grid
-  const processedItems = useMemo(() => {
-    return filteredItems.map((scored, idx) => ({
-      id: scored.item.id,
-      coverUrl: apiClient.getItemCoverUrl(scored.item.id),
-      title: (scored.item.media?.metadata as any)?.title || 'Unknown',
-      author: (scored.item.media?.metadata as any)?.authorName || 'Unknown',
-      // Top scored items get large cards
-      size: (idx < 3 && scored.score > 30) || idx % 7 === 0 ? 2 : 1,
-      score: scored.score,
-    })) as BookItem[];
-  }, [filteredItems]);
+  // Pan gesture
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = savedTranslateX.value + event.translationX;
+      translateY.value = savedTranslateY.value + event.translationY;
+    })
+    .onEnd((event) => {
+      // Apply momentum
+      const velocityFactor = 0.2;
+      translateX.value = withSpring(
+        translateX.value + event.velocityX * velocityFactor,
+        { damping: 20, stiffness: 100 }
+      );
+      translateY.value = withSpring(
+        translateY.value + event.velocityY * velocityFactor,
+        { damping: 20, stiffness: 100 }
+      );
+    });
 
-  // Compute masonry layout
-  const layout = useMemo(() => computeMasonryLayout(processedItems), [processedItems]);
-  const gridHeight = useMemo(() => {
-    if (layout.length === 0) return 0;
-    return Math.max(...layout.map(p => p.y + p.h)) + GAP;
-  }, [layout]);
+  // Pinch gesture for zoom
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      savedScale.value = scale.value;
+    })
+    .onUpdate((event) => {
+      scale.value = Math.max(0.5, Math.min(2.5, savedScale.value * event.scale));
+    })
+    .onEnd(() => {
+      // Snap to reasonable zoom levels
+      if (scale.value < 0.7) {
+        scale.value = withTiming(0.5, { duration: 200 });
+      } else if (scale.value > 2) {
+        scale.value = withTiming(2.5, { duration: 200 });
+      }
+    });
+
+  // Combine gestures
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  // Animated canvas style
+  const canvasStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
 
   // Handle book press - open player without autoplay
   const handleBookPress = useCallback(async (bookId: string) => {
@@ -329,13 +420,12 @@ export function BrowseScreen() {
     }
   }, [loadBook]);
 
-  const categories: { key: Category; label: string; count?: number }[] = [
-    { key: 'for_you', label: 'For You', count: filteredItems.length },
-    { key: 'recent', label: 'Recent' },
-    { key: 'unstarted', label: 'New' },
-    { key: 'short', label: 'Quick Listens' },
-    { key: 'long', label: 'Epic' },
-  ];
+  // Reset view to center
+  const handleResetView = useCallback(() => {
+    translateX.value = withSpring(-(CANVAS_WIDTH - SCREEN_WIDTH) / 2, { damping: 15 });
+    translateY.value = withSpring(-(CANVAS_HEIGHT - SCREEN_HEIGHT) / 2, { damping: 15 });
+    scale.value = withSpring(1, { damping: 15 });
+  }, []);
 
   if (isLoading || !isLoaded) {
     return (
@@ -347,16 +437,32 @@ export function BrowseScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={BG_COLOR} />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      {/* Interactive map canvas */}
+      <GestureDetector gesture={composedGesture}>
+        <Animated.View style={[styles.canvas, canvasStyle]}>
+          {bookPositions.map((book) => (
+            <BookCover
+              key={book.id}
+              book={book}
+              onPress={handleBookPress}
+            />
+          ))}
+        </Animated.View>
+      </GestureDetector>
+
+      {/* Header overlay */}
+      <View style={[styles.headerOverlay, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Icon name="chevron-back" size={24} color="#FFFFFF" set="ionicons" />
+          </TouchableOpacity>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Just for You</Text>
+            <Text style={styles.headerTitle}>Discover</Text>
             <Text style={styles.headerSubtitle}>
-              Based on your preferences & listening history
+              Drag to explore • Bigger = Better match
             </Text>
           </View>
           <TouchableOpacity
@@ -368,72 +474,29 @@ export function BrowseScreen() {
         </View>
       </View>
 
-      {/* Main content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 80 + insets.bottom },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {processedItems.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Icon name="library-outline" size={48} color="rgba(255,255,255,0.3)" set="ionicons" />
-            <Text style={styles.emptyTitle}>No recommendations yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Start listening to some books and we'll personalize your recommendations
-            </Text>
-          </View>
-        ) : (
-          <View style={[styles.grid, { height: gridHeight }]}>
-            {layout.map(({ item, x, y, w, h }) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.card, { left: x, top: y, width: w, height: h }]}
-                onPress={() => handleBookPress(item.id)}
-                activeOpacity={0.85}
-              >
-                <Image
-                  source={item.coverUrl}
-                  style={styles.cardImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Bottom category tabs */}
-      <View style={[styles.bottomTabs, { paddingBottom: insets.bottom + 10 }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="chevron-back" size={24} color="#FFFFFF" set="ionicons" />
+      {/* Bottom controls */}
+      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
+        <TouchableOpacity style={styles.controlButton} onPress={handleResetView}>
+          <Icon name="locate-outline" size={22} color="#FFFFFF" set="ionicons" />
+          <Text style={styles.controlText}>Center</Text>
         </TouchableOpacity>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsContent}
-        >
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.key}
-              style={[styles.tab, activeCategory === cat.key && styles.tabActive]}
-              onPress={() => setActiveCategory(cat.key)}
-            >
-              <Text style={[styles.tabText, activeCategory === cat.key && styles.tabTextActive]}>
-                {cat.label}
-              </Text>
-              {cat.count !== undefined && activeCategory === cat.key && (
-                <Text style={styles.tabCount}>{cat.count}</Text>
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={styles.bookCount}>
+          <Text style={styles.countText}>{bookPositions.length} books</Text>
+        </View>
       </View>
-    </View>
+
+      {/* Empty state */}
+      {bookPositions.length === 0 && (
+        <View style={styles.emptyState}>
+          <Icon name="library-outline" size={48} color="rgba(255,255,255,0.3)" set="ionicons" />
+          <Text style={styles.emptyTitle}>No recommendations yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Start listening to some books and we'll personalize your recommendations
+          </Text>
+        </View>
+      )}
+    </GestureHandlerRootView>
   );
 }
 
@@ -442,26 +505,59 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG_COLOR,
   },
-  header: {
-    paddingHorizontal: PADDING + 10,
-    paddingBottom: 16,
+  canvas: {
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
+    position: 'absolute',
+  },
+  bookCover: {
+    position: 'absolute',
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a2a',
+    // Shadow for depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bookImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: 'rgba(13, 13, 13, 0.85)',
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   headerTextContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255,255,255,0.5)',
   },
   preferencesButton: {
@@ -473,30 +569,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 12,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 0,
-  },
-  grid: {
-    width: SCREEN_WIDTH,
-    position: 'relative',
-  },
-  card: {
+  bottomControls: {
     position: 'absolute',
-    borderRadius: CARD_RADIUS,
-    overflow: 'hidden',
-    backgroundColor: '#2a2a2a',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: 'rgba(13, 13, 13, 0.85)',
   },
-  cardImage: {
-    width: '100%',
-    height: '100%',
+  controlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 8,
+  },
+  controlText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  bookCount: {
+    backgroundColor: 'rgba(204, 255, 0, 0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  countText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: ACCENT,
   },
   emptyState: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
     paddingHorizontal: 40,
   },
   emptyTitle: {
@@ -512,52 +629,5 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',
     lineHeight: 20,
-  },
-  bottomTabs: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: BG_COLOR,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 4,
-  },
-  tabsContent: {
-    paddingRight: 20,
-    alignItems: 'center',
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
-  },
-  tabActive: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-  },
-  tabCount: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
-    marginLeft: 6,
   },
 });
