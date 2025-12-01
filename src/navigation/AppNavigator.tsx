@@ -22,7 +22,7 @@ import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { ProfileScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
-import { MiniPlayer, PlayerScreen } from '@/features/player';
+import { MiniPlayer, PlayerScreen, audioService } from '@/features/player';
 import { SplashScreen } from '@/shared/components/SplashScreen';
 import { FloatingTabBar } from './components/FloatingTabBar';
 
@@ -71,6 +71,13 @@ function AuthenticatedApp() {
   const { library } = useDefaultLibrary();
   const { loadCache, isLoaded, isLoading, items, error } = useLibraryCache();
   const [cacheProgress, setCacheProgress] = useState('Connecting...');
+
+  // Pre-initialize audio service at app startup for faster playback
+  useEffect(() => {
+    audioService.ensureSetup().catch((err) => {
+      console.warn('[AppNavigator] Audio service pre-init failed:', err);
+    });
+  }, []);
 
   useEffect(() => {
     if (library?.id) {

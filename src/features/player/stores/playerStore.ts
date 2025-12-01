@@ -289,10 +289,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
       // Get metadata for lock screen
       const title = book.media?.metadata?.title || 'Audiobook';
-      const author = book.media?.metadata?.authorName || 
-                     book.media?.metadata?.authors?.[0]?.name || 
+      const author = book.media?.metadata?.authorName ||
+                     book.media?.metadata?.authors?.[0]?.name ||
                      'Unknown Author';
       const coverUrl = apiClient.getItemCoverUrl(book.id);
+
+      // CRITICAL: Set up status callback BEFORE loading audio
+      // This ensures we capture all playback state changes during loading
+      audioService.setStatusUpdateCallback((state) => {
+        get().updatePlaybackState(state);
+      });
 
       // Load audio with metadata
       timing('Before loadAudio');
@@ -312,11 +318,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         log('Load cancelled after audio load');
         return;
       }
-
-      // Set up status callback immediately
-      audioService.setStatusUpdateCallback((state) => {
-        get().updatePlaybackState(state);
-      });
 
       // Apply playback rate
       const { playbackRate } = get();

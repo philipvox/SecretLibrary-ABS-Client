@@ -31,19 +31,48 @@ class AudioService {
   private isLoaded = false;
   private progressInterval: NodeJS.Timeout | null = null;
   private setupPromise: Promise<void> | null = null;
+  private setupAttempts = 0;
   private loadId = 0; // Track load requests to cancel stale ones
 
   constructor() {
-    // Pre-warm on construction
+    // Pre-warm on construction - don't await, let it run in background
     this.setupPromise = this.setup();
   }
 
-  async setup(): Promise<void> {
+  /**
+   * Ensures the audio service is set up and ready.
+   * Call this at app startup for eager initialization.
+   * Safe to call multiple times - will reuse existing setup or retry if failed.
+   */
+  async ensureSetup(): Promise<void> {
+    // If already set up, return immediately
     if (this.isSetup) return;
 
+    // If there's an existing setup promise, wait for it
+    if (this.setupPromise) {
+      try {
+        await this.setupPromise;
+        return;
+      } catch (error) {
+        // Setup failed, will retry below
+        log('Previous setup failed, retrying...');
+      }
+    }
+
+    // (Re)attempt setup
+    this.setupPromise = this.setup();
+    await this.setupPromise;
+  }
+
+  private async setup(): Promise<void> {
+    if (this.isSetup) return;
+
+    this.setupAttempts++;
+    const attempt = this.setupAttempts;
+
     try {
-      log('Setting up TrackPlayer...');
-      
+      log(`Setting up TrackPlayer... (attempt ${attempt})`);
+
       await TrackPlayer.setupPlayer({
         autoHandleInterruptions: true,
         // Optimized buffering for audiobooks (longer content)
@@ -87,6 +116,8 @@ class AudioService {
         log('TrackPlayer already initialized');
       } else {
         console.error('[Audio] Setup failed:', error);
+        // Clear the promise so ensureSetup can retry
+        this.setupPromise = null;
         throw error;
       }
     }
@@ -156,12 +187,10 @@ class AudioService {
     
     log(`Loading: ${url.substring(0, 80)}...`);
 
-    // Ensure setup is done first
-    if (this.setupPromise) {
-      t('Waiting for setup...');
-      await this.setupPromise;
-      t('Setup done');
-    }
+    // Ensure setup is done first (will retry if previous setup failed)
+    t('Ensuring setup...');
+    await this.ensureSetup();
+    t('Setup ready');
 
     // Check if cancelled
     if (this.loadId !== thisLoadId) {
