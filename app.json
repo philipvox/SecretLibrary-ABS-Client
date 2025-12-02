@@ -71,10 +71,9 @@
         "expo-build-properties",
         {
           "android": {
-            "enableProguardInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true,
-            "useLegacyPackaging": false,
-            "extraProguardRules": "-keep class com.audiobookshelf.** { *; }"
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "useLegacyPackaging": false
           },
           "ios": {
             "deploymentTarget": "15.1",
