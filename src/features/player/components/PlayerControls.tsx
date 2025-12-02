@@ -1,15 +1,26 @@
 /**
  * src/features/player/components/PlayerControls.tsx
- * 
+ *
  * Improved with native touch events for reliable Android support
  * Uses View + onTouchStart/End/Cancel instead of Pressable
+ * Uses custom SVG buttons from Figma designs
  */
 
 import React, { useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { Icon } from '@/shared/components/Icon';
+import {
+  PlayButton,
+  PauseButton,
+  RewindButton,
+  FastForwardButton,
+  ChapterBackButton,
+  ChapterForwardButton,
+} from '@/shared/assets/svg';
 import { formatDelta } from '../utils';
 import { CARD_MARGIN, BUTTON_GAP, BUTTON_SIZE, RADIUS } from '../constants';
+
+// Button aspect ratio from SVG (128x136)
+const BUTTON_HEIGHT = BUTTON_SIZE * (136 / 128);
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -18,8 +29,7 @@ interface PlayerControlsProps {
   isFastForwarding: boolean;
   seekDelta: number;
   controlMode: 'rewind' | 'chapter';
-  cardColor: string;
-  textColor: string;
+  accentColor?: string;
   onPlayPause: () => void;
   onLeftPress: () => void;
   onLeftPressIn: () => void;
@@ -36,14 +46,12 @@ function HoldButton({
   onPressOut,
   isActive,
   children,
-  style,
 }: {
   onPress: () => void;
   onPressIn: () => void;
   onPressOut: () => void;
   isActive: boolean;
   children: React.ReactNode;
-  style: any;
 }) {
   const touchActiveRef = useRef(false);
   const pressStartRef = useRef(0);
@@ -58,10 +66,10 @@ function HoldButton({
   const handleTouchEnd = useCallback(() => {
     if (!touchActiveRef.current) return;
     touchActiveRef.current = false;
-    
+
     const duration = Date.now() - pressStartRef.current;
     onPressOut();
-    
+
     // If it was a quick tap (not a hold), also fire onPress
     if (duration < HOLD_THRESHOLD) {
       onPress();
@@ -76,7 +84,7 @@ function HoldButton({
 
   return (
     <View
-      style={[style, isActive && styles.buttonActive]}
+      style={[styles.buttonWrapper, isActive && styles.buttonActive]}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
@@ -93,8 +101,7 @@ export function PlayerControls({
   isFastForwarding,
   seekDelta,
   controlMode,
-  cardColor,
-  textColor,
+  accentColor = '#F55F05',
   onPlayPause,
   onLeftPress,
   onLeftPressIn,
@@ -108,25 +115,24 @@ export function PlayerControls({
   return (
     <View style={styles.controlsRow}>
       {/* Play/Pause Button */}
-      <TouchableOpacity 
-        style={[styles.controlButton, { backgroundColor: cardColor }]}
+      <TouchableOpacity
+        style={styles.buttonWrapper}
         onPress={onPlayPause}
         activeOpacity={0.7}
         disabled={isLoading}
       >
         {isLoading ? (
-          <ActivityIndicator size="large" color={textColor} />
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
         ) : isSeeking ? (
-          <Text style={[styles.seekDeltaText, { color: textColor }]}>
-            {formatDelta(seekDelta)}
-          </Text>
+          <View style={styles.seekDeltaOverlay}>
+            <Text style={styles.seekDeltaText}>{formatDelta(seekDelta)}</Text>
+          </View>
+        ) : isPlaying ? (
+          <PauseButton width={BUTTON_SIZE} height={BUTTON_HEIGHT} accentColor={accentColor} />
         ) : (
-          <Icon 
-            name={isPlaying ? 'pause' : 'play'} 
-            size={45} 
-            color={textColor} 
-            set="ionicons" 
-          />
+          <PlayButton width={BUTTON_SIZE} height={BUTTON_HEIGHT} accentColor={accentColor} />
         )}
       </TouchableOpacity>
 
@@ -137,17 +143,16 @@ export function PlayerControls({
           onPressIn={onLeftPressIn}
           onPressOut={onLeftPressOut}
           isActive={isRewinding}
-          style={[styles.controlButton, { backgroundColor: cardColor }]}
         >
-          <Icon name="play-back" size={45} color={textColor} set="ionicons" />
+          <RewindButton width={BUTTON_SIZE} height={BUTTON_HEIGHT} />
         </HoldButton>
       ) : (
         <TouchableOpacity
-          style={[styles.controlButton, { backgroundColor: cardColor }]}
+          style={styles.buttonWrapper}
           onPress={onLeftPress}
           activeOpacity={0.7}
         >
-          <Icon name="play-skip-back" size={45} color={textColor} set="ionicons" />
+          <ChapterBackButton width={BUTTON_SIZE} height={BUTTON_HEIGHT} />
         </TouchableOpacity>
       )}
 
@@ -158,17 +163,16 @@ export function PlayerControls({
           onPressIn={onRightPressIn}
           onPressOut={onRightPressOut}
           isActive={isFastForwarding}
-          style={[styles.controlButton, { backgroundColor: cardColor }]}
         >
-          <Icon name="play-forward" size={45} color={textColor} set="ionicons" />
+          <FastForwardButton width={BUTTON_SIZE} height={BUTTON_HEIGHT} />
         </HoldButton>
       ) : (
         <TouchableOpacity
-          style={[styles.controlButton, { backgroundColor: cardColor }]}
+          style={styles.buttonWrapper}
           onPress={onRightPress}
           activeOpacity={0.7}
         >
-          <Icon name="play-skip-forward" size={45} color={textColor} set="ionicons" />
+          <ChapterForwardButton width={BUTTON_SIZE} height={BUTTON_HEIGHT} />
         </TouchableOpacity>
       )}
     </View>
@@ -183,20 +187,36 @@ const styles = StyleSheet.create({
     marginHorizontal: CARD_MARGIN,
     marginTop: 5,
   },
-  controlButton: {
+  buttonWrapper: {
     width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
+    height: BUTTON_HEIGHT,
     borderRadius: RADIUS,
-    justifyContent: 'center',
-    alignItems: 'center',
+    overflow: 'hidden',
   },
   buttonActive: {
     opacity: 0.7,
     transform: [{ scale: 0.97 }],
   },
+  loadingOverlay: {
+    width: BUTTON_SIZE,
+    height: BUTTON_HEIGHT,
+    borderRadius: RADIUS,
+    backgroundColor: '#262626',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seekDeltaOverlay: {
+    width: BUTTON_SIZE,
+    height: BUTTON_HEIGHT,
+    borderRadius: RADIUS,
+    backgroundColor: '#262626',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   seekDeltaText: {
     fontSize: 20,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+    color: '#fff',
   },
 });

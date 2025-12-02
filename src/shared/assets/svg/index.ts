@@ -13,9 +13,10 @@
 export { HomeButton, HomeButtonActive, SearchButton } from './navigation';
 
 // Player Controls
-export { 
-  PlayButton, 
-  RewindButton, 
+export {
+  PlayButton,
+  PauseButton,
+  RewindButton,
   FastForwardButton,
   ChapterBackButton,
   ChapterForwardButton,
