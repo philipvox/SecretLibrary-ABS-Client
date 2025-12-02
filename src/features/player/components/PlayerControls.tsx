@@ -7,7 +7,7 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   PlayButton,
   PauseButton,
@@ -15,6 +15,7 @@ import {
   FastForwardButton,
   ChapterBackButton,
   ChapterForwardButton,
+  LoadingDots,
 } from '@/shared/assets/svg';
 import { formatDelta } from '../utils';
 import { CARD_MARGIN, BUTTON_GAP, BUTTON_SIZE, RADIUS } from '../constants';
@@ -122,9 +123,7 @@ export function PlayerControls({
         disabled={isLoading}
       >
         {isLoading ? (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
+          <LoadingDots width={BUTTON_SIZE} height={BUTTON_HEIGHT} animating={true} />
         ) : isSeeking ? (
           <View style={styles.seekDeltaOverlay}>
             <Text style={styles.seekDeltaText}>{formatDelta(seekDelta)}</Text>
@@ -196,14 +195,6 @@ const styles = StyleSheet.create({
   buttonActive: {
     opacity: 0.7,
     transform: [{ scale: 0.97 }],
-  },
-  loadingOverlay: {
-    width: BUTTON_SIZE,
-    height: BUTTON_HEIGHT,
-    borderRadius: RADIUS,
-    backgroundColor: '#262626',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   seekDeltaOverlay: {
     width: BUTTON_SIZE,
