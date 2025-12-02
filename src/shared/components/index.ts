@@ -1,18 +1,50 @@
 /**
  * Public API exports for shared components
+ *
+ * Organization:
+ * - buttons/  → Button, IconButton
+ * - cards/    → Card, GlassCard
+ * - inputs/   → TextInput, SearchInput
+ * - feedback/ → LoadingSpinner, ErrorView, EmptyState, TabBar
  */
 
+// =============================================================================
+// BUTTONS
+// =============================================================================
 export { Button } from './Button';
+export { IconButton } from './buttons/IconButton';
+
+// =============================================================================
+// CARDS
+// =============================================================================
 export { Card } from './Card';
-export { Icon } from './Icon';
+export { GlassCard } from './cards/GlassCard';
+
+// =============================================================================
+// INPUTS
+// =============================================================================
+export { TextInput } from './inputs/TextInput';
+export { SearchInput } from './inputs/SearchInput';
+
+// =============================================================================
+// FEEDBACK & STATES
+// =============================================================================
 export { LoadingSpinner } from './LoadingSpinner';
 export { ErrorView } from './ErrorView';
 export { EmptyState } from './EmptyState';
+export { TabBar } from './feedback/TabBar';
+
+// =============================================================================
+// UTILITY COMPONENTS
+// =============================================================================
+export { Icon } from './Icon';
 export { SplashScreen } from './SplashScreen';
 export { FilterSortBar } from './FilterSortBar';
 export type { SortOption } from './FilterSortBar';
 
-// Skeleton loading components
+// =============================================================================
+// SKELETON LOADING
+// =============================================================================
 export {
   Shimmer,
   BookCardSkeleton,
@@ -25,7 +57,9 @@ export {
   ListSkeleton,
 } from './Skeleton';
 
-// Gesture-optimized components
+// =============================================================================
+// GESTURE COMPONENTS
+// =============================================================================
 export {
   Swipeable,
   ScalePressable,
@@ -34,7 +68,9 @@ export {
   GestureHandlerRootView,
 } from './GestureComponents';
 
-// Animation components
+// =============================================================================
+// ANIMATION COMPONENTS
+// =============================================================================
 export {
   FadeInUp,
   ScaleIn,
@@ -46,7 +82,9 @@ export {
   layoutAnimations,
 } from './AnimatedComponents';
 
-// Lazy loading components
+// =============================================================================
+// LAZY LOADING
+// =============================================================================
 export {
   DeferRender,
   LazyWrapper,
@@ -59,6 +97,8 @@ export {
   preloadComponent,
 } from './LazyComponents';
 
-// Offline-first components
+// =============================================================================
+// OFFLINE-FIRST
+// =============================================================================
 export { SyncStatusBadge } from './SyncStatusBadge';
 export { DownloadButton } from './DownloadButton';
