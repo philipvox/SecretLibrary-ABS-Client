@@ -5,9 +5,14 @@
  * Reels animate to position and clip outside the window.
  * Slides in from top when loading, out to bottom when unloading.
  * Animation triggers on book change or chapter change.
+ *
+ * Enhanced with robust seek handling:
+ * - Smooth animation transitions during seek
+ * - Chapter change animations only trigger on manual navigation, not during seeking
+ * - Rotation speed adjusts based on seek direction
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle, Line, Defs, Rect, LinearGradient, Stop } from 'react-native-svg';
 import Animated, {
@@ -17,9 +22,11 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  withSpring,
   Easing,
   cancelAnimation,
   runOnJS,
+  interpolate,
 } from 'react-native-reanimated';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -30,6 +37,11 @@ const REEL_MIN_RADIUS = 15;
 const HUB_RADIUS = 10;
 const DEFAULT_COLOR = '#F55F05';
 const SLIDE_DURATION = 250;
+
+// Animation durations
+const PLAYBACK_ROTATION_DURATION = 2000;
+const SEEK_ROTATION_DURATION = 500;
+const REEL_TRANSITION_DURATION = 150;
 
 // Inset shadow config
 const SHADOW = {
@@ -44,6 +56,7 @@ interface CassetteTapeProps {
   isPlaying: boolean;
   isRewinding?: boolean;
   isFastForwarding?: boolean;
+  isChangingChapter?: boolean; // New prop for chapter transition
   accentColor?: string;
   bookId?: string; // Used to detect book changes
   chapterIndex?: number; // Used to detect chapter changes
@@ -54,6 +67,7 @@ export function CassetteTape({
   isPlaying,
   isRewinding = false,
   isFastForwarding = false,
+  isChangingChapter = false,
   accentColor = DEFAULT_COLOR,
   bookId,
   chapterIndex = 0,
@@ -63,18 +77,21 @@ export function CassetteTape({
   const rightRadius = useSharedValue(REEL_MIN_RADIUS);
   const isSpinningToPosition = useSharedValue(false);
   const hasInitialized = useSharedValue(false);
-  
+
   // Slide animation for load/unload effect
   const slideY = useSharedValue(0);
   const prevBookId = useRef<string | undefined>(undefined);
   const prevChapterIndex = useRef<number>(0);
   const isFirstRender = useRef(true);
-  const isSeeking = useRef(false);
 
-  // Track seeking state
+  // Track seeking state (combined for any type of seek)
+  const isSeeking = useMemo(() => isRewinding || isFastForwarding, [isRewinding, isFastForwarding]);
+  const isSeekingRef = useRef(isSeeking);
+
+  // Keep ref in sync
   useEffect(() => {
-    isSeeking.current = isRewinding || isFastForwarding;
-  }, [isRewinding, isFastForwarding]);
+    isSeekingRef.current = isSeeking;
+  }, [isSeeking]);
 
   // Trigger slide animation
   const triggerSlideAnimation = (resetReels: boolean = false) => {
@@ -137,19 +154,21 @@ export function CassetteTape({
       return;
     }
 
-    // Chapter changed (same book) - but NOT while seeking/rewinding
-    if (chapterIndex !== prevChapterIndex.current && !isSeeking.current) {
+    // Chapter changed (same book) - but NOT while seeking/rewinding/changing chapter
+    // This prevents the slide animation from triggering during continuous seek
+    // when we cross chapter boundaries
+    if (chapterIndex !== prevChapterIndex.current && !isSeekingRef.current && !isChangingChapter) {
       triggerSlideAnimation(false);
     }
     prevChapterIndex.current = chapterIndex;
     prevBookId.current = bookId;
-  }, [bookId, chapterIndex]);
+  }, [bookId, chapterIndex, isChangingChapter]);
   
   // Animate reel sizes to match progress with rotation
   useEffect(() => {
     const targetLeft = REEL_MAX_RADIUS - (progress * (REEL_MAX_RADIUS - REEL_MIN_RADIUS));
     const targetRight = REEL_MIN_RADIUS + (progress * (REEL_MAX_RADIUS - REEL_MIN_RADIUS));
-    
+
     // First load - set position immediately without animation
     if (!hasInitialized.value) {
       leftRadius.value = targetLeft;
@@ -157,14 +176,27 @@ export function CassetteTape({
       hasInitialized.value = true;
       return;
     }
-    
+
     // Calculate how much the reels need to change
     const leftDelta = Math.abs(leftRadius.value - targetLeft);
     const rightDelta = Math.abs(rightRadius.value - targetRight);
     const maxDelta = Math.max(leftDelta, rightDelta);
-    
-    // Only do spin animation if significant change (> 5px) and not playing
-    if (maxDelta > 5 && !isPlaying && !isRewinding && !isFastForwarding) {
+
+    // During seeking - use fast, responsive updates
+    if (isSeeking) {
+      leftRadius.value = withTiming(targetLeft, {
+        duration: REEL_TRANSITION_DURATION,
+        easing: Easing.out(Easing.linear),
+      });
+      rightRadius.value = withTiming(targetRight, {
+        duration: REEL_TRANSITION_DURATION,
+        easing: Easing.out(Easing.linear),
+      });
+      return;
+    }
+
+    // Only do spin animation if significant change (> 5px) and not playing/seeking
+    if (maxDelta > 5 && !isPlaying) {
       isSpinningToPosition.value = true;
 
       // Cancel any existing rotation animation first
@@ -183,7 +215,7 @@ export function CassetteTape({
       }, () => {
         isSpinningToPosition.value = false;
       });
-      
+
       leftRadius.value = withTiming(targetLeft, {
         duration,
         easing: Easing.out(Easing.cubic),
@@ -194,20 +226,28 @@ export function CassetteTape({
       });
     } else {
       // Small change, just update directly
-      leftRadius.value = withTiming(targetLeft, { duration: 150 });
-      rightRadius.value = withTiming(targetRight, { duration: 150 });
+      leftRadius.value = withTiming(targetLeft, { duration: REEL_TRANSITION_DURATION });
+      rightRadius.value = withTiming(targetRight, { duration: REEL_TRANSITION_DURATION });
     }
-  }, [progress]);
+  }, [progress, isSeeking]);
 
-  // Continuous rotation animation for playback
+  // Continuous rotation animation for playback and seeking
   useEffect(() => {
-    // Always cancel existing animation first to prevent jumps
-    if (!isSpinningToPosition.value) {
-      cancelAnimation(rotation);
+    // Don't interfere with spin-to-position animation
+    if (isSpinningToPosition.value) {
+      return;
     }
 
-    if (isPlaying || isRewinding || isFastForwarding) {
-      const duration = isRewinding || isFastForwarding ? 500 : 2000;
+    // Cancel any existing rotation animation
+    cancelAnimation(rotation);
+
+    // Determine if we should be spinning
+    const shouldSpin = isPlaying || isRewinding || isFastForwarding;
+
+    if (shouldSpin) {
+      // Use faster rotation during seeking for visual feedback
+      const duration = isSeeking ? SEEK_ROTATION_DURATION : PLAYBACK_ROTATION_DURATION;
+      // Reverse direction when rewinding
       const direction = isRewinding ? -360 : 360;
 
       // Normalize rotation to 0-360 range to prevent accumulation issues
@@ -230,7 +270,7 @@ export function CassetteTape({
         cancelAnimation(rotation);
       }
     };
-  }, [isPlaying, isRewinding, isFastForwarding]);
+  }, [isPlaying, isRewinding, isFastForwarding, isSeeking]);
 
   const leftReelStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],

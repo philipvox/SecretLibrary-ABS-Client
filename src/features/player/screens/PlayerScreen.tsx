@@ -4,6 +4,7 @@
  * Refactored full-screen player with glass morphism design.
  *
  * Key changes:
+ * - Uses robust seek control hook with lock mechanism for race-condition-free seeking
  * - Removed all local playback state (isRewinding, seekDelta, etc.)
  * - Uses store selectors for derived state
  * - Simplified handlers that just dispatch to store
@@ -29,14 +30,14 @@ import { getColors } from 'react-native-image-colors';
 // Store and selectors
 import {
   usePlayerStore,
-  useDisplayPosition,
-  useSeekDelta,
-  useIsSeeking,
-  useSeekDirection,
   useCurrentChapterIndex,
   useChapterProgress,
   useBookProgress,
 } from '../stores/playerStore';
+
+// Robust seek control hook
+import { useRobustSeekControl } from '../hooks/useRobustSeekControl';
+
 import { useMyLibraryStore } from '@/features/library/stores/myLibraryStore';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
@@ -106,6 +107,7 @@ export function PlayerScreen() {
     isPlayerVisible,
     isPlaying,
     isLoading,
+    position,
     duration: storeDuration,
     playbackRate,
     sleepTimer,
@@ -113,21 +115,30 @@ export function PlayerScreen() {
     closePlayer,
     play,
     pause,
-    seekTo,
-    startContinuousSeeking,
-    stopContinuousSeeking,
-    prevChapter,
-    nextChapter,
   } = usePlayerStore();
 
+  // Robust seek control - handles all seek operations with lock mechanism
+  const {
+    isSeeking,
+    isChangingChapter,
+    seekDirection,
+    seekDelta,
+    seekPosition,
+    seekAbsolute,
+    startContinuousSeek,
+    stopContinuousSeek,
+    cancelSeek,
+    nextChapter,
+    prevChapter,
+  } = useRobustSeekControl();
+
   // Derived state via selectors
-  const position = useDisplayPosition();
-  const seekDelta = useSeekDelta();
-  const isSeeking = useIsSeeking();
-  const seekDirection = useSeekDirection();
   const chapterIndex = useCurrentChapterIndex();
   const chapterProgress = useChapterProgress();
   const bookProgress = useBookProgress();
+
+  // Use seek position during seeking for display, otherwise actual position
+  const displayPosition = isSeeking ? seekPosition : position;
 
   // ===========================================================================
   // UI-ONLY LOCAL STATE (animations, colors, panel mode)
@@ -144,9 +155,6 @@ export function PlayerScreen() {
   const [sleepInputValue, setSleepInputValue] = useState('15');
   const [controlMode, setControlMode] = useState<'rewind' | 'chapter'>('rewind');
   const [progressMode, setProgressMode] = useState<'bar' | 'chapters'>('chapters');
-
-  // Track if we were playing before continuous seek started
-  const wasPlayingBeforeSeek = useRef(false);
 
   // Animation refs
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -260,9 +268,9 @@ export function PlayerScreen() {
   }, [currentBook, isInLibrary, addToLibrary, removeFromLibrary]);
 
   const handleClose = useCallback(() => {
-    // Stop any ongoing seeking
+    // Cancel any ongoing seeking
     if (isSeeking) {
-      stopContinuousSeeking();
+      cancelSeek();
     }
 
     Animated.timing(slideAnim, {
@@ -275,7 +283,7 @@ export function PlayerScreen() {
       setFlipMode('details');
       flipAnim.setValue(0);
     });
-  }, [closePlayer, slideAnim, flipAnim, isSeeking, stopContinuousSeeking]);
+  }, [closePlayer, slideAnim, flipAnim, isSeeking, cancelSeek]);
 
   const handleNavigateToAuthor = useCallback((authorName: string) => {
     handleClose();
@@ -324,37 +332,30 @@ export function PlayerScreen() {
   }, [isPlaying, pause, play]);
 
   const handleRestart = useCallback(async () => {
-    await seekTo(0);
-    play();
-  }, [seekTo, play]);
+    await seekAbsolute(0);
+    await play();
+  }, [seekAbsolute, play]);
 
   // ---------------------------------------------------------------------------
   // Continuous Seeking Handlers (Rewind/FF)
+  // The robust seek hook handles pause/play state internally
   // ---------------------------------------------------------------------------
 
   const handleRewindPressIn = useCallback(async () => {
-    wasPlayingBeforeSeek.current = isPlaying;
-    await startContinuousSeeking('backward');
-  }, [isPlaying, startContinuousSeeking]);
+    await startContinuousSeek('backward');
+  }, [startContinuousSeek]);
 
   const handleRewindPressOut = useCallback(async () => {
-    await stopContinuousSeeking();
-    if (wasPlayingBeforeSeek.current) {
-      await play();
-    }
-  }, [stopContinuousSeeking, play]);
+    await stopContinuousSeek();
+  }, [stopContinuousSeek]);
 
   const handleFFPressIn = useCallback(async () => {
-    wasPlayingBeforeSeek.current = isPlaying;
-    await startContinuousSeeking('forward');
-  }, [isPlaying, startContinuousSeeking]);
+    await startContinuousSeek('forward');
+  }, [startContinuousSeek]);
 
   const handleFFPressOut = useCallback(async () => {
-    await stopContinuousSeeking();
-    if (wasPlayingBeforeSeek.current) {
-      await play();
-    }
-  }, [stopContinuousSeeking, play]);
+    await stopContinuousSeek();
+  }, [stopContinuousSeek]);
 
   // ---------------------------------------------------------------------------
   // Chapter Navigation Handlers
@@ -567,7 +568,7 @@ export function PlayerScreen() {
                           chapters={chapters}
                           currentChapter={currentChapter}
                           onChapterSelect={(start) => {
-                            seekTo(start);
+                            seekAbsolute(start);
                             handleFlipBack();
                           }}
                           onClose={handleFlipBack}
@@ -604,6 +605,7 @@ export function PlayerScreen() {
                       isPlaying={isPlaying}
                       isRewinding={isRewinding}
                       isFastForwarding={isFastForwarding}
+                      isChangingChapter={isChangingChapter}
                       accentColor={cardColor}
                       bookId={currentBook?.id}
                       chapterIndex={chapterIndex}
@@ -613,7 +615,7 @@ export function PlayerScreen() {
 
                 {/* Bottom controls row */}
                 <View style={styles.controlsRow}>
-                  <Text style={styles.time}>{formatTime(position)}</Text>
+                  <Text style={styles.time}>{formatTime(displayPosition)}</Text>
                   <TouchableOpacity style={styles.controlItem} onPress={() => handleFlip('sleep')}>
                     <Icon
                       name={sleepTimer ? "moon" : "moon-outline"}
