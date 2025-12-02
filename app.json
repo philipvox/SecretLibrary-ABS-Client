@@ -67,7 +67,6 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to visualize audio."
         }
       ],
-      "react-native-audio-api",
       [
         "expo-build-properties",
         {
