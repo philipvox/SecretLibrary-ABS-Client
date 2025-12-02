@@ -2,8 +2,8 @@
  * src/features/home/components/CardActions.tsx
  * 
  * Action buttons below the main card:
- * - View Series (left)
- * - Restart (right)
+ * - View Series (left) - menu/list icon
+ * - Restart (right) - skip back icon
  */
 
 import React from 'react';
@@ -18,7 +18,6 @@ import Svg, { Path } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Default config
 const DEFAULT_CONFIG = {
   mainCard: {
     width: Math.min(339, SCREEN_WIDTH - 32),
@@ -26,13 +25,13 @@ const DEFAULT_CONFIG = {
   actions: {
     paddingVertical: 12,
     paddingHorizontal: 4,
-    marginBottom: 16,
+    marginBottom: 0,
     fontSize: 14,
-    iconSize: 18,
-    iconGap: 8,
+    iconSize: 16,
+    iconGap: 6,
   },
   colors: {
-    textTertiary: 'rgba(255,255,255,0.5)',
+    textTertiary: 'rgba(255,255,255,0.4)',
   },
 };
 
@@ -43,12 +42,12 @@ interface CardActionsProps {
   config?: typeof DEFAULT_CONFIG;
 }
 
-// Icons
-function MenuIcon({ size = 18, color = 'rgba(255,255,255,0.5)' }: { size?: number; color?: string }) {
+// Menu/List icon (three horizontal lines)
+function MenuIcon({ size = 16, color = 'rgba(255,255,255,0.4)' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M3 6H21M3 12H21M3 18H21"
+        d="M4 6H20M4 12H20M4 18H20"
         stroke={color}
         strokeWidth={2}
         strokeLinecap="round"
@@ -57,21 +56,22 @@ function MenuIcon({ size = 18, color = 'rgba(255,255,255,0.5)' }: { size?: numbe
   );
 }
 
-function RestartIcon({ size = 18, color = 'rgba(255,255,255,0.5)' }: { size?: number; color?: string }) {
+// Skip back / Restart icon (arrow pointing left with vertical line)
+function RestartIcon({ size = 16, color = 'rgba(255,255,255,0.4)' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M3 12H7M7 12L4 9M7 12L4 15"
+        d="M4 5V19"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M20 12L8 5V19L20 12Z"
         stroke={color}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
-      />
-      <Path
-        d="M7 12C7 8.13401 10.134 5 14 5C17.866 5 21 8.13401 21 12C21 15.866 17.866 19 14 19C11.5 19 9.31 17.73 8 15.8"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
       />
     </Svg>
   );
@@ -133,7 +133,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 4,
   },
-  actionText: {},
+  actionText: {
+    fontWeight: '500',
+  },
 });
 
 export default CardActions;

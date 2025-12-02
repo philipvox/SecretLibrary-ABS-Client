@@ -1,7 +1,7 @@
 /**
  * src/features/home/components/GlassPanel.tsx
  * 
- * SVG glass panel background matching Rectangle_21.svg
+ * SVG glass panel background using HomeCardBackground design
  */
 
 import React from 'react';
@@ -9,10 +9,11 @@ import { StyleSheet } from 'react-native';
 import Svg, { 
   Path, 
   Defs, 
-  LinearGradient as SvgLinearGradient, 
+  LinearGradient, 
   RadialGradient,
   Stop,
   Rect,
+  Mask,
 } from 'react-native-svg';
 
 interface GlassPanelProps {
@@ -22,10 +23,11 @@ interface GlassPanelProps {
 }
 
 export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps) {
-  // Scale factors based on original 339x514 SVG
-  const scaleX = width / 339;
-  const scaleY = height / 514;
+  const r = borderRadius;
   
+  // Create rounded rect path
+  const path = `M0 ${r}C0 ${r * 0.447} ${r * 0.447} 0 ${r} 0H${width - r}C${width - r * 0.447} 0 ${width} ${r * 0.447} ${width} ${r}V${height - r}C${width} ${height - r * 0.447} ${width - r * 0.447} ${height} ${width - r} ${height}H${r}C${r * 0.447} ${height} 0 ${height - r * 0.447} 0 ${height - r}V${r}Z`;
+
   return (
     <Svg 
       width={width} 
@@ -34,26 +36,25 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
       style={StyleSheet.absoluteFill}
     >
       <Defs>
-        {/* Top dark gradient */}
-        <SvgLinearGradient id="paint0" x1="50%" y1="17.7%" x2="50%" y2="0%" gradientUnits="userSpaceOnUse">
+        {/* Top dark gradient - subtle shadow at top */}
+        <LinearGradient id="topGrad" x1="50%" y1="17.7%" x2="50%" y2="0%">
           <Stop offset="0.48" stopOpacity="0" />
-          <Stop offset="0.65" stopColor="black" />
-        </SvgLinearGradient>
+          <Stop offset="0.65" stopColor="black" stopOpacity="1" />
+        </LinearGradient>
         
-        {/* Bottom light gradient */}
-        <SvgLinearGradient id="paint1" x1="50%" y1="98%" x2="50%" y2="100%" gradientUnits="userSpaceOnUse">
+        {/* Bottom light gradient - subtle highlight at bottom */}
+        <LinearGradient id="bottomGrad" x1="50%" y1="98.4%" x2="50%" y2="100%">
           <Stop offset="0.4" stopOpacity="0" />
-          <Stop offset="0.9" stopColor="white" />
-        </SvgLinearGradient>
+          <Stop offset="0.9" stopColor="white" stopOpacity="1" />
+        </LinearGradient>
         
         {/* Bottom-right radial glow */}
         <RadialGradient 
-          id="paint2" 
+          id="brGlow" 
           cx="100%" 
           cy="95%" 
           rx="160%" 
           ry="50%"
-          gradientUnits="userSpaceOnUse"
         >
           <Stop stopColor="white" />
           <Stop offset="1" stopOpacity="0" />
@@ -61,12 +62,11 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
         
         {/* Top-left radial glow */}
         <RadialGradient 
-          id="paint3" 
+          id="tlGlow" 
           cx="4%" 
           cy="0%" 
-          rx="150%" 
-          ry="70%"
-          gradientUnits="userSpaceOnUse"
+          rx="31%" 
+          ry="67%"
         >
           <Stop stopColor="white" />
           <Stop offset="1" stopOpacity="0" />
@@ -79,7 +79,7 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
         y="0" 
         width={width} 
         height={height} 
-        rx={borderRadius}
+        rx={r}
         fill="#262626"
       />
       
@@ -89,8 +89,8 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
         y="0" 
         width={width} 
         height={height} 
-        rx={borderRadius}
-        fill="url(#paint0)" 
+        rx={r}
+        fill="url(#topGrad)" 
         fillOpacity="0.2"
       />
       
@@ -100,8 +100,8 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
         y="0" 
         width={width} 
         height={height} 
-        rx={borderRadius}
-        fill="url(#paint1)" 
+        rx={r}
+        fill="url(#bottomGrad)" 
         fillOpacity="0.2"
       />
       
@@ -111,8 +111,8 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
         y="0" 
         width={width} 
         height={height} 
-        rx={borderRadius}
-        fill="url(#paint2)" 
+        rx={r}
+        fill="url(#brGlow)" 
         fillOpacity="0.1"
       />
       
@@ -122,20 +122,20 @@ export function GlassPanel({ width, height, borderRadius = 5 }: GlassPanelProps)
         y="0" 
         width={width} 
         height={height} 
-        rx={borderRadius}
-        fill="url(#paint3)" 
+        rx={r}
+        fill="url(#tlGlow)" 
         fillOpacity="0.1"
       />
       
       {/* Border */}
       <Rect 
-        x="0.25" 
-        y="0.25" 
-        width={width - 0.5} 
-        height={height - 0.5} 
-        rx={borderRadius}
+        x="0.35" 
+        y="0.35" 
+        width={width - 0.7} 
+        height={height - 0.7} 
+        rx={r}
         stroke="rgba(255,255,255,0.5)" 
-        strokeWidth="0.5" 
+        strokeWidth="0.7" 
         fill="none"
       />
     </Svg>

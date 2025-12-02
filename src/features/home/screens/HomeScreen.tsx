@@ -1,10 +1,5 @@
 /**
  * src/features/home/screens/HomeScreen.tsx
- * 
- * Home screen layout:
- * - Main card (most recent book)
- * - Action buttons (View Series, Restart)
- * - Library list (recently added books)
  */
 
 import React, { useCallback } from 'react';
@@ -17,6 +12,7 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
@@ -26,123 +22,75 @@ import { CardActions } from '../components/CardActions';
 import { LibraryListCard } from '../components/LibraryListCard';
 import { useContinueListening } from '../hooks/useContinueListening';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const BG_COLOR = '#1a1a1a';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ============================================================================
-// LAYOUT CONFIGURATION - Adjust these values to customize the home screen
-// ============================================================================
 const CONFIG = {
-  // === SCREEN LAYOUT ===
   screen: {
-    backgroundColor: '#1a1a1a',
-    horizontalPadding: 15,           // Left/right padding for content
-    topPadding: 0,                  // Extra padding below safe area
-    bottomPadding: 0,              // Extra padding above tab bar
+    backgroundColor: '#000',
+    horizontalPadding: 16,
+    topPadding: 8,
+    bottomPadding: 160,
   },
-  // === MAIN CARD ===
   mainCard: {
-    width: SCREEN_WIDTH - 30,  // Card width (max 339 or screen - padding)
-    height: 550,                     // Total card height
-    borderRadius: 8,                 // Corner radius
-    marginTop: 0,                    // Space above card
-    marginBottom: 0,                 // Space below card (before actions)
+    width: SCREEN_WIDTH - 32,
   },
-
-  // === MAIN CARD COVER ===
-  cover: {
-    height: 400,                     // Cover image height
-    margin: 5,                       // Margin around cover inside card
-    borderRadius: 8,                 // Cover corner radius
-  },
-
-  // === MAIN CARD CONTENT ===
-  cardContent: {
-    paddingHorizontal: 10,           // Left/right padding inside card
-    paddingVertical: 10,             // Top/bottom padding inside card
-    titleFontSize: 26,               // Book title font size
-    titleLineHeight: 30,             // Book title line height
-    titleMarginBottom: 4,            // Space below title
-    chapterFontSize: 14,             // Chapter text font size
-    iconSize: 24,                    // Download/heart icon size
-    iconGap: 8,                      // Gap between icons
-  },
-
-  // === CARD ACTIONS (View Series / Restart) ===
   actions: {
-    paddingVertical: 12,             // Top/bottom padding
-    paddingHorizontal: 4,            // Left/right padding
-    marginBottom: 16,                // Space below actions (before library list)
-    fontSize: 14,                    // Action text font size
-    iconSize: 18,                    // Action icon size
-    iconGap: 8,                      // Gap between icon and text
+    paddingVertical: 10,
+    paddingHorizontal: 0,
+    fontSize: 14,
+    iconSize: 16,
+    iconGap: 6,
   },
-
-  // === LIBRARY LIST ===
   libraryList: {
-    gap: 5,                          // Gap between library cards
-    marginTop: 50,                    // Space above library list
-
+    gap: 6,
+    marginTop: 20,
+    headerFontSize: 13,
+    headerMarginBottom: 10,
   },
-
-  // === LIBRARY LIST CARD ===
   libraryCard: {
-    height: 100,                      // Card height
-    borderRadius: 5,                 // Corner radius
-    paddingHorizontal: 8,            // Left/right padding inside card
-    paddingVertical: 8,              // Top/bottom padding inside card
+    height: 88,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
-
-  // === LIBRARY CARD COVER ===
   libraryCover: {
-    size: 64,                        // Cover thumbnail size (square)
-    borderRadius: 5,                 // Cover corner radius
-    marginRight: 20,                 // Space between cover and text
+    size: 68,
+    borderRadius: 6,
+    marginRight: 14,
   },
-
-  // === LIBRARY CARD CONTENT ===
   libraryContent: {
-    titleFontSize: 16,               // Title font size
-    titleLineHeight: 20,             // Title line height
-    titleMarginBottom: 4,            // Space below title
-    timeFontSize: 13,                // Time text font size
+    titleFontSize: 16,
+    titleLineHeight: 20,
+    titleMarginBottom: 4,
+    timeFontSize: 13,
   },
-
-  // === LIBRARY CARD RIGHT COLUMN ===
   libraryRightColumn: {
-    marginLeft: 8,                   // Space before play button
-    gap: 4,                          // Gap between play and heart
-    playButtonSize: 40,              // Play button diameter
-    playIconSize: 24,                // Play icon size
-    heartSize: 18,                   // Heart icon size
-    heartPadding: 4,                 // Heart button padding
+    marginLeft: 8,
+    gap: 6,
+    playButtonSize: 36,
+    playIconSize: 18,
+    heartSize: 16,
+    heartPadding: 4,
   },
-
-  // === COLORS ===
   colors: {
-    accent: '#CCFF00',               // Primary accent color (heart, etc)
-    textPrimary: '#FFFFFF',          // Primary text color
-    textSecondary: 'rgba(255,255,255,0.6)',  // Secondary text color
-    textTertiary: 'rgba(255,255,255,0.5)',   // Tertiary text color
-    iconDefault: 'rgba(255,255,255,0.6)',    // Default icon color
-    playButtonBg: 'rgba(255,255,255,0.1)',   // Play button background
+    accent: '#CCFF00',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(255,255,255,0.6)',
+    textTertiary: 'rgba(255,255,255,0.4)',
+    iconDefault: 'rgba(255,255,255,0.5)',
+    playButtonBg: 'rgba(255,255,255,0.1)',
   },
-
-  // === EMPTY STATE ===
   emptyState: {
     titleFontSize: 24,
     subtitleFontSize: 16,
     subtitlePaddingHorizontal: 40,
   },
-
-  // === LOADING STATE ===
   loading: {
     indicatorSize: 'large' as const,
     indicatorColor: '#CCFF00',
   },
 };
 
-// Export config for use in child components
 export { CONFIG as HOME_CONFIG };
 
 export function HomeScreen() {
@@ -193,7 +141,6 @@ export function HomeScreen() {
     console.log('Heart:', book.id);
   }, []);
 
-  // Loading state
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -206,7 +153,6 @@ export function HomeScreen() {
     );
   }
 
-  // Empty state
   if (continueListeningItems.length === 0) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -219,12 +165,9 @@ export function HomeScreen() {
     );
   }
 
-  // First book is the main card
   const mainBook = continueListeningItems[0];
-  // Rest are library list
   const libraryBooks = continueListeningItems.slice(1);
   
-  // Check if main book has series
   const mainSeries = mainBook.media?.metadata?.series?.[0];
   const hasMainSeries = typeof mainSeries === 'object' ? !!mainSeries?.id : false;
 
@@ -237,65 +180,55 @@ export function HomeScreen() {
           styles.scrollContent,
           { 
             paddingTop: insets.top + CONFIG.screen.topPadding, 
-            paddingBottom: insets.bottom + CONFIG.screen.bottomPadding,
+            paddingBottom: CONFIG.screen.bottomPadding,
             paddingHorizontal: CONFIG.screen.horizontalPadding,
           }
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Main Card Container */}
-        <View style={[
-          styles.mainCardContainer, 
-          { 
-            marginTop: CONFIG.mainCard.marginTop,
-            marginBottom: CONFIG.mainCard.marginBottom,
-          }
-        ]}>
-          <HomeCard
-            book={mainBook}
-            onPress={() => handleBookSelect(mainBook)}
-            onDownload={() => handleDownload(mainBook)}
-            onHeart={() => handleHeart(mainBook)}
-            config={CONFIG}
-          />
-        </View>
+        {/* Main Card */}
+        <HomeCard
+          book={mainBook}
+          onPress={() => handleBookSelect(mainBook)}
+          onDownload={() => handleDownload(mainBook)}
+          onHeart={() => handleHeart(mainBook)}
+        />
         
-        {/* Actions Container */}
-        <View style={[
-          styles.actionsContainer, 
-          { marginBottom: CONFIG.actions.marginBottom }
-        ]}>
-          <CardActions
-            showViewSeries={hasMainSeries}
-            onViewSeries={() => handleViewSeries(mainBook)}
-            onRestart={() => handleRestart(mainBook)}
-            config={CONFIG}
-          />
-        </View>
+        {/* Actions */}
+        <CardActions
+          showViewSeries={hasMainSeries}
+          onViewSeries={() => handleViewSeries(mainBook)}
+          onRestart={() => handleRestart(mainBook)}
+          config={CONFIG}
+        />
 
-        {/* Library List Container */}
+        {/* Your Library Section */}
         {libraryBooks.length > 0 && (
-          <View style={[
-            styles.libraryContainer, 
-            { 
-              gap: CONFIG.libraryList.gap,
-              marginTop: CONFIG.libraryList.marginTop,
-            }
-          ]}>
-            {libraryBooks.map((book) => (
-              <View key={book.id} style={styles.libraryItemWrapper}>
+          <View style={styles.librarySection}>
+            <Text style={styles.libraryHeader}>Your library</Text>
+            <View style={styles.libraryContainer}>
+              {libraryBooks.map((book) => (
                 <LibraryListCard
+                  key={book.id}
                   book={book}
                   onPress={() => handleBookSelect(book)}
                   onPlay={() => handlePlayBook(book)}
                   onHeart={() => handleHeart(book)}
                   config={CONFIG}
                 />
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
+
+      {/* Bottom gradient fade */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.9)', '#000']}
+        locations={[0, 0.6, 1]}
+        style={styles.bottomGradient}
+        pointerEvents="none"
+      />
     </View>
   );
 }
@@ -312,19 +245,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
   },
-  mainCardContainer: {
-    alignItems: 'center',
+  librarySection: {
     width: '100%',
+    marginTop: CONFIG.libraryList.marginTop,
   },
-  actionsContainer: {
-    alignItems: 'center',
-    width: '100%',
+  libraryHeader: {
+    fontSize: CONFIG.libraryList.headerFontSize,
+    fontWeight: '500',
+    color: CONFIG.colors.textTertiary,
+    marginBottom: CONFIG.libraryList.headerMarginBottom,
   },
   libraryContainer: {
     width: '100%',
+    gap: CONFIG.libraryList.gap,
   },
-  libraryItemWrapper: {
-    width: '100%',
+  bottomGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 200,
   },
   emptyTitle: {
     fontSize: CONFIG.emptyState.titleFontSize,

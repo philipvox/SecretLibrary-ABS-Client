@@ -1,11 +1,7 @@
 /**
  * src/features/home/components/LibraryListCard.tsx
  * 
- * Horizontal card for library list showing:
- * - Cover thumbnail on left
- * - Title, time progress
- * - Play button on right
- * - Heart icon
+ * Horizontal card for library list
  */
 
 import React from 'react';
@@ -17,7 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { getTitle } from '@/shared/utils/metadata';
@@ -25,21 +21,18 @@ import { GlassPanel } from './GlassPanel';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Default config
 const DEFAULT_CONFIG = {
-  screen: {
-    horizontalPadding: 16,
-  },
+  screen: { horizontalPadding: 16 },
   libraryCard: {
-    height: 80,
+    height: 88,
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
   libraryCover: {
-    size: 64,
+    size: 68,
     borderRadius: 6,
-    marginRight: 12,
+    marginRight: 14,
   },
   libraryContent: {
     titleFontSize: 16,
@@ -49,16 +42,16 @@ const DEFAULT_CONFIG = {
   },
   libraryRightColumn: {
     marginLeft: 8,
-    gap: 4,
-    playButtonSize: 40,
-    playIconSize: 24,
-    heartSize: 18,
+    gap: 6,
+    playButtonSize: 36,
+    playIconSize: 18,
+    heartSize: 16,
     heartPadding: 4,
   },
   colors: {
     accent: '#CCFF00',
     textPrimary: '#FFFFFF',
-    textTertiary: 'rgba(255,255,255,0.5)',
+    textTertiary: 'rgba(255,255,255,0.4)',
     playButtonBg: 'rgba(255,255,255,0.1)',
   },
 };
@@ -77,22 +70,18 @@ interface LibraryListCardProps {
   config?: typeof DEFAULT_CONFIG;
 }
 
-// Format seconds to MM:SS or HH:MM:SS
 function formatTime(seconds: number): string {
   if (!seconds || seconds <= 0) return '0:00';
-  
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
   if (hrs > 0) {
     return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Icons
-function PlayIcon({ size = 24, color = 'white' }: { size?: number; color?: string }) {
+function PlayIcon({ size = 18, color = 'white' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -103,7 +92,7 @@ function PlayIcon({ size = 24, color = 'white' }: { size?: number; color?: strin
   );
 }
 
-function HeartIcon({ size = 20, color = '#CCFF00', filled = true }: { size?: number; color?: string; filled?: boolean }) {
+function HeartIcon({ size = 16, color = '#CCFF00', filled = true }: { size?: number; color?: string; filled?: boolean }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -144,14 +133,12 @@ export function LibraryListCard({
           borderRadius: c.libraryCard.borderRadius,
         }
       ]}>
-        {/* SVG Glass Background */}
         <GlassPanel 
           width={CARD_WIDTH} 
           height={c.libraryCard.height} 
           borderRadius={c.libraryCard.borderRadius} 
         />
 
-        {/* Content */}
         <View style={[
           styles.content,
           {
@@ -159,7 +146,7 @@ export function LibraryListCard({
             paddingVertical: c.libraryCard.paddingVertical,
           }
         ]}>
-          {/* Cover thumbnail */}
+          {/* Cover */}
           <View style={[
             styles.coverContainer,
             {
@@ -177,7 +164,7 @@ export function LibraryListCard({
             />
           </View>
 
-          {/* Info section */}
+          {/* Info */}
           <View style={styles.infoSection}>
             <Text 
               style={[
@@ -204,7 +191,7 @@ export function LibraryListCard({
             </Text>
           </View>
 
-          {/* Right column: Play and Heart aligned vertically */}
+          {/* Right column */}
           <View style={[
             styles.rightColumn,
             {

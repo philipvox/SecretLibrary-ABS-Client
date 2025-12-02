@@ -72,7 +72,7 @@ const GAP = 5;
 const BUTTON_WIDTH = 128;
 const BUTTON_HEIGHT = 136;
 const DISPLAY_WIDTH = BUTTON_WIDTH * 3 + GAP * 2;
-const DISPLAY_PADDING = 12;
+const DISPLAY_PADDING = 5;
 const ARTWORK_SIZE = DISPLAY_WIDTH - DISPLAY_PADDING * 2;
 
 // Artwork inset shadow config (plastic cover effect)
@@ -281,27 +281,27 @@ export function PlayerScreen() {
     handleClose();
     setTimeout(() => {
       navigation.navigate('AuthorDetail' as never, { authorName } as never);
-    }, 150);
+    }, 100);
   }, [navigation, handleClose]);
 
   const handleNavigateToNarrator = useCallback((narratorName: string) => {
     handleClose();
     setTimeout(() => {
       navigation.navigate('NarratorDetail' as never, { narratorName } as never);
-    }, 150);
+    }, 100);
   }, [navigation, handleClose]);
 
   const handleNavigateToSeries = useCallback((seriesName: string) => {
     handleClose();
     setTimeout(() => {
       navigation.navigate('SeriesDetail' as never, { seriesName } as never);
-    }, 150);
+    }, 100);
   }, [navigation, handleClose]);
 
   const handleFlip = useCallback((mode: FlipMode = 'details') => {
     if (isFlipped && flipMode === mode) {
       setIsFlipped(false);
-      Animated.timing(flipAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+      Animated.timing(flipAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start();
     } else if (isFlipped && flipMode !== mode) {
       setFlipMode(mode);
       if (mode === 'speed') setTempSpeed(playbackRate);
@@ -309,13 +309,13 @@ export function PlayerScreen() {
       setFlipMode(mode);
       if (mode === 'speed') setTempSpeed(playbackRate);
       setIsFlipped(true);
-      Animated.timing(flipAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      Animated.timing(flipAnim, { toValue: 1, duration: 100, useNativeDriver: true }).start();
     }
   }, [isFlipped, flipMode, playbackRate, flipAnim]);
 
   const handleFlipBack = useCallback(() => {
     setIsFlipped(false);
-    Animated.timing(flipAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    Animated.timing(flipAnim, { toValue: 0, duration: 100, useNativeDriver: true }).start();
   }, [flipAnim]);
 
   const handlePlayPause = useCallback(async () => {
@@ -339,7 +339,6 @@ export function PlayerScreen() {
 
   const handleRewindPressOut = useCallback(async () => {
     await stopContinuousSeeking();
-    // Resume playback if we were playing before
     if (wasPlayingBeforeSeek.current) {
       await play();
     }
@@ -352,7 +351,6 @@ export function PlayerScreen() {
 
   const handleFFPressOut = useCallback(async () => {
     await stopContinuousSeeking();
-    // Resume playback if we were playing before
     if (wasPlayingBeforeSeek.current) {
       await play();
     }
@@ -420,8 +418,8 @@ export function PlayerScreen() {
   const frontOpacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const backOpacity = flipAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  // Calculate display height
-  const displayHeight = DISPLAY_PADDING + 28 + ARTWORK_SIZE + 8 + 52 + 8 + 80 + 8 + 24 + DISPLAY_PADDING;
+  // Calculate display height (removed header row height)
+  const displayHeight = DISPLAY_PADDING + ARTWORK_SIZE + 8 + 52 + 8 + 80 + 8 + 24 + DISPLAY_PADDING;
 
   // ===========================================================================
   // MAIN RENDER
@@ -429,217 +427,220 @@ export function PlayerScreen() {
 
   return (
     <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a1a" />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      <View style={[styles.mainContent, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.mainContent, { paddingTop: insets.top + 16 }]}>
         <View style={styles.playerWrapper}>
           {/* Display Panel */}
           <View style={styles.displayWrapper}>
             <GlassPanel width={DISPLAY_WIDTH} height={displayHeight} variant="display">
-            <View style={styles.displayContent}>
-              {/* Back button row */}
-              <View style={styles.cardHeaderRow}>
-                <TouchableOpacity style={styles.backButton} onPress={handleClose}>
-                  <Icon name="chevron-down" size={24} color="rgba(255,255,255,0.7)" set="ionicons" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleFlip('settings')}>
-                  <Icon name="settings-outline" size={20} color="rgba(255,255,255,0.5)" set="ionicons" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Top content */}
-              <View>
-                {/* Artwork container with flip */}
-                <View style={styles.artworkContainer}>
-                  {/* Front - Cover Image */}
-                  <Animated.View
-                    style={[styles.artworkFace, { opacity: frontOpacity }]}
-                    pointerEvents={isFlipped ? 'none' : 'auto'}
-                  >
-                    <TouchableOpacity onPress={() => handleFlip('details')} activeOpacity={0.9}>
-                      <Image
-                        source={coverUrl}
-                        style={styles.artwork}
-                        contentFit="cover"
-                        transition={300}
-                      />
-                      {/* Inner shadow overlay - plastic cover effect */}
-                      <View style={[styles.artworkInnerShadow, { borderWidth: ART_SHADOW.border.width, borderColor: `rgba(0,0,0,${ART_SHADOW.border.opacity})` }]} pointerEvents="none">
-                        <Svg width="100%" height="100%" preserveAspectRatio="none">
-                          <Defs>
+              <View style={styles.displayContent}>
+                {/* Top content */}
+                <View>
+                  {/* Artwork container with flip */}
+                  <View style={styles.artworkContainer}>
+                    {/* Front - Cover Image */}
+                    <Animated.View
+                      style={[styles.artworkFace, { opacity: frontOpacity }]}
+                      pointerEvents={isFlipped ? 'none' : 'auto'}
+                    >
+                      <TouchableOpacity onPress={() => handleFlip('details')} activeOpacity={0.9}>
+                        <Image
+                          source={coverUrl}
+                          style={styles.artwork}
+                          contentFit="cover"
+                          transition={100}
+                        />
+                        {/* Inner shadow overlay - plastic cover effect */}
+                        <View style={[styles.artworkInnerShadow, { borderWidth: ART_SHADOW.border.width, borderColor: `rgba(0,0,0,${ART_SHADOW.border.opacity})` }]} pointerEvents="none">
+                          <Svg width="100%" height="100%" preserveAspectRatio="none">
+                            <Defs>
+                              {/* Edge shadows */}
+                              <LinearGradient id="artTop" x1="0" y1="0" x2="0" y2="1">
+                                <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.top.opacity} />
+                                <Stop offset={ART_SHADOW.top.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.top.opacity * 0.4} />
+                                <Stop offset={ART_SHADOW.top.depth} stopColor="black" stopOpacity="0" />
+                              </LinearGradient>
+                              <LinearGradient id="artBottom" x1="0" y1="1" x2="0" y2="0">
+                                <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.bottom.opacity} />
+                                <Stop offset={ART_SHADOW.bottom.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.bottom.opacity * 0.4} />
+                                <Stop offset={ART_SHADOW.bottom.depth} stopColor="black" stopOpacity="0" />
+                              </LinearGradient>
+                              <LinearGradient id="artLeft" x1="0" y1="0" x2="1" y2="0">
+                                <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.left.opacity} />
+                                <Stop offset={ART_SHADOW.left.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.left.opacity * 0.4} />
+                                <Stop offset={ART_SHADOW.left.depth} stopColor="black" stopOpacity="0" />
+                              </LinearGradient>
+                              <LinearGradient id="artRight" x1="1" y1="0" x2="0" y2="0">
+                                <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.right.opacity} />
+                                <Stop offset={ART_SHADOW.right.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.right.opacity * 0.4} />
+                                <Stop offset={ART_SHADOW.right.depth} stopColor="black" stopOpacity="0" />
+                              </LinearGradient>
+                              {/* Plastic sheen highlight */}
+                              <LinearGradient id="artSheen" x1="0" y1="0" x2="0" y2="1">
+                                <Stop offset="0" stopColor="white" stopOpacity={ART_SHADOW.sheen.opacity} />
+                                <Stop offset={ART_SHADOW.sheen.depth / 2} stopColor="white" stopOpacity={ART_SHADOW.sheen.opacity * 0.3} />
+                                <Stop offset={ART_SHADOW.sheen.depth} stopColor="white" stopOpacity="0" />
+                              </LinearGradient>
+                            </Defs>
                             {/* Edge shadows */}
-                            <LinearGradient id="artTop" x1="0" y1="0" x2="0" y2="1">
-                              <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.top.opacity} />
-                              <Stop offset={ART_SHADOW.top.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.top.opacity * 0.4} />
-                              <Stop offset={ART_SHADOW.top.depth} stopColor="black" stopOpacity="0" />
-                            </LinearGradient>
-                            <LinearGradient id="artBottom" x1="0" y1="1" x2="0" y2="0">
-                              <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.bottom.opacity} />
-                              <Stop offset={ART_SHADOW.bottom.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.bottom.opacity * 0.4} />
-                              <Stop offset={ART_SHADOW.bottom.depth} stopColor="black" stopOpacity="0" />
-                            </LinearGradient>
-                            <LinearGradient id="artLeft" x1="0" y1="0" x2="1" y2="0">
-                              <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.left.opacity} />
-                              <Stop offset={ART_SHADOW.left.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.left.opacity * 0.4} />
-                              <Stop offset={ART_SHADOW.left.depth} stopColor="black" stopOpacity="0" />
-                            </LinearGradient>
-                            <LinearGradient id="artRight" x1="1" y1="0" x2="0" y2="0">
-                              <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.right.opacity} />
-                              <Stop offset={ART_SHADOW.right.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.right.opacity * 0.4} />
-                              <Stop offset={ART_SHADOW.right.depth} stopColor="black" stopOpacity="0" />
-                            </LinearGradient>
-                            {/* Plastic sheen highlight */}
-                            <LinearGradient id="artSheen" x1="0" y1="0" x2="0" y2="1">
-                              <Stop offset="0" stopColor="white" stopOpacity={ART_SHADOW.sheen.opacity} />
-                              <Stop offset={ART_SHADOW.sheen.depth / 2} stopColor="white" stopOpacity={ART_SHADOW.sheen.opacity * 0.3} />
-                              <Stop offset={ART_SHADOW.sheen.depth} stopColor="white" stopOpacity="0" />
-                            </LinearGradient>
-                          </Defs>
-                          {/* Edge shadows */}
-                          <Rect x="0" y="0" width="100%" height="100%" fill="url(#artTop)" />
-                          <Rect x="0" y="0" width="100%" height="100%" fill="url(#artBottom)" />
-                          <Rect x="0" y="0" width="100%" height="100%" fill="url(#artLeft)" />
-                          <Rect x="0" y="0" width="100%" height="100%" fill="url(#artRight)" />
-                          {/* Top highlight */}
-                          <Rect x="0" y="0" width="100%" height="100%" fill="url(#artSheen)" />
-                        </Svg>
-                      </View>
+                            <Rect x="0" y="0" width="100%" height="100%" fill="url(#artTop)" />
+                            <Rect x="0" y="0" width="100%" height="100%" fill="url(#artBottom)" />
+                            <Rect x="0" y="0" width="100%" height="100%" fill="url(#artLeft)" />
+                            <Rect x="0" y="0" width="100%" height="100%" fill="url(#artRight)" />
+                            {/* Top highlight */}
+                            <Rect x="0" y="0" width="100%" height="100%" fill="url(#artSheen)" />
+                          </Svg>
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Back button on cover */}
+                      <TouchableOpacity style={styles.backButton} onPress={handleClose}>
+                        <Icon name="chevron-down" size={24} color="rgba(255,255,255,0.9)" set="ionicons" />
+                      </TouchableOpacity>
+
+                      {/* Settings icon on cover */}
+                      <TouchableOpacity
+                        style={styles.settingsButton}
+                        onPress={() => handleFlip('settings')}
+                      >
+                        <Icon name="settings-outline" size={20} color="rgba(255,255,255,0.7)" set="ionicons" />
+                      </TouchableOpacity>
+                    </Animated.View>
+
+                    {/* Back - Panel */}
+                    <Animated.View
+                      style={[styles.artworkFace, styles.artworkBack, { opacity: backOpacity }]}
+                      pointerEvents={isFlipped ? 'auto' : 'none'}
+                    >
+                      <TouchableOpacity style={styles.flipCloseButton} onPress={handleFlipBack}>
+                        <Icon name="close" size={20} color="rgba(255,255,255,0.5)" set="ionicons" />
+                      </TouchableOpacity>
+
+                      {flipMode === 'details' && (
+                        <DetailsPanel
+                          book={currentBook}
+                          duration={bookDuration}
+                          chaptersCount={chapters.length}
+                          isLight={false}
+                          onNavigateToAuthor={handleNavigateToAuthor}
+                          onNavigateToNarrator={handleNavigateToNarrator}
+                          onNavigateToSeries={handleNavigateToSeries}
+                        />
+                      )}
+
+                      {flipMode === 'speed' && (
+                        <SpeedPanel
+                          tempSpeed={tempSpeed}
+                          setTempSpeed={setTempSpeed}
+                          onApply={() => {
+                            usePlayerStore.getState().setPlaybackRate(tempSpeed);
+                            handleFlipBack();
+                          }}
+                          onClose={handleFlipBack}
+                          isLight={false}
+                        />
+                      )}
+
+                      {flipMode === 'sleep' && (
+                        <SleepPanel
+                          tempSleepMins={tempSleepMins}
+                          setTempSleepMins={setTempSleepMins}
+                          sleepInputValue={sleepInputValue}
+                          setSleepInputValue={setSleepInputValue}
+                          onClear={() => {
+                            usePlayerStore.getState().clearSleepTimer?.();
+                            handleFlipBack();
+                          }}
+                          onStart={() => {
+                            if (tempSleepMins > 0) {
+                              usePlayerStore.getState().setSleepTimer?.(tempSleepMins);
+                            }
+                            handleFlipBack();
+                          }}
+                          isLight={false}
+                        />
+                      )}
+
+                      {flipMode === 'chapters' && (
+                        <ChaptersPanel
+                          chapters={chapters}
+                          currentChapter={currentChapter}
+                          onChapterSelect={(start) => {
+                            seekTo(start);
+                            handleFlipBack();
+                          }}
+                          onClose={handleFlipBack}
+                          isLight={false}
+                        />
+                      )}
+
+                      {flipMode === 'settings' && (
+                        <SettingsPanel
+                          controlMode={controlMode}
+                          progressMode={progressMode}
+                          onControlModeChange={setControlMode}
+                          onProgressModeChange={setProgressMode}
+                          onViewChapters={() => setFlipMode('chapters')}
+                          onViewDetails={() => setFlipMode('details')}
+                          isLight={false}
+                        />
+                      )}
+                    </Animated.View>
+                  </View>
+
+                  {/* Title row */}
+                  <View style={styles.titleRow}>
+                    <Text style={styles.title} numberOfLines={2}>{title}</Text>
+                    <TouchableOpacity onPress={() => handleFlip('chapters')}>
+                      <Text style={styles.chapter}>{chapterTitle}</Text>
                     </TouchableOpacity>
-                  </Animated.View>
+                  </View>
 
-                  {/* Back - Panel */}
-                  <Animated.View
-                    style={[styles.artworkFace, styles.artworkBack, { opacity: backOpacity }]}
-                    pointerEvents={isFlipped ? 'auto' : 'none'}
-                  >
-                    <TouchableOpacity style={styles.flipCloseButton} onPress={handleFlipBack}>
-                      <Icon name="close" size={20} color="rgba(255,255,255,0.5)" set="ionicons" />
-                    </TouchableOpacity>
-
-                    {flipMode === 'details' && (
-                      <DetailsPanel
-                        book={currentBook}
-                        duration={bookDuration}
-                        chaptersCount={chapters.length}
-                        isLight={false}
-                        onNavigateToAuthor={handleNavigateToAuthor}
-                        onNavigateToNarrator={handleNavigateToNarrator}
-                        onNavigateToSeries={handleNavigateToSeries}
-                      />
-                    )}
-
-                    {flipMode === 'speed' && (
-                      <SpeedPanel
-                        tempSpeed={tempSpeed}
-                        setTempSpeed={setTempSpeed}
-                        onApply={() => {
-                          usePlayerStore.getState().setPlaybackRate(tempSpeed);
-                          handleFlipBack();
-                        }}
-                        onClose={handleFlipBack}
-                        isLight={false}
-                      />
-                    )}
-
-                    {flipMode === 'sleep' && (
-                      <SleepPanel
-                        tempSleepMins={tempSleepMins}
-                        setTempSleepMins={setTempSleepMins}
-                        sleepInputValue={sleepInputValue}
-                        setSleepInputValue={setSleepInputValue}
-                        onClear={() => {
-                          usePlayerStore.getState().clearSleepTimer?.();
-                          handleFlipBack();
-                        }}
-                        onStart={() => {
-                          if (tempSleepMins > 0) {
-                            usePlayerStore.getState().setSleepTimer?.(tempSleepMins);
-                          }
-                          handleFlipBack();
-                        }}
-                        isLight={false}
-                      />
-                    )}
-
-                    {flipMode === 'chapters' && (
-                      <ChaptersPanel
-                        chapters={chapters}
-                        currentChapter={currentChapter}
-                        onChapterSelect={(start) => {
-                          seekTo(start);
-                          handleFlipBack();
-                        }}
-                        onClose={handleFlipBack}
-                        isLight={false}
-                      />
-                    )}
-
-                    {flipMode === 'settings' && (
-                      <SettingsPanel
-                        controlMode={controlMode}
-                        progressMode={progressMode}
-                        onControlModeChange={setControlMode}
-                        onProgressModeChange={setProgressMode}
-                        onViewChapters={() => setFlipMode('chapters')}
-                        onViewDetails={() => setFlipMode('details')}
-                        isLight={false}
-                      />
-                    )}
-                  </Animated.View>
+                  {/* Cassette Tape Progress */}
+                  <View style={styles.waveformContainer}>
+                    <CassetteTape
+                      progress={progressMode === 'chapters' ? chapterProgress : bookProgress}
+                      isPlaying={isPlaying}
+                      isRewinding={isRewinding}
+                      isFastForwarding={isFastForwarding}
+                      accentColor={cardColor}
+                      bookId={currentBook?.id}
+                      chapterIndex={chapterIndex}
+                    />
+                  </View>
                 </View>
 
-                {/* Title row */}
-                <View style={styles.titleRow}>
-                  <Text style={styles.title} numberOfLines={2}>{title}</Text>
-                  <TouchableOpacity onPress={() => handleFlip('chapters')}>
-                    <Text style={styles.chapter}>{chapterTitle}</Text>
+                {/* Bottom controls row */}
+                <View style={styles.controlsRow}>
+                  <Text style={styles.time}>{formatTime(position)}</Text>
+                  <TouchableOpacity style={styles.controlItem} onPress={() => handleFlip('sleep')}>
+                    <Icon
+                      name={sleepTimer ? "moon" : "moon-outline"}
+                      size={20}
+                      color={sleepTimer ? cardColor : "rgba(255,255,255,0.5)"}
+                      set="ionicons"
+                    />
+                    {sleepTimer && sleepTimer > 0 && (
+                      <Text style={[styles.controlText, { color: cardColor }]}>
+                        {Math.ceil(sleepTimer / 60)}m
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.controlItem} onPress={handleHeartPress}>
+                    <Icon
+                      name={isFavorite ? "heart" : "heart-outline"}
+                      size={22}
+                      color={isFavorite ? cardColor : "rgba(255,255,255,0.5)"}
+                      set="ionicons"
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleFlip('speed')}>
+                    <Text style={styles.speed}>{Number(playbackRate.toFixed(2))}x</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* Cassette Tape Progress */}
-                <View style={styles.waveformContainer}>
-                  <CassetteTape
-                    progress={progressMode === 'chapters' ? chapterProgress : bookProgress}
-                    isPlaying={isPlaying}
-                    isRewinding={isRewinding}
-                    isFastForwarding={isFastForwarding}
-                    accentColor={cardColor}
-                    bookId={currentBook?.id}
-                    chapterIndex={chapterIndex}
-                  />
-                </View>
               </View>
-
-              {/* Bottom controls row */}
-              <View style={styles.controlsRow}>
-                <Text style={styles.time}>{formatTime(position)}</Text>
-                <TouchableOpacity style={styles.controlItem} onPress={() => handleFlip('sleep')}>
-                  <Icon
-                    name={sleepTimer ? "moon" : "moon-outline"}
-                    size={14}
-                    color={sleepTimer ? cardColor : "rgba(255,255,255,0.5)"}
-                    set="ionicons"
-                  />
-                  {sleepTimer && sleepTimer > 0 && (
-                    <Text style={[styles.controlText, { color: cardColor }]}>
-                      {Math.ceil(sleepTimer / 60)}m
-                    </Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.controlItem} onPress={handleHeartPress}>
-                  <Icon
-                    name={isFavorite ? "heart" : "heart-outline"}
-                    size={16}
-                    color={isFavorite ? cardColor : "rgba(255,255,255,0.5)"}
-                    set="ionicons"
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleFlip('speed')}>
-                  <Text style={styles.speed}>{Number(playbackRate.toFixed(2))}x</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </GlassPanel>
+            </GlassPanel>
           </View>
 
           {/* Button Row */}
@@ -681,7 +682,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#000',
   },
   mainContent: {
     flex: 1,
@@ -694,37 +695,29 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     // Drop shadow onto buttons below
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.8,
     shadowRadius: 20,
     elevation: 15,
+    zIndex: 1000,
   },
   displayContent: {
     flex: 1,
     padding: DISPLAY_PADDING,
     justifyContent: 'space-between',
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  backButton: {
-    padding: 2,
-  },
   artworkContainer: {
     width: ARTWORK_SIZE,
     height: ARTWORK_SIZE,
-    marginBottom: 8,
-    borderRadius: 11,
+    marginBottom: 10,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   artworkFace: {
     position: 'absolute',
     width: ARTWORK_SIZE,
     height: ARTWORK_SIZE,
-    borderRadius: 11,
+    borderRadius: 5,
   },
   artworkBack: {
     backgroundColor: '#333',
@@ -733,7 +726,7 @@ const styles = StyleSheet.create({
   artwork: {
     width: ARTWORK_SIZE,
     height: ARTWORK_SIZE,
-    borderRadius: 11,
+    borderRadius: 5,
     backgroundColor: '#000',
   },
   artworkInnerShadow: {
@@ -744,6 +737,28 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderRadius: 11,
     overflow: 'hidden',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   flipCloseButton: {
     position: 'absolute',
@@ -756,7 +771,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   title: {
     fontFamily: 'System',
@@ -770,17 +785,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Courier',
     fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
-    marginTop: 4,
+    marginTop: 10,
   },
   waveformContainer: {
     position: 'relative',
     width: '100%',
-    height: 80,
+    height: 100,
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 10,
   },
   time: {
     fontFamily: 'System',
@@ -801,7 +818,7 @@ const styles = StyleSheet.create({
   speed: {
     fontFamily: 'System',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
     color: 'rgba(255,255,255,0.5)',
   },
   buttonRow: {
