@@ -14,7 +14,7 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native';
-import { Heart } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useIsFavorite, useToggleFavorite } from '../hooks/useFavorites';
 import { theme } from '@/shared/theme';
 
@@ -135,11 +135,10 @@ export function FavoriteButton({
 
   const heartIcon = (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <Heart
+      <Ionicons
+        name={isFavorite ? 'heart' : 'heart-outline'}
         size={iconSize}
         color={isFavorite ? activeColor : inactiveColor}
-        fill={isFavorite ? activeColor : 'transparent'}
-        strokeWidth={2}
       />
     </Animated.View>
   );

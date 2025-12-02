@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Cloud, CloudOff, RefreshCw, AlertCircle, Check } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSyncStatus } from '@/core/hooks/useSyncStatus';
 import { theme } from '@/shared/theme';
 import Animated, {
@@ -15,8 +15,6 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-
-const AnimatedRefreshCw = Animated.createAnimatedComponent(RefreshCw);
 
 interface SyncStatusBadgeProps {
   showText?: boolean;
@@ -60,7 +58,7 @@ export function SyncStatusBadge({
         return {
           icon: (
             <Animated.View style={spinStyle}>
-              <RefreshCw size={iconSize} color="#4CAF50" />
+              <Feather name="refresh-cw" size={iconSize} color="#4CAF50" />
             </Animated.View>
           ),
           text: 'Syncing...',
@@ -69,14 +67,14 @@ export function SyncStatusBadge({
         };
       case 'offline':
         return {
-          icon: <CloudOff size={iconSize} color="#FF9800" />,
+          icon: <Feather name="cloud-off" size={iconSize} color="#FF9800" />,
           text: pendingCount > 0 ? `Offline (${pendingCount})` : 'Offline',
           color: '#FF9800',
           bgColor: 'rgba(255, 152, 0, 0.15)',
         };
       case 'error':
         return {
-          icon: <AlertCircle size={iconSize} color="#F44336" />,
+          icon: <Feather name="alert-circle" size={iconSize} color="#F44336" />,
           text: 'Sync error',
           color: '#F44336',
           bgColor: 'rgba(244, 67, 54, 0.15)',
@@ -84,14 +82,14 @@ export function SyncStatusBadge({
       default:
         if (pendingCount > 0) {
           return {
-            icon: <Cloud size={iconSize} color={theme.colors.text.secondary} />,
+            icon: <Feather name="cloud" size={iconSize} color={theme.colors.text.secondary} />,
             text: `${pendingCount} pending`,
             color: theme.colors.text.secondary,
             bgColor: 'rgba(255, 255, 255, 0.08)',
           };
         }
         return {
-          icon: <Check size={iconSize} color="#4CAF50" />,
+          icon: <Feather name="check" size={iconSize} color="#4CAF50" />,
           text: 'Synced',
           color: '#4CAF50',
           bgColor: 'rgba(76, 175, 80, 0.1)',

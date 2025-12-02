@@ -12,14 +12,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import {
-  Download,
-  CheckCircle,
-  Trash2,
-  AlertCircle,
-  Pause,
-  Play,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
 import { LibraryItem } from '@/core/types';
@@ -74,14 +67,14 @@ export function DownloadButton({
   const getIconAndColor = () => {
     if (isDownloaded) {
       return {
-        icon: <CheckCircle size={iconSize} color="#4CAF50" fill="#4CAF50" />,
+        icon: <Feather name="check-circle" size={iconSize} color="#4CAF50" />,
         color: '#4CAF50',
         label: 'Downloaded',
       };
     }
     if (isDownloading) {
       return {
-        icon: <Pause size={iconSize} color={theme.colors.accent.primary} />,
+        icon: <Feather name="pause" size={iconSize} color={theme.colors.accent.primary} />,
         color: theme.colors.accent.primary,
         label: `${Math.round(progress * 100)}%`,
       };
@@ -95,20 +88,20 @@ export function DownloadButton({
     }
     if (isPaused) {
       return {
-        icon: <Play size={iconSize} color="#FF9800" />,
+        icon: <Feather name="play" size={iconSize} color="#FF9800" />,
         color: '#FF9800',
         label: 'Paused',
       };
     }
     if (hasError) {
       return {
-        icon: <AlertCircle size={iconSize} color="#F44336" />,
+        icon: <Feather name="alert-circle" size={iconSize} color="#F44336" />,
         color: '#F44336',
         label: 'Retry',
       };
     }
     return {
-      icon: <Download size={iconSize} color={theme.colors.text.secondary} />,
+      icon: <Feather name="download" size={iconSize} color={theme.colors.text.secondary} />,
       color: theme.colors.text.secondary,
       label: 'Download',
     };

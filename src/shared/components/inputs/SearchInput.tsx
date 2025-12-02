@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   TextInputProps as RNTextInputProps,
 } from 'react-native';
-import { Search, X } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../../theme';
 
 interface SearchInputProps extends Omit<RNTextInputProps, 'style'> {
@@ -55,7 +55,8 @@ export const SearchInput = forwardRef<RNTextInput, SearchInputProps>(
           containerStyle,
         ]}
       >
-        <Search
+        <Feather
+          name="search"
           size={20}
           color={theme.colors.text.tertiary}
           style={styles.searchIcon}
@@ -89,7 +90,7 @@ export const SearchInput = forwardRef<RNTextInput, SearchInputProps>(
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <X size={18} color={theme.colors.text.tertiary} />
+            <Feather name="x" size={18} color={theme.colors.text.tertiary} />
           </TouchableOpacity>
         )}
       </View>

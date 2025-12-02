@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { FolderPlus, Check, X, Plus } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { useCollections } from '@/features/collections/hooks/useCollections';
 import {
   useAddToCollection,
@@ -72,9 +72,9 @@ export function AddToCollectionButton({
         </View>
         <View style={styles.checkContainer}>
           {inCollection ? (
-            <Check size={20} color={theme.colors.accent.primary} strokeWidth={3} />
+            <Feather name="check" size={20} color={theme.colors.accent.primary} />
           ) : (
-            <Plus size={20} color={theme.colors.text.secondary} strokeWidth={2} />
+            <Feather name="plus" size={20} color={theme.colors.text.secondary} />
           )}
         </View>
       </TouchableOpacity>
@@ -87,7 +87,7 @@ export function AddToCollectionButton({
         onPress={() => setModalVisible(true)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <FolderPlus size={size} color={color} />
+        <Feather name="folder-plus" size={size} color={color} />
       </TouchableOpacity>
 
       <Modal
@@ -104,7 +104,7 @@ export function AddToCollectionButton({
                 onPress={() => setModalVisible(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <X size={24} color={theme.colors.text.primary} />
+                <Feather name="x" size={24} color={theme.colors.text.primary} />
               </TouchableOpacity>
             </View>
 
@@ -114,7 +114,7 @@ export function AddToCollectionButton({
               </View>
             ) : collections.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <FolderPlus size={48} color={theme.colors.text.secondary} />
+                <Feather name="folder-plus" size={48} color={theme.colors.text.secondary} />
                 <Text style={styles.emptyText}>No collections yet</Text>
                 <Text style={styles.emptySubtext}>
                   Create a collection on the server to organize your books
