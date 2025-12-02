@@ -66,12 +66,12 @@ const ARTWORK_SIZE = DISPLAY_WIDTH - DISPLAY_PADDING * 2;
 // opacity: darkness at edge (0-1)
 // depth: how far shadow extends inward (0-1, where 0.1 = 10% of artwork size)
 const ART_SHADOW = {
-  top:    { opacity: .65, depth: 0.05},
-  bottom: { opacity: 0.5, depth: 1 },
-  left:   { opacity: 0, depth: 0.05 },
-  right:  { opacity: 0.5, depth: 0.05 },
-  sheen:  { opacity: 0, depth: .0 },  // top highlight
-  border: { opacity: .7, width: 1},      // frame edge
+  top:    { opacity: 0.6, depth: 0.12 },
+  bottom: { opacity: 0.5, depth: 0.10 },
+  left:   { opacity: 0.55, depth: 0.10 },
+  right:  { opacity: 0.55, depth: 0.10 },
+  sheen:  { opacity: 0.08, depth: 0.05 },  // top highlight
+  border: { opacity: 0.4, width: 1 },      // frame edge
 };
 
 const PANEL_CONFIG = {
@@ -128,6 +128,7 @@ export function PlayerScreen() {
     play,
     pause,
     seekTo,
+    chapters: storeChapters,
   } = usePlayerStore();
 
   // Library store for favorites
@@ -164,10 +165,10 @@ export function PlayerScreen() {
         let dominant = theme.colors.neutral[200];
 
         if (result.platform === 'ios') {
-          dominant = result.primary || result.primary || result.secondary || theme.colors.neutral[200];
+          dominant = result.detail || result.primary || result.secondary || theme.colors.neutral[200];
         } else if (result.platform === 'android') {
           const candidates = [
-            result.primary,
+            result.vibrant,
             result.darkVibrant, 
             result.lightVibrant,
             result.muted,
@@ -211,10 +212,12 @@ export function PlayerScreen() {
     };
   }, []);
 
-  // Sync seeking position
+  // Sync seeking position (but not while actively rewinding/ff)
   useEffect(() => {
-    seekingPos.current = position;
-  }, [position]);
+    if (!isRewinding && !isFastForwarding) {
+      seekingPos.current = position;
+    }
+  }, [position, isRewinding, isFastForwarding]);
 
   // ===========================================================================
   // HANDLERS
@@ -264,7 +267,8 @@ export function PlayerScreen() {
 
   // Derived values
   const title = getTitle(currentBook);
-  const chapters = currentBook.media?.chapters || [];
+  // Use store chapters (from session API) first, fallback to book chapters
+  const chapters = storeChapters.length > 0 ? storeChapters : (currentBook.media?.chapters || []);
   
   let bookDuration = currentBook.media?.duration || 0;
   if (bookDuration <= 0 && storeDuration > 0) bookDuration = storeDuration;
@@ -321,40 +325,44 @@ export function PlayerScreen() {
   };
 
   const handlePrevChapter = async () => {
-    const storeChapters = usePlayerStore.getState().chapters;
-    const chapterList = storeChapters.length > 0 ? storeChapters : chapters;
-    if (chapterList.length === 0) return;
+    if (chapters.length === 0) return;
     
     let currentIdx = 0;
-    for (let i = chapterList.length - 1; i >= 0; i--) {
-      if (position >= chapterList[i].start) {
+    for (let i = chapters.length - 1; i >= 0; i--) {
+      if (position >= chapters[i].start) {
         currentIdx = i;
         break;
       }
     }
     
-    const currentChapterStart = chapterList[currentIdx]?.start || 0;
+    const currentChapterStart = chapters[currentIdx]?.start || 0;
     const targetIdx = (position - currentChapterStart > 3) ? currentIdx : Math.max(0, currentIdx - 1);
-    await seekTo(chapterList[targetIdx].start);
+    await seekTo(chapters[targetIdx].start);
   };
 
   const handleNextChapter = async () => {
-    const storeChapters = usePlayerStore.getState().chapters;
-    const chapterList = storeChapters.length > 0 ? storeChapters : chapters;
-    if (chapterList.length === 0) return;
+    if (chapters.length === 0) return;
     
     let currentIdx = 0;
-    for (let i = chapterList.length - 1; i >= 0; i--) {
-      if (position >= chapterList[i].start) {
+    for (let i = chapters.length - 1; i >= 0; i--) {
+      if (position >= chapters[i].start) {
         currentIdx = i;
         break;
       }
     }
     
-    if (currentIdx < chapterList.length - 1) {
-      await seekTo(chapterList[currentIdx + 1].start);
+    if (currentIdx < chapters.length - 1) {
+      await seekTo(chapters[currentIdx + 1].start);
     }
   };
+
+  const handleRestart = async () => {
+    await seekTo(0);
+    play();
+  };
+
+  // Check if book is finished
+  const isBookFinished = progress >= 0.99;
 
   // Rewind handlers
   const startRewind = async () => {
@@ -435,12 +443,10 @@ export function PlayerScreen() {
     if (wasPlaying.current) await play();
   };
 
-  const handleLeftPressIn = () => { if (controlMode === 'rewind') startRewind(); };
-  const handleLeftPressOut = () => { if (controlMode === 'rewind') stopRewind(); };
-  const handleLeftPress = () => { if (controlMode === 'chapter') handlePrevChapter(); };
-  const handleRightPressIn = () => { if (controlMode === 'rewind') startFastForward(); };
-  const handleRightPressOut = () => { if (controlMode === 'rewind') stopFastForward(); };
-  const handleRightPress = () => { if (controlMode === 'chapter') handleNextChapter(); };
+  const handleLeftPressIn = () => { startRewind(); };
+  const handleLeftPressOut = () => { stopRewind(); };
+  const handleRightPressIn = () => { startFastForward(); };
+  const handleRightPressOut = () => { stopFastForward(); };
 
   const handleProgressScrub = async (percent: number) => {
     const newPosition = Math.max(0, Math.min(bookDuration, percent * bookDuration));
@@ -509,7 +515,7 @@ export function PlayerScreen() {
                               <Stop offset={ART_SHADOW.top.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.top.opacity * 0.4} />
                               <Stop offset={ART_SHADOW.top.depth} stopColor="black" stopOpacity="0" />
                             </LinearGradient>
-                            <LinearGradient id="artBottom" x1="0" y1="0" x2="0" y2="1">
+                            <LinearGradient id="artBottom" x1="0" y1="1" x2="0" y2="0">
                               <Stop offset="0" stopColor="black" stopOpacity={ART_SHADOW.bottom.opacity} />
                               <Stop offset={ART_SHADOW.bottom.depth / 2} stopColor="black" stopOpacity={ART_SHADOW.bottom.opacity * 0.4} />
                               <Stop offset={ART_SHADOW.bottom.depth} stopColor="black" stopOpacity="0" />
@@ -640,6 +646,8 @@ export function PlayerScreen() {
                   isRewinding={isRewinding}
                   isFastForwarding={isFastForwarding}
                   accentColor={cardColor}
+                  bookId={currentBook?.id}
+                  chapterIndex={chapterIndex}
                 />
               </View>
               </View>
@@ -679,24 +687,24 @@ export function PlayerScreen() {
           {/* Button Row */}
           <View style={styles.buttonRow}>
             <PlayerButton
-              variant="rewind"
-              onPress={handleLeftPress}
-              onPressIn={handleLeftPressIn}
-              onPressOut={handleLeftPressOut}
-              isActive={isRewinding}
-              seekDelta={isRewinding ? seekDelta : undefined}
+              variant={controlMode === 'chapter' ? 'skip-back' : 'rewind'}
+              onPress={controlMode === 'chapter' ? handlePrevChapter : () => {}}
+              onPressIn={controlMode === 'chapter' ? undefined : handleLeftPressIn}
+              onPressOut={controlMode === 'chapter' ? undefined : handleLeftPressOut}
+              isActive={controlMode !== 'chapter' && isRewinding}
+              seekDelta={controlMode !== 'chapter' && isRewinding ? seekDelta : undefined}
             />
             <PlayerButton
-              variant="fastforward"
-              onPress={handleRightPress}
-              onPressIn={handleRightPressIn}
-              onPressOut={handleRightPressOut}
-              isActive={isFastForwarding}
-              seekDelta={isFastForwarding ? seekDelta : undefined}
+              variant={controlMode === 'chapter' ? 'skip-forward' : 'fastforward'}
+              onPress={controlMode === 'chapter' ? handleNextChapter : () => {}}
+              onPressIn={controlMode === 'chapter' ? undefined : handleRightPressIn}
+              onPressOut={controlMode === 'chapter' ? undefined : handleRightPressOut}
+              isActive={controlMode !== 'chapter' && isFastForwarding}
+              seekDelta={controlMode !== 'chapter' && isFastForwarding ? seekDelta : undefined}
             />
             <PlayerButton
-              variant="play"
-              onPress={handlePlayPause}
+              variant={isBookFinished ? 'restart' : 'play'}
+              onPress={isBookFinished ? handleRestart : handlePlayPause}
               isPlaying={isPlaying}
               isLoading={isLoading}
               accentColor={cardColor}

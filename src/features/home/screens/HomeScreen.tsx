@@ -1,254 +1,300 @@
 /**
  * src/features/home/screens/HomeScreen.tsx
  * 
- * Home screen with:
- * - Auto-download of top 3 continue listening books
- * - Stacked continue listening cards
+ * Home screen layout:
+ * - Main card (most recent book)
+ * - Action buttons (View Series, Restart)
+ * - Library list (recently added books)
  */
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
+  StyleSheet,
+  StatusBar,
+  ActivityIndicator,
   Text,
   ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  StatusBar,
   Dimensions,
-  ActivityIndicator,
-  Image,
-  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
-import Svg, { Path } from 'react-native-svg';
-import { apiClient } from '@/core/api';
+import { LibraryItem } from '@/core/types';
 import { usePlayerStore } from '@/features/player';
-import { theme } from '@/shared/theme';
+import { HomeCard } from '../components/HomeCard';
+import { CardActions } from '../components/CardActions';
+import { LibraryListCard } from '../components/LibraryListCard';
 import { useContinueListening } from '../hooks/useContinueListening';
-import { ContinueListeningCard, CARD_HEIGHT, CARD_OVERLAP, CARD_MARGIN_BOTTOM } from '../components/ContinueListeningCard';
-import { Icon } from '@/shared/components/Icon';
-import { autoDownloadService } from '@/features/downloads';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HEADER_BG = '#303030';
-const GAP = 5;
-const CARD_WIDTH_RATIO = 0.5;
-const ACTION_CARD_WIDTH = (SCREEN_WIDTH - 10) * CARD_WIDTH_RATIO; // 2.5 margin each side + 5 gap
-const ACTION_CARD_HEIGHT = ACTION_CARD_WIDTH;
-const MAX_CARDS = 3;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const BG_COLOR = '#1a1a1a';
 
-function ArrowUpRight({ size = 32, color = '#000000' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 89 89" fill="none">
-      <Path
-        d="M25.9583 63.0416L63.0416 25.9583M63.0416 25.9583H25.9583M63.0416 25.9583V63.0416"
-        stroke={color}
-        strokeWidth={7.41667}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
+// ============================================================================
+// LAYOUT CONFIGURATION - Adjust these values to customize the home screen
+// ============================================================================
+const CONFIG = {
+  // === SCREEN LAYOUT ===
+  screen: {
+    backgroundColor: '#1a1a1a',
+    horizontalPadding: 15,           // Left/right padding for content
+    topPadding: 0,                  // Extra padding below safe area
+    bottomPadding: 0,              // Extra padding above tab bar
+  },
+  // === MAIN CARD ===
+  mainCard: {
+    width: SCREEN_WIDTH - 30,  // Card width (max 339 or screen - padding)
+    height: 550,                     // Total card height
+    borderRadius: 8,                 // Corner radius
+    marginTop: 0,                    // Space above card
+    marginBottom: 0,                 // Space below card (before actions)
+  },
+
+  // === MAIN CARD COVER ===
+  cover: {
+    height: 400,                     // Cover image height
+    margin: 5,                       // Margin around cover inside card
+    borderRadius: 8,                 // Cover corner radius
+  },
+
+  // === MAIN CARD CONTENT ===
+  cardContent: {
+    paddingHorizontal: 10,           // Left/right padding inside card
+    paddingVertical: 10,             // Top/bottom padding inside card
+    titleFontSize: 26,               // Book title font size
+    titleLineHeight: 30,             // Book title line height
+    titleMarginBottom: 4,            // Space below title
+    chapterFontSize: 14,             // Chapter text font size
+    iconSize: 24,                    // Download/heart icon size
+    iconGap: 8,                      // Gap between icons
+  },
+
+  // === CARD ACTIONS (View Series / Restart) ===
+  actions: {
+    paddingVertical: 12,             // Top/bottom padding
+    paddingHorizontal: 4,            // Left/right padding
+    marginBottom: 16,                // Space below actions (before library list)
+    fontSize: 14,                    // Action text font size
+    iconSize: 18,                    // Action icon size
+    iconGap: 8,                      // Gap between icon and text
+  },
+
+  // === LIBRARY LIST ===
+  libraryList: {
+    gap: 5,                          // Gap between library cards
+    marginTop: 50,                    // Space above library list
+
+  },
+
+  // === LIBRARY LIST CARD ===
+  libraryCard: {
+    height: 100,                      // Card height
+    borderRadius: 5,                 // Corner radius
+    paddingHorizontal: 8,            // Left/right padding inside card
+    paddingVertical: 8,              // Top/bottom padding inside card
+  },
+
+  // === LIBRARY CARD COVER ===
+  libraryCover: {
+    size: 64,                        // Cover thumbnail size (square)
+    borderRadius: 5,                 // Cover corner radius
+    marginRight: 20,                 // Space between cover and text
+  },
+
+  // === LIBRARY CARD CONTENT ===
+  libraryContent: {
+    titleFontSize: 16,               // Title font size
+    titleLineHeight: 20,             // Title line height
+    titleMarginBottom: 4,            // Space below title
+    timeFontSize: 13,                // Time text font size
+  },
+
+  // === LIBRARY CARD RIGHT COLUMN ===
+  libraryRightColumn: {
+    marginLeft: 8,                   // Space before play button
+    gap: 4,                          // Gap between play and heart
+    playButtonSize: 40,              // Play button diameter
+    playIconSize: 24,                // Play icon size
+    heartSize: 18,                   // Heart icon size
+    heartPadding: 4,                 // Heart button padding
+  },
+
+  // === COLORS ===
+  colors: {
+    accent: '#CCFF00',               // Primary accent color (heart, etc)
+    textPrimary: '#FFFFFF',          // Primary text color
+    textSecondary: 'rgba(255,255,255,0.6)',  // Secondary text color
+    textTertiary: 'rgba(255,255,255,0.5)',   // Tertiary text color
+    iconDefault: 'rgba(255,255,255,0.6)',    // Default icon color
+    playButtonBg: 'rgba(255,255,255,0.1)',   // Play button background
+  },
+
+  // === EMPTY STATE ===
+  emptyState: {
+    titleFontSize: 24,
+    subtitleFontSize: 16,
+    subtitlePaddingHorizontal: 40,
+  },
+
+  // === LOADING STATE ===
+  loading: {
+    indicatorSize: 'large' as const,
+    indicatorColor: '#CCFF00',
+  },
+};
+
+// Export config for use in child components
+export { CONFIG as HOME_CONFIG };
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const queryClient = useQueryClient();
-  const { items: continueListeningItems, isLoading: isLoadingContinue, refetch } = useContinueListening();
-  const { 
-    currentBook, 
-    isPlaying, 
-    loadBook, 
-    play, 
-    pause,
-  } = usePlayerStore();
+  const { loadBook } = usePlayerStore();
+  const { items: continueListeningItems, isLoading } = useContinueListening();
 
-  // Track last synced items to avoid redundant syncs
-  const lastSyncedRef = useRef<string>('');
-  
-  // Track locally hidden items for immediate UI feedback
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-
-  // Handle removing a book from continue listening
-  const handleRemoveFromContinue = useCallback((bookId: string) => {
-    // Immediately hide locally
-    setHiddenIds(prev => new Set(prev).add(bookId));
-    
-    // Clear sync ref to force re-sync when new data arrives
-    lastSyncedRef.current = '';
-    
-    // Refetch from server
-    refetch();
-  }, [refetch]);
-  
-  // Filter out hidden items
-  const visibleItems = continueListeningItems.filter(item => !hiddenIds.has(item.id));
-
-  // Auto-download disabled - manual download buttons used instead
-  // useEffect(() => {
-  //   if (!visibleItems.length) return;
-  //   const itemsKey = visibleItems.slice(0, MAX_CARDS).map(i => i.id).join(',');
-  //   if (itemsKey === lastSyncedRef.current) return;
-  //   lastSyncedRef.current = itemsKey;
-  //   console.log('[HomeScreen] Syncing auto-downloads:', itemsKey);
-  //   autoDownloadService.syncWithContinueListening(visibleItems).catch(e => {
-  //     console.warn('[HomeScreen] Auto-download sync failed:', e);
-  //   });
-  // }, [visibleItems]);
-
-  const visibleCards = visibleItems.slice(0, MAX_CARDS);
-
-  const fullStackHeight = visibleCards.length > 0 
-    ? CARD_HEIGHT + (visibleCards.length - 1) * (CARD_HEIGHT + CARD_OVERLAP)
-    : 0;
-
-  const reversedCards = [...visibleCards].reverse();
-  const lastBook = visibleItems[0];
-
-  const playCardBook = currentBook || lastBook;
-  const playCardCoverUrl = playCardBook ? apiClient.getItemCoverUrl(playCardBook.id) : null;
-  const hasCurrentBook = !!currentBook;
-
-  const handlePlayPress = async () => {
-    if (currentBook) {
-      if (isPlaying) {
-        await pause();
-      } else {
-        await play();
-      }
-    } else if (lastBook) {
-      try {
-        const fullBook = await apiClient.getItem(lastBook.id);
-        await loadBook(fullBook);
-      } catch (err) {
-        console.error('Failed to load book:', err);
-        try {
-          await loadBook(lastBook);
-        } catch (e) {
-          console.error('Fallback failed:', e);
-        }
-      }
-    }
-  };
-
-  const handlePlayLongPress = () => {
-    if (currentBook) {
-      usePlayerStore.setState({ isPlayerVisible: true });
-    }
-  };
-
-  // Open player without autoplay when tapping a card
-  const handleCardPress = useCallback(async (book: any) => {
+  const handleBookSelect = useCallback(async (book: LibraryItem) => {
     try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: false });
-    } catch (err) {
-      console.error('Failed to open player:', err);
-      // Fallback to partial book data
-      try {
-        await loadBook(book, { autoPlay: false });
-      } catch (e) {
-        console.error('Fallback failed:', e);
-      }
+      await loadBook(book, { autoPlay: false });
+    } catch (e) {
+      console.warn('Failed to load book:', e);
     }
   }, [loadBook]);
 
-  const handleJustForYou = () => {
-    // Navigate to the Discover tab (Browse screen with recommendations)
-    navigation.navigate('DiscoverTab');
-  };
+  const handlePlayBook = useCallback(async (book: LibraryItem) => {
+    try {
+      await loadBook(book, { autoPlay: true });
+    } catch (e) {
+      console.warn('Failed to play book:', e);
+    }
+  }, [loadBook]);
+
+  const handleViewSeries = useCallback((book: LibraryItem) => {
+    const series = book.media?.metadata?.series?.[0];
+    const seriesId = typeof series === 'object' ? series?.id : undefined;
+    const seriesName = typeof series === 'string' ? series : series?.name;
+    
+    if (seriesId) {
+      navigation.navigate('SeriesDetail', { id: seriesId, name: seriesName });
+    }
+  }, [navigation]);
+
+  const handleRestart = useCallback(async (book: LibraryItem) => {
+    try {
+      await loadBook(book, { startPosition: 0, autoPlay: true });
+    } catch (e) {
+      console.warn('Failed to restart book:', e);
+    }
+  }, [loadBook]);
+
+  const handleDownload = useCallback((book: LibraryItem) => {
+    console.log('Download:', book.id);
+  }, []);
+
+  const handleHeart = useCallback((book: LibraryItem) => {
+    console.log('Heart:', book.id);
+  }, []);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <StatusBar barStyle="light-content" backgroundColor={CONFIG.screen.backgroundColor} />
+        <ActivityIndicator 
+          size={CONFIG.loading.indicatorSize} 
+          color={CONFIG.loading.indicatorColor} 
+        />
+      </View>
+    );
+  }
+
+  // Empty state
+  if (continueListeningItems.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <StatusBar barStyle="light-content" backgroundColor={CONFIG.screen.backgroundColor} />
+        <Text style={styles.emptyTitle}>No Books Yet</Text>
+        <Text style={styles.emptySubtitle}>
+          Start listening to see your books here
+        </Text>
+      </View>
+    );
+  }
+
+  // First book is the main card
+  const mainBook = continueListeningItems[0];
+  // Rest are library list
+  const libraryBooks = continueListeningItems.slice(1);
+  
+  // Check if main book has series
+  const mainSeries = mainBook.media?.metadata?.series?.[0];
+  const hasMainSeries = typeof mainSeries === 'object' ? !!mainSeries?.id : false;
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={HEADER_BG} />
+      <StatusBar barStyle="light-content" backgroundColor={CONFIG.screen.backgroundColor} />
       
-      <ScrollView
-        style={styles.scrollView}
+      <ScrollView 
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 10, paddingBottom: 100 + insets.bottom }
+          { 
+            paddingTop: insets.top + CONFIG.screen.topPadding, 
+            paddingBottom: insets.bottom + CONFIG.screen.bottomPadding,
+            paddingHorizontal: CONFIG.screen.horizontalPadding,
+          }
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Continue Listening Card Stack */}
-        {isLoadingContinue ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={theme.colors.primary[500]} />
-          </View>
-        ) : visibleCards.length > 0 ? (
-          <View style={[styles.cardStack, { height: fullStackHeight, marginBottom: CARD_MARGIN_BOTTOM }]}>
-            {reversedCards.map((book, reverseIndex) => {
-              const zIndex = MAX_CARDS - reverseIndex;
-              return (
-                <ContinueListeningCard
-                  key={book.id}
+        {/* Main Card Container */}
+        <View style={[
+          styles.mainCardContainer, 
+          { 
+            marginTop: CONFIG.mainCard.marginTop,
+            marginBottom: CONFIG.mainCard.marginBottom,
+          }
+        ]}>
+          <HomeCard
+            book={mainBook}
+            onPress={() => handleBookSelect(mainBook)}
+            onDownload={() => handleDownload(mainBook)}
+            onHeart={() => handleHeart(mainBook)}
+            config={CONFIG}
+          />
+        </View>
+        
+        {/* Actions Container */}
+        <View style={[
+          styles.actionsContainer, 
+          { marginBottom: CONFIG.actions.marginBottom }
+        ]}>
+          <CardActions
+            showViewSeries={hasMainSeries}
+            onViewSeries={() => handleViewSeries(mainBook)}
+            onRestart={() => handleRestart(mainBook)}
+            config={CONFIG}
+          />
+        </View>
+
+        {/* Library List Container */}
+        {libraryBooks.length > 0 && (
+          <View style={[
+            styles.libraryContainer, 
+            { 
+              gap: CONFIG.libraryList.gap,
+              marginTop: CONFIG.libraryList.marginTop,
+            }
+          ]}>
+            {libraryBooks.map((book) => (
+              <View key={book.id} style={styles.libraryItemWrapper}>
+                <LibraryListCard
                   book={book}
-                  zIndex={zIndex}
-                  onRemove={handleRemoveFromContinue}
-                  onPress={() => handleCardPress(book)}
-                  style={{
-                    position: 'absolute',
-                    top: reverseIndex * (CARD_HEIGHT + CARD_OVERLAP),
-                    left: 0,
-                    right: 0,
-                  }}
+                  onPress={() => handleBookSelect(book)}
+                  onPlay={() => handlePlayBook(book)}
+                  onHeart={() => handleHeart(book)}
+                  config={CONFIG}
                 />
-              );
-            })}
-          </View>
-        ) : (
-          <View style={styles.emptyStack}>
-            <Text style={styles.emptyEmoji}>🎧</Text>
-            <Text style={styles.emptyTitle}>Start listening</Text>
-            <Text style={styles.emptySubtitle}>Your audiobooks will appear here</Text>
+              </View>
+            ))}
           </View>
         )}
-
-        {/* Action Cards */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={[styles.justForYouCard, { width: ACTION_CARD_WIDTH, height: ACTION_CARD_HEIGHT }]} 
-            onPress={handleJustForYou}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.justForYouTitle}>Just for{'\n'}You</Text>
-            <View style={styles.justForYouBottom}>
-              <Text style={styles.justForYouSubtitle}>your{'\n'}recommendations</Text>
-              <ArrowUpRight size={32} color="#000000" />
-            </View>
-          </TouchableOpacity>
-
-          <Pressable 
-            style={[
-              styles.playCard, 
-              { width: ACTION_CARD_WIDTH, height: ACTION_CARD_HEIGHT },
-              !playCardBook && styles.playCardDisabled
-            ]} 
-            onPress={handlePlayPress}
-            onLongPress={handlePlayLongPress}
-            delayLongPress={300}
-            disabled={!playCardBook}
-          >
-            {playCardCoverUrl ? (
-              <Image 
-                source={{ uri: playCardCoverUrl }} 
-                style={styles.playCardCover}
-                resizeMode="cover"
-              />
-            ) : null}
-            <View style={styles.playCardOverlay}>
-              <Icon 
-                name={hasCurrentBook && isPlaying ? 'pause' : 'play'} 
-                size={48} 
-                color="#FFFFFF" 
-                set="ionicons"
-              />
-            </View>
-          </Pressable>
-        </View>
       </ScrollView>
     </View>
   );
@@ -257,88 +303,41 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: HEADER_BG,
+    backgroundColor: CONFIG.screen.backgroundColor,
   },
-  scrollView: {
-    flex: 1,
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 0,
-  },
-  loadingContainer: {
-    height: 200,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 2.5,
   },
-  cardStack: {
-    position: 'relative',
-  },
-  emptyStack: {
-    height: 200,
-    justifyContent: 'center',
+  mainCardContainer: {
     alignItems: 'center',
-    marginBottom: CARD_MARGIN_BOTTOM,
-    marginHorizontal: 2.5,
+    width: '100%',
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
+  actionsContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  libraryContainer: {
+    width: '100%',
+  },
+  libraryItemWrapper: {
+    width: '100%',
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: CONFIG.emptyState.titleFontSize,
+    fontWeight: '700',
+    color: CONFIG.colors.textPrimary,
+    marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#AAAAAA',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: GAP,
-    marginHorizontal: 2.5,
-  },
-  justForYouCard: {
-    backgroundColor: '#CCFF00',
-    borderRadius: 5,
-    padding: 16,
-    justifyContent: 'space-between',
-  },
-  justForYouTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#000000',
-    lineHeight: 32,
-  },
-  justForYouBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  justForYouSubtitle: {
-    fontSize: 12,
-    color: '#000000',
-    opacity: 0.7,
-    lineHeight: 16,
-  },
-  playCard: {
-    borderRadius: 5,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  playCardDisabled: {
-    opacity: 0.5,
-  },
-  playCardCover: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  playCardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: CONFIG.emptyState.subtitleFontSize,
+    color: CONFIG.colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: CONFIG.emptyState.subtitlePaddingHorizontal,
   },
 });
+
+export default HomeScreen;

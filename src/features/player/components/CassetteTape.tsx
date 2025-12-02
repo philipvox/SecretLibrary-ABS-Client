@@ -3,9 +3,11 @@
  *
  * Cassette tape visualization with spinning reels.
  * Reels animate to position and clip outside the window.
+ * Slides in from top when loading, out to bottom when unloading.
+ * Animation triggers on book change or chapter change.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle, Line, Defs, Rect, LinearGradient, Stop } from 'react-native-svg';
 import Animated, {
@@ -14,8 +16,10 @@ import Animated, {
   useAnimatedProps,
   withRepeat,
   withTiming,
+  withSequence,
   Easing,
   cancelAnimation,
+  runOnJS,
 } from 'react-native-reanimated';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -25,18 +29,15 @@ const REEL_MAX_RADIUS = 120;
 const REEL_MIN_RADIUS = 15;
 const HUB_RADIUS = 10;
 const DEFAULT_COLOR = '#F55F05';
+const SLIDE_DURATION = 250;
 
 // Inset shadow config
-// opacity: darkness at edge (0-1)
-// depth: how far shadow extends inward (0-1, where 0.3 = 30% of container)
 const SHADOW = {
-  top:    { opacity: .65, depth: 0.25},
-  bottom: { opacity: .2, depth: 0.1},
-  cover: { opacity: 0.5, depth: 1 },
-  left:   { opacity: 0, depth: 0.05 },
-  right:  { opacity: 0.5, depth: 0.05 },
+  top:    { opacity: 0.5, depth: 0.30 },
+  bottom: { opacity: 0.3, depth: 0.30 },
+  left:   { opacity: 0.4, depth: 0.25 },
+  right:  { opacity: 0.4, depth: 0.25 },
 };
-
 
 interface CassetteTapeProps {
   progress: number; // 0-1
@@ -44,6 +45,8 @@ interface CassetteTapeProps {
   isRewinding?: boolean;
   isFastForwarding?: boolean;
   accentColor?: string;
+  bookId?: string; // Used to detect book changes
+  chapterIndex?: number; // Used to detect chapter changes
 }
 
 export function CassetteTape({
@@ -52,12 +55,95 @@ export function CassetteTape({
   isRewinding = false,
   isFastForwarding = false,
   accentColor = DEFAULT_COLOR,
+  bookId,
+  chapterIndex = 0,
 }: CassetteTapeProps) {
   const rotation = useSharedValue(0);
   const leftRadius = useSharedValue(REEL_MAX_RADIUS);
   const rightRadius = useSharedValue(REEL_MIN_RADIUS);
   const isSpinningToPosition = useSharedValue(false);
   const hasInitialized = useSharedValue(false);
+  
+  // Slide animation for load/unload effect
+  const slideY = useSharedValue(0);
+  const prevBookId = useRef<string | undefined>(undefined);
+  const prevChapterIndex = useRef<number>(0);
+  const isFirstRender = useRef(true);
+  const isSeeking = useRef(false);
+
+  // Track seeking state
+  useEffect(() => {
+    isSeeking.current = isRewinding || isFastForwarding;
+  }, [isRewinding, isFastForwarding]);
+
+  // Trigger slide animation
+  const triggerSlideAnimation = (resetReels: boolean = false) => {
+    slideY.value = withSequence(
+      // Slide out (current cassette goes down and out)
+      withTiming(TAPE_HEIGHT + 20, { 
+        duration: SLIDE_DURATION, 
+        easing: Easing.in(Easing.cubic) 
+      }),
+      // Jump to top (new cassette starts above)
+      withTiming(-TAPE_HEIGHT - 20, { duration: 0 }),
+      // Slide in (new cassette comes down from top)
+      withTiming(0, { 
+        duration: SLIDE_DURATION, 
+        easing: Easing.out(Easing.cubic) 
+      })
+    );
+    
+    if (resetReels) {
+      hasInitialized.value = false;
+    }
+  };
+
+  // Detect book or chapter changes
+  useEffect(() => {
+    // Skip first render
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      prevBookId.current = bookId;
+      prevChapterIndex.current = chapterIndex;
+      
+      // Initial load - slide in from top
+      if (bookId) {
+        slideY.value = -TAPE_HEIGHT - 20;
+        slideY.value = withTiming(0, { 
+          duration: SLIDE_DURATION, 
+          easing: Easing.out(Easing.cubic) 
+        });
+      }
+      return;
+    }
+
+    // Book changed
+    if (bookId && prevBookId.current && bookId !== prevBookId.current) {
+      triggerSlideAnimation(true);
+      prevBookId.current = bookId;
+      prevChapterIndex.current = chapterIndex;
+      return;
+    }
+    
+    // First book load
+    if (bookId && !prevBookId.current) {
+      slideY.value = -TAPE_HEIGHT - 20;
+      slideY.value = withTiming(0, { 
+        duration: SLIDE_DURATION, 
+        easing: Easing.out(Easing.cubic) 
+      });
+      prevBookId.current = bookId;
+      prevChapterIndex.current = chapterIndex;
+      return;
+    }
+
+    // Chapter changed (same book) - but NOT while seeking/rewinding
+    if (chapterIndex !== prevChapterIndex.current && !isSeeking.current) {
+      triggerSlideAnimation(false);
+    }
+    prevChapterIndex.current = chapterIndex;
+    prevBookId.current = bookId;
+  }, [bookId, chapterIndex]);
   
   // Animate reel sizes to match progress with rotation
   useEffect(() => {
@@ -139,12 +225,16 @@ export function CassetteTape({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: slideY.value }],
+  }));
+
   return (
-    <View style={styles.container}>
-      {/* Background */}
+    <View style={styles.outerContainer}>
+      {/* Background stays fixed */}
       <View style={styles.tapeBg} />
       
-      {/* Inset shadow overlay */}
+      {/* Inset shadow overlay - stays fixed */}
       <View style={styles.insetShadow} pointerEvents="none">
         <Svg width="100%" height="100%" preserveAspectRatio="none">
           <Defs>
@@ -157,11 +247,6 @@ export function CassetteTape({
               <Stop offset="0" stopColor="black" stopOpacity={SHADOW.bottom.opacity} />
               <Stop offset={SHADOW.bottom.depth / 2} stopColor="black" stopOpacity={SHADOW.bottom.opacity * 0.4} />
               <Stop offset={SHADOW.bottom.depth} stopColor="black" stopOpacity="0" />
-            </LinearGradient>
-             <LinearGradient id="coverShadow" x1="0" y1="0" x2="0" y2="0">
-              <Stop offset="0" stopColor="black" stopOpacity={SHADOW.bottom.opacity} />
-              <Stop offset={SHADOW.cover.depth / 2} stopColor="black" stopOpacity={SHADOW.bottom.opacity * 0.4} />
-              <Stop offset={SHADOW.cover.depth} stopColor="black" stopOpacity="0" />
             </LinearGradient>
             <LinearGradient id="leftShadow" x1="0" y1="0" x2="1" y2="0">
               <Stop offset="0" stopColor="black" stopOpacity={SHADOW.left.opacity} />
@@ -181,19 +266,22 @@ export function CassetteTape({
         </Svg>
       </View>
       
-      {/* Left Reel */}
-      <View style={styles.leftReelContainer}>
-        <Animated.View style={leftReelStyle}>
-          <AnimatedReel radius={leftRadius} linePosition="bottom" color={accentColor} />
-        </Animated.View>
-      </View>
-      
-      {/* Right Reel */}
-      <View style={styles.rightReelContainer}>
-        <Animated.View style={rightReelStyle}>
-          <AnimatedReel radius={rightRadius} linePosition="top" color={accentColor} />
-        </Animated.View>
-      </View>
+      {/* Reels container - this slides */}
+      <Animated.View style={[styles.reelsContainer, containerStyle]}>
+        {/* Left Reel */}
+        <View style={styles.leftReelContainer}>
+          <Animated.View style={leftReelStyle}>
+            <AnimatedReel radius={leftRadius} linePosition="bottom" color={accentColor} />
+          </Animated.View>
+        </View>
+        
+        {/* Right Reel */}
+        <View style={styles.rightReelContainer}>
+          <Animated.View style={rightReelStyle}>
+            <AnimatedReel radius={rightRadius} linePosition="top" color={accentColor} />
+          </Animated.View>
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -265,7 +353,7 @@ function AnimatedReel({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
     width: '100%',
     height: TAPE_HEIGHT,
     borderRadius: 8,
@@ -281,6 +369,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 10,
     borderRadius: 8,
+  },
+  reelsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
   },
   leftReelContainer: {
     position: 'absolute',
