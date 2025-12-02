@@ -56,5 +56,18 @@ target 'AudiobookShelf' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # Disable worklets support in react-native-audio-api to avoid header search path issues
+    # This project doesn't use WorkletNode, WorkletSourceNode, or WorkletProcessingNode
+    installer.pods_project.targets.each do |target|
+      if target.name == 'RNAudioAPI'
+        target.build_configurations.each do |config|
+          preprocessor_defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+          unless preprocessor_defs.include?('RN_AUDIO_API_ENABLE_WORKLETS=0')
+            preprocessor_defs << 'RN_AUDIO_API_ENABLE_WORKLETS=0'
+          end
+        end
+      end
+    end
   end
 end
