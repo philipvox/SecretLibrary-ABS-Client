@@ -1,41 +1,79 @@
 # AudiobookShelf Mobile App
 
-A native mobile wrapper for AudiobookShelf with enhanced features including fuzzy search, intelligent recommendations, and improved UI for series, authors, and narrators.
+A React Native mobile client for AudiobookShelf with enhanced features including offline playback, smart search, and improved UI for series, authors, and narrators.
+
+## Table of Contents
+
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [Documentation](#documentation)
+- [Development](#development)
+- [Building](#building)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
 ### Core Functionality
-- 📚 Browse your AudiobookShelf library
-- 🎧 Audio playback with background support
-- 📥 Download books for offline listening
-- 🔄 Sync progress across devices
-- 🔐 Secure authentication
+- Browse your AudiobookShelf library with grid/list views
+- Audio playback with background support and lock screen controls
+- Download books for offline listening
+- Sync playback progress across devices
+- Secure authentication with token management
 
-### Enhanced Features
-- 🔍 **Smart Search**: Fuzzy search across titles, authors, narrators, genres, and descriptions
-- 🎯 **Recommendations**: Personalized suggestions based on your listening history
-- 📖 **Enhanced Pages**: Beautiful series, author, and narrator pages with rich information
-- 📋 **Smart Playlists**: Create and manage custom playlists and collections
-- ⚡ **Fast & Smooth**: Native performance with offline support
+### Library Management
+- Series browsing with sequence ordering
+- Author pages with biography and book listings
+- Narrator pages extracted from metadata
+- Collections and playlists support
+- Filter and sort by multiple criteria
+
+### Player Features
+- Chapter navigation with visual timeline
+- Sleep timer with multiple presets
+- Playback speed control (0.5x - 3x)
+- Skip forward/backward with customizable intervals
+- Mini player with quick controls
+- Full-screen player with cover art
+
+### Offline Support
+- Download entire audiobooks for offline listening
+- Automatic progress sync when back online
+- Download queue management
+- Storage usage tracking
+
+### Search
+- Fuzzy search across titles, authors, narrators, and descriptions
+- Search within series and collections
+- Recent search history
 
 ## Tech Stack
 
-- **Framework**: React Native + Expo
-- **Language**: TypeScript
-- **State**: Zustand + TanStack Query
-- **Navigation**: React Navigation
-- **Storage**: Expo SQLite
-- **Search**: Fuse.js
-- **Audio**: Expo AV
+| Category | Technology |
+|----------|------------|
+| Framework | React Native + Expo SDK 54 |
+| Language | TypeScript (strict mode) |
+| Navigation | React Navigation v7 |
+| Server State | TanStack Query v5 |
+| Client State | Zustand v5 |
+| Local Storage | Expo SQLite + AsyncStorage |
+| Audio | expo-av / react-native-track-player |
+| Networking | Axios |
+| Search | Fuse.js |
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
+
+- Node.js 18 or later
 - npm or yarn
-- Expo Go app on your mobile device (for development)
+- Expo Go app (for development) or development build
+- An AudiobookShelf server instance
 
 ### Installation
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/audiobookshelf-app.git
@@ -48,91 +86,190 @@ npm install
 npm start
 ```
 
-### Configuration
+### Running the App
 
-1. Open the Expo Go app on your device
-2. Scan the QR code from the terminal
-3. On first launch, enter your AudiobookShelf server URL and credentials
+```bash
+# Start Expo development server
+npm start
 
-## Development
+# Run on iOS simulator
+npm run ios
 
-### Project Structure
+# Run on Android emulator
+npm run android
 
-See [Architecture Documentation](docs/architecture.md) for detailed information.
+# Clear cache and restart
+npm run clean
+```
+
+### First Launch
+
+1. Open the app on your device or simulator
+2. Enter your AudiobookShelf server URL (e.g., https://abs.example.com)
+3. Enter your username and password
+4. Select your default library
+
+## Project Structure
+
 ```
 src/
-├── core/          # Foundation (API, auth, storage)
-├── features/      # Feature modules (library, search, player, etc.)
-├── shared/        # Shared components and utilities
-└── navigation/    # App navigation
-```
-
-### Development Guidelines
-
-- Keep files under 400 lines
-- Features should be self-contained
-- Use TypeScript for everything
-- Follow the patterns in `docs/claude-instructions.md`
-
-### Available Scripts
-```bash
-npm start          # Start Expo development server
-npm run tsc        # Type check
-npm run lint       # Lint code
-npm run format     # Format code with Prettier
+├── config/                 # App configuration
+│   ├── constants.ts        # API URLs, timeouts, limits
+│   └── features.ts         # Feature flags
+│
+├── core/                   # Foundation layer
+│   ├── api/                # HTTP client and endpoints
+│   │   ├── baseClient.ts   # Axios configuration
+│   │   ├── apiClient.ts    # API methods
+│   │   ├── endpoints.ts    # URL definitions
+│   │   ├── errors.ts       # Custom error classes
+│   │   ├── middleware.ts   # Request/response hooks
+│   │   └── endpoints/      # Domain-specific APIs
+│   ├── auth/               # Authentication
+│   ├── services/           # Core services
+│   │   ├── sqliteCache.ts  # SQLite database
+│   │   ├── syncQueue.ts    # Offline sync queue
+│   │   └── downloadManager.ts
+│   ├── hooks/              # Core hooks
+│   │   ├── useDownloads.ts
+│   │   └── useSyncStatus.ts
+│   ├── types/              # TypeScript definitions
+│   └── queryClient.ts      # React Query configuration
+│
+├── features/               # Feature modules
+│   ├── author/             # Author pages
+│   ├── book-detail/        # Book detail screen
+│   ├── browse/             # Browse tab
+│   ├── collections/        # Collections feature
+│   ├── downloads/          # Download management
+│   ├── library/            # Library browsing
+│   ├── narrator/           # Narrator pages
+│   ├── player/             # Audio player
+│   ├── profile/            # User profile
+│   ├── recommendations/    # Book recommendations
+│   ├── search/             # Search feature
+│   ├── series/             # Series pages
+│   └── user/               # User features (favorites, etc.)
+│
+├── navigation/             # App navigation
+│   ├── AppNavigator.tsx    # Root navigator
+│   ├── types.ts            # Navigation types
+│   └── components/         # Nav components
+│
+└── shared/                 # Shared utilities
+    ├── components/         # Reusable UI components
+    │   ├── buttons/        # Button, IconButton
+    │   ├── cards/          # Card, GlassCard
+    │   ├── inputs/         # TextInput, SearchInput
+    │   └── feedback/       # Loading, Error, Empty states
+    ├── hooks/              # Shared hooks
+    ├── theme/              # Design tokens
+    └── utils/              # Utility functions
 ```
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) - Project structure and design
-- [Current Work](docs/current-work.md) - Development status and next steps
-- [API Reference](docs/api-reference.md) - AudiobookShelf API documentation
-- [Decisions](docs/decisions.md) - Architectural decision records
-- [Claude Instructions](docs/claude-instructions.md) - Guidelines for AI-assisted development
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/GETTING_STARTED.md) | Setup and development guide |
+| [Architecture](docs/architecture.md) | Project structure and design patterns |
+| [API Reference](docs/api.md) | AudiobookShelf API documentation |
+| [Components](docs/COMPONENTS.md) | Shared component library |
+| [State Management](docs/STATE_MANAGEMENT.md) | State management patterns |
+| [Progress](docs/progress.md) | Development progress tracking |
+
+## Development
+
+### Available Scripts
+
+```bash
+npm start              # Start Expo dev server
+npm run ios            # Run on iOS
+npm run android        # Run on Android
+npm run clean          # Clear cache and restart
+npm run lint           # Run ESLint
+npm run typecheck      # Run TypeScript compiler
+npm run bundle:analyze # Analyze bundle size
+```
+
+### Code Quality
+
+```bash
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+
+# Format code (if configured)
+npm run format
+```
+
+### Development Guidelines
+
+- Maximum 400 lines per file
+- Features should be self-contained modules
+- Use TypeScript strict mode
+- Export via index.ts barrel files
+- Follow the component hierarchy (Screen > Feature > UI)
+
+## Building
+
+### Development Build
+
+```bash
+# Build for all platforms
+npm run build:dev
+
+# Build preview (internal testing)
+npm run build:preview
+```
+
+### Production Build
+
+```bash
+# iOS production build
+npm run build:ios
+
+# Android production build
+npm run build:android
+
+# Both platforms
+npm run build:all
+```
+
+### EAS Build Configuration
+
+The project uses Expo Application Services (EAS) for builds. Configuration is in `eas.json`:
+
+- `development`: Development client with debugging
+- `preview`: Internal testing builds
+- `production`: App store builds
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the coding guidelines
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
-## Roadmap
+### Coding Standards
 
-### Phase 1: Foundation (Current)
-- [x] Project setup
-- [ ] Core API client
-- [ ] Authentication
-- [ ] Basic navigation
-
-### Phase 2: Core Features
-- [ ] Library browsing
-- [ ] Book details
-- [ ] Audio player
-- [ ] Progress syncing
-
-### Phase 3: Enhanced Features
-- [ ] Fuzzy search
-- [ ] Recommendations
-- [ ] Enhanced pages (series, author, narrator)
-- [ ] Playlists and collections
-
-### Phase 4: Polish
-- [ ] Performance optimization
-- [ ] Offline mode
-- [ ] Settings and customization
-- [ ] App store submission
+- Use TypeScript for all new code
+- Follow existing patterns in the codebase
+- Write self-documenting code with clear naming
+- Keep components focused and single-purpose
+- Test on both iOS and Android
 
 ## License
 
-MIT
+MIT License - see LICENSE file for details.
 
 ## Acknowledgments
 
-- AudiobookShelf for the excellent server platform
-- Expo team for the amazing development experience
-- React Native community
-
-## Support
-
-For issues and questions:
-- Create an issue in this repository
-- Check AudiobookShelf documentation
-- Join the AudiobookShelf Discord
+- [AudiobookShelf](https://www.audiobookshelf.org/) - The server platform
+- [Expo](https://expo.dev/) - React Native development framework
+- [React Navigation](https://reactnavigation.org/) - Navigation library
+- [TanStack Query](https://tanstack.com/query) - Data fetching library

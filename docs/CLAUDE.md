@@ -1,146 +1,231 @@
-# AudiobookShelf Mobile App
+# Development Guide
 
-React Native/Expo app for AudiobookShelf server.
+Quick reference for AI-assisted development on the AudiobookShelf mobile app.
 
-## Current Status (Stage 8 Complete)
+## Project Overview
 
-**Complete:**
-- ✅ Auth (login, token storage, context)
-- ✅ Library browsing with grid view
-- ✅ Book detail with chapters
-- ✅ Audio player (play/pause, seek, progress sync)
-- ✅ Mini player with full-screen modal
-- ✅ Search with fuzzy matching
-- ✅ Series list/detail screens
-- ✅ Authors list/detail screens
-- ✅ Narrators list/detail screens (extracted from metadata)
-- ✅ Collections list/detail screens
-- ✅ Browse tab (top tabs: Series | Authors | Narrators | Collections)
-- ✅ Profile tab (user info, server URL, logout)
-- ✅ 4 bottom tabs: Library, Search, Browse, Profile
-- ✅ Offline downloads (expo-file-system)
-- ✅ Download button on BookDetail header & Player menu
-- ✅ Downloads screen (Profile > Storage > Downloads)
-- ✅ Offline playback detection
-- ✅ Streaming/Downloaded indicator in player
-
-**Next (Stage 9):**
-- 🎯 Polish and animations
-- 🎯 Error boundaries
-- 🎯 Skeleton loaders
-- 🎯 Pull to refresh everywhere
+React Native/Expo app for AudiobookShelf server with offline-first architecture.
 
 ## Tech Stack
 
-- React Native + Expo SDK 54
-- TypeScript
-- React Navigation (bottom tabs + stack + top tabs)
-- TanStack Query (data fetching/caching)
-- Zustand (player state, download state)
-- expo-av (audio playback)
-- expo-file-system/legacy (offline downloads)
+| Category | Technology |
+|----------|------------|
+| Framework | React Native + Expo SDK 54 |
+| Language | TypeScript (strict) |
+| Navigation | React Navigation v7 |
+| Server State | TanStack Query v5 |
+| Client State | Zustand v5 |
+| Local Storage | Expo SQLite + AsyncStorage |
+| Audio | expo-av / react-native-track-player |
+| HTTP Client | Axios |
 
 ## Project Structure
+
 ```
 src/
-├── core/           # Foundation (api, auth, types, storage)
-├── features/       # Feature modules (each self-contained)
-│   ├── auth/
-│   ├── authors/
+├── config/           # Constants, feature flags
+├── core/             # Foundation (api, auth, types, services)
+│   ├── api/          # HTTP client, endpoints, errors
+│   ├── auth/         # Authentication context/service
+│   ├── services/     # SQLite, sync queue, downloads
+│   ├── hooks/        # Core React hooks
+│   └── types/        # TypeScript definitions
+├── features/         # Feature modules (self-contained)
+│   ├── author/
 │   ├── book-detail/
 │   ├── browse/
 │   ├── collections/
-│   ├── downloads/    # NEW: Offline download management
+│   ├── downloads/
 │   ├── library/
-│   ├── narrators/
+│   ├── narrator/
 │   ├── player/
 │   ├── profile/
+│   ├── recommendations/
 │   ├── search/
-│   └── series/
-├── navigation/     # AppNavigator, routes
-└── shared/         # Reusable components, theme, utils
+│   ├── series/
+│   └── user/
+├── navigation/       # AppNavigator, routes, types
+└── shared/           # Reusable components, theme, utils
+    ├── components/   # UI components (buttons, cards, inputs, feedback)
+    ├── hooks/        # Shared hooks
+    ├── theme/        # Design tokens
+    └── utils/        # Utility functions
 ```
 
-## Navigation Structure
+## Feature Module Pattern
 
-```
-Stack Navigator (root)
-├── Login (unauthenticated)
-└── Main (authenticated)
-    ├── Bottom Tab Navigator (4 tabs)
-    │   ├── LibraryTab → LibraryItemsScreen
-    │   ├── SearchTab → SearchScreen
-    │   ├── BrowseTab → BrowseScreen
-    │   │   └── Top Tab Navigator
-    │   │       ├── Series → SeriesListContent
-    │   │       ├── Authors → AuthorsListContent
-    │   │       ├── Narrators → NarratorsListContent
-    │   │       └── Collections → CollectionsListContent
-    │   └── ProfileTab → ProfileScreen
-    ├── BookDetail (modal)
-    ├── SeriesDetail (modal)
-    ├── AuthorDetail (modal)
-    ├── NarratorDetail (modal)
-    ├── CollectionDetail (modal)
-    ├── Downloads (modal)
-    └── PlayerScreen (fullscreen modal)
-```
-
-## Downloads Feature
-
-**Storage location:** `{documentDirectory}/downloads/{libraryItemId}/`
-**Metadata storage:** AsyncStorage (`downloads_metadata`)
-
-```
-src/features/downloads/
-├── services/downloadService.ts   # File download/storage
-├── stores/downloadStore.ts       # Zustand state
-├── hooks/useDownloads.ts         # React hooks
-├── components/
-│   ├── DownloadButton.tsx        # Progress indicator button
-│   └── DownloadItem.tsx          # List item component
-├── screens/DownloadsScreen.tsx   # Management screen
-└── index.ts
-```
-
-**Usage:**
-```tsx
-import { DownloadButton, useBookDownload } from '@/features/downloads';
-
-// In component
-const { downloaded, downloading, progress } = useBookDownload(bookId);
-<DownloadButton item={book} />
-```
-
-## Key Patterns
-
-**Feature structure:**
 ```
 features/{name}/
-├── components/    # UI components
-├── hooks/         # Data fetching hooks
-├── screens/       # Screen components
-├── services/      # Adapters, business logic
-├── stores/        # Zustand stores (if needed)
-└── index.ts       # Public exports
+├── components/     # UI components
+├── hooks/          # Data fetching hooks
+├── screens/        # Screen components
+├── services/       # Business logic
+├── stores/         # Zustand stores (if needed)
+├── types.ts        # Feature types
+└── index.ts        # Public exports
 ```
 
-**Data fetching:** TanStack Query with staleTime caching
-**State:** Zustand for player + downloads, React Query for server state
-**Navigation:** Type-safe with stack and tab navigators
+## Key Files
 
-## Rules
+| File | Purpose |
+|------|---------|
+| `core/queryClient.ts` | React Query config + query keys factory |
+| `core/api/apiClient.ts` | Main API client |
+| `core/api/endpoints.ts` | URL definitions |
+| `core/api/errors.ts` | Custom error classes |
+| `core/services/sqliteCache.ts` | SQLite database |
+| `core/services/syncQueue.ts` | Offline sync queue |
+| `shared/components/index.ts` | Component exports |
+| `shared/theme/index.ts` | Design tokens |
 
-- Max 400 lines per file
-- No cross-feature imports (use shared/)
-- TypeScript strict mode
-- Export via index.ts barrel files
-- Use expo-file-system/legacy (new API has deprecated methods)
+## State Management Rules
+
+| State Type | Tool | When to Use |
+|------------|------|-------------|
+| Server data | React Query | API responses, cached data |
+| App state | Zustand | Player, downloads, preferences |
+| UI state | useState | Form inputs, modals, toggles |
+
+## Query Keys
+
+Use the centralized factory:
+
+```typescript
+import { queryKeys } from '@/core/queryClient';
+
+// Examples
+queryKeys.libraries.items(libraryId)
+queryKeys.items.detail(itemId)
+queryKeys.user.progress(itemId)
+queryKeys.user.favorites()
+```
+
+## API Layer
+
+Domain-specific APIs in `core/api/endpoints/`:
+
+```typescript
+import { librariesApi, itemsApi, userApi } from '@/core/api';
+
+// Usage
+const libraries = await librariesApi.getAll();
+const item = await itemsApi.getById(itemId);
+const progress = await userApi.getMediaProgress(itemId);
+```
+
+Offline-aware functions:
+
+```typescript
+import { updateProgressOffline, toggleFavoriteOffline } from '@/core/api';
+
+// Queues if offline, syncs when online
+await updateProgressOffline(itemId, currentTime, duration);
+```
+
+## Shared Components
+
+```typescript
+import {
+  Button,
+  IconButton,
+  Card,
+  GlassCard,
+  TextInput,
+  SearchInput,
+  LoadingSpinner,
+  ErrorView,
+  EmptyState,
+  TabBar,
+} from '@/shared/components';
+```
+
+## Coding Rules
+
+1. Maximum 400 lines per file
+2. No cross-feature imports (use shared/)
+3. TypeScript strict mode
+4. Export via index.ts barrel files
+5. Use query keys factory for all queries
+6. Follow component hierarchy: Screen > Feature > UI
 
 ## Commands
+
 ```bash
-npm install        # Install dependencies
-npm start          # Start Expo dev server
-npx expo run:ios   # Run on iOS (native build required for image-colors)
-npm run android    # Run on Android emulator
+npm start              # Start Expo dev server
+npm run ios            # Run on iOS
+npm run android        # Run on Android
+npm run clean          # Clear cache and restart
+npm run typecheck      # Type check
+npm run lint           # Lint code
 ```
+
+## Navigation
+
+4 bottom tabs: Library, Search, Browse, Profile
+
+Modal screens: BookDetail, SeriesDetail, AuthorDetail, NarratorDetail, CollectionDetail, Downloads
+
+Full-screen modal: PlayerScreen
+
+## Offline Support
+
+1. SQLite for cached data and sync queue
+2. Downloads stored in documentDirectory
+3. Mutations queued when offline
+4. Auto-sync when network restored
+
+## Common Patterns
+
+### Data Fetching Hook
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/core/queryClient';
+
+export function useBookDetail(itemId: string) {
+  return useQuery({
+    queryKey: queryKeys.items.detail(itemId),
+    queryFn: () => apiClient.getItem(itemId),
+  });
+}
+```
+
+### Screen Template
+
+```typescript
+export function FeatureScreen({ route }) {
+  const { data, isLoading, error, refetch } = useFeatureData(route.params.id);
+
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorView message={error.message} onRetry={refetch} />;
+  if (!data) return <EmptyState title="No data" />;
+
+  return <FeatureContent data={data} />;
+}
+```
+
+### Zustand Store
+
+```typescript
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+export const useFeatureStore = create(
+  persist(
+    (set) => ({
+      value: null,
+      setValue: (v) => set({ value: v }),
+    }),
+    { name: 'feature-store', storage: createJSONStorage(() => AsyncStorage) }
+  )
+);
+```
+
+## Documentation
+
+- [README](../README.md) - Project overview
+- [Getting Started](GETTING_STARTED.md) - Setup guide
+- [Architecture](architecture.md) - Project structure
+- [API Reference](api.md) - AudiobookShelf API
+- [Components](COMPONENTS.md) - Component library
+- [State Management](STATE_MANAGEMENT.md) - State patterns
