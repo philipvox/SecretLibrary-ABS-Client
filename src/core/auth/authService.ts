@@ -7,7 +7,8 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { apiClient } from '../api';
+// Import directly to avoid circular dependency with ../api
+import { apiClient } from '../api/apiClient';
 
 // Storage keys
 const TOKEN_KEY = 'auth_token';

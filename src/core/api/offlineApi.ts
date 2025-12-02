@@ -5,19 +5,34 @@
  * and provides cached data when network is unavailable.
  */
 
-import NetInfo from '@react-native-community/netinfo';
 import { syncQueue } from '@/core/services/syncQueue';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { OfflineError, isNetworkError } from './errors';
 import { userApi } from './endpoints/user';
 import { collectionsApi } from './endpoints/collections';
 
+// Safe NetInfo import - may not be available in Expo Go
+let NetInfo: typeof import('@react-native-community/netinfo').default | null = null;
+try {
+  NetInfo = require('@react-native-community/netinfo').default;
+} catch {
+  console.warn('NetInfo not available - assuming online');
+}
+
 /**
  * Check if device is currently online
  */
 async function isOnline(): Promise<boolean> {
-  const state = await NetInfo.fetch();
-  return state.isConnected ?? false;
+  if (!NetInfo) {
+    // NetInfo not available, assume online
+    return true;
+  }
+  try {
+    const state = await NetInfo.fetch();
+    return state.isConnected ?? false;
+  } catch {
+    return true; // Assume online on error
+  }
 }
 
 /**

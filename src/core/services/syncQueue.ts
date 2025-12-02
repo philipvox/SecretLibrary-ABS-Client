@@ -5,9 +5,17 @@
  * Queues mutations when offline and processes them when connection is restored.
  */
 
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { sqliteCache } from './sqliteCache';
-import { apiClient } from '@/core/api';
+// Import directly to avoid circular dependency with @/core/api
+import { apiClient } from '@/core/api/apiClient';
+
+// Safe NetInfo import - may not be available in Expo Go
+let NetInfo: typeof import('@react-native-community/netinfo').default | null = null;
+try {
+  NetInfo = require('@react-native-community/netinfo').default;
+} catch {
+  // NetInfo not available
+}
 
 interface SyncQueueItem {
   id: number;
@@ -43,8 +51,15 @@ class SyncQueue {
   async processQueue(): Promise<void> {
     if (this.isProcessing) return;
 
-    const netInfo = await NetInfo.fetch();
-    if (!netInfo.isConnected) return;
+    // Check network status if NetInfo is available
+    if (NetInfo) {
+      try {
+        const netInfo = await NetInfo.fetch();
+        if (!netInfo.isConnected) return;
+      } catch {
+        // Assume online on error
+      }
+    }
 
     this.isProcessing = true;
 
@@ -121,12 +136,14 @@ class SyncQueue {
   startNetworkListener(): void {
     if (this.unsubscribe) return;
 
-    this.unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
-      if (state.isConnected) {
-        console.log('[SyncQueue] Network connected, processing queue...');
-        this.processQueue();
-      }
-    });
+    if (NetInfo) {
+      this.unsubscribe = NetInfo.addEventListener((state) => {
+        if (state.isConnected) {
+          console.log('[SyncQueue] Network connected, processing queue...');
+          this.processQueue();
+        }
+      });
+    }
 
     // Process any pending items on startup
     this.processQueue();

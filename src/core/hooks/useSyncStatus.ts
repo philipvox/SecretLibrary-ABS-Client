@@ -5,8 +5,15 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { syncQueue } from '@/core/services/syncQueue';
+
+// Safe NetInfo import - may not be available in Expo Go
+let NetInfo: typeof import('@react-native-community/netinfo').default | null = null;
+try {
+  NetInfo = require('@react-native-community/netinfo').default;
+} catch {
+  // NetInfo not available
+}
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
 
@@ -40,29 +47,33 @@ export function useSyncStatus() {
 
   // Network listener
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((netState: NetInfoState) => {
-      const isOnline = netState.isConnected ?? false;
+    let unsubscribe: (() => void) | null = null;
 
-      setState((prev) => ({
-        ...prev,
-        isOnline,
-        status: isOnline ? (prev.pendingCount > 0 ? 'syncing' : 'idle') : 'offline',
-      }));
+    if (NetInfo) {
+      unsubscribe = NetInfo.addEventListener((netState) => {
+        const isOnline = netState.isConnected ?? false;
 
-      // Update pending count when coming online
-      if (isOnline) {
-        updatePendingCount();
-      }
-    });
+        setState((prev) => ({
+          ...prev,
+          isOnline,
+          status: isOnline ? (prev.pendingCount > 0 ? 'syncing' : 'idle') : 'offline',
+        }));
 
-    // Initial state
-    NetInfo.fetch().then((netState) => {
-      setState((prev) => ({
-        ...prev,
-        isOnline: netState.isConnected ?? false,
-        status: netState.isConnected ? 'idle' : 'offline',
-      }));
-    });
+        // Update pending count when coming online
+        if (isOnline) {
+          updatePendingCount();
+        }
+      });
+
+      // Initial state
+      NetInfo.fetch().then((netState) => {
+        setState((prev) => ({
+          ...prev,
+          isOnline: netState.isConnected ?? false,
+          status: netState.isConnected ? 'idle' : 'offline',
+        }));
+      });
+    }
 
     // Initial pending count
     updatePendingCount();
@@ -71,7 +82,7 @@ export function useSyncStatus() {
     const interval = setInterval(updatePendingCount, 10000);
 
     return () => {
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
       clearInterval(interval);
     };
   }, [updatePendingCount]);
