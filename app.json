@@ -28,7 +28,7 @@
           "remote-notification"
         ],
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to visualize audio.",
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": false
       },
       "config": {
         "usesNonExemptEncryption": false
