@@ -166,12 +166,18 @@ export function CassetteTape({
     // Only do spin animation if significant change (> 5px) and not playing
     if (maxDelta > 5 && !isPlaying && !isRewinding && !isFastForwarding) {
       isSpinningToPosition.value = true;
-      
+
+      // Cancel any existing rotation animation first
+      cancelAnimation(rotation);
+
+      // Normalize rotation to prevent accumulation
+      const currentRotation = rotation.value % 360;
+
       // Duration based on how far we need to go
       const duration = Math.min(Math.max(maxDelta * 15, 400), 1500);
-      
+
       // Spin while transitioning
-      rotation.value = withTiming(rotation.value + 360 * (duration / 500), {
+      rotation.value = withTiming(currentRotation + 360 * (duration / 500), {
         duration,
         easing: Easing.out(Easing.cubic),
       }, () => {
@@ -195,19 +201,28 @@ export function CassetteTape({
 
   // Continuous rotation animation for playback
   useEffect(() => {
+    // Always cancel existing animation first to prevent jumps
+    if (!isSpinningToPosition.value) {
+      cancelAnimation(rotation);
+    }
+
     if (isPlaying || isRewinding || isFastForwarding) {
       const duration = isRewinding || isFastForwarding ? 500 : 2000;
       const direction = isRewinding ? -360 : 360;
+
+      // Normalize rotation to 0-360 range to prevent accumulation issues
+      const currentRotation = rotation.value % 360;
+      rotation.value = currentRotation;
+
+      // Start fresh continuous rotation from normalized position
       rotation.value = withRepeat(
-        withTiming(rotation.value + direction, {
+        withTiming(currentRotation + direction, {
           duration,
           easing: Easing.linear,
         }),
         -1,
         false
       );
-    } else if (!isSpinningToPosition.value) {
-      cancelAnimation(rotation);
     }
 
     return () => {

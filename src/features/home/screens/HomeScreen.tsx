@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
+import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { HomeCard } from '../components/HomeCard';
 import { CardActions } from '../components/CardActions';
@@ -101,17 +102,25 @@ export function HomeScreen() {
 
   const handleBookSelect = useCallback(async (book: LibraryItem) => {
     try {
-      await loadBook(book, { autoPlay: false });
+      // Fetch full item data to ensure complete metadata (author, narrator, etc.)
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook, { autoPlay: false });
     } catch (e) {
-      console.warn('Failed to load book:', e);
+      // Fallback to partial data if full fetch fails
+      console.warn('Failed to load full book data, using partial:', e);
+      await loadBook(book, { autoPlay: false });
     }
   }, [loadBook]);
 
   const handlePlayBook = useCallback(async (book: LibraryItem) => {
     try {
-      await loadBook(book, { autoPlay: true });
+      // Fetch full item data to ensure complete metadata (author, narrator, etc.)
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook, { autoPlay: true });
     } catch (e) {
-      console.warn('Failed to play book:', e);
+      // Fallback to partial data if full fetch fails
+      console.warn('Failed to load full book data, using partial:', e);
+      await loadBook(book, { autoPlay: true });
     }
   }, [loadBook]);
 
@@ -127,9 +136,13 @@ export function HomeScreen() {
 
   const handleRestart = useCallback(async (book: LibraryItem) => {
     try {
-      await loadBook(book, { startPosition: 0, autoPlay: true });
+      // Fetch full item data to ensure complete metadata (author, narrator, etc.)
+      const fullBook = await apiClient.getItem(book.id);
+      await loadBook(fullBook, { startPosition: 0, autoPlay: true });
     } catch (e) {
+      // Fallback to partial data if full fetch fails
       console.warn('Failed to restart book:', e);
+      await loadBook(book, { startPosition: 0, autoPlay: true });
     }
   }, [loadBook]);
 
