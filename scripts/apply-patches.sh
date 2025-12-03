@@ -2,7 +2,6 @@
 # Apply patches to node_modules
 # This script is run as postinstall to fix Kotlin 2.x compatibility issues
 
-PATCH_DIR="$(dirname "$0")/../patches"
 NODE_MODULES="$(dirname "$0")/../node_modules"
 
 if [ ! -d "$NODE_MODULES" ]; then
@@ -10,22 +9,38 @@ if [ ! -d "$NODE_MODULES" ]; then
     exit 0
 fi
 
-for patch_file in "$PATCH_DIR"/*.patch; do
-    if [ -f "$patch_file" ]; then
-        echo "Applying patch: $(basename "$patch_file")"
-        # Use -p1 since paths in patch have a/ and b/ prefixes (git diff format)
-        # Use --forward to skip already applied patches
-        # Use -d to change to project root directory
-        patch -p1 -d "$(dirname "$0")/.." --forward < "$patch_file" || {
-            # Check if patch was already applied (exit code 1 with "already applied" message)
-            if patch -p1 -d "$(dirname "$0")/.." --reverse --dry-run < "$patch_file" > /dev/null 2>&1; then
-                echo "Patch already applied: $(basename "$patch_file")"
-            else
-                echo "Failed to apply patch: $(basename "$patch_file")"
-                exit 1
+echo "Applying Kotlin 2.x null safety patches..."
+
+# Fix react-native-track-player MusicModule.kt
+# Kotlin 2.x requires explicit null handling for Arguments.toBundle()
+TRACK_PLAYER_FILE="$NODE_MODULES/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt"
+
+if [ -f "$TRACK_PLAYER_FILE" ]; then
+    # Check if already patched (contains " ?: Bundle()")
+    if grep -q "Arguments.toBundle(map) ?: Bundle()" "$TRACK_PLAYER_FILE"; then
+        echo "react-native-track-player: already patched"
+    else
+        # Replace Arguments.toBundle(map) with Arguments.toBundle(map) ?: Bundle()
+        # Use sed to do pattern replacement regardless of line numbers
+        sed -i.bak 's/Arguments\.toBundle(map)\([^)]\)/Arguments.toBundle(map) ?: Bundle()\1/g' "$TRACK_PLAYER_FILE"
+
+        # Also handle the case where it's at the end of function call: Arguments.toBundle(map))
+        sed -i.bak 's/Arguments\.toBundle(map))/Arguments.toBundle(map) ?: Bundle())/g' "$TRACK_PLAYER_FILE"
+
+        # Verify patch was applied
+        if grep -q "Arguments.toBundle(map) ?: Bundle()" "$TRACK_PLAYER_FILE"; then
+            echo "react-native-track-player: patched successfully"
+            rm -f "$TRACK_PLAYER_FILE.bak"
+        else
+            echo "react-native-track-player: patch may have failed, please check manually"
+            # Restore backup if patch failed
+            if [ -f "$TRACK_PLAYER_FILE.bak" ]; then
+                mv "$TRACK_PLAYER_FILE.bak" "$TRACK_PLAYER_FILE"
             fi
-        }
+        fi
     fi
-done
+else
+    echo "react-native-track-player: MusicModule.kt not found, skipping"
+fi
 
 echo "All patches applied successfully"
