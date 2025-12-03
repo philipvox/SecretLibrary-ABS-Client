@@ -13,12 +13,12 @@ fi
 for patch_file in "$PATCH_DIR"/*.patch; do
     if [ -f "$patch_file" ]; then
         echo "Applying patch: $(basename "$patch_file")"
-        # Use -p0 since paths in patch start with node_modules/
+        # Use -p1 since paths in patch have a/ and b/ prefixes (git diff format)
         # Use --forward to skip already applied patches
         # Use -d to change to project root directory
-        patch -p0 -d "$(dirname "$0")/.." --forward < "$patch_file" || {
+        patch -p1 -d "$(dirname "$0")/.." --forward < "$patch_file" || {
             # Check if patch was already applied (exit code 1 with "already applied" message)
-            if patch -p0 -d "$(dirname "$0")/.." --reverse --dry-run < "$patch_file" > /dev/null 2>&1; then
+            if patch -p1 -d "$(dirname "$0")/.." --reverse --dry-run < "$patch_file" > /dev/null 2>&1; then
                 echo "Patch already applied: $(basename "$patch_file")"
             else
                 echo "Failed to apply patch: $(basename "$patch_file")"
