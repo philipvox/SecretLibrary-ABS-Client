@@ -72,6 +72,11 @@ export function HomeScreen() {
     skipBackward,
   } = usePlayerStore();
 
+  // Open full player screen
+  const openPlayer = useCallback(() => {
+    usePlayerStore.setState({ isPlayerVisible: true });
+  }, []);
+
   const currentCoverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : undefined;
 
   const handleBookPress = useCallback(
