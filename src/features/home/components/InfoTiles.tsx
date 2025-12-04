@@ -1,13 +1,16 @@
 /**
  * src/features/home/components/InfoTiles.tsx
  *
- * Info tiles displaying book title, chapter, time, speed and sleep timer
- * Layout: Title/Chapter on left, Time/Speed/Timer on right
+ * Info tiles with black pill backgrounds
+ * Left: Title + Chapter | Right: Time + Speed + Sleep Timer
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, TYPOGRAPHY, DIMENSIONS } from '../homeDesign';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { COLORS } from '../homeDesign';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 interface InfoTilesProps {
   title: string;
@@ -26,43 +29,35 @@ export function InfoTiles({
   sleepTimerMinutes,
   playbackSpeed = 1,
 }: InfoTilesProps) {
-  // Format sleep timer
   const formatSleepTimer = (minutes?: number | null): string | null => {
     if (!minutes || minutes <= 0) return null;
-    if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60);
-      const mins = Math.round(minutes % 60);
-      return `${hours}h ${mins}m`;
-    }
     return `${Math.round(minutes)}m`;
   };
 
   const sleepTimerText = formatSleepTimer(sleepTimerMinutes);
-  const chapterDisplay = chapterNumber ? `Chpt. ${chapterNumber}` : chapter;
+  const chapterDisplay = chapterNumber ? `Chpt.\n${chapterNumber}` : chapter;
 
   return (
     <View style={styles.container}>
-      {/* Left Column: Title & Chapter */}
-      <View style={styles.leftColumn}>
+      {/* Left Pill: Title & Chapter */}
+      <View style={styles.leftPill}>
         <Text style={styles.title} numberOfLines={2}>
           {title}
         </Text>
         {chapterDisplay && (
-          <Text style={styles.chapter} numberOfLines={1}>
+          <Text style={styles.chapter}>
             {chapterDisplay}
           </Text>
         )}
       </View>
 
-      {/* Right Column: Time, Speed & Sleep Timer */}
-      <View style={styles.rightColumn}>
+      {/* Right Pill: Time, Speed & Sleep Timer */}
+      <View style={styles.rightPill}>
         <Text style={styles.timeText}>{timeRemaining || '00:00:00'}</Text>
-        <View style={styles.speedRow}>
+        <View style={styles.bottomRow}>
           <Text style={styles.speedText}>{playbackSpeed.toFixed(2)}x</Text>
           {sleepTimerText && (
-            <View style={styles.sleepTimerBadge}>
-              <Text style={styles.sleepTimerText}>{sleepTimerText}</Text>
-            </View>
+            <Text style={styles.sleepTimerText}>{sleepTimerText}</Text>
           )}
         </View>
       </View>
@@ -74,56 +69,68 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    gap: scale(4),
   },
-  leftColumn: {
+  leftPill: {
     flex: 1,
-    marginRight: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    backgroundColor: '#000000',
+    borderRadius: 5,
+    paddingHorizontal: scale(11),
+    paddingVertical: scale(7),
+    minHeight: scale(61),
   },
-  rightColumn: {
+  rightPill: {
+    backgroundColor: '#000000',
+    borderRadius: 5,
+    paddingHorizontal: scale(11),
+    paddingVertical: scale(5),
+    minHeight: scale(61),
     alignItems: 'flex-end',
+    justifyContent: 'space-between',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    flex: 1,
+    fontFamily: 'Courier',
+    fontSize: scale(20),
+    fontWeight: '400',
     color: COLORS.textPrimary,
-    letterSpacing: -0.3,
+    lineHeight: scale(21),
   },
   chapter: {
-    fontSize: 14,
+    fontFamily: 'Courier',
+    fontSize: scale(20),
     fontWeight: '400',
-    color: COLORS.textSecondary,
-    marginTop: 2,
+    color: COLORS.textPrimary,
+    lineHeight: scale(21),
+    textAlign: 'right',
   },
   timeText: {
-    fontSize: 14,
-    fontWeight: '500',
     fontFamily: 'Courier',
+    fontSize: scale(20),
+    fontWeight: '400',
     color: COLORS.textPrimary,
-    letterSpacing: 1,
+    lineHeight: scale(21),
   },
-  speedRow: {
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: scale(8),
   },
   speedText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-  },
-  sleepTimerBadge: {
-    backgroundColor: COLORS.sleepTimerRed,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 8,
+    fontFamily: 'Courier',
+    fontSize: scale(20),
+    fontWeight: '400',
+    color: COLORS.textPrimary,
+    lineHeight: scale(21),
   },
   sleepTimerText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
+    fontFamily: 'Courier',
+    fontSize: scale(20),
+    fontWeight: '400',
+    color: '#F12802',
+    lineHeight: scale(21),
   },
 });

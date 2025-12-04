@@ -2,7 +2,7 @@
  * src/features/home/screens/HomeScreen.tsx
  *
  * Main home screen with Now Playing card and carousels
- * New design with glassmorphism and blurred background
+ * Layout based on Figma design
  */
 
 import React, { useCallback } from 'react';
@@ -14,6 +14,7 @@ import {
   Text,
   RefreshControl,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,16 +36,18 @@ import { SeriesCard } from '../components/SeriesCard';
 import { PlaylistCard } from '../components/PlaylistCard';
 
 // Design constants
-import { COLORS, DIMENSIONS, LAYOUT, TYPOGRAPHY } from '../homeDesign';
+import { COLORS, LAYOUT } from '../homeDesign';
 
 // Types
 import { SeriesWithBooks, PlaylistDisplay } from '../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
-  // Get home data
   const {
     currentBook,
     currentProgress,
@@ -56,7 +59,6 @@ export function HomeScreen() {
     refresh,
   } = useHomeData();
 
-  // Get player actions
   const {
     isPlaying,
     playbackRate,
@@ -68,10 +70,8 @@ export function HomeScreen() {
     skipBackward,
   } = usePlayerStore();
 
-  // Get cover URL for background
   const currentCoverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : undefined;
 
-  // Navigation handlers
   const handleBookPress = useCallback(
     async (book: LibraryItem) => {
       try {
@@ -93,7 +93,6 @@ export function HomeScreen() {
 
   const handlePlaylistPress = useCallback(
     (playlist: PlaylistDisplay) => {
-      // Navigate to playlist detail when implemented
       console.log('Playlist pressed:', playlist.id);
     },
     []
@@ -108,13 +107,11 @@ export function HomeScreen() {
   }, [navigation]);
 
   const handleViewAllPlaylists = useCallback(() => {
-    // Navigate to playlists list when implemented
     console.log('View all playlists');
   }, []);
 
   const handleNowPlayingPress = useCallback(() => {
-    // Player screen is shown as overlay via PlayerScreen component
-    // Just need to ensure book is loaded
+    // Navigate to player
   }, []);
 
   const handlePlayPause = useCallback(() => {
@@ -125,7 +122,6 @@ export function HomeScreen() {
     }
   }, [isPlaying, play, pause]);
 
-  // Loading state
   if (isLoading && !currentBook && recentBooks.length === 0) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -135,7 +131,6 @@ export function HomeScreen() {
     );
   }
 
-  // Empty state
   if (!currentBook && recentBooks.length === 0) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -153,7 +148,6 @@ export function HomeScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Blurred background */}
       <HomeBackground coverUrl={currentCoverUrl} />
 
       <ScrollView
@@ -161,8 +155,8 @@ export function HomeScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + DIMENSIONS.screenPadding,
-            paddingBottom: insets.bottom + LAYOUT.tabBarHeight,
+            paddingTop: insets.top + scale(18),
+            paddingBottom: insets.bottom + LAYOUT.tabBarHeight + scale(20),
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -193,33 +187,35 @@ export function HomeScreen() {
 
         {/* Your Books Section */}
         {recentBooks.length > 0 && (
-          <>
+          <View style={styles.section}>
             <SectionHeader title="Your Books" onViewAll={handleViewAllBooks} />
             <HorizontalCarousel
               data={recentBooks}
               keyExtractor={(book) => book.id}
-              itemWidth={DIMENSIONS.bookCardWidth}
+              itemWidth={scale(110)}
+              gap={scale(10)}
+              contentPadding={scale(29)}
               renderItem={(book) => (
                 <BookCard
                   book={book}
                   onPress={() => handleBookPress(book)}
-                  showProgress
-                  progress={(book as any).userMediaProgress?.progress || 0}
                   isFavorite={true}
                 />
               )}
             />
-          </>
+          </View>
         )}
 
         {/* Your Series Section */}
         {userSeries.length > 0 && (
-          <>
+          <View style={styles.section}>
             <SectionHeader title="Your Series" onViewAll={handleViewAllSeries} />
             <HorizontalCarousel
               data={userSeries}
               keyExtractor={(series) => series.id}
-              itemWidth={DIMENSIONS.seriesCardWidth}
+              itemWidth={scale(110)}
+              gap={scale(10)}
+              contentPadding={scale(29)}
               renderItem={(series) => (
                 <SeriesCard
                   series={series}
@@ -227,17 +223,19 @@ export function HomeScreen() {
                 />
               )}
             />
-          </>
+          </View>
         )}
 
         {/* Your Playlists Section */}
         {userPlaylists.length > 0 && (
-          <>
+          <View style={styles.section}>
             <SectionHeader title="Your Playlists" onViewAll={handleViewAllPlaylists} />
             <HorizontalCarousel
               data={userPlaylists}
               keyExtractor={(playlist) => playlist.id}
-              itemWidth={DIMENSIONS.playlistCardWidth}
+              itemWidth={scale(110)}
+              gap={scale(10)}
+              contentPadding={scale(29)}
               renderItem={(playlist) => (
                 <PlaylistCard
                   playlist={playlist}
@@ -245,11 +243,10 @@ export function HomeScreen() {
                 />
               )}
             />
-          </>
+          </View>
         )}
       </ScrollView>
 
-      {/* Bottom fade gradient */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
         locations={[0, 0.5, 1]}
@@ -274,7 +271,10 @@ const styles = StyleSheet.create({
   },
   nowPlayingContainer: {
     alignItems: 'center',
-    paddingHorizontal: DIMENSIONS.screenPadding,
+    paddingHorizontal: scale(10),
+  },
+  section: {
+    marginTop: scale(23),
   },
   bottomGradient: {
     position: 'absolute',
@@ -288,20 +288,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.sectionTitle,
+    fontSize: scale(20),
+    fontWeight: '700',
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
   emptySubtitle: {
-    ...TYPOGRAPHY.cardSubtitle,
+    fontSize: scale(14),
     color: COLORS.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 40,
   },
 });
 
-// Legacy export for backwards compatibility
 export { HomeScreen as default };
-
-// Re-export config for other files that might import it
 export { COLORS as HOME_CONFIG } from '../homeDesign';

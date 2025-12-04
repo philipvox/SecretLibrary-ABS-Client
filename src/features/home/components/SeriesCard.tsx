@@ -1,25 +1,28 @@
 /**
  * src/features/home/components/SeriesCard.tsx
  *
- * Series card with stacked book covers
+ * Series card with horizontal stack of covers
+ * Figma: 110x86.5px, 5 stacked covers 35x51px each, 17px offset
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { apiClient } from '@/core/api';
-import { COLORS, DIMENSIONS, TYPOGRAPHY, SHADOWS } from '../homeDesign';
+import { COLORS, TYPOGRAPHY } from '../homeDesign';
 import { SeriesCardProps } from '../types';
-import { CoverStack } from './CoverStack';
 import { HeartIcon } from './icons';
 
-export function SeriesCard({ series, onPress, onLongPress }: SeriesCardProps) {
-  // Get cover URLs for first 4 books
-  const coverUrls = series.books.slice(0, 4).map((book) => apiClient.getItemCoverUrl(book.id));
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
-  // Calculate stack dimensions
-  const coverSize = DIMENSIONS.seriesCardWidth * 0.65;
-  const overlap = coverSize * 0.15;
-  const stackHeight = coverSize * 2 - overlap;
+export function SeriesCard({ series, onPress, onLongPress }: SeriesCardProps) {
+  // Get cover URLs for books
+  const coverUrls = series.books.slice(0, 5).map((book) => apiClient.getItemCoverUrl(book.id));
+
+  const coverWidth = scale(35);
+  const coverHeight = scale(51);
+  const offset = scale(17);
 
   return (
     <TouchableOpacity
@@ -28,62 +31,94 @@ export function SeriesCard({ series, onPress, onLongPress }: SeriesCardProps) {
       onLongPress={onLongPress}
       activeOpacity={0.8}
     >
-      {/* Cover Stack */}
-      <View style={[styles.stackContainer, { height: stackHeight }]}>
-        <CoverStack
-          covers={coverUrls}
-          size={coverSize}
-          overlap={overlap}
-        />
+      {/* Horizontal Cover Stack */}
+      <View style={[styles.stackContainer, { height: coverHeight }]}>
+        {[0, 1, 2, 3, 4].map((index) => (
+          <View
+            key={index}
+            style={[
+              styles.coverWrapper,
+              {
+                width: coverWidth,
+                height: coverHeight,
+                left: index * offset,
+                zIndex: 5 - index,
+              },
+            ]}
+          >
+            {coverUrls[index] ? (
+              <Image
+                source={{ uri: coverUrls[index] }}
+                style={styles.cover}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View style={styles.placeholder} />
+            )}
+          </View>
+        ))}
+      </View>
 
-        {/* Heart Badge */}
+      {/* Title with Heart */}
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={2}>
+          {series.name}
+        </Text>
         {series.isFavorite && (
-          <View style={styles.heartBadge}>
-            <HeartIcon size={14} color={COLORS.heart} />
+          <View style={styles.heartContainer}>
+            <HeartIcon size={scale(14)} color={COLORS.heart} filled />
           </View>
         )}
       </View>
-
-      {/* Title */}
-      <Text style={styles.title} numberOfLines={2}>
-        {series.name}
-      </Text>
-
-      {/* Book count */}
-      <Text style={styles.subtitle}>
-        {series.totalBooks} book{series.totalBooks !== 1 ? 's' : ''}
-      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: DIMENSIONS.seriesCardWidth,
+    width: scale(110),
   },
   stackContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'relative',
+    width: scale(103), // 35 + 4*17 = 103
   },
-  heartBadge: {
+  coverWrapper: {
     position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 5,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 9, height: 4 },
+    shadowOpacity: 0.46,
+    shadowRadius: 2,
+    elevation: 4,
+  },
+  cover: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#7D7D7D',
+  },
+  placeholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#7D7D7D',
+    borderRadius: 5,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: scale(9),
   },
   title: {
-    ...TYPOGRAPHY.cardTitle,
+    flex: 1,
+    fontFamily: 'System',
+    fontSize: scale(12),
+    fontWeight: '400',
     color: COLORS.textPrimary,
-    marginTop: 8,
+    lineHeight: scale(12.4),
   },
-  subtitle: {
-    ...TYPOGRAPHY.cardSubtitle,
-    color: COLORS.textTertiary,
-    marginTop: 2,
+  heartContainer: {
+    marginLeft: scale(4),
+    marginTop: scale(2),
   },
 });

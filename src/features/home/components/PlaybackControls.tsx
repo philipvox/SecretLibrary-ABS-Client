@@ -2,14 +2,17 @@
  * src/features/home/components/PlaybackControls.tsx
  *
  * Playback control buttons: Rewind | Forward | Play
- * Arranged left to right as per design
+ * Figma: 162px wide container, buttons ~52px
  */
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { GlassButton } from './GlassButton';
 import { PlayTriangle, PauseIcon, SkipForwardIcon, SkipBackwardIcon } from './icons';
-import { COLORS, DIMENSIONS } from '../homeDesign';
+import { COLORS } from '../homeDesign';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 interface PlaybackControlsProps {
   isPlaying: boolean;
@@ -36,41 +39,40 @@ export function PlaybackControls({
     }
   };
 
-  // Button sizes from design
-  const smallButtonSize = DIMENSIONS.skipButtonSize;
-  const playButtonSize = DIMENSIONS.playButtonSize;
+  const buttonSize = scale(52);
+  const gap = scale(2);
 
   return (
-    <View style={styles.container}>
-      {/* Skip Backward (Rewind) - Left */}
+    <View style={[styles.container, { gap }]}>
+      {/* Rewind */}
       <GlassButton
         onPress={onSkipBackward}
-        size={smallButtonSize}
+        size={buttonSize}
         disabled={disabled}
       >
-        <SkipBackwardIcon size={smallButtonSize * 0.5} color={COLORS.textPrimary} />
+        <SkipBackwardIcon size={buttonSize * 0.5} color={COLORS.textPrimary} />
       </GlassButton>
 
-      {/* Skip Forward - Middle */}
+      {/* Fast Forward */}
       <GlassButton
         onPress={onSkipForward}
-        size={smallButtonSize}
+        size={buttonSize}
         disabled={disabled}
       >
-        <SkipForwardIcon size={smallButtonSize * 0.5} color={COLORS.textPrimary} />
+        <SkipForwardIcon size={buttonSize * 0.5} color={COLORS.textPrimary} />
       </GlassButton>
 
-      {/* Play/Pause - Right (Larger, Lime) */}
+      {/* Play/Pause */}
       <GlassButton
         onPress={handlePlayPause}
-        size={playButtonSize}
+        size={buttonSize}
         isPlayButton
         disabled={disabled}
       >
         {isPlaying ? (
-          <PauseIcon size={playButtonSize * 0.35} color={COLORS.playButton} />
+          <PauseIcon size={buttonSize * 0.35} color={COLORS.playButton} />
         ) : (
-          <PlayTriangle size={playButtonSize * 0.35} color={COLORS.playButton} />
+          <PlayTriangle size={buttonSize * 0.35} color={COLORS.playButton} />
         )}
       </GlassButton>
     </View>
@@ -82,6 +84,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: DIMENSIONS.controlButtonGap,
   },
 });

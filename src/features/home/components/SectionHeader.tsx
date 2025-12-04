@@ -1,13 +1,17 @@
 /**
  * src/features/home/components/SectionHeader.tsx
  *
- * Section header with title and optional "View All" action
+ * Section header with title and "View All" button
+ * Figma: Bold 14px title, regular 14px View All
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, TYPOGRAPHY, LAYOUT } from '../homeDesign';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { COLORS } from '../homeDesign';
 import { SectionHeaderProps } from '../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 export function SectionHeader({
   title,
@@ -31,16 +35,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: LAYOUT.sectionHeaderMarginTop,
-    paddingBottom: LAYOUT.sectionHeaderMarginBottom,
-    paddingHorizontal: LAYOUT.carouselPaddingHorizontal,
+    paddingHorizontal: scale(29),
+    marginBottom: scale(15),
   },
   title: {
-    ...TYPOGRAPHY.sectionTitle,
+    fontFamily: 'System',
+    fontSize: scale(14),
+    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   viewAll: {
-    ...TYPOGRAPHY.viewAll,
-    color: COLORS.playButton,
+    fontFamily: 'System',
+    fontSize: scale(14),
+    fontWeight: '400',
+    color: COLORS.textPrimary,
   },
 });

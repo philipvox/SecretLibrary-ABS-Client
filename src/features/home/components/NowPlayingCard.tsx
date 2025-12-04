@@ -8,13 +8,14 @@
 import React, { useMemo } from 'react';
 import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { apiClient } from '@/core/api';
-import { COLORS, DIMENSIONS as DESIGN_DIMS, SHADOWS } from '../homeDesign';
+import { COLORS, SHADOWS } from '../homeDesign';
 import { NowPlayingCardProps } from '../types';
 import { CoverArtwork } from './CoverArtwork';
 import { InfoTiles } from './InfoTiles';
 import { PlaybackControls } from './PlaybackControls';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 export function NowPlayingCard({
   book,
@@ -32,8 +33,8 @@ export function NowPlayingCard({
 
   // Get current chapter info
   const chapters = (book.media as any)?.chapters || [];
-  const { chapterNumber, chapterText } = useMemo(() => {
-    if (!chapters.length || !progress) return { chapterNumber: undefined, chapterText: undefined };
+  const chapterNumber = useMemo(() => {
+    if (!chapters.length || !progress) return undefined;
     const currentTime = progress.currentTime;
     const currentChapter = chapters.find((ch: any, i: number) => {
       const nextChapter = chapters[i + 1];
@@ -41,10 +42,9 @@ export function NowPlayingCard({
       return currentTime >= ch.start && currentTime < chapterEnd;
     });
     if (currentChapter) {
-      const idx = chapters.indexOf(currentChapter) + 1;
-      return { chapterNumber: idx, chapterText: `Chapter ${idx}` };
+      return chapters.indexOf(currentChapter) + 1;
     }
-    return { chapterNumber: undefined, chapterText: undefined };
+    return undefined;
   }, [chapters, progress]);
 
   // Format time as HH:MM:SS
@@ -59,22 +59,12 @@ export function NowPlayingCard({
   const timeRemaining = useMemo(() => {
     if (!progress) return '00:00:00';
     const remaining = progress.duration - progress.currentTime;
-    return formatTime(remaining);
+    return formatTime(Math.max(0, remaining));
   }, [progress]);
 
-  // Calculate progress percentage
-  const progressPercent = useMemo(() => {
-    if (!progress || !progress.duration) return 0;
-    return progress.currentTime / progress.duration;
-  }, [progress]);
-
-  // Handle play/pause
-  const handlePlay = () => onPlay();
-  const handlePause = () => onPlay(); // Toggle
-
-  // Card and cover dimensions based on screen width
-  const cardWidth = SCREEN_WIDTH - 44; // 22px padding on each side
-  const coverSize = Math.min(cardWidth * 0.65, 220); // Cover is ~65% of card width, max 220px
+  // Dimensions from Figma
+  const cardWidth = scale(382);
+  const coverSize = scale(263);
 
   return (
     <TouchableOpacity
@@ -98,8 +88,6 @@ export function NowPlayingCard({
         <CoverArtwork
           coverUrl={coverUrl}
           size={coverSize}
-          progress={progressPercent}
-          showProgress={false}
         />
       </View>
 
@@ -107,8 +95,8 @@ export function NowPlayingCard({
       <View style={styles.controlsContainer}>
         <PlaybackControls
           isPlaying={isPlaying}
-          onPlay={handlePlay}
-          onPause={handlePause}
+          onPlay={onPlay}
+          onPause={onPlay}
           onSkipForward={onSkipForward}
           onSkipBackward={onSkipBack}
         />
@@ -120,17 +108,15 @@ export function NowPlayingCard({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 16,
   },
   infoContainer: {
     width: '100%',
-    marginBottom: 16,
+    marginBottom: scale(12),
   },
   coverContainer: {
-    marginBottom: 24,
     ...SHADOWS.cover,
   },
   controlsContainer: {
-    marginTop: 8,
+    marginTop: scale(-4),
   },
 });

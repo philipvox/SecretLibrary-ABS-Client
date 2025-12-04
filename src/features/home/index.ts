@@ -9,6 +9,11 @@ export { HomeScreen, HOME_CONFIG } from './screens/HomeScreen';
 
 // Components
 export { NowPlayingCard } from './components/NowPlayingCard';
+export { InfoTiles } from './components/InfoTiles';
+export { PlaybackControls } from './components/PlaybackControls';
+export { GlassButton } from './components/GlassButton';
+export { CoverArtwork } from './components/CoverArtwork';
+export { HomeBackground } from './components/HomeBackground';
 export { MiniControls } from './components/MiniControls';
 export { SectionHeader } from './components/SectionHeader';
 export { HorizontalCarousel } from './components/HorizontalCarousel';
@@ -19,11 +24,8 @@ export { CoverStack } from './components/CoverStack';
 export { CoverGrid } from './components/CoverGrid';
 export { HeartBadge } from './components/HeartBadge';
 
-// Legacy components (deprecated)
-export { HomeCard } from './components/HomeCard';
-export { LibraryListCard } from './components/LibraryListCard';
-export { CardActions } from './components/CardActions';
-export { GlassPanel } from './components/GlassPanel';
+// Icons
+export * from './components/icons';
 
 // Hooks
 export { useHomeData } from './hooks/useHomeData';
@@ -34,3 +36,4 @@ export * from './types';
 
 // Constants
 export * from './constants';
+// Note: homeDesign.ts exports are imported directly where needed to avoid conflicts

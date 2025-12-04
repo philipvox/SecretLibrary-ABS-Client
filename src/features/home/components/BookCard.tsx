@@ -1,24 +1,25 @@
 /**
  * src/features/home/components/BookCard.tsx
  *
- * Book card for horizontal carousel display
+ * Book card for carousel - Figma: 110x141.5px, cover 106x106px
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { apiClient } from '@/core/api';
-import { COLORS, DIMENSIONS, TYPOGRAPHY, SHADOWS } from '../homeDesign';
+import { COLORS, TYPOGRAPHY } from '../homeDesign';
 import { BookCardProps } from '../types';
 import { HeartIcon } from './icons';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 export function BookCard({
   book,
   onPress,
   onLongPress,
   isFavorite = false,
-  showProgress = false,
-  progress = 0,
 }: BookCardProps) {
   const coverUrl = apiClient.getItemCoverUrl(book.id);
   const title = book.media?.metadata?.title || 'Untitled';
@@ -38,72 +39,53 @@ export function BookCard({
           contentFit="cover"
           transition={200}
         />
+      </View>
 
-        {/* Heart Badge */}
+      {/* Title with Heart */}
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={2}>
+          {title}
+        </Text>
         {isFavorite && (
-          <View style={styles.heartBadge}>
-            <HeartIcon size={DIMENSIONS.heartBadgeSize * 0.6} color={COLORS.heart} />
-          </View>
-        )}
-
-        {/* Progress Bar */}
-        {showProgress && progress > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
+          <View style={styles.heartContainer}>
+            <HeartIcon size={scale(14)} color={COLORS.heart} filled />
           </View>
         )}
       </View>
-
-      {/* Title */}
-      <Text style={styles.title} numberOfLines={2}>
-        {title}
-      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: DIMENSIONS.bookCardWidth,
+    width: scale(110),
   },
   coverContainer: {
-    width: DIMENSIONS.bookCardWidth,
-    height: DIMENSIONS.bookCardHeight,
-    borderRadius: DIMENSIONS.coverRadius,
+    width: scale(106),
+    height: scale(106),
+    borderRadius: 5,
     overflow: 'hidden',
-    backgroundColor: COLORS.controlButtonBg,
-    ...SHADOWS.card,
+    backgroundColor: '#7D7D7D',
   },
   cover: {
     width: '100%',
     height: '100%',
   },
-  heartBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: DIMENSIONS.heartBadgeSize,
-    height: DIMENSIONS.heartBadgeSize,
-    borderRadius: DIMENSIONS.heartBadgeSize / 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: DIMENSIONS.progressBarHeight,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: COLORS.playButton,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: scale(9),
   },
   title: {
-    ...TYPOGRAPHY.cardTitle,
+    flex: 1,
+    fontFamily: 'System',
+    fontSize: scale(12),
+    fontWeight: '400',
     color: COLORS.textPrimary,
-    marginTop: 8,
+    lineHeight: scale(12.4),
+  },
+  heartContainer: {
+    marginLeft: scale(4),
+    marginTop: scale(2),
   },
 });
