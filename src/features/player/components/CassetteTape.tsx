@@ -76,7 +76,6 @@ export function CassetteTape({
   const rotation = useSharedValue(0);
   const leftRadius = useSharedValue(REEL_MAX_RADIUS);
   const rightRadius = useSharedValue(REEL_MIN_RADIUS);
-  const isSpinningToPosition = useSharedValue(false);
   const hasInitialized = useSharedValue(false);
 
   // Slide animation for load/unload effect
@@ -165,7 +164,7 @@ export function CassetteTape({
     prevBookId.current = bookId;
   }, [bookId, chapterIndex, isChangingChapter]);
   
-  // Animate reel sizes to match progress with rotation
+  // Animate reel sizes to match progress - always from current value, never jump
   useEffect(() => {
     const targetLeft = REEL_MAX_RADIUS - (progress * (REEL_MAX_RADIUS - REEL_MIN_RADIUS));
     const targetRight = REEL_MIN_RADIUS + (progress * (REEL_MAX_RADIUS - REEL_MIN_RADIUS));
@@ -178,58 +177,18 @@ export function CassetteTape({
       return;
     }
 
-    // Calculate how much the reels need to change
-    const leftDelta = Math.abs(leftRadius.value - targetLeft);
-    const rightDelta = Math.abs(rightRadius.value - targetRight);
-    const maxDelta = Math.max(leftDelta, rightDelta);
+    // Always animate from current position to target - never reset/jump
+    // Use faster duration during seeking for responsive feel
+    const duration = isSeeking ? REEL_TRANSITION_DURATION : 100;
 
-    // During seeking - use fast, responsive updates
-    if (isSeeking) {
-      leftRadius.value = withTiming(targetLeft, {
-        duration: REEL_TRANSITION_DURATION,
-        easing: Easing.out(Easing.linear),
-      });
-      rightRadius.value = withTiming(targetRight, {
-        duration: REEL_TRANSITION_DURATION,
-        easing: Easing.out(Easing.linear),
-      });
-      return;
-    }
-
-    // Only do spin animation if significant change (> 5px) and not playing/seeking
-    if (maxDelta > 5 && !isPlaying) {
-      isSpinningToPosition.value = true;
-
-      // Cancel any existing rotation animation first
-      cancelAnimation(rotation);
-
-      // Normalize rotation to prevent accumulation
-      const currentRotation = rotation.value % 360;
-
-      // Duration based on how far we need to go
-      const duration = Math.min(Math.max(maxDelta * 15, 400), 1500);
-
-      // Spin while transitioning
-      rotation.value = withTiming(currentRotation + 360 * (duration / 500), {
-        duration,
-        easing: Easing.out(Easing.cubic),
-      }, () => {
-        isSpinningToPosition.value = false;
-      });
-
-      leftRadius.value = withTiming(targetLeft, {
-        duration,
-        easing: Easing.out(Easing.cubic),
-      });
-      rightRadius.value = withTiming(targetRight, {
-        duration,
-        easing: Easing.out(Easing.cubic),
-      });
-    } else {
-      // Small change, just update directly
-      leftRadius.value = withTiming(targetLeft, { duration: REEL_TRANSITION_DURATION });
-      rightRadius.value = withTiming(targetRight, { duration: REEL_TRANSITION_DURATION });
-    }
+    leftRadius.value = withTiming(targetLeft, {
+      duration,
+      easing: Easing.out(Easing.linear),
+    });
+    rightRadius.value = withTiming(targetRight, {
+      duration,
+      easing: Easing.out(Easing.linear),
+    });
   }, [progress, isSeeking]);
 
   // Continuous rotation animation - INSTANT response to seeking
