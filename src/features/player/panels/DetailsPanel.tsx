@@ -1,276 +1,210 @@
 /**
  * src/features/player/panels/DetailsPanel.tsx
- * Redesigned to match AudioDetailsSection example
  */
 
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import {
   getAuthorName,
   getNarratorName,
   getDescription,
   getSeriesWithSequence,
-  getSeriesName,
-  getGenres,
-  getPublishedYear,
 } from '@/shared/utils/metadata';
-import type { LibraryItem } from '@/core/api';
 
 interface DetailsPanelProps {
-  book: LibraryItem;
+  book: any;
   duration: number;
   chaptersCount: number;
-  isLight: boolean;
-  onNavigateToAuthor?: (authorName: string) => void;
-  onNavigateToNarrator?: (narratorName: string) => void;
-  onNavigateToSeries?: (seriesName: string) => void;
+  isLight?: boolean;
+  textColor?: string;
+  secondaryColor?: string;
 }
 
-export function DetailsPanel({
+function formatDuration(seconds: number): string {
+  if (!seconds || isNaN(seconds)) return '0m';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
+
+function DetailsPanel({
   book,
   duration,
   chaptersCount,
-  isLight,
-  onNavigateToAuthor,
-  onNavigateToNarrator,
-  onNavigateToSeries,
+  isLight = false,
+  textColor,
+  secondaryColor,
 }: DetailsPanelProps) {
-  const textColor = isLight ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.95)';
-  const labelColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
-  const descColor = isLight ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.85)';
-  const borderColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)';
+  const text = textColor || (isLight ? '#000000' : '#FFFFFF');
+  const secondary = secondaryColor || (isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.6)');
+  const chipBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)';
 
-  // Extract metadata using utilities
   const author = getAuthorName(book);
   const narrator = getNarratorName(book);
   const description = getDescription(book);
   const series = getSeriesWithSequence(book);
-  const seriesName = getSeriesName(book);
-  const genres = getGenres(book);
-  const publishedYear = getPublishedYear(book);
-  const metadata = (book?.media?.metadata as any) || {};
-  const language = metadata.language || null;
 
-  const handleAuthorPress = () => {
-    if (author && author !== 'Unknown Author' && onNavigateToAuthor) {
-      onNavigateToAuthor(author);
-    }
-  };
-
-  const handleNarratorPress = () => {
-    if (narrator && narrator !== 'Unknown Narrator' && onNavigateToNarrator) {
-      onNavigateToNarrator(narrator);
-    }
-  };
-
-  const handleSeriesPress = () => {
-    if (seriesName && onNavigateToSeries) {
-      onNavigateToSeries(seriesName);
-    }
-  };
-
-  const canNavigateToAuthor = !!onNavigateToAuthor && author && author !== 'Unknown Author';
-  const canNavigateToNarrator = !!onNavigateToNarrator && narrator && narrator !== 'Unknown Narrator';
-  const canNavigateToSeries = !!onNavigateToSeries && !!seriesName;
-
-  const hasAuthor = author && author !== 'Unknown Author';
-  const hasNarrator = narrator && narrator !== 'Unknown Narrator';
-
-  // Format duration nicely
-  const formatDurationLong = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-    }
-    return `${minutes}m`;
-  };
+  // Extract metadata
+  const metadata = book?.media?.metadata || book?.mediaMetadata || {};
+  const genres: string[] = metadata.genres || [];
+  const publishedYear = metadata.publishedYear || '';
+  const language = metadata.language || 'English';
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* By / Read by - Horizontal Layout */}
-        {(hasAuthor || hasNarrator) && (
-          <View style={styles.byRow}>
-            {hasAuthor && (
-              <View style={styles.byColumn}>
-                <Text style={[styles.label, { color: labelColor }]}>By</Text>
-                {canNavigateToAuthor ? (
-                  <TouchableOpacity onPress={handleAuthorPress} activeOpacity={0.7}>
-                    <Text style={[styles.byValue, { color: textColor }]}>{author}</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={[styles.byValue, { color: textColor }]}>{author}</Text>
-                )}
-              </View>
-            )}
-            {hasNarrator && (
-              <View style={styles.byColumn}>
-                <Text style={[styles.label, { color: labelColor }]}>Read by</Text>
-                {canNavigateToNarrator ? (
-                  <TouchableOpacity onPress={handleNarratorPress} activeOpacity={0.7}>
-                    <Text style={[styles.byValue, { color: textColor }]}>{narrator}</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={[styles.byValue, { color: textColor }]}>{narrator}</Text>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Description */}
-        {description && (
-          <View style={styles.descSection}>
-            <Text style={[styles.label, { color: labelColor }]}>Desc.</Text>
-            <Text style={[styles.description, { color: descColor }]} numberOfLines={5}>
-              {description}
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Author & Narrator Row */}
+      <View style={styles.headerRow}>
+        {author && author !== 'Unknown Author' && (
+          <View style={styles.headerItem}>
+            <Text style={[styles.label, { color: secondary }]}>By</Text>
+            <Text style={[styles.headerValue, { color: text }]} numberOfLines={1}>
+              {author}
             </Text>
           </View>
         )}
+        {narrator && narrator !== 'Unknown Narrator' && (
+          <View style={styles.headerItem}>
+            <Text style={[styles.label, { color: secondary }]}>Read by</Text>
+            <Text style={[styles.headerValue, { color: text }]} numberOfLines={1}>
+              {narrator}
+            </Text>
+          </View>
+        )}
+      </View>
 
-        {/* Genres - Bordered Pills */}
-        {genres.length > 0 && (
-          <View style={styles.genresSection}>
-            <Text style={[styles.label, { color: labelColor }]}>Genres</Text>
-            <View style={styles.pillsRow}>
-              {genres.slice(0, 4).map((genre: string, idx: number) => (
-                <View key={idx} style={[styles.pill, { borderColor }]}>
-                  <Text style={[styles.pillText, { color: textColor }]}>{genre}</Text>
-                </View>
-              ))}
+      {/* Description */}
+      {description && (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: secondary }]}>Desc.</Text>
+          <Text style={[styles.description, { color: text }]} numberOfLines={5}>
+            {description}
+          </Text>
+        </View>
+      )}
+
+      {/* Genres */}
+      {genres.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: secondary }]}>Genres</Text>
+          <View style={styles.chipRow}>
+            {genres.map((genre, idx) => (
+              <View key={idx} style={[styles.chip, { backgroundColor: chipBg }]}>
+                <Text style={[styles.chipText, { color: text }]}>{genre}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Series */}
+      {series && (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: secondary }]}>Series</Text>
+          <View style={styles.chipRow}>
+            <View style={[styles.chip, { backgroundColor: chipBg }]}>
+              <Text style={[styles.chipText, { color: text }]}>{series}</Text>
             </View>
           </View>
-        )}
-
-        {/* Series - Bordered Pill Button */}
-        {series && (
-          <View style={styles.seriesSection}>
-            <Text style={[styles.label, { color: labelColor }]}>Series</Text>
-            {canNavigateToSeries ? (
-              <TouchableOpacity onPress={handleSeriesPress} activeOpacity={0.7}>
-                <View style={[styles.pill, { borderColor }]}>
-                  <Text style={[styles.pillText, { color: textColor }]}>{series}</Text>
-                </View>
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.pill, { borderColor }]}>
-                <Text style={[styles.pillText, { color: textColor }]}>{series}</Text>
-              </View>
-            )}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Bottom Stats Row - Fixed at bottom */}
-      <View style={[styles.statsRow, { borderTopColor: borderColor }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: labelColor }]}>Chapters:</Text>
-          <Text style={[styles.statValue, { color: textColor }]}>{chaptersCount}</Text>
         </View>
+      )}
+
+      {/* Metadata Row */}
+      <View style={styles.metadataRow}>
+        <Text style={[styles.metadataText, { color: text }]}>
+          Chapters: {chaptersCount}
+        </Text>
         {publishedYear && (
-          <Text style={[styles.statValue, { color: textColor }]}>{publishedYear}</Text>
+          <>
+            <Text style={[styles.metadataSeparator, { color: secondary }]}> | </Text>
+            <Text style={[styles.metadataText, { color: text }]}>{publishedYear}</Text>
+          </>
         )}
         {language && (
-          <Text style={[styles.statValue, { color: textColor }]}>{language}</Text>
+          <>
+            <Text style={[styles.metadataSeparator, { color: secondary }]}> | </Text>
+            <Text style={[styles.metadataText, { color: text }]}>{language}</Text>
+          </>
         )}
-        <Text style={[styles.statValue, { color: textColor }]}>
-          {formatDurationLong(duration)}
-        </Text>
+        {duration > 0 && (
+          <>
+            <Text style={[styles.metadataSeparator, { color: secondary }]}> | </Text>
+            <Text style={[styles.metadataText, { color: text }]}>
+              {formatDuration(duration)}
+            </Text>
+          </>
+        )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   scroll: {
     flex: 1,
   },
   content: {
-    paddingTop: 12,
-    paddingBottom: 20,
-    paddingHorizontal: 4,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
-  // By / Read by row
-  byRow: {
+  headerRow: {
     flexDirection: 'row',
-    gap: 40,
-    marginBottom: 20,
+    marginBottom: 16,
+    gap: 24,
   },
-  byColumn: {
-    gap: 4,
+  headerItem: {
+    flex: 1,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '400',
+    marginBottom: 2,
   },
-  byValue: {
-    fontSize: 20,
-    fontWeight: '400',
+  headerValue: {
+    fontSize: 16,
+    fontWeight: '500',
   },
-  // Description
-  descSection: {
-    marginBottom: 20,
-    gap: 4,
+  section: {
+    marginBottom: 16,
   },
   description: {
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '400',
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 4,
   },
-  // Genres
-  genresSection: {
-    marginBottom: 20,
-    gap: 10,
-  },
-  pillsRow: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
+    marginTop: 6,
   },
-  pill: {
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  pillText: {
-    fontSize: 16,
-    fontWeight: '400',
+  chipText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
-  // Series
-  seriesSection: {
-    gap: 10,
-    marginBottom: 20,
-  },
-  // Bottom stats row
-  statsRow: {
+  metadataRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 4,
-    borderTopWidth: 0,
+    marginTop: 8,
   },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  metadataText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
-  statLabel: {
-    fontSize: 16,
-    fontWeight: '400',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '400',
+  metadataSeparator: {
+    fontSize: 14,
   },
 });
 
