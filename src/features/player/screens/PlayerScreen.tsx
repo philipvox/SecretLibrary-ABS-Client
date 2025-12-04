@@ -468,7 +468,7 @@ export function PlayerScreen() {
           {/* Cassette Tape Progress */}
           <View style={styles.cassetteContainer}>
             <CassetteTape
-              progress={chapterProgress}
+              progress={bookProgress}
               isPlaying={isPlaying}
               isRewinding={isRewinding}
               isFastForwarding={isFastForwarding}
