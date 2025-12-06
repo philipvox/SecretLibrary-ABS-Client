@@ -278,12 +278,13 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: scale(10),
   },
+  // NN/g: Minimum 44×44px touch target for panel close
   panelCloseButton: {
     position: 'absolute',
     top: 0,
     right: 0,
-    width: scale(40),
-    height: scale(40),
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -297,11 +298,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: scale(16),
+    marginTop: scale(20),
     width: '100%',
-    paddingHorizontal: scale(40),
+    paddingHorizontal: scale(50),
   },
+  // NN/g: Minimum 44×44px touch target for action buttons
   actionButton: {
-    padding: scale(8),
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

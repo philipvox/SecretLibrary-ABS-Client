@@ -2,8 +2,8 @@
  * src/features/player/panels/SpeedPanel.tsx
  */
 
-import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, Keyboard } from 'react-native';
 import { LiquidSlider } from '../components/LiquidSlider';
 
 // =============================================================================
@@ -31,13 +31,17 @@ const SPEED_STEP = 0.05;
 // COMPONENT
 // =============================================================================
 
-export function SpeedPanel({ 
-  tempSpeed, 
-  setTempSpeed, 
+export function SpeedPanel({
+  tempSpeed,
+  setTempSpeed,
   onApply,
   onClose,
   isLight,
 }: SpeedPanelProps) {
+  // NN/g: Precision input state - allows typing exact speed values
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(tempSpeed.toFixed(2));
+
   const textColor = isLight ? '#000000' : '#FFFFFF';
   const secondaryColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
   const buttonBg = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.15)';
@@ -50,11 +54,39 @@ export function SpeedPanel({
 
   const handleSliderChange = useCallback((value: number) => {
     setTempSpeed(value);
+    setInputValue(value.toFixed(2));
   }, [setTempSpeed]);
 
   const handlePresetPress = useCallback((speed: number) => {
     setTempSpeed(speed);
+    setInputValue(speed.toFixed(2));
   }, [setTempSpeed]);
+
+  // NN/g: Handle precision input for exact speed values
+  const handleStartEdit = useCallback(() => {
+    setIsEditing(true);
+    setInputValue(tempSpeed.toFixed(2));
+  }, [tempSpeed]);
+
+  const handleInputChange = useCallback((text: string) => {
+    // Allow only valid number input
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    setInputValue(cleaned);
+  }, []);
+
+  const handleInputSubmit = useCallback(() => {
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed)) {
+      // Clamp to valid range
+      const clamped = Math.max(MIN_SPEED, Math.min(MAX_SPEED, parsed));
+      // Round to nearest step
+      const stepped = Math.round(clamped / SPEED_STEP) * SPEED_STEP;
+      setTempSpeed(stepped);
+      setInputValue(stepped.toFixed(2));
+    }
+    setIsEditing(false);
+    Keyboard.dismiss();
+  }, [inputValue, setTempSpeed]);
 
   // ===========================================================================
   // HELPERS
@@ -76,10 +108,32 @@ export function SpeedPanel({
 
   return (
     <View style={styles.container}>
-      {/* Speed Value Display */}
-      <Text style={[styles.valueText, { color: textColor }]}>
-        {formatSpeed(tempSpeed)}
-      </Text>
+      {/* NN/g: Speed Value Display - tap to type exact value */}
+      {isEditing ? (
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[styles.valueInput, { color: textColor, borderColor: secondaryColor }]}
+            value={inputValue}
+            onChangeText={handleInputChange}
+            onBlur={handleInputSubmit}
+            onSubmitEditing={handleInputSubmit}
+            keyboardType="decimal-pad"
+            autoFocus
+            selectTextOnFocus
+            returnKeyType="done"
+          />
+          <Text style={[styles.inputSuffix, { color: textColor }]}>x</Text>
+        </View>
+      ) : (
+        <TouchableOpacity onPress={handleStartEdit} style={styles.valueButton}>
+          <Text style={[styles.valueText, { color: textColor }]}>
+            {formatSpeed(tempSpeed)}
+          </Text>
+          <Text style={[styles.tapHint, { color: secondaryColor }]}>
+            tap to type
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Slider */}
       <View style={styles.sliderSection}>
@@ -169,9 +223,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 0,
   },
+  // NN/g: Tappable value display for precision input
+  valueButton: {
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
   valueText: {
     fontSize: 64,
     fontWeight: '700',
+  },
+  tapHint: {
+    fontSize: 12,
+    marginTop: -4,
+    marginLeft: 2,
+  },
+  // NN/g: Precision input field
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  valueInput: {
+    fontSize: 64,
+    fontWeight: '700',
+    borderBottomWidth: 2,
+    minWidth: 120,
+    paddingBottom: 4,
+  },
+  inputSuffix: {
+    fontSize: 48,
+    fontWeight: '700',
+    marginLeft: 4,
     marginBottom: 8,
   },
   sliderSection: {

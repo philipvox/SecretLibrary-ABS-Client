@@ -14,7 +14,9 @@ import {
   Dimensions,
   PanResponder,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -413,12 +415,27 @@ export function PlayerScreen() {
         />
       </View>
 
+      {/* NN/g: Explicit close button for gesture discoverability */}
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
+        {/* Swipe indicator pill */}
+        <View style={styles.swipeIndicator} />
+
+        {/* Close button - minimum 44×44px touch target */}
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={handleClose}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-down" size={28} color="rgba(255, 255, 255, 0.8)" />
+        </TouchableOpacity>
+      </View>
+
       {/* Main content */}
       <ScrollView
         style={styles.scrollContent}
         contentContainerStyle={[
           styles.scrollContentContainer,
-          { paddingTop: insets.top + scale(40), paddingBottom: insets.bottom + scale(100) }
+          { paddingTop: scale(20), paddingBottom: insets.bottom + scale(100) }
         ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
@@ -471,6 +488,29 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#000',
+  },
+  // NN/g: Header with close button and swipe hint
+  headerBar: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    zIndex: 10,
+  },
+  swipeIndicator: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginBottom: 8,
+  },
+  closeButton: {
+    // NN/g: Minimum 44×44px touch target
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   baseColor: {
     ...StyleSheet.absoluteFillObject,
