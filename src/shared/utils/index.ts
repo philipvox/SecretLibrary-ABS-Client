@@ -1,3 +1,3 @@
 export * from './metadata';
 export * from './audioDebug';
-export * from './audioDiagnostics';
+export * from './format';

@@ -22,12 +22,14 @@ const ACCENT_COLOR = '#C8FF00';
 const INACTIVE_COLOR = '#808080';
 const BACKGROUND_COLOR = 'rgba(0, 0, 0, 0.85)';
 
-// Tab configuration
+// Tab configuration - NN/g: Clear labels indicate purpose
+// Library → Downloads: Shows downloaded books (ready to play offline)
+// Browse → Discover: Browse full server library to find new books
 const TABS = [
   { name: 'HomeTab', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { name: 'LibraryTab', label: 'Library', icon: 'library-outline', activeIcon: 'library' },
+  { name: 'LibraryTab', label: 'Downloads', icon: 'download-outline', activeIcon: 'download' },
   { name: 'Search', label: 'Search', icon: 'search-outline', activeIcon: 'search' },
-  { name: 'DiscoverTab', label: 'Browse', icon: 'compass-outline', activeIcon: 'compass' },
+  { name: 'DiscoverTab', label: 'Discover', icon: 'compass-outline', activeIcon: 'compass' },
   { name: 'ProfileTab', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
 ] as const;
 

@@ -13,6 +13,7 @@ import { LibraryItem } from '@/core/types';
 const CACHE_KEY = 'library_cache_v1';
 const CACHE_TTL_DAYS = 30;
 const CACHE_TTL_MS = CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
+const DEBUG = __DEV__;
 
 interface CachedLibrary {
   items: LibraryItem[];
@@ -226,13 +227,13 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
 
           // Check if cache is still valid (same library, not expired)
           if (parsed.libraryId === libraryId && age < CACHE_TTL_MS) {
-            console.log(`[LibraryCache] Using cached data (${Math.round(age / 1000 / 60)} min old)`);
+            DEBUG && console.log(`[LibraryCache] Using cached data (${Math.round(age / 1000 / 60)} min old)`);
             const indexes = buildIndexes(parsed.items);
 
             // Fetch authors from API in background to get accurate book counts
             apiClient.getLibraryAuthors(libraryId).then((apiAuthors) => {
               if (apiAuthors && apiAuthors.length > 0) {
-                console.log(`[LibraryCache] Merging ${apiAuthors.length} authors from API (background)`);
+                DEBUG && console.log(`[LibraryCache] Merging ${apiAuthors.length} authors from API (background)`);
                 for (const apiAuthor of apiAuthors) {
                   const key = apiAuthor.name.toLowerCase();
                   const existing = indexes.authors.get(key);
@@ -273,7 +274,7 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
       }
 
       // Fetch fresh data from API - items and authors in parallel
-      console.log('[LibraryCache] Fetching fresh library data for library:', libraryId);
+      DEBUG && console.log('[LibraryCache] Fetching fresh library data for library:', libraryId);
       const [itemsResponse, apiAuthors] = await Promise.all([
         apiClient.getLibraryItems(libraryId, { limit: 100000 }),  // Large limit to fetch all books
         apiClient.getLibraryAuthors(libraryId).catch(() => [] as any[]),
@@ -285,7 +286,7 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
 
       // Merge API author data (which has accurate book counts) with local data
       if (apiAuthors && apiAuthors.length > 0) {
-        console.log(`[LibraryCache] Merging ${apiAuthors.length} authors from API`);
+        DEBUG && console.log(`[LibraryCache] Merging ${apiAuthors.length} authors from API`);
         for (const apiAuthor of apiAuthors) {
           const key = apiAuthor.name.toLowerCase();
           const existing = indexes.authors.get(key);
@@ -327,7 +328,7 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
         console.warn(`[LibraryCache] Cache too large to persist (${(cacheJson.length / 1024 / 1024).toFixed(1)}MB), using in-memory only`);
       }
 
-      console.log(`[LibraryCache] Cached ${items.length} items, ${indexes.authors.size} authors`);
+      DEBUG && console.log(`[LibraryCache] Cached ${items.length} items, ${indexes.authors.size} authors`);
 
       set({
         items,
@@ -349,14 +350,14 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
   refreshCache: async (libraryId?: string) => {
     const id = libraryId || get().currentLibraryId;
     if (!id) {
-      console.error('[LibraryCache] No library ID available for refresh');
+      // Silently ignore - this can happen during startup before library is selected
       return;
     }
-    console.log('[LibraryCache] Refreshing cache for library:', id);
+    DEBUG && console.log('[LibraryCache] Refreshing cache for library:', id);
     await get().loadCache(id, true);
     // Set lastRefreshed to bust image caches
     set({ lastRefreshed: Date.now() });
-    console.log('[LibraryCache] Cache refresh complete, image caches will be busted');
+    DEBUG && console.log('[LibraryCache] Cache refresh complete, image caches will be busted');
   },
 
   getItem: (id: string) => {
@@ -403,11 +404,13 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
   },
 
   filterItems: (filters: FilterOptions) => {
-    let { items } = get();
+    let { items, isLoaded } = get();
+    DEBUG && console.log(`[LibraryCache] filterItems called. Items: ${items.length}, isLoaded: ${isLoaded}`);
 
     // Text search
     if (filters.query?.trim()) {
       const lowerQuery = filters.query.toLowerCase();
+      const beforeCount = items.length;
       items = items.filter((item) => {
         const metadata = getMetadata(item);
         const title = (metadata.title || '').toLowerCase();
@@ -421,6 +424,7 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
           series.includes(lowerQuery)
         );
       });
+      DEBUG && console.log(`[LibraryCache] Text search "${filters.query}": ${beforeCount} -> ${items.length} items`);
     }
 
     // Genre filter
@@ -546,42 +550,42 @@ export function getNextBookInSeries(currentBook: LibraryItem): LibraryItem | nul
   const metadata = (currentBook.media?.metadata as any) || {};
   const seriesName = metadata.seriesName || '';
 
-  console.log('[getNextBookInSeries] Input seriesName:', seriesName);
+  DEBUG && console.log('[getNextBookInSeries] Input seriesName:', seriesName);
 
   if (!seriesName) {
-    console.log('[getNextBookInSeries] No series name, returning null');
+    DEBUG && console.log('[getNextBookInSeries] No series name, returning null');
     return null;
   }
 
   // Extract current sequence number
   const seqMatch = seriesName.match(/#([\d.]+)/);
   if (!seqMatch) {
-    console.log('[getNextBookInSeries] No sequence number found in:', seriesName);
+    DEBUG && console.log('[getNextBookInSeries] No sequence number found in:', seriesName);
     return null;
   }
   const currentSeq = parseFloat(seqMatch[1]);
-  console.log('[getNextBookInSeries] Current sequence:', currentSeq);
+  DEBUG && console.log('[getNextBookInSeries] Current sequence:', currentSeq);
 
   // Get the series from cache
   const cleanSeriesName = seriesName.replace(/\s*#[\d.]+$/, '').trim();
-  console.log('[getNextBookInSeries] Clean series name:', cleanSeriesName);
+  DEBUG && console.log('[getNextBookInSeries] Clean series name:', cleanSeriesName);
 
   const seriesInfo = useLibraryCache.getState().getSeries(cleanSeriesName);
-  console.log('[getNextBookInSeries] Series info:', seriesInfo ? `${seriesInfo.books.length} books` : 'null');
+  DEBUG && console.log('[getNextBookInSeries] Series info:', seriesInfo ? `${seriesInfo.books.length} books` : 'null');
 
   if (!seriesInfo || seriesInfo.books.length === 0) {
-    console.log('[getNextBookInSeries] No series info found');
+    DEBUG && console.log('[getNextBookInSeries] No series info found');
     return null;
   }
 
   // Find the current book's index in the sorted series
   const currentIndex = seriesInfo.books.findIndex(book => book.id === currentBook.id);
-  console.log('[getNextBookInSeries] Current index:', currentIndex, 'of', seriesInfo.books.length);
+  DEBUG && console.log('[getNextBookInSeries] Current index:', currentIndex, 'of', seriesInfo.books.length);
 
   // Return the next book if it exists
   if (currentIndex >= 0 && currentIndex < seriesInfo.books.length - 1) {
     const nextBook = seriesInfo.books[currentIndex + 1];
-    console.log('[getNextBookInSeries] Found next book by index:', (nextBook.media?.metadata as any)?.title);
+    DEBUG && console.log('[getNextBookInSeries] Found next book by index:', (nextBook.media?.metadata as any)?.title);
     return nextBook;
   }
 
@@ -593,12 +597,12 @@ export function getNextBookInSeries(currentBook: LibraryItem): LibraryItem | nul
     if (bookSeqMatch) {
       const bookSeq = parseFloat(bookSeqMatch[1]);
       if (bookSeq > currentSeq) {
-        console.log('[getNextBookInSeries] Found next book by sequence:', bookMetadata.title);
+        DEBUG && console.log('[getNextBookInSeries] Found next book by sequence:', bookMetadata.title);
         return book;
       }
     }
   }
 
-  console.log('[getNextBookInSeries] No next book found');
+  DEBUG && console.log('[getNextBookInSeries] No next book found');
   return null;
 }

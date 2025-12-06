@@ -221,16 +221,26 @@ class AudioService {
         }
       }
     } else if (this.tracks.length === 0) {
-      // Single-track mode - track finished means book finished
-      this.hasReachedEnd = true;
-      log('Single track finished - book complete');
-      this.statusCallback?.({
-        isPlaying: false,
-        position: this.totalDuration,
-        duration: this.totalDuration,
-        isBuffering: false,
-        didJustFinish: true,
-      });
+      // Single-track mode - check if we're actually at the end
+      const currentPos = await this.getPosition();
+      const nearEnd = this.totalDuration > 0 && currentPos >= this.totalDuration - 5;
+
+      if (nearEnd) {
+        // Actually finished the book
+        this.hasReachedEnd = true;
+        log('Single track finished - book complete');
+        this.statusCallback?.({
+          isPlaying: false,
+          position: this.totalDuration,
+          duration: this.totalDuration,
+          isBuffering: false,
+          didJustFinish: true,
+        });
+      } else {
+        // Stream segment ended but book not finished - resume playback
+        log(`Stream segment ended at ${currentPos}s of ${this.totalDuration}s - resuming`);
+        this.player?.play();
+      }
     } else {
       // Last track in multi-track mode finished
       this.hasReachedEnd = true;

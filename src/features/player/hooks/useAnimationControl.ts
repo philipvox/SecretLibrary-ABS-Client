@@ -7,7 +7,6 @@
 
 import { useRef, useCallback } from 'react';
 import { SharedValue } from 'react-native-reanimated';
-import { seekLog } from '../utils/seekLogger';
 
 export interface AnimationSuspensionState {
   isSuspended: boolean;
@@ -48,7 +47,6 @@ export function useAnimationControl(): UseAnimationControlReturn {
       suspendedAt: Date.now(),
       reason,
     };
-    seekLog.animation('suspend', reason);
   }, []);
 
   /**
@@ -60,7 +58,6 @@ export function useAnimationControl(): UseAnimationControlReturn {
       suspendedAt: 0,
       reason: null,
     };
-    seekLog.animation('resume');
   }, []);
 
   /**
@@ -115,11 +112,9 @@ export function createAnimationController(): {
     },
     suspend: (reason: 'seek' | 'chapter-change') => {
       isSuspended = true;
-      seekLog.animation('suspend', reason);
     },
     resume: () => {
       isSuspended = false;
-      seekLog.animation('resume');
     },
   };
 }

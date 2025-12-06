@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { sqliteCache } from './sqliteCache';
 import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
+import { formatBytes } from '@/shared/utils/format';
 
 // =============================================================================
 // LOGGING
@@ -33,14 +34,6 @@ function logError(...args: any[]) {
 
 function logWarn(...args: any[]) {
   console.warn(LOG_PREFIX, '[WARN]', ...args);
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
 }
 
 // =============================================================================

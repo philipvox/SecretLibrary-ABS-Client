@@ -121,7 +121,7 @@ export function BookDetailScreen() {
 
   const renderDownloadIcon = () => {
     if (downloadStatus === 'completed') {
-      return <Icon name="checkmark-circle" size={22} color={theme.colors.success?.[500] || '#22c55e'} set="ionicons" />;
+      return <Icon name="checkmark-circle" size={22} color="#22c55e" set="ionicons" />;
     }
     if (downloadStatus === 'downloading' || downloadStatus === 'queued') {
       return <ActivityIndicator size="small" color={theme.colors.text.secondary} />;
@@ -203,7 +203,44 @@ export function BookDetailScreen() {
             <Text style={styles.statLabel}>Chapters</Text>
             <Text style={styles.statValue}>{chapters.length}</Text>
           </View>
+        </View>
+
+        {/* Action Buttons - NN/g: Primary actions should be prominent */}
+        <View style={styles.actionButtons}>
+          {/* Download Button - Prominent when not downloaded */}
+          {downloadStatus !== 'completed' ? (
+            <TouchableOpacity
+              style={[
+                styles.downloadButton,
+                (downloadStatus === 'downloading' || downloadStatus === 'queued') && styles.downloadButtonDisabled
+              ]}
+              onPress={handleDownload}
+              disabled={downloadStatus === 'downloading' || downloadStatus === 'queued'}
+            >
+              {downloadStatus === 'downloading' || downloadStatus === 'queued' ? (
+                <>
+                  <ActivityIndicator size="small" color={theme.colors.text.secondary} />
+                  <Text style={styles.downloadButtonTextDisabled}>
+                    {downloadStatus === 'downloading' ? 'Downloading...' : 'Queued'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Icon name="download-outline" size={20} color={theme.colors.primary[500]} set="ionicons" />
+                  <Text style={styles.downloadButtonText}>Download</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.downloadedIndicator}>
+              <Icon name="checkmark-circle" size={20} color="#22c55e" set="ionicons" />
+              <Text style={styles.downloadedText}>Downloaded</Text>
+            </View>
+          )}
+
+          {/* Play Button - Always prominent */}
           <TouchableOpacity style={styles.playNowButton} onPress={handlePlay}>
+            <Icon name="play" size={20} color="#FFFFFF" set="ionicons" />
             <Text style={styles.playNowText}>{playButtonText}</Text>
           </TouchableOpacity>
         </View>
@@ -303,8 +340,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing[3],
   },
   headerButton: {
-    width: 40,
-    height: 40,
+    width: 44,  // NN/g: Minimum 44px touch target
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -399,9 +436,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.neutral[200],
+    paddingBottom: theme.spacing[3],
   },
   statItem: {
     marginRight: theme.spacing[6],
@@ -416,12 +451,72 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.text.primary,
   },
-  playNowButton: {
-    marginLeft: 'auto',
-    backgroundColor: theme.colors.primary[500],
-    paddingHorizontal: theme.spacing[6],
+  // NN/g: Action buttons should be prominent and have clear affordances
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing[5],
+    paddingBottom: theme.spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.neutral[200],
+    gap: theme.spacing[3],
+  },
+  downloadButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48, // NN/g: Touch target
+    paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[3],
     borderRadius: theme.radius.full,
+    borderWidth: 2,
+    borderColor: theme.colors.primary[500],
+    backgroundColor: 'transparent',
+    gap: theme.spacing[2],
+  },
+  downloadButtonDisabled: {
+    borderColor: theme.colors.neutral[300],
+    backgroundColor: theme.colors.neutral[100],
+  },
+  downloadButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.primary[500],
+  },
+  downloadButtonTextDisabled: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.colors.text.secondary,
+  },
+  downloadedIndicator: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.neutral[100],
+    gap: theme.spacing[2],
+  },
+  downloadedText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#16a34a',
+  },
+  playNowButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48, // NN/g: Touch target
+    backgroundColor: theme.colors.primary[500],
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.full,
+    gap: theme.spacing[2],
   },
   playNowText: {
     fontSize: 15,

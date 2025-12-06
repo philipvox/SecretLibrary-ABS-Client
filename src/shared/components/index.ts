@@ -40,7 +40,6 @@ export { TabBar } from './feedback/TabBar';
 // UTILITY COMPONENTS
 // =============================================================================
 export { Icon } from './Icon';
-export { SplashScreen } from './SplashScreen';
 export { FilterSortBar } from './FilterSortBar';
 export type { SortOption } from './FilterSortBar';
 

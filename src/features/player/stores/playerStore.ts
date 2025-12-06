@@ -512,11 +512,54 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         let audioTrackInfos: AudioTrackInfo[] = [];
 
         if (isOffline && localPath) {
-          // OFFLINE PLAYBACK - use local file
-          streamUrl = localPath;
+          // OFFLINE PLAYBACK - use local files
           chapters = extractChaptersFromBook(book);
           log('OFFLINE PLAYBACK MODE');
-          validateUrl(localPath, 'Offline path');
+
+          // Check if localPath is a directory (multi-file) or single file
+          const FileSystem = await import('expo-file-system/legacy');
+          const pathInfo = await FileSystem.getInfoAsync(localPath);
+
+          if (pathInfo.isDirectory) {
+            // Multi-file audiobook - enumerate audio files in directory
+            log('OFFLINE MULTI-FILE AUDIOBOOK');
+            const dirContents = await FileSystem.readDirectoryAsync(localPath);
+            const audioExtensions = ['.m4b', '.m4a', '.mp3', '.mp4', '.opus', '.ogg', '.flac', '.aac'];
+            const audioFileNames = dirContents
+              .filter(name => audioExtensions.some(ext => name.toLowerCase().endsWith(ext)))
+              .sort(); // Files are named 000_, 001_, etc. so sorting works
+
+            if (audioFileNames.length === 0) {
+              throw new Error('No audio files found in downloaded directory');
+            }
+
+            // Build track infos from downloaded files and book metadata
+            const bookAudioFiles = (book.media as any)?.audioFiles || [];
+            let currentOffset = 0;
+
+            audioTrackInfos = audioFileNames.map((fileName, index) => {
+              const filePath = `${localPath}${fileName}`;
+              // Try to match with book metadata for duration info
+              const bookFile = bookAudioFiles[index];
+              const duration = bookFile?.duration || 0;
+              const trackInfo = {
+                url: filePath,
+                title: bookFile?.metadata?.filename || fileName,
+                startOffset: currentOffset,
+                duration: duration,
+              };
+              currentOffset += duration;
+              return trackInfo;
+            });
+
+            logTracks(audioTrackInfos);
+            totalDuration = currentOffset > 0 ? currentOffset : getBookDuration(book);
+          } else {
+            // Single file audiobook
+            log('OFFLINE SINGLE-FILE AUDIOBOOK');
+            streamUrl = localPath;
+            validateUrl(localPath, 'Offline path');
+          }
 
           if (!startPosition) {
             const localProgress = await progressService.getLocalProgress(book.id);
@@ -845,8 +888,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
     play: async () => {
       if (!audioService.getIsLoaded()) {
-        logError('Cannot play - no audio loaded');
-        throw new Error('No audio loaded');
+        // Silently ignore - this can happen during app startup when iOS
+        // tries to resume playback before audio is loaded
+        return;
       }
       await audioService.play();
       const { currentBook } = get();

@@ -24,6 +24,7 @@ import { useDownloadStatus, useDownloads } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
 import { LibraryItem } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
+import { formatBytes } from '@/shared/utils/format';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
@@ -74,15 +75,6 @@ const QueueIconPath = ({ color = '#FFB800' }: { color?: string }) => (
     />
   </G>
 );
-
-// Format bytes to human readable
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-}
 
 export function CircularDownloadButton({
   book,
@@ -195,8 +187,8 @@ export function CircularDownloadButton({
     // Downloading - show circular progress with size info
     if (isDownloading || isPaused) {
       const progressColor = isPaused ? '#FF9800' : '#4ADE80';
-      const downloadedStr = formatBytes(bytesDownloaded);
-      const totalStr = formatBytes(totalBytes);
+      const downloadedStr = formatBytes(bytesDownloaded, 1);
+      const totalStr = formatBytes(totalBytes, 1);
 
       return (
         <View style={[styles.progressContainer, { width: size, height: size }]}>

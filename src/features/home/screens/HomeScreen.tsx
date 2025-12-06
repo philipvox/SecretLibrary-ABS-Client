@@ -25,6 +25,7 @@ import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { useRobustSeekControl } from '@/features/player/hooks/useRobustSeekControl';
+import { autoDownloadService, DownloadStatus } from '@/features/downloads/services/autoDownloadService';
 
 // Hooks
 import { useHomeData } from '../hooks/useHomeData';
@@ -107,6 +108,26 @@ export function HomeScreen() {
   const [tempSleepMins, setTempSleepMins] = useState(30);
   const [sleepInputValue, setSleepInputValue] = useState('30');
 
+  // Download status tracking (NN/g: Download-first UX pattern)
+  const [downloadStatuses, setDownloadStatuses] = useState<Map<string, DownloadStatus>>(new Map());
+  const [downloadProgress, setDownloadProgress] = useState<Map<string, number>>(new Map());
+
+  // Subscribe to download status changes
+  useEffect(() => {
+    const unsubStatus = autoDownloadService.onStatus((bookId, status) => {
+      setDownloadStatuses(prev => new Map(prev).set(bookId, status));
+    });
+
+    const unsubProgress = autoDownloadService.onProgress((bookId, progress) => {
+      setDownloadProgress(prev => new Map(prev).set(bookId, progress));
+    });
+
+    return () => {
+      unsubStatus();
+      unsubProgress();
+    };
+  }, []);
+
   const currentCoverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : undefined;
 
   // Track if we've already prefetched this book
@@ -159,6 +180,19 @@ export function HomeScreen() {
     [loadBook]
   );
 
+  // Download a book (NN/g: Primary action for non-downloaded books)
+  const handleDownloadBook = useCallback(
+    async (book: LibraryItem) => {
+      try {
+        const fullBook = await apiClient.getItem(book.id);
+        await autoDownloadService.startDownload(fullBook);
+      } catch {
+        await autoDownloadService.startDownload(book);
+      }
+    },
+    []
+  );
+
   const handleSeriesPress = useCallback(
     (series: SeriesWithBooks) => {
       navigation.navigate('SeriesDetail', { seriesName: series.name });
@@ -201,19 +235,18 @@ export function HomeScreen() {
     if (isPlaying) {
       await pause();
     } else {
-      // If no book loaded in player but we have a currentBook to show, load it first
-      if (!isPlayerReady && currentBook) {
+      // Always load/reload the book when pressing play - loadBook handles
+      // the case where audio is already loaded for the same book
+      if (currentBook) {
         try {
           const fullBook = await apiClient.getItem(currentBook.id);
           await loadBook(fullBook, { autoPlay: true, showPlayer: false });
         } catch {
           await loadBook(currentBook, { autoPlay: true, showPlayer: false });
         }
-      } else {
-        await play();
       }
     }
-  }, [isPlaying, play, pause, isPlayerReady, currentBook, loadBook]);
+  }, [isPlaying, pause, currentBook, loadBook]);
 
   const handleSpeedPress = useCallback(() => {
     setTempSpeed(playbackRate);
@@ -450,9 +483,11 @@ export function HomeScreen() {
                 key={book.id}
                 book={book}
                 onPress={() => handleBookPress(book)}
-                onPlayPress={() => handlePlayBook(book)}
+                onDownloadPress={() => handleDownloadBook(book)}
                 showProgress={true}
                 showSwipe={false}
+                downloadStatus={downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id)}
+                downloadProgress={downloadProgress.get(book.id) || 0}
               />
             ))}
           </View>
@@ -467,9 +502,11 @@ export function HomeScreen() {
                 key={book.id}
                 book={book}
                 onPress={() => handleBookPress(book)}
-                onPlayPress={() => handlePlayBook(book)}
+                onDownloadPress={() => handleDownloadBook(book)}
                 showProgress={true}
                 showSwipe={false}
+                downloadStatus={downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id)}
+                downloadProgress={downloadProgress.get(book.id) || 0}
               />
             ))}
           </View>

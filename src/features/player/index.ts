@@ -1,6 +1,4 @@
-export { PlayerScreen } from './screens/PlayerScreen';
 export { SimplePlayerScreen } from './screens/SimplePlayerScreen';
-export { MiniPlayer } from './components/MiniPlayer';
 export { usePlayerStore } from './stores/playerStore';
 export { audioService } from './services/audioService';
 export { backgroundSyncService } from './services/backgroundSyncService';

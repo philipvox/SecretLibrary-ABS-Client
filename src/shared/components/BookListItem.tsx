@@ -4,14 +4,20 @@
  * Shared list item component for displaying individual books
  * Used across all screens where books are shown (home, library, search, etc.)
  *
- * Design: Cover (50x50) | Title | Author | Progress | Heart + Play button
+ * Design: Cover (50x50) | Title | Author | Progress | Queue + Heart + Download button
  * Swipeable left for delete action (optional)
+ *
+ * NN/g UX Pattern: Download button replaces Play button
+ * - Not downloaded: Download icon (starts download)
+ * - Downloading: Progress %
+ * - Queued: Clock icon
+ * - Downloaded: Checkmark (tapping opens BookDetail)
  */
 
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, Pressable, Alert, Animated, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Reanimated, {
   SharedValue,
@@ -23,6 +29,7 @@ import type { LibraryItem } from '@/core/types';
 import { HeartIcon } from './HeartButton';
 import { useMyLibraryStore } from '@/features/library/stores/myLibraryStore';
 import { useQueueStore, useIsInQueue } from '@/features/queue';
+import { autoDownloadService } from '@/features/downloads/services/autoDownloadService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
@@ -35,6 +42,9 @@ const COLORS = {
   textTertiary: 'rgba(255, 255, 255, 0.4)',
   heart: '#4ADE80',
   playButton: '#CCFF00',
+  downloadButton: '#CCFF00',
+  downloadComplete: '#4ADE80',
+  downloadQueued: 'rgba(255, 255, 255, 0.5)',
   deleteAction: '#DC2626',
   heartAction: '#4ADE80',
 };
@@ -118,10 +128,53 @@ const InQueueIndicator = ({ color = '#4ADE80' }: { color?: string }) => (
   </View>
 );
 
+// Download icon SVG (arrow pointing down into tray)
+const DownloadIcon = ({ size = 24, color = '#CCFF00' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"
+      stroke={color}
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// Clock icon SVG (for queued downloads)
+const ClockIcon = ({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={2} />
+    <Path
+      d="M12 7v5l3 3"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// Checkmark icon SVG (for completed downloads)
+const CheckmarkIcon = ({ size = 24, color = '#4ADE80' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M20 6L9 17l-5-5"
+      stroke={color}
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export type DownloadIndicatorStatus = 'none' | 'queued' | 'downloading' | 'completed' | 'error';
+
 export interface BookListItemProps {
   book: LibraryItem;
   onPress: () => void;
   onPlayPress?: () => void;
+  onDownloadPress?: () => void; // Called when download button tapped (only if not downloaded)
   onDelete?: () => void;
   showProgress?: boolean;
   showSwipe?: boolean;
@@ -129,7 +182,9 @@ export interface BookListItemProps {
   seriesSequence?: number;   // Sequence number (#1, #2, etc.)
   hideTitle?: boolean;       // Hide book title (for series page)
   hideQueueButton?: boolean; // Hide queue add button (for queue list)
-  isLoadingThisBook?: boolean; // Show loading spinner on play button
+  isLoadingThisBook?: boolean; // Show loading spinner on download action
+  downloadStatus?: DownloadIndicatorStatus; // Show download status indicator
+  downloadProgress?: number;  // Download progress (0-1)
 }
 
 // Right action component (delete)
@@ -192,6 +247,7 @@ export function BookListItem({
   book,
   onPress,
   onPlayPress,
+  onDownloadPress,
   onDelete,
   showProgress = true,
   showSwipe = true,
@@ -200,6 +256,8 @@ export function BookListItem({
   hideTitle = false,
   hideQueueButton = false,
   isLoadingThisBook = false,
+  downloadStatus = 'none',
+  downloadProgress = 0,
 }: BookListItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const coverUrl = useCoverUrl(book.id);
@@ -316,12 +374,43 @@ export function BookListItem({
       <View style={styles.container}>
         {/* Cover and Info - tapping opens player page */}
         <Pressable style={styles.coverInfoPressable} onPress={onPress}>
-          {/* Cover with optional sequence badge */}
+          {/* Cover with optional sequence badge and download indicator */}
           <View style={styles.coverContainer}>
             <Image source={coverUrl} style={styles.cover} contentFit="cover" />
             {seriesSequence !== undefined && (
               <View style={styles.sequenceBadge}>
                 <Text style={styles.sequenceText}>#{seriesSequence}</Text>
+              </View>
+            )}
+            {/* Download status indicators */}
+            {downloadStatus === 'completed' && (
+              <View style={styles.downloadBadge}>
+                <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M20 6L9 17l-5-5"
+                    stroke="#C8FF00"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              </View>
+            )}
+            {downloadStatus === 'downloading' && (
+              <View style={styles.downloadingBadge}>
+                <Text style={styles.downloadingText}>{Math.round(downloadProgress * 100)}%</Text>
+              </View>
+            )}
+            {downloadStatus === 'queued' && (
+              <View style={styles.queuedBadge}>
+                <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M12 2v10M12 18v4M12 14a2 2 0 100-4 2 2 0 000 4z"
+                    stroke="#FFF"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  />
+                </Svg>
               </View>
             )}
           </View>
@@ -344,7 +433,7 @@ export function BookListItem({
           </View>
         </Pressable>
 
-        {/* Action buttons: Queue + Heart + Play */}
+        {/* Action buttons: Queue + Heart + Download/Status */}
         <View style={styles.actionButtons}>
           {!hideQueueButton && (
             <Pressable style={styles.queueButton} onPress={isInQueue ? undefined : handleQueueAdd} disabled={isInQueue}>
@@ -362,15 +451,30 @@ export function BookListItem({
               filled={isInLibrary}
             />
           </Pressable>
+          {/* Download/Status button - replaces Play per NN/g pattern */}
           <Pressable
-            style={styles.playButton}
-            onPress={onPlayPress}
-            disabled={isLoadingThisBook}
+            style={styles.downloadButton}
+            onPress={
+              downloadStatus === 'completed'
+                ? onPress // Opens BookDetail when already downloaded
+                : downloadStatus === 'none' || downloadStatus === 'error'
+                ? onDownloadPress // Start download
+                : undefined // Disabled while downloading/queued
+            }
+            disabled={isLoadingThisBook || downloadStatus === 'downloading' || downloadStatus === 'queued'}
           >
             {isLoadingThisBook ? (
-              <ActivityIndicator size={scale(18)} color={COLORS.playButton} />
+              <ActivityIndicator size={scale(18)} color={COLORS.downloadButton} />
+            ) : downloadStatus === 'completed' ? (
+              <CheckmarkIcon size={scale(20)} color={COLORS.downloadComplete} />
+            ) : downloadStatus === 'downloading' ? (
+              <View style={styles.downloadProgressContainer}>
+                <Text style={styles.downloadProgressText}>{Math.round(downloadProgress * 100)}%</Text>
+              </View>
+            ) : downloadStatus === 'queued' ? (
+              <ClockIcon size={scale(18)} color={COLORS.downloadQueued} />
             ) : (
-              <PlayIcon size={scale(20)} color={COLORS.playButton} />
+              <DownloadIcon size={scale(20)} color={COLORS.downloadButton} />
             )}
           </Pressable>
         </View>
@@ -514,11 +618,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playButton: {
+  // NN/g: Download button replaces Play button
+  downloadButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  downloadProgressContainer: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    backgroundColor: 'rgba(200, 255, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadProgressText: {
+    fontSize: scale(10),
+    fontWeight: '700',
+    color: COLORS.downloadButton,
   },
   deleteAction: {
     backgroundColor: COLORS.deleteAction,
@@ -553,5 +671,36 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: scale(11),
     fontWeight: '600',
+  },
+  // Download status indicators
+  downloadBadge: {
+    position: 'absolute',
+    bottom: scale(2),
+    right: scale(2),
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: scale(8),
+    padding: scale(3),
+  },
+  downloadingBadge: {
+    position: 'absolute',
+    bottom: scale(2),
+    right: scale(2),
+    backgroundColor: 'rgba(200, 255, 0, 0.9)',
+    borderRadius: scale(8),
+    paddingHorizontal: scale(4),
+    paddingVertical: scale(2),
+  },
+  downloadingText: {
+    fontSize: scale(8),
+    fontWeight: '700',
+    color: '#000000',
+  },
+  queuedBadge: {
+    position: 'absolute',
+    bottom: scale(2),
+    right: scale(2),
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: scale(8),
+    padding: scale(3),
   },
 });

@@ -20,7 +20,6 @@ import {
   SeriesWithBooks,
   PlaylistDisplay,
 } from '../types';
-import { autoDownloadService } from '@/features/downloads/services/autoDownloadService';
 
 /**
  * Main hook for home screen data
@@ -244,14 +243,6 @@ export function useHomeData(): UseHomeDataReturn {
     // No current book, just return top 3
     return others.slice(0, 3);
   }, [inProgressItems, currentBook]);
-
-  // Auto-download top 3 most recently listened books (Audible-style)
-  useEffect(() => {
-    if (recentlyListened.length > 0) {
-      console.log('[useHomeData] Triggering auto-download sync for', recentlyListened.length, 'books');
-      autoDownloadService.syncWithContinueListening(recentlyListened);
-    }
-  }, [recentlyListened]);
 
   // Your Books - from library store (live updates when adding/removing)
   // Exclude current book from the list

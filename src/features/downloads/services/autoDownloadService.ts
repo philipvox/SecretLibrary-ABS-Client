@@ -1,9 +1,9 @@
 /**
  * src/features/downloads/services/autoDownloadService.ts
- * 
- * Audible-style auto-download manager
- * - Downloads top 3 most recently played books
- * - Uses delayed initialization to avoid runtime issues
+ *
+ * Manual download manager for offline audiobooks
+ * - Users explicitly download books they want
+ * - Tracks downloaded books in a manifest
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,10 +11,29 @@ import { InteractionManager, AppState } from 'react-native';
 import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 
-const MAX_DOWNLOADS = 3;
 const MANIFEST_KEY = 'auto_downloads_manifest_v7';
 const DOWNLOADS_SUBDIR = 'audiobooks';
 const RUNTIME_DELAY_MS = 3000; // Wait 3 seconds for runtime to be ready
+
+// Helper to format bytes as human-readable string
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+// Helper to format seconds as mm:ss or hh:mm:ss
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return '--:--';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 export interface DownloadedBook {
   id: string;
@@ -153,10 +172,17 @@ class AutoDownloadService {
       const data = await AsyncStorage.getItem(MANIFEST_KEY);
       if (data) {
         const parsed = JSON.parse(data);
-        // Filter out any books with invalid IDs
+        // Filter out any books with invalid IDs and sanitize paths
         this.manifest = {
           ...parsed,
-          books: (parsed.books || []).filter((book: any) => book && book.id),
+          books: (parsed.books || [])
+            .filter((book: any) => book && book.id)
+            .map((book: any) => ({
+              ...book,
+              // Sanitize paths - remove any parent directory traversal
+              localPath: book.localPath?.replace(/\/\.\..*$/, '') || book.localPath,
+              coverPath: book.coverPath?.replace(/\/\.\..*$/, '') || book.coverPath,
+            })),
         };
         for (const book of this.manifest.books) {
           this.statusState.set(book.id, 'completed');
@@ -244,83 +270,94 @@ class AutoDownloadService {
   // Public API - Actions
   // ========================================
 
-  async syncWithContinueListening(items: LibraryItem[]): Promise<void> {
-    await this.ensureInit();
-    
-    // Ensure file system is ready before any downloads
-    const fsReady = await ensureFileSystem();
-    if (!fsReady) {
-      console.warn('[AutoDownload] FileSystem not ready, skipping sync');
-      return;
-    }
-    
-    const topItems = items.slice(0, MAX_DOWNLOADS);
-    const topIds = new Set(topItems.map(i => i.id));
-
-    console.log('[AutoDownload] Syncing:', topItems.map(i => i.media?.metadata?.title?.substring(0, 20)).join(', '));
-
-    // Remove books no longer in top 3
-    const toRemove = this.manifest.books.filter(b => !topIds.has(b.id));
-    for (const book of toRemove) {
-      await this.removeDownload(book.id);
-    }
-
-    // Queue downloads for new items
-    for (const item of topItems) {
-      if (!this.isDownloaded(item.id) && !this.isDownloading(item.id)) {
-        this.queueDownload(item);
-      }
-    }
-  }
-
   /**
    * Manually start downloading a book
    */
   startDownload(item: LibraryItem): void {
+    const title = item.media?.metadata?.title || 'Unknown';
+    console.log(`[AutoDownload] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>`);
+    console.log(`[AutoDownload] startDownload called for: ${item.id}`);
+    console.log(`[AutoDownload] Title: ${title}`);
+    console.log(`[AutoDownload] Manifest has ${this.manifest.books.length} books`);
+    console.log(`[AutoDownload] isDownloaded: ${this.isDownloaded(item.id)}, isDownloading: ${this.isDownloading(item.id)}`);
+
     if (this.isDownloaded(item.id) || this.isDownloading(item.id)) {
-      console.log('[AutoDownload] Already downloaded or downloading:', item.id);
+      console.log('[AutoDownload] Already downloaded or downloading - skipping');
       return;
     }
-    console.log('[AutoDownload] Manual download started:', item.media?.metadata?.title);
+    console.log('[AutoDownload] Queuing download...');
     this.queueDownload(item);
   }
 
   private queueDownload(item: LibraryItem): void {
     const bookId = item?.id;
+    console.log(`[AutoDownload] queueDownload called for: ${bookId}`);
     if (!bookId) {
       console.warn('[AutoDownload] Skipping item with no id');
       return;
     }
-    if (this.downloadQueue.includes(bookId)) return;
-    
+    if (this.downloadQueue.includes(bookId)) {
+      console.log('[AutoDownload] Already in queue - skipping');
+      return;
+    }
+
+    console.log(`[AutoDownload] Adding to queue. Queue before: ${this.downloadQueue.length}, Active: ${this.activeDownloads.size}`);
     this.downloadQueue.push(bookId);
     this.notifyStatus(bookId, 'queued');
+    console.log(`[AutoDownload] Queue after: ${this.downloadQueue.length}. Calling processQueue...`);
     this.processQueue();
   }
 
   private async processQueue(): Promise<void> {
-    if (this.isProcessingQueue) return;
-    if (this.downloadQueue.length === 0) return;
-    if (this.activeDownloads.size >= 1) return; // One at a time
-    
+    console.log(`[AutoDownload] processQueue called. isProcessing: ${this.isProcessingQueue}, queueLen: ${this.downloadQueue.length}, activeDownloads: ${this.activeDownloads.size}`);
+
+    if (this.isProcessingQueue) {
+      console.log('[AutoDownload] Already processing queue - returning');
+      return;
+    }
+    if (this.downloadQueue.length === 0) {
+      console.log('[AutoDownload] Queue empty - returning');
+      return;
+    }
+    if (this.activeDownloads.size >= 1) {
+      console.log('[AutoDownload] Already have active download - returning');
+      return;
+    }
+
     this.isProcessingQueue = true;
-    
+    console.log('[AutoDownload] Starting queue processing loop...');
+
     while (this.downloadQueue.length > 0 && this.activeDownloads.size < 1) {
       const bookId = this.downloadQueue.shift()!;
+      console.log(`[AutoDownload] Processing book from queue: ${bookId}`);
       await this.downloadBook(bookId);
     }
-    
+
+    console.log('[AutoDownload] Queue processing complete');
     this.isProcessingQueue = false;
   }
 
   private async downloadBook(bookId: string): Promise<void> {
+    console.log(`[AutoDownload] downloadBook called for: ${bookId}`);
+
     if (!bookId) {
       console.warn('[AutoDownload] Skipping undefined bookId');
       return;
     }
-    
-    if (!_fs || !_downloadsDir) {
-      console.warn('[AutoDownload] FileSystem not ready');
+
+    // Ensure FileSystem is initialized before downloading
+    console.log('[AutoDownload] Checking FileSystem...');
+    const fsReady = await ensureFileSystem();
+    console.log(`[AutoDownload] FileSystem ready: ${fsReady}, _fs: ${!!_fs}, _downloadsDir: ${_downloadsDir}`);
+
+    if (!fsReady || !_fs || !_downloadsDir) {
+      console.warn('[AutoDownload] FileSystem not ready, retrying in 2s...');
+      // Retry after delay
+      setTimeout(() => {
+        this.downloadQueue.unshift(bookId);
+        this.activeDownloads.delete(bookId);
+        this.processQueue();
+      }, 2000);
       return;
     }
 
@@ -329,96 +366,155 @@ class AutoDownloadService {
     this.notifyProgress(bookId, 0);
 
     try {
-      // Get book details
+      // Get book metadata from API - includes audioFiles with ino for each file
+      console.log(`[AutoDownload] Fetching book metadata for: ${bookId}`);
       const book = await apiClient.getItem(bookId);
+      console.log(`[AutoDownload] Got metadata for: ${book?.media?.metadata?.title}`);
+
       const title = book.media?.metadata?.title || 'Unknown';
-      
+      const audioFiles = (book.media as any)?.audioFiles || [];
+      console.log(`[AutoDownload] Audio files found: ${audioFiles.length}`);
+
+      if (audioFiles.length === 0) {
+        throw new Error('No audio files found in book metadata');
+      }
+
       // Get auth token and base URL
-      const token = (apiClient as any).getAuthToken?.() || 
-                    (apiClient as any).authToken || 
+      const token = (apiClient as any).getAuthToken?.() ||
+                    (apiClient as any).authToken ||
                     (apiClient as any).token || '';
       const baseUrl = apiClient.getBaseURL().replace(/\/+$/, '');
 
-      // Start a session to get stream URL
-      const sessionResponse = await apiClient.post<any>(`/api/items/${bookId}/play`, {
-        deviceInfo: { clientName: 'AudiobookShelf-Download', deviceId: 'download' },
-        forceDirectPlay: true,
-        forceTranscode: false,
-      });
+      console.log(`[AutoDownload] ====================================`);
+      console.log(`[AutoDownload] BASE URL: ${baseUrl}`);
+      console.log(`[AutoDownload] Token present: ${!!token} (length: ${token.length})`);
+      console.log(`[AutoDownload] ====================================`);
+      console.log(`[AutoDownload] Downloading: ${title} (${audioFiles.length} file${audioFiles.length > 1 ? 's' : ''})`);
 
-      if (!sessionResponse?.audioTracks?.length) {
-        throw new Error('No audio tracks');
+      // Create book directory
+      const bookDir = `${_downloadsDir}${bookId}/`;
+      const dirInfo = await _fs.getInfoAsync(bookDir);
+      if (!dirInfo.exists) {
+        await _fs.makeDirectoryAsync(bookDir, { intermediates: true });
       }
 
-      const sessionId = sessionResponse.id;
-      const audioTrack = sessionResponse.audioTracks[0];
-      let downloadUrl = audioTrack.contentUrl;
-      
-      // Build full URL with token
-      if (downloadUrl.startsWith('/')) {
-        downloadUrl = `${baseUrl}${downloadUrl}`;
-      }
-      if (!downloadUrl.includes('token=')) {
-        downloadUrl += `${downloadUrl.includes('?') ? '&' : '?'}token=${token}`;
+      // Calculate total size for progress tracking
+      let totalSize = 0;
+      let downloadedSize = 0;
+      for (const file of audioFiles) {
+        totalSize += file.metadata?.size || 0;
       }
 
-      const ext = audioTrack.metadata?.ext || '.m4b';
-      const filename = `${bookId}${ext}`;
-      const localPath = `${_downloadsDir}${filename}`;
+      // Download each audio file via /api/items/{itemId}/file/{ino}
+      // This hits the server cache and is much faster than streaming
+      const overallStartTime = Date.now();
 
-      console.log(`[AutoDownload] Downloading: ${title}`);
+      for (let i = 0; i < audioFiles.length; i++) {
+        const file = audioFiles[i];
+        const ino = file.ino;
+        const ext = file.metadata?.ext || '.m4b';
+        const filename = `${i.toString().padStart(3, '0')}_${ino}${ext}`;
+        const localFilePath = `${bookDir}${filename}`;
+        const fileSize = file.metadata?.size || 0;
 
-      // Create download resumable
-      const downloadResumable = _fs.createDownloadResumable(
-        downloadUrl,
-        localPath,
-        {},
-        (progress: { totalBytesWritten: number; totalBytesExpectedToWrite: number }) => {
-          const pct = progress.totalBytesExpectedToWrite > 0
-            ? progress.totalBytesWritten / progress.totalBytesExpectedToWrite
-            : 0;
-          this.notifyProgress(bookId, pct);
+        // Direct file download URL - hits server cache
+        const downloadUrl = `${baseUrl}/api/items/${bookId}/file/${ino}?token=${token}`;
+
+        const fileStartTime = Date.now();
+        console.log(`[AutoDownload] File ${i + 1}/${audioFiles.length}: ${file.metadata?.filename || ino} (${formatBytes(fileSize)})`);
+        console.log(`[AutoDownload] Download URL: ${downloadUrl.replace(/token=[^&]+/, 'token=***')}`);
+        console.log(`[AutoDownload] Local path: ${localFilePath}`);
+
+        const currentDownloadedSize = downloadedSize;
+        let lastLogTime = Date.now();
+        let lastLogBytes = 0;
+
+        const downloadResumable = _fs.createDownloadResumable(
+          downloadUrl,
+          localFilePath,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+          (progress: { totalBytesWritten: number; totalBytesExpectedToWrite: number }) => {
+            const currentTotal = currentDownloadedSize + progress.totalBytesWritten;
+            const pct = totalSize > 0 ? currentTotal / totalSize : (i + progress.totalBytesWritten / (fileSize || 1)) / audioFiles.length;
+            this.notifyProgress(bookId, Math.min(pct, 0.99));
+
+            // Log progress with speed every 2 seconds
+            const now = Date.now();
+            if (now - lastLogTime >= 2000) {
+              const elapsed = (now - lastLogTime) / 1000;
+              const bytesDelta = progress.totalBytesWritten - lastLogBytes;
+              const speed = bytesDelta / elapsed;
+              const overallPct = Math.round(pct * 100);
+              const eta = speed > 0 ? (totalSize - currentTotal) / speed : 0;
+              console.log(`[AutoDownload] ${overallPct}% | ${formatBytes(currentTotal)}/${formatBytes(totalSize)} | ${formatBytes(speed)}/s | ETA: ${formatTime(eta)}`);
+              lastLogTime = now;
+              lastLogBytes = progress.totalBytesWritten;
+            }
+          }
+        );
+
+        this.downloadResumables.set(bookId, downloadResumable);
+
+        console.log(`[AutoDownload] Starting downloadAsync for file ${i + 1}...`);
+        const result = await downloadResumable.downloadAsync();
+        console.log(`[AutoDownload] downloadAsync returned:`, result ? `URI: ${result.uri?.substring(0, 50)}...` : 'null');
+        if (!result?.uri) {
+          throw new Error(`Download failed for file ${i + 1}: no URI`);
         }
-      );
 
-      this.downloadResumables.set(bookId, downloadResumable);
+        const fileElapsed = (Date.now() - fileStartTime) / 1000;
+        const fileSpeed = fileSize / fileElapsed;
+        console.log(`[AutoDownload] File ${i + 1} done in ${fileElapsed.toFixed(1)}s (${formatBytes(fileSpeed)}/s)`);
 
-      const result = await downloadResumable.downloadAsync();
-      
-      if (!result?.uri) {
-        throw new Error('Download failed - no URI');
+        downloadedSize += fileSize;
       }
 
-      // Close session
-      if (sessionId) {
-        apiClient.post(`/api/session/${sessionId}/close`, {}).catch(() => {});
-      }
+      const totalElapsed = (Date.now() - overallStartTime) / 1000;
+      const avgSpeed = downloadedSize / totalElapsed;
+      console.log(`[AutoDownload] All files downloaded in ${totalElapsed.toFixed(1)}s (avg ${formatBytes(avgSpeed)}/s)`);
+
+      // For single-file books, also save the direct path for easier playback
+      const primaryPath = audioFiles.length === 1
+        ? `${bookDir}000_${audioFiles[0].ino}${audioFiles[0].metadata?.ext || '.m4b'}`
+        : bookDir;
 
       // Download cover
       let coverPath: string | null = null;
       try {
         const coverUrl = apiClient.getItemCoverUrl(bookId);
         if (coverUrl) {
-          coverPath = `${_downloadsDir}${bookId}_cover.jpg`;
-          await _fs.downloadAsync(coverUrl, coverPath);
+          coverPath = `${bookDir}cover.jpg`;
+          await _fs.downloadAsync(coverUrl, coverPath, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
         }
       } catch (e) {
         // Cover download optional
       }
 
-      // Get file size
-      const fileInfo = await _fs.getInfoAsync(localPath);
-      const fileSize = fileInfo.size || 0;
+      // Get total downloaded size
+      let totalFileSize = 0;
+      for (let i = 0; i < audioFiles.length; i++) {
+        const file = audioFiles[i];
+        const filename = `${i.toString().padStart(3, '0')}_${file.ino}${file.metadata?.ext || '.m4b'}`;
+        const filePath = `${bookDir}${filename}`;
+        try {
+          const info = await _fs.getInfoAsync(filePath);
+          totalFileSize += info.size || 0;
+        } catch {}
+      }
 
       // Add to manifest
       const downloadedBook: DownloadedBook = {
         id: bookId,
         title,
-        localPath,
+        localPath: primaryPath,
         coverPath,
         downloadedAt: Date.now(),
         lastPlayedAt: Date.now(),
-        fileSize,
+        fileSize: totalFileSize,
         duration: (book.media as any)?.duration || 0,
       };
 
@@ -427,10 +523,14 @@ class AutoDownloadService {
 
       this.notifyProgress(bookId, 1);
       this.notifyStatus(bookId, 'completed');
-      console.log(`[AutoDownload] Completed: ${title}`);
+      console.log(`[AutoDownload] Completed: ${title} (${(totalFileSize / 1024 / 1024).toFixed(1)} MB)`);
 
     } catch (e: any) {
-      console.error(`[AutoDownload] Failed: ${bookId}`, e.message);
+      console.error(`[AutoDownload] ====================================`);
+      console.error(`[AutoDownload] DOWNLOAD FAILED: ${bookId}`);
+      console.error(`[AutoDownload] Error message: ${e.message}`);
+      console.error(`[AutoDownload] Error stack:`, e.stack);
+      console.error(`[AutoDownload] ====================================`);
       this.notifyStatus(bookId, 'error');
     } finally {
       this.activeDownloads.delete(bookId);
@@ -495,13 +595,13 @@ class AutoDownloadService {
     const book = this.manifest.books.find(b => b.id === bookId);
     if (!book) return;
 
-    // Delete files
+    // Delete files (validate paths don't contain directory traversal)
     if (_fs) {
       try {
-        if (book.localPath) {
+        if (book.localPath && !book.localPath.includes('..')) {
           await _fs.deleteAsync(book.localPath, { idempotent: true });
         }
-        if (book.coverPath) {
+        if (book.coverPath && !book.coverPath.includes('..')) {
           await _fs.deleteAsync(book.coverPath, { idempotent: true });
         }
       } catch (e) {
@@ -537,16 +637,31 @@ class AutoDownloadService {
 
 // Export a getter function instead of instance
 let _instance: AutoDownloadService | null = null;
+let _initPromise: Promise<void> | null = null;
+
+async function ensureInstance(): Promise<AutoDownloadService> {
+  if (!_instance) {
+    _instance = new AutoDownloadService();
+  }
+  // Always ensure initialized before returning
+  if (!_initPromise) {
+    _initPromise = _instance['init']();
+  }
+  await _initPromise;
+  return _instance;
+}
 
 export const autoDownloadService = {
   get instance() {
     if (!_instance) {
       _instance = new AutoDownloadService();
+      // Fire init in background (for sync access later)
+      _initPromise = _instance['init']();
     }
     return _instance;
   },
-  
-  // Proxy all methods
+
+  // Sync methods (use cached state, no await needed)
   onProgress: (cb: ProgressCallback) => autoDownloadService.instance.onProgress(cb),
   onStatus: (cb: StatusCallback) => autoDownloadService.instance.onStatus(cb),
   getProgress: (id: string) => autoDownloadService.instance.getProgress(id),
@@ -557,11 +672,33 @@ export const autoDownloadService = {
   getDownloadedBook: (id: string) => autoDownloadService.instance.getDownloadedBook(id),
   getAllDownloads: () => autoDownloadService.instance.getAllDownloads(),
   getTotalSize: () => autoDownloadService.instance.getTotalSize(),
-  syncWithContinueListening: (items: LibraryItem[]) => autoDownloadService.instance.syncWithContinueListening(items),
-  startDownload: (item: LibraryItem) => autoDownloadService.instance.startDownload(item),
-  waitForDownload: (id: string) => autoDownloadService.instance.waitForDownload(id),
-  cancelDownload: (id: string) => autoDownloadService.instance.cancelDownload(id),
-  removeDownload: (id: string) => autoDownloadService.instance.removeDownload(id),
-  updateLastPlayed: (id: string) => autoDownloadService.instance.updateLastPlayed(id),
-  clearAll: () => autoDownloadService.instance.clearAll(),
+
+  // Async methods (ensure init before action)
+  startDownload: async (item: LibraryItem) => {
+    console.log(`[AutoDownload] PROXY startDownload called for: ${item?.id}`);
+    console.log(`[AutoDownload] PROXY awaiting ensureInstance...`);
+    const inst = await ensureInstance();
+    console.log(`[AutoDownload] PROXY got instance, calling startDownload...`);
+    inst.startDownload(item);
+  },
+  waitForDownload: async (id: string) => {
+    const inst = await ensureInstance();
+    return inst.waitForDownload(id);
+  },
+  cancelDownload: async (id: string) => {
+    const inst = await ensureInstance();
+    return inst.cancelDownload(id);
+  },
+  removeDownload: async (id: string) => {
+    const inst = await ensureInstance();
+    return inst.removeDownload(id);
+  },
+  updateLastPlayed: async (id: string) => {
+    const inst = await ensureInstance();
+    return inst.updateLastPlayed(id);
+  },
+  clearAll: async () => {
+    const inst = await ensureInstance();
+    return inst.clearAll();
+  },
 };

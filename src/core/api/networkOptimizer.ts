@@ -162,9 +162,9 @@ interface RetryConfig {
 }
 
 const defaultRetryConfig: RetryConfig = {
-  maxRetries: 3,
-  baseDelay: 1000,
-  maxDelay: 10000,
+  maxRetries: 2,
+  baseDelay: 500,
+  maxDelay: 3000,
   retryOn: (error: any) => {
     // Retry on network errors and 5xx server errors
     if (!error.response) return true; // Network error

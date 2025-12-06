@@ -27,6 +27,7 @@ import { SeriesDetailScreen } from '@/features/series';
 import { AuthorDetailScreen } from '@/features/author';
 import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
+import { BookDetailScreen } from '@/features/book-detail';
 import { ProfileScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
 import { SimplePlayerScreen } from '@/features/player';
@@ -114,6 +115,7 @@ function AuthenticatedApp() {
         <Stack.Screen name="AuthorDetail" component={AuthorDetailScreen} />
         <Stack.Screen name="NarratorDetail" component={NarratorDetailScreen} />
         <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
+        <Stack.Screen name="BookDetail" component={BookDetailScreen} />
         <Stack.Screen name="Preferences" component={PreferencesScreen} />
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
         <Stack.Screen name="Downloads" component={DownloadsScreen} />

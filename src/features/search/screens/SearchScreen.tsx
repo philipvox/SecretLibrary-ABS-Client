@@ -2,7 +2,7 @@
  * src/features/search/screens/SearchScreen.tsx
  *
  * Enhanced search screen with unified results:
- * - 2 rows of books (6 books)
+ * - Books with download status indicators
  * - Top 3 series with stacked covers
  * - Top 2 authors
  * - Top 2 narrators
@@ -27,6 +27,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useLibraryCache, getAllGenres, getAllAuthors, getAllSeries, getAllNarrators, useCoverUrl, type FilterOptions } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
 import { apiClient } from '@/core/api';
+import { autoDownloadService, DownloadStatus } from '@/features/downloads/services/autoDownloadService';
 import { Icon } from '@/shared/components/Icon';
 import { HeartButton, SeriesHeartButton, BookListItem } from '@/shared/components';
 import { LibraryItem } from '@/core/types';
@@ -120,7 +121,7 @@ export function SearchScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ Search: SearchScreenParams }, 'Search'>>();
   const inputRef = useRef<TextInput>(null);
-  const { loadBook, viewBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
+  const { loadBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
 
   // Search state
   const [query, setQuery] = useState('');
@@ -150,6 +151,26 @@ export function SearchScreen() {
   const allAuthors = useMemo(() => getAllAuthors(), [isLoaded]);
   const allNarrators = useMemo(() => getAllNarrators(), [isLoaded]);
   const allSeries = useMemo(() => getAllSeries(), [isLoaded]);
+
+  // Download status tracking
+  const [downloadStatuses, setDownloadStatuses] = useState<Map<string, DownloadStatus>>(new Map());
+  const [downloadProgress, setDownloadProgress] = useState<Map<string, number>>(new Map());
+
+  // Subscribe to download status changes
+  useEffect(() => {
+    const unsubStatus = autoDownloadService.onStatus((bookId, status) => {
+      setDownloadStatuses(prev => new Map(prev).set(bookId, status));
+    });
+
+    const unsubProgress = autoDownloadService.onProgress((bookId, progress) => {
+      setDownloadProgress(prev => new Map(prev).set(bookId, progress));
+    });
+
+    return () => {
+      unsubStatus();
+      unsubProgress();
+    };
+  }, []);
 
   // Load previous searches on mount
   useEffect(() => {
@@ -217,8 +238,10 @@ export function SearchScreen() {
   // Filter book results - instant from cache!
   const bookResults = useMemo(() => {
     if (!hasActiveSearch) return [];
-    return filterItems(filters).slice(0, 100);
-  }, [filterItems, filters, hasActiveSearch]);
+    const results = filterItems(filters);
+    console.log(`[Search] Query: "${filters.query}", isLoaded: ${isLoaded}, Results: ${results.length}`);
+    return results.slice(0, 100);
+  }, [filterItems, filters, hasActiveSearch, isLoaded]);
 
   // Filter authors matching query
   const authorResults = useMemo(() => {
@@ -282,16 +305,11 @@ export function SearchScreen() {
     saveSearch(search);
   };
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
+  const handleBookPress = useCallback((book: LibraryItem) => {
     Keyboard.dismiss();
     if (query.trim()) saveSearch(query.trim());
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await viewBook(fullBook);
-    } catch {
-      await viewBook(book);
-    }
-  }, [viewBook, query]);
+    navigation.navigate('BookDetail', { id: book.id });
+  }, [navigation, query]);
 
   const handlePlayBook = useCallback(async (book: LibraryItem) => {
     Keyboard.dismiss();
@@ -604,17 +622,23 @@ export function SearchScreen() {
               )}
             </View>
             <View>
-              {bookResults.slice(0, 5).map(book => (
-                <BookListItem
-                  key={book.id}
-                  book={book}
-                  onPress={() => handleBookPress(book)}
-                  onPlayPress={() => handlePlayBook(book)}
-                  showProgress={true}
-                  showSwipe={true}
-                  isLoadingThisBook={isPlayerLoading && currentBook?.id === book.id}
-                />
-              ))}
+              {bookResults.slice(0, 5).map(book => {
+                const status = downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id);
+                const progress = downloadProgress.get(book.id) || 0;
+                return (
+                  <BookListItem
+                    key={book.id}
+                    book={book}
+                    onPress={() => handleBookPress(book)}
+                    onPlayPress={() => handlePlayBook(book)}
+                    showProgress={true}
+                    showSwipe={true}
+                    isLoadingThisBook={isPlayerLoading && currentBook?.id === book.id}
+                    downloadStatus={status}
+                    downloadProgress={progress}
+                  />
+                );
+              })}
             </View>
           </View>
         )}

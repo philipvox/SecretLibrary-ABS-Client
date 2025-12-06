@@ -40,6 +40,49 @@ class AppInitializer {
     const startTime = Date.now();
     console.log('[AppInitializer] Starting parallel initialization...');
 
+    // =========================================================================
+    // ONE-TIME CACHE CLEAR - Remove this block after stale data is cleared
+    // =========================================================================
+    try {
+      console.log('[AppInitializer] 🧹 CLEARING ALL STALE DATA...');
+
+      // 1. Clear AsyncStorage caches
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      await AsyncStorage.multiRemove([
+        'library_cache_v1',
+        'auto_download_manifest',
+        'search_history',
+        'abs_last_played_book',
+        'player_state',
+      ]);
+      console.log('[AppInitializer] ✓ AsyncStorage cleared');
+
+      // 2. Clear SQLite cache
+      try {
+        const { sqliteCache } = await import('./sqliteCache');
+        await sqliteCache.clearAllCache();
+        console.log('[AppInitializer] ✓ SQLite cache cleared');
+      } catch (e) {
+        console.warn('[AppInitializer] SQLite clear skipped:', e);
+      }
+
+      // 3. Clear downloaded files
+      try {
+        const { autoDownloadService } = await import('@/features/downloads/services/autoDownloadService');
+        await autoDownloadService.clearAll();
+        console.log('[AppInitializer] ✓ Downloads cleared');
+      } catch (e) {
+        console.warn('[AppInitializer] Downloads clear skipped:', e);
+      }
+
+      console.log('[AppInitializer] 🎉 ALL STALE DATA CLEARED');
+    } catch (e) {
+      console.error('[AppInitializer] Cache clear failed:', e);
+    }
+    // =========================================================================
+    // END ONE-TIME CACHE CLEAR
+    // =========================================================================
+
     // Import auth service lazily to avoid circular dependencies
     const { authService } = await import('@/core/auth/authService');
 

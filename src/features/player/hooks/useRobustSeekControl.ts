@@ -16,7 +16,6 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { usePlayerStore } from '../stores/playerStore';
 import { audioService } from '../services/audioService';
-import { seekLog } from '../utils/seekLogger';
 import {
   findChapterIndex,
   calculateSeekPosition,
@@ -105,7 +104,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
       if (nextState !== 'active' && lockRef.current.isLocked) {
-        seekLog.warn('App backgrounded during seek, releasing lock');
         forceReleaseLock();
       }
     };
@@ -143,10 +141,8 @@ export function useRobustSeekControl(): UseSeekControlReturn {
         // Check if lock is stale
         const lockAge = Date.now() - lock.startTime;
         if (lockAge > LOCK_TIMEOUT) {
-          seekLog.warn('Stale lock detected, forcing release', { lockAge });
           forceReleaseLock();
         } else {
-          seekLog.lock('blocked', { existingOperation: lock.operation, requestedOperation: operation });
           return false;
         }
       }
@@ -158,11 +154,9 @@ export function useRobustSeekControl(): UseSeekControlReturn {
 
       // Set auto-release timeout
       lockTimeoutRef.current = setTimeout(() => {
-        seekLog.warn('Lock timeout reached, forcing release');
         forceReleaseLock();
       }, LOCK_TIMEOUT);
 
-      seekLog.lock('acquire', { operation, direction });
       return true;
     },
     []
@@ -182,8 +176,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
     lock.isLocked = false;
     lock.operation = null;
     lock.direction = null;
-
-    seekLog.lock('release');
   }, []);
 
   /**
@@ -217,19 +209,16 @@ export function useRobustSeekControl(): UseSeekControlReturn {
           const diff = Math.abs(currentPos - targetPosition);
 
           if (diff <= POSITION_CONFIRM_TOLERANCE) {
-            seekLog.positionConfirm(targetPosition, currentPos, true);
             return true;
           }
         } catch (error) {
-          seekLog.error('getPosition', error as Error);
+          // Position check failed, will retry
         }
 
         // Small delay before checking again
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
-      const finalPos = await audioService.getPosition();
-      seekLog.positionConfirm(targetPosition, finalPos, false);
       return false;
     },
     []
@@ -240,13 +229,8 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    */
   const performSeek = useCallback(
     async (targetPosition: number, direction?: SeekDirection): Promise<void> => {
-      const timer = seekLog.timer('performSeek');
-
       try {
-        timer.step('seekTo');
         await audioService.seekTo(targetPosition);
-
-        timer.step('confirm');
         await waitForPositionConfirmation(targetPosition);
 
         // Update store position
@@ -254,10 +238,7 @@ export function useRobustSeekControl(): UseSeekControlReturn {
           position: targetPosition,
           isSeeking: false,
         });
-
-        timer.end();
       } catch (error) {
-        seekLog.error('performSeek', error as Error);
         throw error;
       }
     },
@@ -269,18 +250,12 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    */
   const handleChapterTransition = useCallback(
     async (fromIndex: number, toIndex: number, targetPosition: number): Promise<void> => {
-      const timer = seekLog.timer('chapterTransition');
-      seekLog.chapterCrossing(fromIndex, toIndex, { targetPosition });
-
       try {
         if (isMountedRef.current) {
           setState((prev) => ({ ...prev, isChangingChapter: true }));
         }
 
-        timer.step('seekTo');
         await audioService.seekTo(targetPosition);
-
-        timer.step('confirm');
         await waitForPositionConfirmation(targetPosition);
 
         // Update store
@@ -288,8 +263,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
           position: targetPosition,
           isSeeking: false,
         });
-
-        timer.end();
       } finally {
         if (isMountedRef.current) {
           setState((prev) => ({ ...prev, isChangingChapter: false }));
@@ -305,10 +278,8 @@ export function useRobustSeekControl(): UseSeekControlReturn {
   const seekRelative = useCallback(
     async (seconds: number): Promise<void> => {
       const direction: SeekDirection = seconds >= 0 ? 'forward' : 'backward';
-      seekLog.start('seekRelative', { seconds, direction });
 
       if (!acquireLock('seek', direction)) {
-        seekLog.end('seekRelative', { result: 'lock_failed' });
         return;
       }
 
@@ -337,10 +308,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
         // Notify store we're seeking
         usePlayerStore.setState({ isSeeking: true });
 
-        if (boundaryHit) {
-          seekLog.step('boundaryHit', { boundary: boundaryHit });
-        }
-
         if (crossing) {
           await handleChapterTransition(
             crossing.fromChapterIndex,
@@ -350,10 +317,8 @@ export function useRobustSeekControl(): UseSeekControlReturn {
         } else {
           await performSeek(targetPosition, direction);
         }
-
-        seekLog.end('seekRelative', { result: 'success', targetPosition });
       } catch (error) {
-        seekLog.error('seekRelative', error as Error);
+        // Seek failed
       } finally {
         releaseLock();
         if (isMountedRef.current) {
@@ -377,10 +342,7 @@ export function useRobustSeekControl(): UseSeekControlReturn {
       const startPosition = positionRef.current;
       const direction: SeekDirection = targetPosition >= startPosition ? 'forward' : 'backward';
 
-      seekLog.start('seekAbsolute', { targetPosition, direction });
-
       if (!acquireLock('seek', direction)) {
-        seekLog.end('seekAbsolute', { result: 'lock_failed' });
         return;
       }
 
@@ -411,10 +373,8 @@ export function useRobustSeekControl(): UseSeekControlReturn {
         } else {
           await performSeek(clampedTarget, direction);
         }
-
-        seekLog.end('seekAbsolute', { result: 'success', targetPosition: clampedTarget });
       } catch (error) {
-        seekLog.error('seekAbsolute', error as Error);
+        // Seek failed
       } finally {
         releaseLock();
         if (isMountedRef.current) {
@@ -435,10 +395,7 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    */
   const seekToChapter = useCallback(
     async (chapterIndex: number): Promise<void> => {
-      seekLog.start('seekToChapter', { chapterIndex });
-
       if (chapterIndex < 0 || chapterIndex >= chapters.length) {
-        seekLog.warn('Invalid chapter index', { chapterIndex, chaptersLength: chapters.length });
         return;
       }
 
@@ -452,7 +409,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    * Cancel any in-progress seek
    */
   const cancelSeek = useCallback(() => {
-    seekLog.step('cancelSeek');
     forceReleaseLock();
   }, [forceReleaseLock]);
 
@@ -461,8 +417,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    */
   const startContinuousSeek = useCallback(
     async (direction: SeekDirection): Promise<void> => {
-      seekLog.continuous('start', { direction });
-
       if (!acquireLock('continuous', direction)) {
         return;
       }
@@ -521,10 +475,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
           findChapterIndex(chapters, prevPosition) !== findChapterIndex(chapters, currentSeekPositionRef.current);
 
         if (crossing) {
-          const fromIndex = findChapterIndex(chapters, prevPosition);
-          const toIndex = findChapterIndex(chapters, currentSeekPositionRef.current);
-          seekLog.chapterCrossing(fromIndex, toIndex, { position: currentSeekPositionRef.current });
-
           if (isMountedRef.current) {
             setState((prev) => ({ ...prev, isChangingChapter: true }));
           }
@@ -545,8 +495,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
         }
         usePlayerStore.setState({ position: currentSeekPositionRef.current });
 
-        seekLog.continuous('tick', { position: currentSeekPositionRef.current });
-
         // Stop at boundaries
         if (
           (direction === 'backward' && currentSeekPositionRef.current <= 0) ||
@@ -563,8 +511,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    * Stop continuous seeking
    */
   const stopContinuousSeek = useCallback(async (): Promise<void> => {
-    seekLog.continuous('stop');
-
     // Clear interval
     if (continuousSeekIntervalRef.current) {
       clearInterval(continuousSeekIntervalRef.current);
@@ -608,14 +554,10 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    * Go to next chapter
    */
   const nextChapter = useCallback(async (): Promise<void> => {
-    seekLog.start('nextChapter');
-
     const result = calculateNextChapterPosition(chapters, positionRef.current);
 
     if (result) {
       await seekAbsolute(result.position);
-    } else {
-      seekLog.step('atLastChapter');
     }
   }, [chapters, seekAbsolute]);
 
@@ -623,8 +565,6 @@ export function useRobustSeekControl(): UseSeekControlReturn {
    * Go to previous chapter (with restart logic)
    */
   const prevChapter = useCallback(async (): Promise<void> => {
-    seekLog.start('prevChapter');
-
     const result = calculatePrevChapterPosition(
       chapters,
       positionRef.current,
