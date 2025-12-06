@@ -1,38 +1,24 @@
 /**
  * src/navigation/components/NavigationBar.tsx
  *
- * Combined navigation component with:
- * - GlobalMiniPlayer (floating above tabs when audio playing)
- * - BottomTabBar (5-tab navigation)
- *
- * Follows NN/g architecture diagram:
- * ┌────────────────────────────────────────────┐
- * │  🎧 Mini Player                            │
- * ├────────────────────────────────────────────┤
- * │  Home  Downloads  Search  Discover Profile │
- * └────────────────────────────────────────────┘
+ * Minimal 3-item bottom navigation:
+ * - Search | Play/Pause | Home
+ * - No separate mini player - play button is in the bar
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { View, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { BottomTabBar } from './BottomTabBar';
-import { GlobalMiniPlayer, GLOBAL_MINI_PLAYER_HEIGHT } from './GlobalMiniPlayer';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export function NavigationBar() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [currentRouteName, setCurrentRouteName] = useState('HomeTab');
 
-  const currentBook = usePlayerStore((s) => s.currentBook);
   const isPlayerVisible = usePlayerStore((s) => s.isPlayerVisible);
-
-  // Show mini player when audio is loaded and full player is not open
-  const showMiniPlayer = !!currentBook && !isPlayerVisible;
 
   // Listen for navigation state changes
   useEffect(() => {
@@ -71,19 +57,8 @@ export function NavigationBar() {
     }
   }, [navigation, isPlayerVisible]);
 
-  // Handle mini player press - open full player
-  const handleMiniPlayerPress = useCallback(() => {
-    usePlayerStore.setState({ isPlayerVisible: true });
-  }, []);
-
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]} pointerEvents="box-none">
-      {/* Mini Player - shown when audio is loaded */}
-      {showMiniPlayer && (
-        <GlobalMiniPlayer onPress={handleMiniPlayerPress} />
-      )}
-
-      {/* Bottom Tab Bar - always visible */}
       <BottomTabBar
         currentRoute={currentRouteName}
         onNavigate={handleNavigate}
@@ -95,14 +70,9 @@ export function NavigationBar() {
 /** Total height of navigation bar (for content padding) */
 export function useNavigationBarHeight(): number {
   const insets = useSafeAreaInsets();
-  const currentBook = usePlayerStore((s) => s.currentBook);
-  const isPlayerVisible = usePlayerStore((s) => s.isPlayerVisible);
-
-  const showMiniPlayer = !!currentBook && !isPlayerVisible;
   const tabBarHeight = 56;
-  const safeBottom = Math.max(insets.bottom, 16);
-
-  return tabBarHeight + safeBottom + (showMiniPlayer ? GLOBAL_MINI_PLAYER_HEIGHT : 0);
+  const safeBottom = Math.max(insets.bottom, 8);
+  return tabBarHeight + safeBottom;
 }
 
 const styles = StyleSheet.create({
@@ -111,7 +81,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    backgroundColor: 'transparent',
     zIndex: 9999,
     elevation: 9999,
   },

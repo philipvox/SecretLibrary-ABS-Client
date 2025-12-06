@@ -1,24 +1,28 @@
 /**
  * src/features/home/screens/HomeScreen.tsx
  *
- * Main home screen with Now Playing card and carousels
- * Anima layout: 402px base width, gap-6 (24px) between sections
+ * Redesigned home screen matching the new layout:
+ * - Top bar: Profile, Discover, Your Library
+ * - Now Playing: Large cover, title/author, controls
+ * - Recently Added section
  */
 
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   StatusBar,
-  ActivityIndicator,
   Text,
   RefreshControl,
   ScrollView,
   Dimensions,
   TouchableOpacity,
+  ImageBackground,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Icon } from '@/shared/components/Icon';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
@@ -26,37 +30,12 @@ import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { useRobustSeekControl } from '@/features/player/hooks/useRobustSeekControl';
 import { autoDownloadService, DownloadStatus } from '@/features/downloads/services/autoDownloadService';
-
-// Hooks
 import { useHomeData } from '../hooks/useHomeData';
 
-// Components
-import { HomeBackground } from '../components/HomeBackground';
-import { NowPlayingCard } from '../components/NowPlayingCard';
-import { SectionHeader } from '../components/SectionHeader';
-import { HorizontalCarousel } from '../components/HorizontalCarousel';
-import { SeriesCard } from '../components/SeriesCard';
-import { PlaylistCard } from '../components/PlaylistCard';
-import { SpeedPanel } from '@/features/player/panels/SpeedPanel';
-import { SleepPanel } from '@/features/player/panels/SleepPanel';
-import { DetailsPanel } from '@/features/player/panels/DetailsPanel';
-import { ChaptersPanel } from '@/features/player/panels/ChaptersPanel';
-import { ProgressPanel } from '@/features/player/panels/ProgressPanel';
-import { BookListItem } from '@/shared/components';
-import { QueuePreview } from '@/features/queue';
-
-// Design constants
-import { COLORS, LAYOUT } from '../homeDesign';
-
-// Types
-import { SeriesWithBooks, PlaylistDisplay } from '../types';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-// NN/g Navigation: New 5-tab bar + mini player height for proper content padding
-const TAB_BAR_HEIGHT = 56;
-const MINI_PLAYER_HEIGHT = 64;
+const COVER_SIZE = SCREEN_WIDTH * 0.75; // 303/402 from design
+const ACCENT = '#c1f40c'; // Exact color from design
+const CONTROL_SIZE = 58; // Control button size
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -65,11 +44,7 @@ export function HomeScreen() {
   const {
     currentBook,
     currentProgress,
-    recentlyListened,
     recentBooks,
-    userSeries,
-    userPlaylists,
-    isLoading,
     isRefreshing,
     refresh,
   } = useHomeData();
@@ -78,166 +53,44 @@ export function HomeScreen() {
     currentBook: playerCurrentBook,
     isPlaying,
     isLoading: isPlayerLoading,
-    playbackRate,
-    sleepTimer,
     loadBook,
-    viewBook,
     play,
     pause,
-    setPlaybackRate,
-    setSleepTimer,
-    clearSleepTimer,
   } = usePlayerStore();
 
-  // Check if we have a book actually loaded in the player (not just displayed from API)
-  const isPlayerReady = !!playerCurrentBook;
-
-  // Seek control - same as PlayerScreen
   const {
-    isSeeking,
-    seekDirection,
-    seekDelta,
     startContinuousSeek,
     stopContinuousSeek,
   } = useRobustSeekControl();
 
-  // Panel state
-  type PanelMode = 'none' | 'speed' | 'sleep' | 'details' | 'chapters' | 'progress';
-  const [panelMode, setPanelMode] = useState<PanelMode>('none');
-  const [tempSpeed, setTempSpeed] = useState(playbackRate);
-  const [tempSleepMins, setTempSleepMins] = useState(30);
-  const [sleepInputValue, setSleepInputValue] = useState('30');
-
-  // Download status tracking (NN/g: Download-first UX pattern)
+  // Download status tracking
   const [downloadStatuses, setDownloadStatuses] = useState<Map<string, DownloadStatus>>(new Map());
-  const [downloadProgress, setDownloadProgress] = useState<Map<string, number>>(new Map());
 
-  // Subscribe to download status changes
   useEffect(() => {
     const unsubStatus = autoDownloadService.onStatus((bookId, status) => {
       setDownloadStatuses(prev => new Map(prev).set(bookId, status));
     });
-
-    const unsubProgress = autoDownloadService.onProgress((bookId, progress) => {
-      setDownloadProgress(prev => new Map(prev).set(bookId, progress));
-    });
-
-    return () => {
-      unsubStatus();
-      unsubProgress();
-    };
+    return () => unsubStatus();
   }, []);
 
   const currentCoverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : undefined;
+  const currentTitle = currentBook?.media?.metadata?.title || 'No book selected';
+  const currentAuthor = currentBook?.media?.metadata?.authorName || '';
+  const progressPercent = currentProgress?.progress ? Math.round(currentProgress.progress * 100) : 0;
 
-  // Track if we've already prefetched this book
-  const prefetchedBookIdRef = useRef<string | null>(null);
+  // Navigation handlers
+  const handleProfilePress = () => navigation.navigate('Main', { screen: 'ProfileTab' });
+  const handleDiscoverPress = () => navigation.navigate('Main', { screen: 'DiscoverTab' });
+  const handleLibraryPress = () => navigation.navigate('Main', { screen: 'LibraryTab' });
 
-  // Prefetch the current book so controls work instantly (without opening player)
-  useEffect(() => {
-    const prefetchBook = async () => {
-      // Don't prefetch if no book, or already loaded in player, or already prefetched this book
-      if (!currentBook) return;
-      if (playerCurrentBook?.id === currentBook.id) return;
-      if (prefetchedBookIdRef.current === currentBook.id) return;
-
-      prefetchedBookIdRef.current = currentBook.id;
-
-      try {
-        const fullBook = await apiClient.getItem(currentBook.id);
-        await loadBook(fullBook, { autoPlay: false, showPlayer: false });
-      } catch {
-        await loadBook(currentBook, { autoPlay: false, showPlayer: false });
-      }
-    };
-
-    prefetchBook();
-  }, [currentBook?.id, playerCurrentBook?.id, loadBook]);
-
-  // Open player screen to view a book (without stopping current playback)
-  const handleBookPress = useCallback(
-    async (book: LibraryItem) => {
-      try {
-        const fullBook = await apiClient.getItem(book.id);
-        await viewBook(fullBook);
-      } catch {
-        await viewBook(book);
-      }
-    },
-    [viewBook]
-  );
-
-  // Play a book from list view (starts playback without opening player)
-  const handlePlayBook = useCallback(
-    async (book: LibraryItem) => {
-      try {
-        const fullBook = await apiClient.getItem(book.id);
-        await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-      } catch {
-        await loadBook(book, { autoPlay: true, showPlayer: false });
-      }
-    },
-    [loadBook]
-  );
-
-  // Download a book (NN/g: Primary action for non-downloaded books)
-  const handleDownloadBook = useCallback(
-    async (book: LibraryItem) => {
-      try {
-        const fullBook = await apiClient.getItem(book.id);
-        await autoDownloadService.startDownload(fullBook);
-      } catch {
-        await autoDownloadService.startDownload(book);
-      }
-    },
-    []
-  );
-
-  const handleSeriesPress = useCallback(
-    (series: SeriesWithBooks) => {
-      navigation.navigate('SeriesDetail', { seriesName: series.name });
-    },
-    [navigation]
-  );
-
-  const handlePlaylistPress = useCallback(
-    (playlist: PlaylistDisplay) => {
-      console.log('Playlist pressed:', playlist.id);
-    },
-    []
-  );
-
-  const handleViewAllBooks = useCallback(() => {
-    navigation.navigate('LibraryTab');
-  }, [navigation]);
-
-  const handleViewAllSeries = useCallback(() => {
-    navigation.navigate('LibraryTab', { scrollToSeries: true });
-  }, [navigation]);
-
-  const handleViewAllPlaylists = useCallback(() => {
-    console.log('View all playlists');
-  }, []);
-
-  const handleSettingsPress = useCallback(() => {
-    navigation.navigate('ProfileTab');
-  }, [navigation]);
-
-  const handleRecommendationsPress = useCallback(() => {
-    navigation.navigate('DiscoverTab');
-  }, []);
-
-  const handleNowPlayingPress = useCallback(() => {
-    // Navigate to player
-  }, []);
-
+  // Player controls
   const handlePlayPause = useCallback(async () => {
     if (isPlaying) {
       await pause();
-    } else {
-      // Always load/reload the book when pressing play - loadBook handles
-      // the case where audio is already loaded for the same book
-      if (currentBook) {
+    } else if (currentBook) {
+      if (playerCurrentBook?.id === currentBook.id) {
+        await play();
+      } else {
         try {
           const fullBook = await apiClient.getItem(currentBook.id);
           await loadBook(fullBook, { autoPlay: true, showPlayer: false });
@@ -246,342 +99,231 @@ export function HomeScreen() {
         }
       }
     }
-  }, [isPlaying, pause, currentBook, loadBook]);
+  }, [isPlaying, pause, play, currentBook, playerCurrentBook, loadBook]);
 
-  const handleSpeedPress = useCallback(() => {
-    setTempSpeed(playbackRate);
-    setPanelMode(panelMode === 'speed' ? 'none' : 'speed');
-  }, [playbackRate, panelMode]);
-
-  const handleSleepPress = useCallback(() => {
-    setPanelMode(panelMode === 'sleep' ? 'none' : 'sleep');
-  }, [panelMode]);
-
-  const handleApplySpeed = useCallback(() => {
-    setPlaybackRate?.(tempSpeed);
-    setPanelMode('none');
-  }, [tempSpeed, setPlaybackRate]);
-
-  const handleStartSleep = useCallback(() => {
-    setSleepTimer?.(tempSleepMins * 60);
-    setPanelMode('none');
-  }, [tempSleepMins, setSleepTimer]);
-
-  const handleClearSleep = useCallback(() => {
-    clearSleepTimer?.();
-    setPanelMode('none');
-  }, [clearSleepTimer]);
-
-  // Cover tap opens player directly (no details on home)
-  const handleCoverPress = useCallback(async () => {
-    if (currentBook) {
-      try {
-        const fullBook = await apiClient.getItem(currentBook.id);
-        await viewBook(fullBook);
-      } catch {
-        await viewBook(currentBook);
-      }
-    }
-  }, [currentBook, viewBook]);
-
-  // Chapter tap opens chapters panel
-  const handleChapterPress = useCallback(() => {
-    setPanelMode(panelMode === 'chapters' ? 'none' : 'chapters');
-  }, [panelMode]);
-
-  // Time tap opens progress panel
-  const handleTimePress = useCallback(() => {
-    setPanelMode(panelMode === 'progress' ? 'none' : 'progress');
-  }, [panelMode]);
-
-  // Download button (placeholder for now)
-  const handleDownloadPress = useCallback(() => {
-    console.log('Download pressed');
-    // TODO: Implement download functionality
-  }, []);
-
-  // Helper to ensure book is loaded before seeking (without opening player)
-  const ensureBookLoaded = useCallback(async () => {
-    const store = usePlayerStore.getState();
-    if (!store.currentBook && currentBook) {
-      try {
-        const fullBook = await apiClient.getItem(currentBook.id);
-        await loadBook(fullBook, { autoPlay: false, showPlayer: false });
-      } catch {
-        await loadBook(currentBook, { autoPlay: false, showPlayer: false });
-      }
-    }
-  }, [currentBook, loadBook]);
-
-  // Chapter selection from panel
-  const handleChapterSelect = useCallback(async (start: number) => {
-    await ensureBookLoaded();
-    const { seekTo } = usePlayerStore.getState();
-    seekTo?.(start);
-    setPanelMode('none');
-  }, [ensureBookLoaded]);
-
-  // Skip handlers - press and hold for continuous seek (same as PlayerScreen)
-  const handleSkipBackwardPressIn = useCallback(async () => {
-    await ensureBookLoaded();
+  const handleSkipBackPressIn = useCallback(async () => {
     await startContinuousSeek('backward');
-  }, [ensureBookLoaded, startContinuousSeek]);
+  }, [startContinuousSeek]);
 
-  const handleSkipBackwardPressOut = useCallback(async () => {
+  const handleSkipBackPressOut = useCallback(async () => {
     await stopContinuousSeek();
   }, [stopContinuousSeek]);
 
   const handleSkipForwardPressIn = useCallback(async () => {
-    await ensureBookLoaded();
     await startContinuousSeek('forward');
-  }, [ensureBookLoaded, startContinuousSeek]);
+  }, [startContinuousSeek]);
 
   const handleSkipForwardPressOut = useCallback(async () => {
     await stopContinuousSeek();
   }, [stopContinuousSeek]);
 
-  // Convert sleepTimer from seconds to minutes
-  const sleepTimerMinutes = sleepTimer ? Math.round(sleepTimer / 60) : null;
+  // Cover tap opens book details
+  const handleCoverPress = useCallback(() => {
+    if (currentBook) {
+      navigation.navigate('BookDetail', { id: currentBook.id });
+    }
+  }, [currentBook, navigation]);
 
-  if (isLoading && !currentBook && recentBooks.length === 0) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <StatusBar barStyle="light-content" />
-        <ActivityIndicator size="large" color={COLORS.playButton} />
-      </View>
-    );
-  }
+  // Add to library (heart/favorite)
+  const handleAddPress = useCallback(() => {
+    // TODO: Add to favorites
+  }, []);
 
-  if (!currentBook && recentBooks.length === 0) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <StatusBar barStyle="light-content" />
-        <Text style={styles.emptyIcon}>📚</Text>
-        <Text style={styles.emptyTitle}>No Books Yet</Text>
-        <Text style={styles.emptySubtitle}>
-          Start listening to see your books here
-        </Text>
-      </View>
-    );
-  }
+  // Book list item press
+  const handleBookPress = useCallback((book: LibraryItem) => {
+    navigation.navigate('BookDetail', { id: book.id });
+  }, [navigation]);
+
+  const handleDownloadBook = useCallback(async (book: LibraryItem) => {
+    try {
+      const fullBook = await apiClient.getItem(book.id);
+      await autoDownloadService.startDownload(fullBook);
+    } catch {
+      await autoDownloadService.startDownload(book);
+    }
+  }, []);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <HomeBackground coverUrl={currentCoverUrl} />
+      {/* Blurred cover background */}
+      {currentCoverUrl && (
+        <View style={StyleSheet.absoluteFill}>
+          <Image
+            source={currentCoverUrl}
+            style={styles.backgroundImage}
+            contentFit="cover"
+            blurRadius={60}
+          />
+          {/* Dark overlay for readability */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+      {/* Fallback gradient when no cover */}
+      {!currentCoverUrl && (
+        <LinearGradient
+          colors={['#2d3a2d', '#1a1f1a', '#0d0f0d']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
+      {/* Fixed Top Header Bar */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.headerIcon} onPress={handleProfilePress}>
+            <Ionicons name="person-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerIcon} onPress={handleDiscoverPress}>
+            <Ionicons name="help-circle-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.libraryButton} onPress={handleLibraryPress}>
+          <Text style={styles.libraryButtonText}>Your Library</Text>
+          {/* Book icon matching design */}
+          <View style={styles.libraryIcon}>
+            <View style={styles.libraryIconLeft} />
+            <View style={styles.libraryIconRight} />
+            <View style={styles.libraryIconMiddle} />
+          </View>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
-        scrollEventThrottle={16}
         contentContainerStyle={[
           styles.scrollContent,
-          {
-            paddingTop: insets.top + scale(18),
-            // NN/g: Account for new 5-tab bar + mini player
-            paddingBottom: insets.bottom + TAB_BAR_HEIGHT + MINI_PLAYER_HEIGHT + scale(20),
-          },
+          { paddingTop: insets.top + 60, paddingBottom: 100 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refresh}
-            tintColor={COLORS.playButton}
-          />
+          <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={ACCENT} />
         }
       >
-        {/* Now Playing Card OR Panel */}
+
+        {/* Now Playing Section */}
         {currentBook && (
-          <View style={styles.nowPlayingContainer}>
-            <NowPlayingCard
-              book={currentBook}
-              progress={currentProgress}
-              isPlaying={isPlaying}
-              isLoading={isPlayerLoading}
-              playbackSpeed={playbackRate}
-              sleepTimer={sleepTimerMinutes}
-              onPress={handleNowPlayingPress}
-              onCoverPress={handleCoverPress}
-              onPlay={handlePlayPause}
-              onSkipBackPressIn={handleSkipBackwardPressIn}
-              onSkipBackPressOut={handleSkipBackwardPressOut}
-              onSkipForwardPressIn={handleSkipForwardPressIn}
-              onSkipForwardPressOut={handleSkipForwardPressOut}
-              onSpeedPress={handleSpeedPress}
-              onSleepPress={handleSleepPress}
-              onDownloadPress={handleDownloadPress}
-              onClosePanel={() => setPanelMode('none')}
-              onChapterPress={handleChapterPress}
-              onTimePress={handleTimePress}
-              isSeeking={isSeeking}
-              seekDelta={seekDelta}
-              seekDirection={seekDirection}
-              panelMode={panelMode}
-              panelContent={
-                panelMode === 'speed' ? (
-                  <SpeedPanel
-                    tempSpeed={tempSpeed}
-                    setTempSpeed={setTempSpeed}
-                    onApply={handleApplySpeed}
-                    onClose={() => setPanelMode('none')}
-                    isLight={false}
-                  />
-                ) : panelMode === 'sleep' ? (
-                  <SleepPanel
-                    tempSleepMins={tempSleepMins}
-                    setTempSleepMins={setTempSleepMins}
-                    sleepInputValue={sleepInputValue}
-                    setSleepInputValue={setSleepInputValue}
-                    onClear={handleClearSleep}
-                    onStart={handleStartSleep}
-                    isLight={false}
-                  />
-                ) : panelMode === 'details' ? (
-                  <DetailsPanel
-                    book={currentBook}
-                    duration={(currentBook.media as any)?.duration || 0}
-                    chaptersCount={(currentBook.media as any)?.chapters?.length || 0}
-                    isLight={false}
-                  />
-                ) : panelMode === 'chapters' ? (
-                  <ChaptersPanel
-                    chapters={(currentBook.media as any)?.chapters || []}
-                    currentChapter={
-                      ((currentBook.media as any)?.chapters || []).find((ch: any, i: number, arr: any[]) => {
-                        const currentTime = currentProgress?.currentTime || 0;
-                        const nextChapter = arr[i + 1];
-                        const chapterEnd = nextChapter?.start || (currentProgress?.duration || 0);
-                        return currentTime >= ch.start && currentTime < chapterEnd;
-                      })
-                    }
-                    onChapterSelect={handleChapterSelect}
-                    onClose={() => setPanelMode('none')}
-                    isLight={false}
-                  />
-                ) : panelMode === 'progress' ? (
-                  <ProgressPanel
-                    isLight={false}
-                    onViewChapters={() => setPanelMode('chapters')}
-                    onViewDetails={() => setPanelMode('details')}
-                  />
-                ) : null
-              }
-            />
-          </View>
-        )}
+          <View style={styles.nowPlaying}>
+            {/* Title and Author */}
+            <Text style={styles.bookTitle} numberOfLines={1}>{currentTitle}</Text>
+            <Text style={styles.bookAuthor} numberOfLines={1}>{currentAuthor}</Text>
 
-        {/* Queue Preview - compact indicator on home */}
-        <QueuePreview variant="compact" />
-
-        {/* Recently Listened Section - List view */}
-        {recentlyListened.length > 0 && (
-          <View style={styles.recentlyListenedSection}>
-            <SectionHeader title="Recently Listened" />
-            {recentlyListened.map((book) => (
-              <BookListItem
-                key={book.id}
-                book={book}
-                onPress={() => handleBookPress(book)}
-                onDownloadPress={() => handleDownloadBook(book)}
-                showProgress={true}
-                showSwipe={false}
-                downloadStatus={downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id)}
-                downloadProgress={downloadProgress.get(book.id) || 0}
+            {/* Large Cover */}
+            <TouchableOpacity style={styles.coverContainer} onPress={handleCoverPress} activeOpacity={0.9}>
+              <Image
+                source={currentCoverUrl}
+                style={styles.cover}
+                contentFit="cover"
+                transition={200}
               />
-            ))}
+              {/* Add button */}
+              <TouchableOpacity style={styles.addButton} onPress={handleAddPress}>
+                <Ionicons name="add-circle-outline" size={28} color="#fff" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+
+            {/* Control Buttons - Glass effect squares */}
+            <View style={styles.controls}>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPressIn={handleSkipBackPressIn}
+                onPressOut={handleSkipBackPressOut}
+                activeOpacity={0.8}
+              >
+                {/* Double chevron back */}
+                <View style={styles.doubleChevron}>
+                  <Ionicons name="chevron-back" size={22} color={ACCENT} style={{ marginRight: -8 }} />
+                  <Ionicons name="chevron-back" size={22} color={ACCENT} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPressIn={handleSkipForwardPressIn}
+                onPressOut={handleSkipForwardPressOut}
+                activeOpacity={0.8}
+              >
+                {/* Double chevron forward */}
+                <View style={styles.doubleChevron}>
+                  <Ionicons name="chevron-forward" size={22} color={ACCENT} style={{ marginRight: -8 }} />
+                  <Ionicons name="chevron-forward" size={22} color={ACCENT} />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.playButton} onPress={handlePlayPause} activeOpacity={0.8}>
+                <Ionicons
+                  name={isPlaying ? 'pause' : 'play'}
+                  size={26}
+                  color="#000"
+                  style={!isPlaying && { marginLeft: 2 }}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Progress percentage */}
+            <Text style={styles.progressText}>{progressPercent}%</Text>
           </View>
         )}
 
-        {/* Your Books Section - List view, show first 3 */}
+        {/* Full-width Progress Bar */}
+        {currentBook && (
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+          </View>
+        )}
+
+        {/* Recently Added Section */}
         {recentBooks.length > 0 && (
-          <View style={styles.booksSection}>
-            <SectionHeader title="Your Books" onViewAll={handleViewAllBooks} />
-            {recentBooks.slice(0, 3).map((book) => (
-              <BookListItem
-                key={book.id}
-                book={book}
-                onPress={() => handleBookPress(book)}
-                onDownloadPress={() => handleDownloadBook(book)}
-                showProgress={true}
-                showSwipe={false}
-                downloadStatus={downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id)}
-                downloadProgress={downloadProgress.get(book.id) || 0}
-              />
-            ))}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recently Added</Text>
+              <TouchableOpacity onPress={handleLibraryPress}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            {recentBooks.slice(0, 5).map((book) => {
+              const bookCoverUrl = apiClient.getItemCoverUrl(book.id);
+              const bookTitle = book.media?.metadata?.title || 'Unknown';
+              const bookAuthor = book.media?.metadata?.authorName || '';
+              const bookProgress = book.userMediaProgress?.progress || 0;
+              const status = downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id);
+
+              return (
+                <TouchableOpacity
+                  key={book.id}
+                  style={styles.bookItem}
+                  onPress={() => handleBookPress(book)}
+                  activeOpacity={0.7}
+                >
+                  <Image source={bookCoverUrl} style={styles.bookCover} contentFit="cover" />
+                  <View style={styles.bookInfo}>
+                    <Text style={styles.bookItemTitle} numberOfLines={1}>{bookTitle}</Text>
+                    <Text style={styles.bookItemProgress}>
+                      {Math.round(bookProgress * 100)}% Completed
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.bookAddButton}
+                    onPress={() => handleDownloadBook(book)}
+                  >
+                    {status === 'completed' ? (
+                      <Ionicons name="checkmark-circle" size={22} color={ACCENT} />
+                    ) : status === 'downloading' || status === 'queued' ? (
+                      <Ionicons name="cloud-download" size={22} color={ACCENT} />
+                    ) : (
+                      <Ionicons name="add-circle-outline" size={22} color="rgba(255,255,255,0.4)" />
+                    )}
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
-
-        {/* Your Series Section - gap:20px from Anima */}
-        {userSeries.length > 0 && (
-          <View style={styles.seriesSection}>
-            <SectionHeader title="Your Series" onViewAll={handleViewAllSeries} />
-            <HorizontalCarousel
-              data={userSeries}
-              keyExtractor={(series) => series.id}
-              itemWidth={scale(110)}
-              gap={scale(10)}
-              contentPadding={scale(29)}
-              renderItem={(series) => (
-                <SeriesCard
-                  series={series}
-                  onPress={() => handleSeriesPress(series)}
-                />
-              )}
-            />
-          </View>
-        )}
-
-        {/* Your Playlists Section - gap:16px from Anima */}
-        {userPlaylists.length > 0 && (
-          <View style={styles.playlistsSection}>
-            <SectionHeader title="Your Playlists" onViewAll={handleViewAllPlaylists} />
-            <HorizontalCarousel
-              data={userPlaylists}
-              keyExtractor={(playlist) => playlist.id}
-              itemWidth={scale(110)}
-              gap={scale(10)}
-              contentPadding={scale(29)}
-              renderItem={(playlist) => (
-                <PlaylistCard
-                  playlist={playlist}
-                  onPress={() => handlePlaylistPress(playlist)}
-                />
-              )}
-            />
-          </View>
-        )}
-
-        {/* Bottom Action Buttons */}
-        <View style={styles.bottomButtonsSection}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleSettingsPress}
-            activeOpacity={0.7}
-          >
-            <Icon name="settings-outline" size={24} color={COLORS.textPrimary} set="ionicons" />
-            <Text style={styles.actionButtonText}>Settings</Text>
-            <Icon name="chevron-forward" size={20} color={COLORS.textSecondary} set="ionicons" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleRecommendationsPress}
-            activeOpacity={0.7}
-          >
-            <Icon name="sparkles-outline" size={24} color={COLORS.textPrimary} set="ionicons" />
-            <Text style={styles.actionButtonText}>Recommendations</Text>
-            <Icon name="chevron-forward" size={20} color={COLORS.textSecondary} set="ionicons" />
-          </TouchableOpacity>
-        </View>
       </ScrollView>
-
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)', '#000000']}
-        locations={[0, 0.5, 1]}
-        style={styles.bottomGradient}
-        pointerEvents="none"
-      />
     </View>
   );
 }
@@ -589,90 +331,249 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#000',
   },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   scrollContent: {
     flexGrow: 1,
   },
-  nowPlayingContainer: {
-    alignItems: 'center',
-    paddingHorizontal: scale(10),
-  },
-  // NN/g Content Hierarchy: Clear visual separation between sections
-  recentlyListenedSection: {
-    marginTop: scale(32),
-    paddingTop: scale(16),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  booksSection: {
-    marginTop: scale(24),
-    paddingTop: scale(16),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  // NN/g: Visual grouping for series section
-  seriesSection: {
-    marginTop: scale(24),
-    paddingTop: scale(16),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  // NN/g: Visual grouping for playlists section
-  playlistsSection: {
-    marginTop: scale(24),
-    paddingTop: scale(16),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  bottomButtonsSection: {
-    marginTop: scale(32),
-    paddingHorizontal: scale(29),
-    gap: scale(12),
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: scale(12),
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
-  },
-  actionButtonText: {
-    flex: 1,
-    fontSize: scale(16),
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-    marginLeft: scale(12),
-  },
-  bottomGradient: {
+
+  // Header - Fixed at top
+  header: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    height: LAYOUT.bottomGradientHeight,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    zIndex: 100,
   },
-  emptyIcon: {
-    fontSize: 64,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  headerIcon: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  libraryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)', // #ffffff24 from design
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 100,
+    gap: 8,
+  },
+  libraryButtonText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'monospace',
+  },
+  // Custom book icon matching design (3 rounded rectangles)
+  libraryIcon: {
+    width: 15,
+    height: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  libraryIconLeft: {
+    width: 5,
+    height: 16,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#fff',
+    marginRight: 2,
+  },
+  libraryIconRight: {
+    width: 5,
+    height: 16,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  libraryIconMiddle: {
+    position: 'absolute',
+    width: 5,
+    height: 13,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+
+  // Now Playing
+  nowPlaying: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  bookTitle: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  bookAuthor: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
     marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: scale(20),
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
+  coverContainer: {
+    width: COVER_SIZE,
+    height: COVER_SIZE,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  emptySubtitle: {
-    fontSize: scale(14),
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: 40,
+  cover: {
+    width: '100%',
+    height: '100%',
+  },
+  addButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 18,
+  },
+
+  // Controls - Glass effect squares matching design
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    gap: 8,
+  },
+  controlButton: {
+    width: CONTROL_SIZE,
+    height: CONTROL_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  doubleChevron: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playButton: {
+    width: CONTROL_SIZE,
+    height: CONTROL_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: ACCENT,
+    borderRadius: 10,
+  },
+
+  // Progress text
+  progressText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: '#fff',
+    marginTop: 16,
+  },
+  // Progress bar - Full width matching design
+  progressBarContainer: {
+    width: '100%',
+    height: 7,
+    marginTop: 16,
+    backgroundColor: 'transparent',
+  },
+  progressBarFill: {
+    height: 7,
+    backgroundColor: ACCENT,
+    borderRadius: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+
+  // Section - matching design
+  section: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  viewAllText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: '#fff',
+  },
+
+  // Book Item - matching design layout
+  bookItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  bookCover: {
+    width: 50,
+    height: 50,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  bookInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  bookItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  bookItemAuthor: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  bookItemProgress: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  bookAddButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
 export { HomeScreen as default };
-export { COLORS as HOME_CONFIG } from '../homeDesign';

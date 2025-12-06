@@ -1,120 +1,131 @@
 /**
  * src/navigation/components/BottomTabBar.tsx
  *
- * 5-tab bottom navigation bar following NN/g best practices:
- * - Icon + text label for each tab (improves discoverability)
- * - Active state with accent color (#C8FF00)
- * - Touch targets minimum 48×48px per tab
- * - Fixed at bottom with safe area handling
+ * Minimal 3-item bottom bar:
+ * - Search (left)
+ * - Play/Pause mini player (center)
+ * - Home (right)
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { usePlayerStore } from '@/features/player/stores/playerStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Design constants
+// Design constants - matching Anima design
 const TAB_BAR_HEIGHT = 56;
-const ACCENT_COLOR = '#C8FF00';
-const INACTIVE_COLOR = '#808080';
-const BACKGROUND_COLOR = 'rgba(0, 0, 0, 0.85)';
-
-// Tab configuration - NN/g: Clear labels indicate purpose
-// Library → Downloads: Shows downloaded books (ready to play offline)
-// Browse → Discover: Browse full server library to find new books
-const TABS = [
-  { name: 'HomeTab', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { name: 'LibraryTab', label: 'Downloads', icon: 'download-outline', activeIcon: 'download' },
-  { name: 'Search', label: 'Search', icon: 'search-outline', activeIcon: 'search' },
-  { name: 'DiscoverTab', label: 'Discover', icon: 'compass-outline', activeIcon: 'compass' },
-  { name: 'ProfileTab', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
-] as const;
+const ACCENT_COLOR = '#c1f40c'; // Exact color from design
+const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.6)';
 
 interface BottomTabBarProps {
   currentRoute: string;
   onNavigate: (routeName: string) => void;
-  /** Additional bottom offset for mini player */
   bottomOffset?: number;
 }
 
 export function BottomTabBar({ currentRoute, onNavigate, bottomOffset = 0 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const safeBottom = Math.max(insets.bottom, 16);
+  const safeBottom = Math.max(insets.bottom, 8);
+
+  const { isPlaying, play, pause, currentBook } = usePlayerStore();
+  const hasAudio = !!currentBook;
+
+  const isHomeActive = currentRoute === 'HomeTab' || currentRoute === 'Main';
+  const isSearchActive = currentRoute === 'Search';
+
+  const handlePlayPause = async () => {
+    if (isPlaying) {
+      await pause();
+    } else {
+      await play();
+    }
+  };
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: safeBottom, bottom: bottomOffset }]}>
-      <BlurView intensity={40} tint="dark" style={styles.blurContainer}>
-        <View style={styles.tabContainer}>
-          {TABS.map((tab) => {
-            const isActive = currentRoute === tab.name ||
-              // Handle nested routes - Search is a stack screen, not a tab
-              (tab.name === 'HomeTab' && currentRoute === 'Main');
+    <View style={[styles.container, { paddingBottom: safeBottom, bottom: bottomOffset }]}>
+      <View style={styles.tabContainer}>
+        {/* Search */}
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => onNavigate('Search')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={isSearchActive ? 'search' : 'search-outline'}
+            size={26}
+            color={isSearchActive ? ACCENT_COLOR : INACTIVE_COLOR}
+          />
+        </TouchableOpacity>
 
-            return (
-              <TouchableOpacity
-                key={tab.name}
-                style={styles.tab}
-                onPress={() => onNavigate(tab.name)}
-                activeOpacity={0.7}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
-                accessibilityLabel={tab.label}
-              >
-                <Ionicons
-                  name={isActive ? tab.activeIcon : tab.icon}
-                  size={24}
-                  color={isActive ? ACCENT_COLOR : INACTIVE_COLOR}
-                />
-                <Text style={[styles.label, isActive && styles.labelActive]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </BlurView>
+        {/* Center Play/Pause */}
+        <TouchableOpacity
+          style={[styles.playButton, !hasAudio && styles.playButtonDisabled]}
+          onPress={handlePlayPause}
+          activeOpacity={0.7}
+          disabled={!hasAudio}
+        >
+          <Ionicons
+            name={isPlaying ? 'pause' : 'play'}
+            size={28}
+            color={hasAudio ? '#000' : 'rgba(0,0,0,0.3)'}
+          />
+        </TouchableOpacity>
+
+        {/* Home */}
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() => onNavigate('HomeTab')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={isHomeActive ? 'home' : 'home-outline'}
+            size={26}
+            color={isHomeActive ? ACCENT_COLOR : INACTIVE_COLOR}
+          />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  container: {
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: BACKGROUND_COLOR,
-  },
-  blurContainer: {
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   tabContainer: {
     flexDirection: 'row',
     height: TAB_BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'space-around',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 40,
   },
   tab: {
-    flex: 1,
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    // Minimum touch target: 48×48px (NN/g recommendation)
-    minWidth: 48,
-    minHeight: 48,
   },
-  label: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: INACTIVE_COLOR,
-    marginTop: 2,
+  playButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: ACCENT_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: ACCENT_COLOR,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  labelActive: {
-    color: ACCENT_COLOR,
-    fontWeight: '600',
+  playButtonDisabled: {
+    backgroundColor: 'rgba(200, 255, 0, 0.3)',
+    shadowOpacity: 0,
   },
 });
