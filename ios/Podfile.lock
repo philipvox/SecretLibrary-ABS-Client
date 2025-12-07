@@ -228,6 +228,8 @@ PODS:
     - ExpoModulesCore
   - ExpoLinearGradient (15.0.7):
     - ExpoModulesCore
+  - ExpoMediaControl (1.0.7):
+    - ExpoModulesCore
   - ExpoModulesCore (3.0.27):
     - hermes-engine
     - RCTRequired
@@ -2425,6 +2427,7 @@ DEPENDENCIES:
   - ExpoImage (from `../node_modules/expo-image/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
+  - ExpoMediaControl (from `../node_modules/expo-media-control/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
@@ -2562,6 +2565,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-keep-awake/ios"
   ExpoLinearGradient:
     :path: "../node_modules/expo-linear-gradient/ios"
+  ExpoMediaControl:
+    :path: "../node_modules/expo-media-control/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
   ExpoSecureStore:
@@ -2758,6 +2763,7 @@ SPEC CHECKSUMS:
   ExpoImage: d840b256050f4428d2942bc2b6e9251f9e0d7021
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
   ExpoLinearGradient: a464898cb95153125e3b81894fd479bcb1c7dd27
+  ExpoMediaControl: 48b9c858514bd4ebde9c5a7f817918a42a7591ac
   ExpoModulesCore: 665178814f1556ca4c6ee34e3ad5db6cb9155d36
   ExpoSecureStore: 9c6571fe3fcb045a671c4011c451546eaaab98fd
   ExpoSplashScreen: 268b2f128dc04284c21010540a6c4dd9f95003e3

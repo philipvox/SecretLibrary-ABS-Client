@@ -142,8 +142,17 @@ class DownloadManager {
     await sqliteCache.addToDownloadQueue(itemId, priority);
 
     // Cache the library item metadata for offline access
-    log(`Caching library item metadata for offline access...`);
-    await sqliteCache.setLibraryItems(item.libraryId, [item]);
+    // Only cache if we have a valid libraryId
+    if (item.libraryId) {
+      log(`Caching library item metadata for offline access...`);
+      try {
+        await sqliteCache.setLibraryItems(item.libraryId, [item]);
+      } catch (err) {
+        logWarn(`Failed to cache library item metadata:`, err);
+      }
+    } else {
+      logWarn(`Item ${itemId} has no libraryId - skipping metadata cache`);
+    }
 
     this.notifyListeners();
 
@@ -311,6 +320,26 @@ class DownloadManager {
     return downloads.reduce((sum, d) => sum + (d.fileSize || 0), 0);
   }
 
+  /**
+   * Update last played timestamp for a downloaded item
+   */
+  async updateLastPlayed(itemId: string): Promise<void> {
+    log(`Updating last played for: ${itemId}`);
+    await sqliteCache.updateDownloadLastPlayed(itemId);
+  }
+
+  /**
+   * Clear all downloads
+   */
+  async clearAllDownloads(): Promise<void> {
+    log('Clearing all downloads...');
+    const downloads = await this.getAllDownloads();
+    for (const download of downloads) {
+      await this.deleteDownload(download.itemId);
+    }
+    log(`Cleared ${downloads.length} downloads`);
+  }
+
   // ===========================================================================
   // QUEUE PROCESSING
   // ===========================================================================
@@ -338,13 +367,34 @@ class DownloadManager {
       log(`Next item in queue: ${nextItemId}`);
 
       // Get the library item from cache
-      const item = await sqliteCache.getLibraryItem(nextItemId);
+      let item = await sqliteCache.getLibraryItem(nextItemId);
+
+      // If not in cache, try fetching from API
       if (!item) {
-        // Can't download without metadata
+        log(`Item not in cache, fetching from API: ${nextItemId}`);
+        try {
+          const fetchedItem = await apiClient.getItem(nextItemId);
+          if (fetchedItem) {
+            item = fetchedItem;
+            // Cache it for future use if it has a libraryId
+            if (item.libraryId) {
+              await sqliteCache.setLibraryItems(item.libraryId, [item]);
+              log(`Cached fetched item metadata`);
+            }
+          }
+        } catch (err) {
+          logWarn(`Failed to fetch item from API:`, err);
+        }
+      }
+
+      if (!item) {
+        // Can't download without metadata - remove from queue
         logError(`Item metadata not found for: ${nextItemId}`);
         await sqliteCache.removeFromDownloadQueue(nextItemId);
         await sqliteCache.failDownload(nextItemId, 'Item metadata not found');
         this.notifyListeners();
+        // Continue processing queue in case there are more items
+        setTimeout(() => this.processQueue(), 100);
         return;
       }
 

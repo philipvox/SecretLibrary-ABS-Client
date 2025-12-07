@@ -265,50 +265,26 @@ const TRANSITION_GUARD_MS = 500; // Prevent queue races during book transitions
 async function getDownloadPath(bookId: string): Promise<string | null> {
   try {
     const FileSystem = await import('expo-file-system/legacy');
+    const { downloadManager } = await import('@/core/services/downloadManager');
 
-    // Check autoDownloadService first (for auto-downloaded top 3 books)
-    try {
-      const { autoDownloadService } = await import('@/features/downloads');
-
-      if (autoDownloadService.isDownloading(bookId)) {
-        log('Book still downloading via autoDownloadService');
-        return null;
-      }
-
-      const autoPath = autoDownloadService.getLocalPath(bookId);
-      if (autoPath) {
-        const info = await FileSystem.getInfoAsync(autoPath);
-        if (info.exists && ((info as any).size || 0) > 10000) {
-          log('Found offline file via autoDownloadService');
-          autoDownloadService.updateLastPlayed(bookId);
-          return autoPath;
-        } else {
-          log('Auto-downloaded file missing or corrupt, cleaning up');
-          await autoDownloadService.removeDownload(bookId);
-        }
-      }
-    } catch (autoErr) {
-      log('autoDownloadService check failed:', autoErr);
+    // Check if book is downloaded
+    const isDownloaded = await downloadManager.isDownloaded(bookId);
+    if (!isDownloaded) {
+      log('Book not downloaded');
+      return null;
     }
 
-    // Check downloadManager for manually downloaded books
-    try {
-      const { downloadManager } = await import('@/core/services/downloadManager');
-
-      const isDownloaded = await downloadManager.isDownloaded(bookId);
-      if (isDownloaded) {
-        const manualPath = downloadManager.getLocalPath(bookId);
-        // downloadManager stores files in a directory, check for any audio files
-        const dirInfo = await FileSystem.getInfoAsync(manualPath);
-        if (dirInfo.exists && dirInfo.isDirectory) {
-          log('Found offline directory via downloadManager');
-          return manualPath;
-        }
-      }
-    } catch (dlErr) {
-      log('downloadManager check failed:', dlErr);
+    const localPath = downloadManager.getLocalPath(bookId);
+    // downloadManager stores files in a directory, check for any audio files
+    const dirInfo = await FileSystem.getInfoAsync(localPath);
+    if (dirInfo.exists && dirInfo.isDirectory) {
+      log('Found offline directory via downloadManager');
+      // Update last played timestamp
+      await downloadManager.updateLastPlayed(bookId);
+      return localPath;
     }
 
+    log('Download directory not found or invalid');
     return null;
   } catch (error) {
     logError('Failed to verify download:', error);

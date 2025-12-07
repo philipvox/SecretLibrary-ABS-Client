@@ -9,12 +9,10 @@ import {
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCollectionDetails } from '../hooks/useCollectionDetails';
-import { LoadingSpinner, EmptyState, ErrorView, BookListItem } from '@/shared/components';
+import { LoadingSpinner, EmptyState, ErrorView } from '@/shared/components';
+import { BookCard } from '@/shared/components/BookCard';
 import { Icon } from '@/shared/components/Icon';
 import { theme } from '@/shared/theme';
-import { usePlayerStore } from '@/features/player';
-import { apiClient } from '@/core/api';
-import { LibraryItem } from '@/core/types';
 
 type CollectionDetailRouteParams = {
   CollectionDetail: {
@@ -26,28 +24,13 @@ type CollectionDetailRouteProp = RouteProp<CollectionDetailRouteParams, 'Collect
 
 export function CollectionDetailScreen() {
   const route = useRoute<CollectionDetailRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { collectionId } = route.params;
   const { collection, isLoading, error, refetch } = useCollectionDetails(collectionId);
-  const { loadBook, viewBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await viewBook(fullBook);
-    } catch {
-      await viewBook(book);
-    }
-  }, [viewBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  const handleBookPress = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail', { id: bookId });
+  }, [navigation]);
 
   if (isLoading) {
     return <LoadingSpinner text="Loading collection..." />;
@@ -97,13 +80,10 @@ export function CollectionDetailScreen() {
         <FlatList
           data={books}
           renderItem={({ item }) => (
-            <BookListItem
+            <BookCard
               book={item}
-              onPress={() => handleBookPress(item)}
-              onPlayPress={() => handlePlayBook(item)}
-              showProgress={true}
-              showSwipe={false}
-              isLoadingThisBook={isPlayerLoading && currentBook?.id === item.id}
+              onPress={() => handleBookPress(item.id)}
+              showListeningProgress={true}
             />
           )}
           keyExtractor={(item) => item.id}

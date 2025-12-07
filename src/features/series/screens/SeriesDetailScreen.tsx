@@ -22,10 +22,10 @@ import { BlurView } from 'expo-blur';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache } from '@/core/cache';
-import { usePlayerStore } from '@/features/player';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { SeriesHeartButton, BookListItem } from '@/shared/components';
+import { SeriesHeartButton } from '@/shared/components';
+import { BookCard } from '@/shared/components/BookCard';
 import { LibraryItem } from '@/core/types';
 
 type SeriesDetailRouteParams = {
@@ -219,7 +219,6 @@ export function SeriesDetailScreen() {
   const [sortOrder, setSortOrder] = useState<SortType>('asc');
 
   const { getSeries, isLoaded, refreshCache } = useLibraryCache();
-  const { loadBook, viewBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Get series data from cache - instant!
@@ -256,23 +255,9 @@ export function SeriesDetailScreen() {
     }
   }, [refreshCache]);
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await viewBook(fullBook);
-    } catch {
-      await viewBook(book);
-    }
-  }, [viewBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  const handleBookPress = useCallback((bookId: string) => {
+    (navigation as any).navigate('BookDetail', { id: bookId });
+  }, [navigation]);
 
   // Loading/error states
   if (!isLoaded) {
@@ -372,22 +357,14 @@ export function SeriesDetailScreen() {
 
         {/* Book List */}
         <View style={styles.bookList}>
-          {sortedBooks.map((book, index) => {
-            const sequence = getSequence(book);
-            return (
-              <BookListItem
-                key={book.id}
-                book={book}
-                onPress={() => handleBookPress(book)}
-                onPlayPress={() => handlePlayBook(book)}
-                hideTitle={true}
-                seriesSequence={sequence < 999 ? sequence : index + 1}
-                showProgress={true}
-                showSwipe={true}
-                isLoadingThisBook={isPlayerLoading && currentBook?.id === book.id}
-              />
-            );
-          })}
+          {sortedBooks.map((book) => (
+            <BookCard
+              key={book.id}
+              book={book}
+              onPress={() => handleBookPress(book.id)}
+              showListeningProgress={true}
+            />
+          ))}
         </View>
       </ScrollView>
     </View>

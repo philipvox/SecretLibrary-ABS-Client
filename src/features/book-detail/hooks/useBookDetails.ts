@@ -31,7 +31,8 @@ export function useBookDetails(bookId: string): UseBookDetailsResult {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.book.detail(bookId),
-    queryFn: () => apiClient.getItem(bookId, 'progress'),
+    // Include expanded=1 to get full author/series/narrator info
+    queryFn: () => apiClient.getItem(bookId, 'progress,expanded'),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!bookId,
     // Use cached data as placeholder - show instantly, update when API responds

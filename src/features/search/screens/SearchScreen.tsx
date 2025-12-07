@@ -27,9 +27,10 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useLibraryCache, getAllGenres, getAllAuthors, getAllSeries, getAllNarrators, useCoverUrl, type FilterOptions } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
 import { apiClient } from '@/core/api';
-import { autoDownloadService, DownloadStatus } from '@/features/downloads/services/autoDownloadService';
+import { downloadManager, DownloadTask } from '@/core/services/downloadManager';
 import { Icon } from '@/shared/components/Icon';
-import { HeartButton, SeriesHeartButton, BookListItem } from '@/shared/components';
+import { HeartButton, SeriesHeartButton } from '@/shared/components';
+import { BookCard } from '@/shared/components/BookCard';
 import { LibraryItem } from '@/core/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -153,22 +154,20 @@ export function SearchScreen() {
   const allSeries = useMemo(() => getAllSeries(), [isLoaded]);
 
   // Download status tracking
-  const [downloadStatuses, setDownloadStatuses] = useState<Map<string, DownloadStatus>>(new Map());
-  const [downloadProgress, setDownloadProgress] = useState<Map<string, number>>(new Map());
+  const [downloadTasks, setDownloadTasks] = useState<Map<string, DownloadTask>>(new Map());
 
   // Subscribe to download status changes
   useEffect(() => {
-    const unsubStatus = autoDownloadService.onStatus((bookId, status) => {
-      setDownloadStatuses(prev => new Map(prev).set(bookId, status));
-    });
-
-    const unsubProgress = autoDownloadService.onProgress((bookId, progress) => {
-      setDownloadProgress(prev => new Map(prev).set(bookId, progress));
+    const unsubscribe = downloadManager.subscribe((tasks) => {
+      const taskMap = new Map<string, DownloadTask>();
+      for (const task of tasks) {
+        taskMap.set(task.itemId, task);
+      }
+      setDownloadTasks(taskMap);
     });
 
     return () => {
-      unsubStatus();
-      unsubProgress();
+      unsubscribe();
     };
   }, []);
 
@@ -622,23 +621,14 @@ export function SearchScreen() {
               )}
             </View>
             <View>
-              {bookResults.slice(0, 5).map(book => {
-                const status = downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id);
-                const progress = downloadProgress.get(book.id) || 0;
-                return (
-                  <BookListItem
-                    key={book.id}
-                    book={book}
-                    onPress={() => handleBookPress(book)}
-                    onPlayPress={() => handlePlayBook(book)}
-                    showProgress={true}
-                    showSwipe={true}
-                    isLoadingThisBook={isPlayerLoading && currentBook?.id === book.id}
-                    downloadStatus={status}
-                    downloadProgress={progress}
-                  />
-                );
-              })}
+              {bookResults.slice(0, 5).map(book => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  onPress={() => handleBookPress(book)}
+                  showListeningProgress={true}
+                />
+              ))}
             </View>
           </View>
         )}

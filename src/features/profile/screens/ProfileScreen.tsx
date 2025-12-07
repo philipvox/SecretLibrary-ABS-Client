@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@/core/auth';
-import { autoDownloadService } from '@/features/downloads';
+import { useDownloads } from '@/core/hooks/useDownloads';
 import { useLibraryCache } from '@/core/cache';
 import { Icon } from '@/shared/components/Icon';
 
@@ -92,9 +92,8 @@ export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, serverUrl, logout, isLoading } = useAuth();
 
-  // Download stats from autoDownloadService
-  const [downloadCount, setDownloadCount] = useState(0);
-  const [totalStorage, setTotalStorage] = useState(0);
+  // Download stats from downloadManager via useDownloads hook
+  const { downloads } = useDownloads();
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
 
   // Library cache
@@ -103,21 +102,10 @@ export function ProfileScreen() {
   // Safe access to preferences store
   const hasCompletedOnboarding = usePreferencesStore?.()?.hasCompletedOnboarding ?? false;
 
-  useEffect(() => {
-    // Load download stats
-    const loadStats = async () => {
-      const downloads = autoDownloadService.getAllDownloads();
-      setDownloadCount(downloads.length);
-
-      // Calculate total storage
-      let total = 0;
-      for (const d of downloads) {
-        total += d.fileSize || 0;
-      }
-      setTotalStorage(total);
-    };
-    loadStats();
-  }, []);
+  // Calculate download stats from downloads
+  const completedDownloads = downloads.filter(d => d.status === 'complete');
+  const downloadCount = completedDownloads.length;
+  const totalStorage = completedDownloads.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [

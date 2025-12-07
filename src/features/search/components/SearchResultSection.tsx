@@ -14,12 +14,13 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { getColors } from 'react-native-image-colors';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { Icon } from '@/shared/components/Icon';
-import { BookListItem as SharedBookListItem } from '@/shared/components';
+import { BookCard } from '@/shared/components/BookCard';
 import { getTitle, getAuthorName } from '@/shared/utils/metadata';
 import { matchToPalette } from '@/shared/utils/colorPalette';
 import { isColorLight, pickMostSaturated } from '@/features/player/utils';
@@ -193,36 +194,20 @@ interface BookResultsRowProps {
 }
 
 export function BookResultsRow({ books }: BookResultsRowProps) {
-  const { loadBook } = usePlayerStore();
+  const navigation = useNavigation<any>();
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: false, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: false, showPlayer: false });
-    }
-  }, [loadBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  const handleBookPress = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail', { id: bookId });
+  }, [navigation]);
 
   return (
     <View style={styles.bookResultsList}>
       {books.map((book) => (
-        <SharedBookListItem
+        <BookCard
           key={book.id}
           book={book}
-          onPress={() => handleBookPress(book)}
-          onPlayPress={() => handlePlayBook(book)}
-          showProgress={true}
-          showSwipe={false}
+          onPress={() => handleBookPress(book.id)}
+          showListeningProgress={true}
         />
       ))}
     </View>
@@ -501,36 +486,20 @@ interface AllResultsListProps {
 }
 
 export function AllResultsList({ books }: AllResultsListProps) {
-  const { loadBook } = usePlayerStore();
+  const navigation = useNavigation<any>();
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: false, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: false, showPlayer: false });
-    }
-  }, [loadBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  const handleBookPress = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail', { id: bookId });
+  }, [navigation]);
 
   return (
     <View style={styles.allResultsList}>
       {books.map((book) => (
-        <SharedBookListItem
+        <BookCard
           key={book.id}
           book={book}
-          onPress={() => handleBookPress(book)}
-          onPlayPress={() => handlePlayBook(book)}
-          showProgress={true}
-          showSwipe={false}
+          onPress={() => handleBookPress(book.id)}
+          showListeningProgress={true}
         />
       ))}
     </View>

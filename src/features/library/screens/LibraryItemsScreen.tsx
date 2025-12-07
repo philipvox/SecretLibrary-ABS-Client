@@ -15,11 +15,10 @@ import { useLibraryPrefetch } from '@/core/hooks';
 import { useDefaultLibrary } from '../hooks/useDefaultLibrary';
 import { useLibraryItems } from '../hooks/useLibraryItems';
 import { TopNavBar } from '@/navigation/components/TopNavBar';
-import { LoadingSpinner, ErrorView, EmptyState, BookListItem } from '@/shared/components';
+import { LoadingSpinner, ErrorView, EmptyState } from '@/shared/components';
+import { BookCard } from '@/shared/components/BookCard';
 import { LibraryItem } from '@/core/types';
 import { theme } from '@/shared/theme';
-import { usePlayerStore } from '@/features/player';
-import { apiClient } from '@/core/api';
 
 export function LibraryItemsScreen() {
   const insets = useSafeAreaInsets();
@@ -27,38 +26,21 @@ export function LibraryItemsScreen() {
   const { items, isLoading: isLoadingItems, error: itemsError, refetch, isRefetching } = useLibraryItems(library?.id || '', {
     limit: 50,
   });
-  const { loadBook, viewBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
+  const navigation = require('@react-navigation/native').useNavigation();
 
   useLibraryPrefetch(library?.id);
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await viewBook(fullBook);
-    } catch {
-      await viewBook(book);
-    }
-  }, [viewBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  const handleBookPress = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail', { id: bookId });
+  }, [navigation]);
 
   const renderItem = useCallback(({ item }: { item: LibraryItem }) => (
-    <BookListItem
+    <BookCard
       book={item}
-      onPress={() => handleBookPress(item)}
-      onPlayPress={() => handlePlayBook(item)}
-      showProgress={true}
-      showSwipe={false}
-      isLoadingThisBook={isPlayerLoading && currentBook?.id === item.id}
+      onPress={() => handleBookPress(item.id)}
+      showListeningProgress={true}
     />
-  ), [handleBookPress, handlePlayBook, isPlayerLoading, currentBook]);
+  ), [handleBookPress]);
 
   const keyExtractor = useCallback((item: LibraryItem) => item.id, []);
 

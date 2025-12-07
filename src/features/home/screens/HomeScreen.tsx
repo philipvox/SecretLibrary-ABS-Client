@@ -1,10 +1,10 @@
 /**
  * src/features/home/screens/HomeScreen.tsx
  *
- * Redesigned home screen matching the new layout:
+ * Redesigned home screen:
  * - Top bar: Profile, Discover, Your Library
  * - Now Playing: Large cover, title/author, controls
- * - Recently Added section
+ * - Downloaded books section
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
@@ -17,10 +17,9 @@ import {
   ScrollView,
   Dimensions,
   TouchableOpacity,
-  ImageBackground,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,13 +28,36 @@ import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { useRobustSeekControl } from '@/features/player/hooks/useRobustSeekControl';
-import { autoDownloadService, DownloadStatus } from '@/features/downloads/services/autoDownloadService';
+import { useDownloads } from '@/core/hooks/useDownloads';
+import { useLibraryCache } from '@/core/cache/libraryCache';
+import { BookCard } from '@/shared/components/BookCard';
 import { useHomeData } from '../hooks/useHomeData';
+import { useQueue } from '@/features/queue/stores/queueStore';
+
+// Monospace font for titles
+const MONO_FONT = Platform.select({ ios: 'Courier', android: 'monospace', default: 'monospace' });
+
+// Button assets
+const RewindButtonImage = require('../assets/rewind-button.png');
+const FastForwardButtonImage = require('../assets/fast-forward-button.png');
+const PlayButtonImage = require('../assets/play-button.png');
+const PauseButtonImage = require('../assets/pause-button.png');
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const COVER_SIZE = SCREEN_WIDTH * 0.75; // 303/402 from design
-const ACCENT = '#c1f40c'; // Exact color from design
-const CONTROL_SIZE = 58; // Control button size
+const COVER_SIZE = SCREEN_WIDTH * 0.75;
+const ACCENT = '#c1f40c';
+const REWIND_COLOR = '#ff4444';
+const BUTTON_SIZE = 58; // All buttons same size
+
+// Format seek time with appropriate units
+const formatSeekTime = (seconds: number): string => {
+  const absSeconds = Math.abs(Math.round(seconds));
+  if (absSeconds >= 300) { // 5+ minutes
+    const mins = Math.floor(absSeconds / 60);
+    return `${mins}m`;
+  }
+  return `${absSeconds}s`;
+};
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -44,7 +66,6 @@ export function HomeScreen() {
   const {
     currentBook,
     currentProgress,
-    recentBooks,
     isRefreshing,
     refresh,
   } = useHomeData();
@@ -61,27 +82,75 @@ export function HomeScreen() {
   const {
     startContinuousSeek,
     stopContinuousSeek,
+    seekDirection,
+    seekMagnitude,
+    isSeeking,
   } = useRobustSeekControl();
 
-  // Download status tracking
-  const [downloadStatuses, setDownloadStatuses] = useState<Map<string, DownloadStatus>>(new Map());
+  // Queue state
+  const queue = useQueue();
+  const hasQueue = queue.length > 0;
 
+  // Downloaded books from downloads hook
+  const { downloads } = useDownloads();
+  const getItem = useLibraryCache((s) => s.getItem);
+  const [downloadedBooks, setDownloadedBooks] = useState<LibraryItem[]>([]);
+
+  // Load full book data for completed downloads
   useEffect(() => {
-    const unsubStatus = autoDownloadService.onStatus((bookId, status) => {
-      setDownloadStatuses(prev => new Map(prev).set(bookId, status));
-    });
-    return () => unsubStatus();
-  }, []);
+    const loadDownloadedBooks = async () => {
+      const completedDownloads = downloads.filter((d) => d.status === 'complete');
+      const books: LibraryItem[] = [];
+
+      for (const download of completedDownloads.slice(0, 10)) {
+        // Try to get from cache first
+        const cachedBook = getItem(download.itemId);
+        if (cachedBook) {
+          books.push(cachedBook);
+        } else {
+          // Fetch from API if not in cache
+          try {
+            const book = await apiClient.getItem(download.itemId);
+            books.push(book);
+          } catch {
+            // Skip if can't load
+          }
+        }
+      }
+
+      setDownloadedBooks(books);
+    };
+
+    loadDownloadedBooks();
+  }, [downloads, getItem]);
+
+  // Get author from book metadata - check multiple field paths
+  const getAuthor = (book: LibraryItem | null): string => {
+    if (!book) return '';
+    const metadata = book.media?.metadata as any;
+    if (!metadata) return '';
+
+    // Try authorName first (formatted string)
+    if (metadata.authorName) return metadata.authorName;
+
+    // Try authors array
+    if (metadata.authors?.length > 0) {
+      return metadata.authors.map((a: any) => a.name).join(', ');
+    }
+
+    return '';
+  };
 
   const currentCoverUrl = currentBook ? apiClient.getItemCoverUrl(currentBook.id) : undefined;
   const currentTitle = currentBook?.media?.metadata?.title || 'No book selected';
-  const currentAuthor = currentBook?.media?.metadata?.authorName || '';
+  const currentAuthor = getAuthor(currentBook);
   const progressPercent = currentProgress?.progress ? Math.round(currentProgress.progress * 100) : 0;
 
   // Navigation handlers
   const handleProfilePress = () => navigation.navigate('Main', { screen: 'ProfileTab' });
   const handleDiscoverPress = () => navigation.navigate('Main', { screen: 'DiscoverTab' });
   const handleLibraryPress = () => navigation.navigate('Main', { screen: 'LibraryTab' });
+  const handleQueuePress = () => navigation.navigate('QueueScreen');
 
   // Player controls
   const handlePlayPause = useCallback(async () => {
@@ -124,24 +193,10 @@ export function HomeScreen() {
     }
   }, [currentBook, navigation]);
 
-  // Add to library (heart/favorite)
-  const handleAddPress = useCallback(() => {
-    // TODO: Add to favorites
-  }, []);
-
-  // Book list item press
-  const handleBookPress = useCallback((book: LibraryItem) => {
-    navigation.navigate('BookDetail', { id: book.id });
+  // Book list item press - always goes to BookDetail
+  const handleBookPress = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail', { id: bookId });
   }, [navigation]);
-
-  const handleDownloadBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await autoDownloadService.startDownload(fullBook);
-    } catch {
-      await autoDownloadService.startDownload(book);
-    }
-  }, []);
 
   return (
     <View style={styles.container}>
@@ -156,14 +211,12 @@ export function HomeScreen() {
             contentFit="cover"
             blurRadius={60}
           />
-          {/* Dark overlay for readability */}
           <LinearGradient
             colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
             style={StyleSheet.absoluteFill}
           />
         </View>
       )}
-      {/* Fallback gradient when no cover */}
       {!currentCoverUrl && (
         <LinearGradient
           colors={['#2d3a2d', '#1a1f1a', '#0d0f0d']}
@@ -182,15 +235,22 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.libraryButton} onPress={handleLibraryPress}>
-          <Text style={styles.libraryButtonText}>Your Library</Text>
-          {/* Book icon matching design */}
-          <View style={styles.libraryIcon}>
-            <View style={styles.libraryIconLeft} />
-            <View style={styles.libraryIconRight} />
-            <View style={styles.libraryIconMiddle} />
-          </View>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {/* Queue indicator - shows when queue has items */}
+          {hasQueue && (
+            <TouchableOpacity style={styles.queueIndicatorButton} onPress={handleQueuePress}>
+              <Ionicons name="list" size={14} color="#000" />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.libraryButton} onPress={handleLibraryPress}>
+            <Text style={styles.libraryButtonText}>Your Library</Text>
+            <View style={styles.libraryIcon}>
+              <View style={styles.libraryIconBack} />
+              <View style={styles.libraryIconFront} />
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -211,7 +271,7 @@ export function HomeScreen() {
             <Text style={styles.bookTitle} numberOfLines={1}>{currentTitle}</Text>
             <Text style={styles.bookAuthor} numberOfLines={1}>{currentAuthor}</Text>
 
-            {/* Large Cover */}
+            {/* Large Cover - No queue button per spec */}
             <TouchableOpacity style={styles.coverContainer} onPress={handleCoverPress} activeOpacity={0.9}>
               <Image
                 source={currentCoverUrl}
@@ -219,64 +279,75 @@ export function HomeScreen() {
                 contentFit="cover"
                 transition={200}
               />
-              {/* Add button */}
-              <TouchableOpacity style={styles.addButton} onPress={handleAddPress}>
-                <Ionicons name="add-circle-outline" size={28} color="#fff" />
-              </TouchableOpacity>
             </TouchableOpacity>
 
-            {/* Control Buttons - Glass effect squares */}
+            {/* Control Buttons - Under cover: Rewind, FastForward, Play */}
             <View style={styles.controls}>
               <TouchableOpacity
-                style={styles.controlButton}
                 onPressIn={handleSkipBackPressIn}
                 onPressOut={handleSkipBackPressOut}
                 activeOpacity={0.8}
               >
-                {/* Double chevron back */}
-                <View style={styles.doubleChevron}>
-                  <Ionicons name="chevron-back" size={22} color={ACCENT} style={{ marginRight: -8 }} />
-                  <Ionicons name="chevron-back" size={22} color={ACCENT} />
-                </View>
+                <Image
+                  source={RewindButtonImage}
+                  style={styles.controlButtonImage}
+                  contentFit="contain"
+                />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.controlButton}
                 onPressIn={handleSkipForwardPressIn}
                 onPressOut={handleSkipForwardPressOut}
                 activeOpacity={0.8}
               >
-                {/* Double chevron forward */}
-                <View style={styles.doubleChevron}>
-                  <Ionicons name="chevron-forward" size={22} color={ACCENT} style={{ marginRight: -8 }} />
-                  <Ionicons name="chevron-forward" size={22} color={ACCENT} />
-                </View>
+                <Image
+                  source={FastForwardButtonImage}
+                  style={styles.controlButtonImage}
+                  contentFit="contain"
+                />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.playButton} onPress={handlePlayPause} activeOpacity={0.8}>
-                <Ionicons
-                  name={isPlaying ? 'pause' : 'play'}
-                  size={26}
-                  color="#000"
-                  style={!isPlaying && { marginLeft: 2 }}
+              <TouchableOpacity onPress={handlePlayPause} activeOpacity={0.8}>
+                <Image
+                  source={isPlaying ? PauseButtonImage : PlayButtonImage}
+                  style={styles.controlButtonImage}
+                  contentFit="contain"
                 />
               </TouchableOpacity>
             </View>
-
-            {/* Progress percentage */}
-            <Text style={styles.progressText}>{progressPercent}%</Text>
           </View>
         )}
 
-        {/* Full-width Progress Bar */}
+        {/* Seek indicators and Progress Bar */}
         {currentBook && (
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+          <View style={styles.progressSection}>
+            {/* Full-width Progress Bar with background line */}
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarBackground} />
+              <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+            </View>
+            {/* Seek indicators - aligned below progress bar */}
+            <View style={styles.seekIndicators}>
+              <Text style={[
+                styles.seekIndicatorText,
+                styles.seekIndicatorRewind,
+                isSeeking && seekDirection === 'backward' && styles.seekIndicatorRewindActive
+              ]}>
+                -{formatSeekTime(seekMagnitude)}
+              </Text>
+              <Text style={styles.progressPercentCenter}>{progressPercent}%</Text>
+              <Text style={[
+                styles.seekIndicatorText,
+                isSeeking && seekDirection === 'forward' && styles.seekIndicatorForwardActive
+              ]}>
+                +{formatSeekTime(seekMagnitude)}
+              </Text>
+            </View>
           </View>
         )}
 
-        {/* Recently Added Section */}
-        {recentBooks.length > 0 && (
+        {/* Downloaded Books Section - Using BookCard */}
+        {downloadedBooks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Recently Added</Text>
@@ -285,42 +356,22 @@ export function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {recentBooks.slice(0, 5).map((book) => {
-              const bookCoverUrl = apiClient.getItemCoverUrl(book.id);
-              const bookTitle = book.media?.metadata?.title || 'Unknown';
-              const bookAuthor = book.media?.metadata?.authorName || '';
-              const bookProgress = book.userMediaProgress?.progress || 0;
-              const status = downloadStatuses.get(book.id) || autoDownloadService.getStatus(book.id);
+            {downloadedBooks.slice(0, 5).map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                onPress={() => handleBookPress(book.id)}
+                showListeningProgress={true}
+              />
+            ))}
+          </View>
+        )}
 
-              return (
-                <TouchableOpacity
-                  key={book.id}
-                  style={styles.bookItem}
-                  onPress={() => handleBookPress(book)}
-                  activeOpacity={0.7}
-                >
-                  <Image source={bookCoverUrl} style={styles.bookCover} contentFit="cover" />
-                  <View style={styles.bookInfo}>
-                    <Text style={styles.bookItemTitle} numberOfLines={1}>{bookTitle}</Text>
-                    <Text style={styles.bookItemProgress}>
-                      {Math.round(bookProgress * 100)}% Completed
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.bookAddButton}
-                    onPress={() => handleDownloadBook(book)}
-                  >
-                    {status === 'completed' ? (
-                      <Ionicons name="checkmark-circle" size={22} color={ACCENT} />
-                    ) : status === 'downloading' || status === 'queued' ? (
-                      <Ionicons name="cloud-download" size={22} color={ACCENT} />
-                    ) : (
-                      <Ionicons name="add-circle-outline" size={22} color="rgba(255,255,255,0.4)" />
-                    )}
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
+        {/* Empty state when no downloads */}
+        {downloadedBooks.length === 0 && (
+          <View style={styles.emptySection}>
+            <Text style={styles.emptyText}>No downloaded books</Text>
+            <Text style={styles.emptySubtext}>Search for books to download</Text>
           </View>
         )}
       </ScrollView>
@@ -366,10 +417,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  queueIndicatorButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   libraryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)', // #ffffff24 from design
+    backgroundColor: 'rgba(255,255,255,0.14)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 100,
@@ -378,58 +442,58 @@ const styles = StyleSheet.create({
   libraryButtonText: {
     color: '#fff',
     fontSize: 10,
-    fontFamily: 'monospace',
+    fontFamily: MONO_FONT,
+    letterSpacing: 0.2,
   },
-  // Custom book icon matching design (3 rounded rectangles)
   libraryIcon: {
-    width: 15,
+    width: 14,
     height: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'relative',
   },
-  libraryIconLeft: {
-    width: 5,
-    height: 16,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#fff',
-    marginRight: 2,
-  },
-  libraryIconRight: {
-    width: 5,
-    height: 16,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  libraryIconMiddle: {
+  libraryIconBack: {
     position: 'absolute',
-    width: 5,
-    height: 13,
-    borderRadius: 100,
+    top: 2,
+    left: 2,
+    width: 10,
+    height: 14,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'transparent',
+  },
+  libraryIconFront: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 10,
+    height: 14,
+    borderRadius: 2,
     borderWidth: 1,
     borderColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
 
   // Now Playing
   nowPlaying: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 20,
   },
   bookTitle: {
-    fontSize: 12,
-    fontFamily: 'monospace',
+    fontSize: 14,
+    fontFamily: MONO_FONT,
+    fontWeight: '400',
     color: '#fff',
     textAlign: 'center',
-    marginBottom: 4,
+    letterSpacing: 0.3,
+    marginBottom: 6,
   },
   bookAuthor: {
     fontSize: 12,
+    fontFamily: 'System',
     color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   coverContainer: {
     width: COVER_SIZE,
@@ -446,65 +510,74 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  addButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 18,
-  },
 
-  // Controls - Glass effect squares matching design
+  // Controls - Under cover: Rewind, FastForward, Play (all same size)
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    gap: 8,
+    marginTop: 24,
+    gap: 12,
   },
-  controlButton: {
-    width: CONTROL_SIZE,
-    height: CONTROL_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  doubleChevron: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playButton: {
-    width: CONTROL_SIZE,
-    height: CONTROL_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: ACCENT,
-    borderRadius: 10,
+  controlButtonImage: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
   },
 
-  // Progress text
-  progressText: {
-    fontSize: 10,
-    fontFamily: 'monospace',
-    color: '#fff',
-    marginTop: 16,
+  // Progress section with seek indicators
+  progressSection: {
+    width: '100%',
+    marginTop: 20,
   },
-  // Progress bar - Full width matching design
+  seekIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
+  seekIndicatorText: {
+    fontSize: 11,
+    fontFamily: MONO_FONT,
+    color: 'transparent', // Hidden by default
+    letterSpacing: 0.2,
+    minWidth: 50,
+  },
+  seekIndicatorRewind: {
+    textAlign: 'left',
+  },
+  seekIndicatorRewindActive: {
+    color: REWIND_COLOR, // Red when rewinding
+  },
+  seekIndicatorForwardActive: {
+    color: ACCENT, // Green when fast-forwarding
+  },
+  progressPercentCenter: {
+    fontSize: 12,
+    fontFamily: MONO_FONT,
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
+
+  // Progress bar - Full width with background line
   progressBarContainer: {
     width: '100%',
     height: 7,
-    marginTop: 16,
-    backgroundColor: 'transparent',
+    position: 'relative',
+  },
+  progressBarBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 7,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 100,
   },
   progressBarFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
     height: 7,
     backgroundColor: ACCENT,
     borderRadius: 100,
@@ -515,7 +588,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  // Section - matching design
+  // Section
   section: {
     marginTop: 24,
     paddingHorizontal: 20,
@@ -528,51 +601,33 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: MONO_FONT,
+    fontWeight: '400',
     color: '#fff',
+    letterSpacing: 0.3,
   },
   viewAllText: {
     fontSize: 10,
-    fontFamily: 'monospace',
+    fontFamily: MONO_FONT,
     color: '#fff',
+    letterSpacing: 0.2,
   },
 
-  // Book Item - matching design layout
-  bookItem: {
-    flexDirection: 'row',
+  // Empty state
+  emptySection: {
+    marginTop: 40,
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 20,
   },
-  bookCover: {
-    width: 50,
-    height: 50,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  bookInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  bookItemTitle: {
+  emptyText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: 8,
   },
-  bookItemAuthor: {
+  emptySubtext: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: 2,
-  },
-  bookItemProgress: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: 2,
-  },
-  bookAddButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: 'rgba(255,255,255,0.3)',
   },
 });
 

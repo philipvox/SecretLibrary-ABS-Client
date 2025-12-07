@@ -1,26 +1,33 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { BookChapter } from '@/core/types';
-import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { usePlayerStore } from '@/features/player';
+
+// Design constants matching HomeScreen
+const ACCENT = '#c1f40c';
+const MONO_FONT = Platform.select({ ios: 'Courier', android: 'monospace', default: 'monospace' });
 
 interface ChaptersTabProps {
   chapters: BookChapter[];
   currentPosition?: number;
+  bookId?: string;
 }
 
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function ChaptersTab({ chapters, currentPosition = 0 }: ChaptersTabProps) {
+export function ChaptersTab({ chapters, currentPosition = 0, bookId }: ChaptersTabProps) {
+  const { seekTo, currentBook } = usePlayerStore();
+
   if (!chapters || chapters.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -34,15 +41,23 @@ export function ChaptersTab({ chapters, currentPosition = 0 }: ChaptersTabProps)
       (idx === chapters.length - 1 || currentPosition < chapters[idx + 1].start)
   );
 
-  const handleChapterPress = (chapter: BookChapter) => {
-    console.log('Chapter tapped:', chapter.title, 'at', chapter.start);
-    // TODO: Jump to chapter position
+  const handleChapterPress = async (chapter: BookChapter) => {
+    // Only seek if this book is currently loaded in player
+    if (currentBook?.id === bookId) {
+      try {
+        await seekTo(chapter.start);
+      } catch (error) {
+        console.error('Failed to seek to chapter:', error);
+      }
+    } else {
+      console.log('Book not loaded in player, chapter:', chapter.title);
+    }
   };
 
   const renderChapter = ({ item, index }: { item: BookChapter; index: number }) => {
     const duration = item.end - item.start;
     const isCurrentChapter = index === currentIndex;
-    
+
     return (
       <TouchableOpacity
         style={[styles.chapterItem, isCurrentChapter && styles.currentChapter]}
@@ -51,12 +66,12 @@ export function ChaptersTab({ chapters, currentPosition = 0 }: ChaptersTabProps)
       >
         <View style={[styles.chapterNumber, isCurrentChapter && styles.currentChapterNumber]}>
           {isCurrentChapter ? (
-            <Icon name="volume-high" size={14} color="#FFFFFF" set="ionicons" />
+            <Ionicons name="volume-high" size={14} color="#000" />
           ) : (
             <Text style={styles.chapterNumberText}>{index + 1}</Text>
           )}
         </View>
-        
+
         <View style={styles.chapterInfo}>
           <Text style={[styles.chapterTitle, isCurrentChapter && styles.currentChapterTitle]} numberOfLines={2}>
             {item.title || `Chapter ${index + 1}`}
@@ -66,11 +81,10 @@ export function ChaptersTab({ chapters, currentPosition = 0 }: ChaptersTabProps)
           </Text>
         </View>
 
-        <Icon 
-          name="play-circle-outline" 
-          size={24} 
-          color={isCurrentChapter ? theme.colors.primary[500] : theme.colors.text.tertiary} 
-          set="ionicons" 
+        <Ionicons
+          name="play-circle-outline"
+          size={24}
+          color={isCurrentChapter ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)'}
         />
       </TouchableOpacity>
     );
@@ -91,66 +105,70 @@ export function ChaptersTab({ chapters, currentPosition = 0 }: ChaptersTabProps)
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[4],
+    paddingHorizontal: 20,
+    paddingTop: 0,
   },
   emptyContainer: {
-    padding: theme.spacing[8],
+    padding: 40,
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 14,
-    color: theme.colors.text.tertiary,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.4)',
   },
   chapterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing[3],
+    paddingVertical: 12,
   },
   currentChapter: {
-    backgroundColor: theme.colors.primary[50],
-    marginHorizontal: -theme.spacing[3],
-    paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.radius.medium,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
   chapterNumber: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: theme.colors.neutral[100],
+    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: theme.spacing[3],
+    marginRight: 12,
   },
   currentChapterNumber: {
-    backgroundColor: theme.colors.primary[500],
+    backgroundColor: 'rgba(255,255,255,0.9)',
   },
   chapterNumberText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontFamily: MONO_FONT,
     fontWeight: '600',
-    color: theme.colors.text.tertiary,
+    color: 'rgba(255,255,255,0.5)',
   },
   chapterInfo: {
     flex: 1,
-    marginRight: theme.spacing[3],
+    marginRight: 12,
   },
   chapterTitle: {
     fontSize: 14,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+    color: '#fff',
+    marginBottom: 4,
     lineHeight: 19,
   },
   currentChapterTitle: {
     fontWeight: '600',
-    color: theme.colors.primary[600],
+    color: '#fff',
   },
   chapterDuration: {
-    fontSize: 12,
-    color: theme.colors.text.tertiary,
+    fontSize: 11,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 0.2,
   },
   separator: {
     height: 1,
-    backgroundColor: theme.colors.border.light,
-    marginLeft: 28 + theme.spacing[3],
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginLeft: 40,
   },
 });

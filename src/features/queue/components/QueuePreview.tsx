@@ -18,9 +18,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { useQueue, useQueueStore, useAutoplayEnabled, useAutoSeriesBookId } from '../stores/queueStore';
-import { usePlayerStore } from '@/features/player/stores/playerStore';
-import { BookListItem } from '@/shared/components';
-import type { LibraryItem } from '@/core/types';
+import { BookCard } from '@/shared/components/BookCard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
@@ -54,20 +52,11 @@ export function QueuePreview({ variant = 'full' }: QueuePreviewProps) {
   const queue = useQueue();
   const autoplayEnabled = useAutoplayEnabled();
   const autoSeriesBookId = useAutoSeriesBookId();
-  const removeFromQueue = useQueueStore((state) => state.removeFromQueue);
   const setAutoplayEnabled = useQueueStore((state) => state.setAutoplayEnabled);
-  const loadBook = usePlayerStore((state) => state.loadBook);
 
   const handleSeeAll = useCallback(() => {
     navigation.navigate('QueueScreen');
   }, [navigation]);
-
-  const handleRemove = useCallback(
-    (bookId: string) => {
-      removeFromQueue(bookId);
-    },
-    [removeFromQueue]
-  );
 
   const handleToggleAutoplay = useCallback(
     (value: boolean) => {
@@ -78,17 +67,9 @@ export function QueuePreview({ variant = 'full' }: QueuePreviewProps) {
 
   const handleBookPress = useCallback(
     (bookId: string) => {
-      // Navigate to book detail or play
-      navigation.navigate('BookDetail', { bookId });
+      navigation.navigate('BookDetail', { id: bookId });
     },
     [navigation]
-  );
-
-  const handlePlayBook = useCallback(
-    (book: LibraryItem) => {
-      loadBook(book, { autoPlay: true, showPlayer: true });
-    },
-    [loadBook]
   );
 
   // Don't render if queue is empty and no autoplay setting to show
@@ -132,12 +113,8 @@ export function QueuePreview({ variant = 'full' }: QueuePreviewProps) {
       {/* Queue items list */}
       {queue.length > 0 ? (
         <View style={styles.listContainer}>
-          {queue.slice(0, 5).map((item, index) => {
+          {queue.slice(0, 5).map((item) => {
             const isAutoSeries = item.bookId === autoSeriesBookId;
-            const metadata = (item.book.media?.metadata as any) || {};
-            const seriesName = metadata.seriesName?.replace(/\s*#[\d.]+$/, '');
-            const seqMatch = metadata.seriesName?.match(/#([\d.]+)/);
-            const seriesSequence = seqMatch ? parseFloat(seqMatch[1]) : undefined;
 
             return (
               <View key={item.id} style={styles.listItem}>
@@ -146,16 +123,10 @@ export function QueuePreview({ variant = 'full' }: QueuePreviewProps) {
                     <Text style={styles.autoSeriesText}>From series</Text>
                   </View>
                 )}
-                <BookListItem
+                <BookCard
                   book={item.book}
                   onPress={() => handleBookPress(item.bookId)}
-                  onPlayPress={() => handlePlayBook(item.book)}
-                  onDelete={() => handleRemove(item.bookId)}
-                  showSwipe={true}
-                  showProgress={true}
-                  seriesName={seriesName}
-                  seriesSequence={seriesSequence}
-                  hideQueueButton={true}
+                  showListeningProgress={true}
                 />
               </View>
             );

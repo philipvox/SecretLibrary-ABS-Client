@@ -18,10 +18,8 @@ import {
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache } from '@/core/cache';
-import { usePlayerStore } from '@/features/player';
-import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { BookListItem } from '@/shared/components';
+import { BookCard } from '@/shared/components/BookCard';
 import { LibraryItem } from '@/core/types';
 
 type AuthorDetailRouteParams = {
@@ -47,7 +45,6 @@ export function AuthorDetailScreen() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { getAuthor, isLoaded } = useLibraryCache();
-  const { loadBook, viewBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
 
   // Get author data from cache - instant!
   const authorInfo = useMemo(() => {
@@ -99,23 +96,10 @@ export function AuthorDetailScreen() {
     }
   };
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await viewBook(fullBook);
-    } catch {
-      await viewBook(book);
-    }
-  }, [viewBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  // Navigate to BookDetail - per spec, all book taps go to detail
+  const handleBookPress = useCallback((book: LibraryItem) => {
+    (navigation as any).navigate('BookDetail', { id: book.id });
+  }, [navigation]);
 
   // Generate initials
   const initials = authorName
@@ -233,17 +217,14 @@ export function AuthorDetailScreen() {
           </ScrollView>
         </View>
 
-        {/* Book List */}
+        {/* Book List - Using BookCard with state-aware icons */}
         <View style={styles.bookList}>
           {sortedBooks.map((book) => (
-            <BookListItem
+            <BookCard
               key={book.id}
               book={book}
               onPress={() => handleBookPress(book)}
-              onPlayPress={() => handlePlayBook(book)}
-              showProgress={true}
-              showSwipe={true}
-              isLoadingThisBook={isPlayerLoading && currentBook?.id === book.id}
+              showListeningProgress={true}
             />
           ))}
         </View>

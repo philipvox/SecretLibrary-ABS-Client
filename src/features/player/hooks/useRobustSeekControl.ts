@@ -33,6 +33,15 @@ const LOCK_TIMEOUT = 3000; // ms - auto-release lock if stuck (reduced for snapp
 const DEBOUNCE_DELAY = 50; // ms - for rapid seek requests
 const PREV_CHAPTER_THRESHOLD = 3; // seconds before going to prev vs restart
 
+// Accelerating seek increments
+const getSeekStep = (totalSeekSeconds: number): number => {
+  const absSec = Math.abs(totalSeekSeconds);
+  if (absSec >= 600) return 300; // After 10 min: 5 min steps
+  if (absSec >= 300) return 30;  // After 5 min: 30 sec steps
+  if (absSec >= 60) return 10;   // After 1 min: 10 sec steps
+  return 2;                       // Default: 2 sec steps (base rate)
+};
+
 interface SeekControlState {
   isSeeking: boolean;
   isChangingChapter: boolean;
@@ -442,11 +451,15 @@ export function useRobustSeekControl(): UseSeekControlReturn {
 
       usePlayerStore.setState({ isSeeking: true });
 
-      const step = direction === 'backward' ? -REWIND_STEP : FF_STEP;
       currentSeekPositionRef.current = startPosition;
 
+      // Track total seek amount for accelerating increments
+      let totalSeekDelta = 0;
+
       // Perform initial step
-      currentSeekPositionRef.current = clampPosition(currentSeekPositionRef.current + step, durationRef.current);
+      const initialStep = direction === 'backward' ? -2 : 2;
+      totalSeekDelta += initialStep;
+      currentSeekPositionRef.current = clampPosition(currentSeekPositionRef.current + initialStep, durationRef.current);
       await audioService.seekTo(currentSeekPositionRef.current);
 
       // Update both local state AND player store for real-time UI updates
@@ -455,7 +468,7 @@ export function useRobustSeekControl(): UseSeekControlReturn {
       }
       usePlayerStore.setState({ position: currentSeekPositionRef.current });
 
-      // Start interval for continuous seeking
+      // Start interval for continuous seeking with accelerating increments
       continuousSeekIntervalRef.current = setInterval(async () => {
         if (!lockRef.current.isLocked || lockRef.current.operation !== 'continuous') {
           // Lock was released externally
@@ -465,6 +478,11 @@ export function useRobustSeekControl(): UseSeekControlReturn {
           }
           return;
         }
+
+        // Get accelerating step based on total seek amount
+        const baseStep = getSeekStep(totalSeekDelta);
+        const step = direction === 'backward' ? -baseStep : baseStep;
+        totalSeekDelta += step;
 
         const prevPosition = currentSeekPositionRef.current;
         currentSeekPositionRef.current = clampPosition(currentSeekPositionRef.current + step, durationRef.current);

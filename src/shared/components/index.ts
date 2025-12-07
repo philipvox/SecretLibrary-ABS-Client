@@ -114,7 +114,7 @@ export { SeriesHeartButton } from './SeriesHeartButton';
 export type { SeriesHeartButtonProps } from './SeriesHeartButton';
 
 // =============================================================================
-// LIST ITEMS
+// BOOK CARDS
 // =============================================================================
-export { BookListItem } from './BookListItem';
-export type { BookListItemProps } from './BookListItem';
+export { BookCard, BookCardWithState } from './BookCard';
+export type { BookCardProps } from './BookCard';

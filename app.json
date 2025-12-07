@@ -73,6 +73,13 @@
         }
       ],
       [
+        "expo-media-control",
+        {
+          "enableBackgroundAudio": true,
+          "audioSessionCategory": "playback"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

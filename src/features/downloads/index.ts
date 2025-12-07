@@ -1,14 +1,10 @@
 /**
  * src/features/downloads/index.ts
  *
- * Downloads feature - both auto-download and manual download support
+ * Downloads feature - using downloadManager with SQLite persistence
  */
 
-// Services
-export { autoDownloadService } from './services/autoDownloadService';
-export type { DownloadedBook, DownloadStatus } from './services/autoDownloadService';
-
-// Re-export core download manager for convenience
+// Re-export core download manager
 export { downloadManager } from '@/core/services/downloadManager';
 export type { DownloadTask } from '@/core/services/downloadManager';
 

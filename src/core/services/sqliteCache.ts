@@ -271,6 +271,14 @@ class SQLiteCache {
         CREATE INDEX IF NOT EXISTS idx_playback_queue_position ON playback_queue(position ASC);
       `);
 
+      // Migration: Add last_played_at column if it doesn't exist
+      try {
+        await db.execAsync(`ALTER TABLE downloads ADD COLUMN last_played_at TEXT`);
+        console.log('[SQLiteCache] Added last_played_at column to downloads');
+      } catch {
+        // Column already exists, ignore
+      }
+
       this.isInitialized = true;
       console.log('[SQLiteCache] Database initialized successfully');
     } catch (err) {
@@ -1111,6 +1119,18 @@ class SQLiteCache {
       ]);
     } catch (err) {
       console.warn('[SQLiteCache] failDownload error:', err);
+    }
+  }
+
+  async updateDownloadLastPlayed(itemId: string): Promise<void> {
+    const db = await this.ensureReady();
+    try {
+      await db.runAsync('UPDATE downloads SET last_played_at = ? WHERE item_id = ?', [
+        new Date().toISOString(),
+        itemId,
+      ]);
+    } catch (err) {
+      console.warn('[SQLiteCache] updateDownloadLastPlayed error:', err);
     }
   }
 

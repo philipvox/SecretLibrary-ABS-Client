@@ -68,8 +68,8 @@ class AppInitializer {
 
       // 3. Clear downloaded files
       try {
-        const { autoDownloadService } = await import('@/features/downloads/services/autoDownloadService');
-        await autoDownloadService.clearAll();
+        const { downloadManager } = await import('./downloadManager');
+        await downloadManager.clearAllDownloads();
         console.log('[AppInitializer] ✓ Downloads cleared');
       } catch (e) {
         console.warn('[AppInitializer] Downloads clear skipped:', e);

@@ -1,8 +1,10 @@
 /**
  * src/features/book-detail/screens/BookDetailScreen.tsx
+ *
+ * Dark theme book detail screen matching home screen design
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,106 +12,138 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
-  Image,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useBookDetails } from '../hooks/useBookDetails';
 import { OverviewTab } from '../components/OverviewTab';
 import { ChaptersTab } from '../components/ChaptersTab';
-import { LoadingSpinner, ErrorView, HeartButton } from '@/shared/components';
-import { Icon } from '@/shared/components/Icon';
+import { LoadingSpinner, ErrorView } from '@/shared/components';
 import { useCoverUrl } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
-import { autoDownloadService, DownloadStatus } from '@/features/downloads';
-import { theme } from '@/shared/theme';
+import { useDownloadStatus as useDownloadStatusHook } from '@/core/hooks/useDownloads';
+import { downloadManager } from '@/core/services/downloadManager';
+import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
+
+// Design constants matching HomeScreen - minimal accent usage
+const ACCENT = '#c1f40c';
+const ACCENT_SUBTLE = 'rgba(193,244,12,0.6)'; // Muted accent for less prominence
+const MONO_FONT = Platform.select({ ios: 'Courier', android: 'monospace', default: 'monospace' });
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const COVER_SIZE = SCREEN_WIDTH * 0.45;
 
 type BookDetailRouteParams = {
   BookDetail: { id: string };
 };
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const COVER_SIZE = SCREEN_WIDTH * 0.38;
-
 type TabType = 'overview' | 'chapters' | 'details';
 
-// Hook for download status
-function useDownloadStatus(bookId: string) {
-  const [status, setStatus] = useState<DownloadStatus>(() =>
-    autoDownloadService.getStatus(bookId)
-  );
-  const [progress, setProgress] = useState<number>(() =>
-    autoDownloadService.getProgress(bookId)
-  );
-
-  useEffect(() => {
-    setStatus(autoDownloadService.getStatus(bookId));
-    setProgress(autoDownloadService.getProgress(bookId));
-
-    const unsubProgress = autoDownloadService.onProgress((id, pct) => {
-      if (id === bookId) setProgress(pct);
-    });
-    const unsubStatus = autoDownloadService.onStatus((id, newStatus) => {
-      if (id === bookId) setStatus(newStatus);
-    });
-
-    return () => {
-      unsubProgress();
-      unsubStatus();
-    };
-  }, [bookId]);
-
-  return { status, progress };
-}
-
 export function BookDetailScreen() {
+  const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<BookDetailRouteParams, 'BookDetail'>>();
   const navigation = useNavigation();
   const { id: bookId } = route.params;
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   const { book, isLoading, error, refetch } = useBookDetails(bookId);
-  const { loadBook } = usePlayerStore();
-  const { status: downloadStatus } = useDownloadStatus(bookId);
+  const { loadBook, currentBook, isPlaying, play, pause } = usePlayerStore();
+  const {
+    isDownloaded,
+    isDownloading,
+    isPending,
+    progress: downloadProgress
+  } = useDownloadStatusHook(bookId);
+  const isThisBookPlaying = currentBook?.id === bookId && isPlaying;
+  const isThisBookLoaded = currentBook?.id === bookId;
   const coverUrl = useCoverUrl(bookId);
 
-  // ALL HOOKS MUST BE BEFORE EARLY RETURNS
-  const handlePlay = useCallback(async () => {
+  // Queue state
+  const isInQueue = useIsInQueue(bookId);
+  const addToQueue = useQueueStore((s) => s.addToQueue);
+  const removeFromQueue = useQueueStore((s) => s.removeFromQueue);
+
+  const handlePlayPause = useCallback(async () => {
     if (!book) return;
+
+    // If this book is already loaded, toggle play/pause
+    if (isThisBookLoaded) {
+      if (isPlaying) {
+        await pause();
+      } else {
+        await play();
+      }
+      return;
+    }
+
+    // Otherwise, load and start playing this book
     try {
-      await loadBook(book);
+      await loadBook(book, { showPlayer: false });
     } catch (err) {
       console.error('Failed to start playback:', err);
     }
-  }, [book, loadBook]);
+  }, [book, loadBook, isThisBookLoaded, isPlaying, play, pause]);
 
   const handleDownload = useCallback(() => {
     if (!book) return;
-    if (downloadStatus === 'completed' || downloadStatus === 'downloading' || downloadStatus === 'queued') {
+    if (isDownloaded || isDownloading || isPending) {
       return;
     }
-    autoDownloadService.startDownload(book);
-  }, [book, downloadStatus]);
+    downloadManager.queueDownload(book);
+  }, [book, isDownloaded, isDownloading, isPending]);
 
-  // Early returns AFTER all hooks
+  const handleQueueToggle = useCallback(() => {
+    if (!book || !isDownloaded) return;
+    if (isInQueue) {
+      removeFromQueue(bookId);
+    } else {
+      addToQueue(book);
+    }
+  }, [book, bookId, isDownloaded, isInQueue, addToQueue, removeFromQueue]);
+
   if (isLoading) {
-    return <LoadingSpinner text="Loading book details..." />;
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" />
+        <ActivityIndicator size="large" color={ACCENT} />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
   }
 
   if (error || !book) {
     return <ErrorView message="Failed to load book details" onRetry={refetch} />;
   }
 
-  // Derived values (not hooks, safe after early returns)
+  // Derived values - handle both cached and expanded API data
   const metadata = book.media.metadata as any;
   const title = metadata.title || 'Unknown Title';
-  const author = metadata.authorName || 'Unknown Author';
-  const rawNarrator = metadata.narratorName || '';
+
+  // Author: try authorName, then authors array (expanded), then fallback
+  let author = metadata.authorName || '';
+  if (!author && metadata.authors?.length > 0) {
+    author = metadata.authors.map((a: any) => a.name || a).filter(Boolean).join(', ');
+  }
+  if (!author) author = 'Unknown Author';
+
+  // Narrator: try narratorName, then narrators array
+  let rawNarrator = metadata.narratorName || '';
+  if (!rawNarrator && metadata.narrators?.length > 0) {
+    rawNarrator = metadata.narrators.map((n: any) => typeof n === 'string' ? n : n.name).filter(Boolean).join(', ');
+  }
   const narrator = rawNarrator.replace(/^Narrated by\s*/i, '').trim() || null;
+
   const genres = metadata.genres || [];
   const chapters = book.media.chapters || [];
+
+  // Series: try series array first (expanded), then seriesName string
+  const series = metadata.series?.[0] || metadata.seriesName || null;
+  const seriesSequence = metadata.series?.[0]?.sequence || null;
 
   let duration = book.media.duration || 0;
   if (!duration && book.media.audioFiles?.length) {
@@ -118,16 +152,7 @@ export function BookDetailScreen() {
 
   const progress = book.userMediaProgress?.progress || 0;
   const hasProgress = progress > 0 && progress < 1;
-
-  const renderDownloadIcon = () => {
-    if (downloadStatus === 'completed') {
-      return <Icon name="checkmark-circle" size={22} color="#22c55e" set="ionicons" />;
-    }
-    if (downloadStatus === 'downloading' || downloadStatus === 'queued') {
-      return <ActivityIndicator size="small" color={theme.colors.text.secondary} />;
-    }
-    return <Icon name="download-outline" size={22} color={theme.colors.text.secondary} set="ionicons" />;
-  };
+  const progressPercent = Math.round(progress * 100);
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -136,141 +161,190 @@ export function BookDetailScreen() {
     return `${minutes}m`;
   };
 
-  const playButtonText = hasProgress ? 'Continue' : 'Play Now';
+  const playButtonText = hasProgress ? 'Continue' : 'Play';
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background.primary} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={22} color={theme.colors.text.primary} set="ionicons" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Book Details</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={handleDownload}
-            disabled={downloadStatus === 'downloading' || downloadStatus === 'queued'}
-            style={styles.headerButton}
-          >
-            {renderDownloadIcon()}
-          </TouchableOpacity>
-          <HeartButton bookId={book.id} size={24} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Blurred cover background */}
+      {coverUrl && (
+        <View style={StyleSheet.absoluteFill}>
+          <Image
+            source={coverUrl}
+            style={styles.backgroundImage}
+            contentFit="cover"
+            blurRadius={60}
+          />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.95)']}
+            style={StyleSheet.absoluteFill}
+          />
         </View>
+      )}
+      {!coverUrl && (
+        <LinearGradient
+          colors={['#2d3a2d', '#1a1f1a', '#0d0f0d']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+
+      {/* Header - Only back button and queue indicator when queued */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        {/* Only show queue indicator when book is in queue */}
+        {isInQueue && (
+          <TouchableOpacity style={styles.queueIndicator} onPress={handleQueueToggle}>
+            <Ionicons name="checkmark" size={18} color="#000" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Top Section - Cover + Info */}
-        <View style={styles.topSection}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Cover and Info */}
+        <View style={styles.coverSection}>
+          {/* Title and Author above cover */}
+          <Text style={styles.title} numberOfLines={2}>{title}</Text>
+          <Text style={styles.author}>{author}</Text>
+
           <View style={styles.coverContainer}>
-            <Image source={{ uri: coverUrl }} style={styles.cover} resizeMode="cover" />
+            <Image source={coverUrl} style={styles.cover} contentFit="cover" />
           </View>
 
-          <View style={styles.infoSide}>
-            <Text style={styles.title} numberOfLines={3}>{title}</Text>
-            <Text style={styles.authorLabel}>
-              Author: <Text style={styles.authorName}>{author}</Text>
-            </Text>
-            {narrator && (
-              <Text style={styles.narratorLabel}>
-                Narrator: <Text style={styles.narratorName}>{narrator}</Text>
-              </Text>
-            )}
+          {/* Narrator below cover */}
+          {narrator && <Text style={styles.narrator}>Narrated by {narrator}</Text>}
 
-            {genres.length > 0 && (
-              <View style={styles.tagsSection}>
-                <Text style={styles.tagsLabel}>Tags</Text>
-                <View style={styles.tagsRow}>
-                  {genres.slice(0, 2).map((genre: string, idx: number) => (
-                    <View key={idx} style={styles.tag}>
-                      <Text style={styles.tagText}>#{genre.toLowerCase()}</Text>
-                    </View>
-                  ))}
-                </View>
+          {/* Progress */}
+          {hasProgress && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
               </View>
-            )}
-          </View>
+              <Text style={styles.progressText}>{progressPercent}% Complete</Text>
+            </View>
+          )}
         </View>
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Duration</Text>
+            <Ionicons name="time-outline" size={18} color="rgba(255,255,255,0.5)" />
             <Text style={styles.statValue}>{formatDuration(duration)}</Text>
           </View>
+          <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Chapters</Text>
-            <Text style={styles.statValue}>{chapters.length}</Text>
+            <Ionicons name="list-outline" size={18} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.statValue}>{chapters.length} Chapters</Text>
           </View>
-        </View>
-
-        {/* Action Buttons - NN/g: Primary actions should be prominent */}
-        <View style={styles.actionButtons}>
-          {/* Download Button - Prominent when not downloaded */}
-          {downloadStatus !== 'completed' ? (
-            <TouchableOpacity
-              style={[
-                styles.downloadButton,
-                (downloadStatus === 'downloading' || downloadStatus === 'queued') && styles.downloadButtonDisabled
-              ]}
-              onPress={handleDownload}
-              disabled={downloadStatus === 'downloading' || downloadStatus === 'queued'}
-            >
-              {downloadStatus === 'downloading' || downloadStatus === 'queued' ? (
-                <>
-                  <ActivityIndicator size="small" color={theme.colors.text.secondary} />
-                  <Text style={styles.downloadButtonTextDisabled}>
-                    {downloadStatus === 'downloading' ? 'Downloading...' : 'Queued'}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Icon name="download-outline" size={20} color={theme.colors.primary[500]} set="ionicons" />
-                  <Text style={styles.downloadButtonText}>Download</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.downloadedIndicator}>
-              <Icon name="checkmark-circle" size={20} color="#22c55e" set="ionicons" />
-              <Text style={styles.downloadedText}>Downloaded</Text>
-            </View>
+          {series && (
+            <>
+              <View style={styles.statDivider} />
+              <TouchableOpacity
+                style={[styles.statItem, { flexShrink: 1 }]}
+                onPress={() => {
+                  const seriesName = typeof series === 'object' ? series.name : series;
+                  if (seriesName) {
+                    (navigation as any).navigate('SeriesDetail', { seriesName });
+                  }
+                }}
+              >
+                <Text style={styles.seriesLink} numberOfLines={2}>
+                  {typeof series === 'object' ? series.name : series}
+                  {seriesSequence ? ` #${seriesSequence}` : ''}
+                </Text>
+              </TouchableOpacity>
+            </>
           )}
+        </View>
 
-          {/* Play Button - Always prominent */}
-          <TouchableOpacity style={styles.playNowButton} onPress={handlePlay}>
-            <Icon name="play" size={20} color="#FFFFFF" set="ionicons" />
-            <Text style={styles.playNowText}>{playButtonText}</Text>
+        {/* Action Buttons - Download and Play */}
+        <View style={styles.actionButtons}>
+          {/* Download Button */}
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              isDownloaded && styles.actionButtonCompleted
+            ]}
+            onPress={handleDownload}
+            disabled={isDownloading || isPending || isDownloaded}
+            activeOpacity={0.7}
+          >
+            {isDownloaded ? (
+              <>
+                <Ionicons name="checkmark-circle" size={18} color={ACCENT} />
+                <Text style={styles.actionButtonTextCompleted}>Downloaded</Text>
+              </>
+            ) : isDownloading || isPending ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.actionButtonText}>{Math.round(downloadProgress * 100)}%</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="arrow-down-circle-outline" size={18} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.actionButtonText}>Download</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Play Button */}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.playButton, isThisBookPlaying && styles.playButtonActive]}
+            onPress={handlePlayPause}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={isThisBookPlaying ? 'pause' : 'play'}
+              size={18}
+              color={isThisBookPlaying ? '#000' : 'rgba(255,255,255,0.7)'}
+            />
+            <Text style={[styles.actionButtonText, isThisBookPlaying && styles.playButtonTextActive]}>
+              {isThisBookPlaying ? 'Pause' : 'Play'}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Tabs */}
+        {/* Tabs with Queue (+) button */}
         <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
-            onPress={() => setActiveTab('overview')}
-          >
-            <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
-              Overview
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'chapters' && styles.tabActive]}
-            onPress={() => setActiveTab('chapters')}
-          >
-            <Text style={[styles.tabText, activeTab === 'chapters' && styles.tabTextActive]}>
-              Chapters ({chapters.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'details' && styles.tabActive]}
-            onPress={() => setActiveTab('details')}
-          >
-            <Text style={[styles.tabText, activeTab === 'details' && styles.tabTextActive]}>
-              Details
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.tabsLeft}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
+              onPress={() => setActiveTab('overview')}
+            >
+              <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
+                Overview
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'chapters' && styles.tabActive]}
+              onPress={() => setActiveTab('chapters')}
+            >
+              <Text style={[styles.tabText, activeTab === 'chapters' && styles.tabTextActive]}>
+                Chapters
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'details' && styles.tabActive]}
+              onPress={() => setActiveTab('details')}
+            >
+              <Text style={[styles.tabText, activeTab === 'details' && styles.tabTextActive]}>
+                Details
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Queue (+) button - only show when downloaded and not yet in queue */}
+          {isDownloaded && !isInQueue && (
+            <TouchableOpacity style={styles.addToQueueButton} onPress={handleQueueToggle}>
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Tab Content */}
@@ -279,295 +353,348 @@ export function BookDetailScreen() {
             <OverviewTab book={book} />
           )}
           {activeTab === 'chapters' && (
-            <ChaptersTab chapters={chapters} />
+            <ChaptersTab chapters={chapters} bookId={bookId} />
           )}
           {activeTab === 'details' && (
             <View style={styles.detailsTab}>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Title</Text>
+                <Text style={styles.detailLabel}>TITLE</Text>
                 <Text style={styles.detailValue}>{title}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Author</Text>
+                <Text style={styles.detailLabel}>AUTHOR</Text>
                 <Text style={styles.detailValue}>{author}</Text>
               </View>
               {narrator && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Narrator</Text>
+                  <Text style={styles.detailLabel}>NARRATOR</Text>
                   <Text style={styles.detailValue}>{narrator}</Text>
                 </View>
               )}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Duration</Text>
+                <Text style={styles.detailLabel}>DURATION</Text>
                 <Text style={styles.detailValue}>{formatDuration(duration)}</Text>
               </View>
               {metadata.publishedYear && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Published</Text>
+                  <Text style={styles.detailLabel}>PUBLISHED</Text>
                   <Text style={styles.detailValue}>{metadata.publishedYear}</Text>
                 </View>
               )}
               {metadata.publisher && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Publisher</Text>
+                  <Text style={styles.detailLabel}>PUBLISHER</Text>
                   <Text style={styles.detailValue}>{metadata.publisher}</Text>
                 </View>
               )}
-              {metadata.language && (
+              {genres.length > 0 && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Language</Text>
-                  <Text style={styles.detailValue}>{metadata.language}</Text>
+                  <Text style={styles.detailLabel}>GENRES</Text>
+                  <View style={styles.genrePills}>
+                    {genres.map((genre: string, idx: number) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.genrePill}
+                        onPress={() => (navigation as any).navigate('GenreDetail', { genreName: genre })}
+                      >
+                        <Text style={styles.genrePillText}>#{genre.toLowerCase()}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
               )}
             </View>
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: '#000',
   },
-  header: {
-    flexDirection: 'row',
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 12,
+    fontFamily: MONO_FONT,
+    fontSize: 12,
+  },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+
+  // Header
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    zIndex: 100,
   },
   headerButton: {
-    width: 44,  // NN/g: Minimum 44px touch target
+    width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  headerActions: {
-    flexDirection: 'row',
+  queueIndicator: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: theme.spacing[2],
   },
+
   scrollView: {
     flex: 1,
   },
-  topSection: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[4],
-    paddingBottom: theme.spacing[5],
+
+  // Cover Section
+  coverSection: {
+    alignItems: 'center',
+    paddingTop: 100,
+    paddingHorizontal: 20,
   },
   coverContainer: {
     width: COVER_SIZE,
     height: COVER_SIZE * 1.1,
-    borderRadius: theme.radius.medium,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: theme.colors.neutral[200],
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+    marginTop: 16,
+    marginBottom: 16,
   },
   cover: {
     width: '100%',
     height: '100%',
   },
-  infoSide: {
-    flex: 1,
-    marginLeft: theme.spacing[4],
-    paddingTop: theme.spacing[1],
-  },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: theme.colors.text.primary,
-    lineHeight: 26,
-    marginBottom: theme.spacing[2],
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 0.3,
   },
-  authorLabel: {
+  author: {
     fontSize: 14,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing[1],
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  authorName: {
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  narratorLabel: {
-    fontSize: 14,
-    color: theme.colors.text.secondary,
-  },
-  narratorName: {
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-  },
-  tagsSection: {
-    marginTop: theme.spacing[3],
-  },
-  tagsLabel: {
+  narrator: {
     fontSize: 12,
-    color: theme.colors.text.tertiary,
-    marginBottom: theme.spacing[2],
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
   },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing[2],
+
+  // Progress
+  progressSection: {
+    width: '100%',
+    marginTop: 20,
+    alignItems: 'center',
   },
-  tag: {
-    backgroundColor: theme.colors.neutral[100],
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[1],
-    borderRadius: theme.radius.full,
+  progressBar: {
+    width: '80%',
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-  tagText: {
-    fontSize: 12,
-    color: theme.colors.text.secondary,
+  progressFill: {
+    height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.7)', // Subtle white instead of green
+    borderRadius: 2,
   },
+  progressText: {
+    fontSize: 11,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 8,
+    letterSpacing: 0.2,
+  },
+
+  // Stats
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[3],
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    gap: 16,
+    flexWrap: 'wrap',
   },
   statItem: {
-    marginRight: theme.spacing[6],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  statLabel: {
-    fontSize: 12,
-    color: theme.colors.text.tertiary,
-    marginBottom: theme.spacing[1],
+  statDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
+    fontSize: 13,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.2,
   },
-  // NN/g: Action buttons should be prominent and have clear affordances
+  seriesLink: {
+    fontSize: 13,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.2,
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+    maxWidth: 180,
+  },
+
+  // Action Buttons - Download and Sample (same size pills)
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.neutral[200],
-    gap: theme.spacing[3],
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
   },
-  downloadButton: {
-    flex: 1,
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48, // NN/g: Touch target
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
-    borderRadius: theme.radius.full,
-    borderWidth: 2,
-    borderColor: theme.colors.primary[500],
-    backgroundColor: 'transparent',
-    gap: theme.spacing[2],
+    height: 44,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 22,
+    gap: 8,
+    minWidth: 120,
   },
-  downloadButtonDisabled: {
-    borderColor: theme.colors.neutral[300],
-    backgroundColor: theme.colors.neutral[100],
+  actionButtonCompleted: {
+    backgroundColor: 'rgba(193,244,12,0.1)',
   },
-  downloadButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.primary[500],
+  actionButtonText: {
+    fontSize: 13,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.7)',
   },
-  downloadButtonTextDisabled: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: theme.colors.text.secondary,
+  actionButtonTextCompleted: {
+    fontSize: 13,
+    fontFamily: MONO_FONT,
+    color: ACCENT,
   },
-  downloadedIndicator: {
-    flex: 1,
+  playButton: {
+    // Same base styling from actionButton
+  },
+  playButtonActive: {
+    backgroundColor: ACCENT,
+  },
+  playButtonTextActive: {
+    color: '#000',
+  },
+
+  // Genre Pills (in Details tab)
+  genrePills: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.neutral[100],
-    gap: theme.spacing[2],
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
   },
-  downloadedText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#16a34a',
+  genrePill: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 100,
   },
-  playNowButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48, // NN/g: Touch target
-    backgroundColor: theme.colors.primary[500],
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3],
-    borderRadius: theme.radius.full,
-    gap: theme.spacing[2],
+  genrePillText: {
+    fontSize: 12,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 0.2,
   },
-  playNowText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+
+  // Tabs
   tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[3],
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.neutral[200],
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  tabsLeft: {
+    flexDirection: 'row',
+  },
+  addToQueueButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   tab: {
-    paddingVertical: theme.spacing[3],
-    marginRight: theme.spacing[5],
+    paddingVertical: 14,
+    marginRight: 24,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: theme.colors.text.primary,
+    borderBottomColor: 'rgba(255,255,255,0.8)', // Subtle white instead of green
   },
   tabText: {
     fontSize: 14,
-    color: theme.colors.text.tertiary,
+    color: 'rgba(255,255,255,0.5)',
     fontWeight: '500',
   },
   tabTextActive: {
-    color: theme.colors.text.primary,
+    color: '#fff',
     fontWeight: '600',
   },
   tabContent: {
-    paddingTop: theme.spacing[4],
-    paddingBottom: theme.spacing[32] + 80,
+    paddingTop: 20,
   },
+
+  // Details Tab
   detailsTab: {
-    paddingHorizontal: theme.spacing[5],
+    paddingHorizontal: 20,
   },
   detailRow: {
-    marginBottom: theme.spacing[4],
+    marginBottom: 20,
   },
   detailLabel: {
-    fontSize: 12,
-    color: theme.colors.text.tertiary,
-    marginBottom: theme.spacing[1],
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 4,
+    letterSpacing: 1,
   },
   detailValue: {
     fontSize: 15,
-    color: theme.colors.text.primary,
+    color: '#fff',
     lineHeight: 22,
   },
 });

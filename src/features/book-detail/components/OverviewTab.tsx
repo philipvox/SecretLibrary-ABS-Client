@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
-import { theme } from '@/shared/theme';
+
+// Design constants matching HomeScreen
+const ACCENT = '#c1f40c';
+const MONO_FONT = Platform.select({ ios: 'Courier', android: 'monospace', default: 'monospace' });
 
 interface OverviewTabProps {
   book: LibraryItem;
@@ -14,17 +17,17 @@ interface OverviewTabProps {
 export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { loadBook } = usePlayerStore();
-  
+
   const metadata = book.media.metadata as any;
   const description = metadata.description || '';
   const seriesName = metadata.seriesName || null;
   const publishedYear = metadata.publishedYear;
   const publisher = metadata.publisher;
   const language = metadata.language;
-  
+
   const needsExpansion = description.length > 200;
-  const displayDescription = needsExpansion && !isExpanded 
-    ? description.substring(0, 200) + '...' 
+  const displayDescription = needsExpansion && !isExpanded
+    ? description.substring(0, 200) + '...'
     : description;
 
   const similarBooks: any[] = [];
@@ -40,31 +43,35 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
             </TouchableOpacity>
           )}
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.section}>
+          <Text style={styles.noDescription}>No description available</Text>
+        </View>
+      )}
 
       {showFullDetails && (
         <View style={styles.detailsSection}>
           {seriesName && (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Series</Text>
+              <Text style={styles.detailLabel}>SERIES</Text>
               <Text style={styles.detailValue}>{seriesName}</Text>
             </View>
           )}
           {publishedYear && (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Published</Text>
+              <Text style={styles.detailLabel}>PUBLISHED</Text>
               <Text style={styles.detailValue}>{publishedYear}</Text>
             </View>
           )}
           {publisher && (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Publisher</Text>
+              <Text style={styles.detailLabel}>PUBLISHER</Text>
               <Text style={styles.detailValue}>{publisher}</Text>
             </View>
           )}
           {language && (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Language</Text>
+              <Text style={styles.detailLabel}>LANGUAGE</Text>
               <Text style={styles.detailValue}>{language}</Text>
             </View>
           )}
@@ -74,7 +81,7 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
       {!showFullDetails && similarBooks.length > 0 && (
         <View style={styles.similarSection}>
           <View style={styles.similarHeader}>
-            <Text style={styles.sectionTitle}>Similar Category</Text>
+            <Text style={styles.sectionTitle}>Similar Books</Text>
             <TouchableOpacity>
               <Text style={styles.moreLink}>More</Text>
             </TouchableOpacity>
@@ -114,77 +121,86 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: theme.spacing[4],
+    paddingTop: 0,
   },
   section: {
-    paddingHorizontal: theme.spacing[5],
-    marginBottom: theme.spacing[5],
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   description: {
-    fontSize: 15,
-    color: theme.colors.text.secondary,
-    lineHeight: 24,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 22,
+  },
+  noDescription: {
+    fontSize: 14,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.4)',
+    fontStyle: 'italic',
   },
   readMore: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.primary[500],
-    marginTop: theme.spacing[2],
+    color: ACCENT,
+    marginTop: 8,
   },
   detailsSection: {
-    paddingHorizontal: theme.spacing[5],
-    backgroundColor: theme.colors.neutral[50],
-    paddingVertical: theme.spacing[4],
-    marginHorizontal: theme.spacing[5],
-    borderRadius: theme.radius.large,
-    marginBottom: theme.spacing[5],
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 20,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: theme.spacing[2],
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   detailLabel: {
-    fontSize: 14,
-    color: theme.colors.text.tertiary,
+    fontSize: 10,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 1,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme.colors.text.primary,
+    color: '#fff',
   },
   similarSection: {
-    marginTop: theme.spacing[2],
+    marginTop: 8,
   },
   similarHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[5],
-    marginBottom: theme.spacing[3],
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: '#fff',
   },
   moreLink: {
-    fontSize: 14,
-    color: theme.colors.text.tertiary,
+    fontSize: 12,
+    fontFamily: MONO_FONT,
+    color: 'rgba(255,255,255,0.5)',
   },
   similarList: {
-    paddingHorizontal: theme.spacing[5],
+    paddingHorizontal: 20,
   },
   similarBook: {
     width: 100,
-    marginRight: theme.spacing[3],
+    marginRight: 12,
   },
   similarCover: {
     width: 100,
     height: 150,
-    borderRadius: theme.radius.medium,
-    backgroundColor: theme.colors.neutral[200],
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
 });

@@ -2,6 +2,7 @@
  * src/features/player/services/audioService.ts
  *
  * Audio playback using expo-audio (compatible with New Architecture)
+ * With expo-media-control for lock screen / notification controls
  */
 
 import {
@@ -11,6 +12,21 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import { Platform } from 'react-native';
+
+// Try to import expo-media-control, but handle if native module is missing (Expo Go)
+let MediaControl: any = null;
+let MediaPlaybackState: any = null;
+let Command: any = null;
+type MediaControlEvent = any;
+
+try {
+  const mediaControlModule = require('expo-media-control');
+  MediaControl = mediaControlModule.MediaControl;
+  MediaPlaybackState = mediaControlModule.PlaybackState;
+  Command = mediaControlModule.Command;
+} catch (e) {
+  console.warn('[AudioService] expo-media-control not available (Expo Go mode)');
+}
 
 import {
   audioLog,
@@ -58,6 +74,8 @@ class AudioService {
   private pendingSeekAfterLoad: number | null = null;
   private autoPlayAfterLoad = true;
   private hasReachedEnd = false; // Prevent repeated end handling
+  private mediaControlEnabled = false;
+  private removeMediaControlListener: (() => void) | null = null;
 
   // Dynamic polling rates for better performance
   private readonly POLL_RATE_PLAYING = 250;  // More responsive when playing
@@ -66,6 +84,10 @@ class AudioService {
 
   // Pre-buffer threshold (seconds before track end to start preloading)
   private readonly PRELOAD_THRESHOLD = 30;
+
+  // Media control position update counter (every N updates)
+  private mediaControlUpdateCounter = 0;
+  private readonly MEDIA_CONTROL_UPDATE_INTERVAL = 8; // ~2 seconds at 250ms
 
   constructor() {
     // Pre-warm on construction - don't await, let it run in background
@@ -132,6 +154,10 @@ class AudioService {
       this.setupEventListeners();
       timing('event listeners done');
 
+      // Initialize media controls for lock screen / notification
+      await this.setupMediaControls();
+      timing('media controls done');
+
       this.isSetup = true;
       log('expo-audio ready');
     } catch (error: any) {
@@ -147,17 +173,147 @@ class AudioService {
 
     // Listen for playback status updates
     this.player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
+      // DEBUG: Log significant status changes
+      const currentPos = this.player?.currentTime || 0;
+      const isPlaying = this.player?.playing || false;
+      const duration = this.player?.duration || 0;
+
+      // Log when playback stops unexpectedly
+      if (status.didJustFinish) {
+        log(`🛑 STATUS: didJustFinish=true | pos=${currentPos.toFixed(1)}s | duration=${duration.toFixed(1)}s | totalDur=${this.totalDuration.toFixed(1)}s | tracks=${this.tracks.length} | hasReachedEnd=${this.hasReachedEnd} | isLoaded=${this.isLoaded}`);
+        log(`🛑 Full status: playbackState=${status.playbackState} | timeControl=${status.timeControlStatus} | waitReason=${status.reasonForWaitingToPlay} | isBuffering=${status.isBuffering} | isLoaded=${status.isLoaded}`);
+      }
+
+      // Log if playback is waiting for some reason
+      if (status.reasonForWaitingToPlay && status.reasonForWaitingToPlay !== 'none') {
+        log(`⏳ WAITING: reason=${status.reasonForWaitingToPlay} | pos=${currentPos.toFixed(1)}s | playbackState=${status.playbackState}`);
+      }
+
       // Handle track end - only once per load, and only if still loaded
       if (status.didJustFinish && !this.hasReachedEnd && this.isLoaded) {
         this.handleTrackEnd();
       }
     });
 
-    // Listen for playback errors
-    this.player.addListener('playbackError', (error: any) => {
-      audioLog.error('Playback error:', error?.message || error);
-      audioLog.error('Error details:', JSON.stringify(error));
-    });
+    // Note: expo-audio doesn't have a playbackError event
+    // Errors will show up in playbackStatusUpdate with error property
+  }
+
+  /**
+   * Initialize media controls for lock screen and notification center
+   */
+  private async setupMediaControls(): Promise<void> {
+    // Skip if native module not available (Expo Go mode)
+    if (!MediaControl || !Command) {
+      log('Media controls not available (Expo Go mode) - skipping');
+      return;
+    }
+
+    try {
+      log('Setting up media controls...');
+
+      await MediaControl.enableMediaControls({
+        capabilities: [
+          Command.PLAY,
+          Command.PAUSE,
+          Command.SKIP_FORWARD,
+          Command.SKIP_BACKWARD,
+          Command.SEEK,
+        ],
+        notification: {
+          color: '#1a1a1a',
+        },
+        ios: {
+          skipInterval: 30,
+        },
+        android: {
+          skipInterval: 30,
+        },
+      });
+
+      // Set up event listener for remote commands
+      this.removeMediaControlListener = MediaControl.addListener(
+        (event: MediaControlEvent) => {
+          this.handleMediaControlEvent(event);
+        }
+      );
+
+      this.mediaControlEnabled = true;
+      log('Media controls enabled');
+    } catch (error: any) {
+      audioLog.warn('Media controls setup failed:', error.message);
+      // Non-fatal - continue without media controls
+    }
+  }
+
+  /**
+   * Handle remote control events from lock screen / notification
+   */
+  private handleMediaControlEvent(event: MediaControlEvent): void {
+    log(`Media control event: ${event.command}`);
+
+    switch (event.command) {
+      case Command.PLAY:
+        this.play();
+        break;
+      case Command.PAUSE:
+        this.pause();
+        break;
+      case Command.SKIP_FORWARD:
+        // Skip forward 30 seconds
+        this.getPosition().then((pos) => {
+          const newPos = Math.min(pos + 30, this.totalDuration);
+          this.seekTo(newPos);
+        });
+        break;
+      case Command.SKIP_BACKWARD:
+        // Skip backward 30 seconds
+        this.getPosition().then((pos) => {
+          const newPos = Math.max(pos - 30, 0);
+          this.seekTo(newPos);
+        });
+        break;
+      case Command.SEEK:
+        if (event.data?.position !== undefined) {
+          this.seekTo(event.data.position);
+        }
+        break;
+    }
+  }
+
+  /**
+   * Update media control metadata (call when loading new audio)
+   */
+  private async updateMediaControlMetadata(): Promise<void> {
+    if (!this.mediaControlEnabled || !MediaControl) return;
+
+    try {
+      await MediaControl.updateMetadata({
+        title: this.metadata.title || 'Unknown Title',
+        artist: this.metadata.artist || 'Unknown Author',
+        duration: this.totalDuration,
+        artwork: this.metadata.artwork ? { uri: this.metadata.artwork } : undefined,
+      });
+    } catch (error: any) {
+      audioLog.warn('Failed to update media metadata:', error.message);
+    }
+  }
+
+  /**
+   * Update media control playback state
+   */
+  private async updateMediaControlPlaybackState(
+    isPlaying: boolean,
+    position?: number
+  ): Promise<void> {
+    if (!this.mediaControlEnabled || !MediaControl || !MediaPlaybackState) return;
+
+    try {
+      const state = isPlaying ? MediaPlaybackState.PLAYING : MediaPlaybackState.PAUSED;
+      await MediaControl.updatePlaybackState(state, position);
+    } catch (error: any) {
+      audioLog.warn('Failed to update playback state:', error.message);
+    }
   }
 
   /**
@@ -186,11 +342,13 @@ class AudioService {
   private async handleTrackEnd(): Promise<void> {
     // Don't handle if already unloaded or not properly loaded
     if (!this.isLoaded) {
-      log('handleTrackEnd called but not loaded - ignoring');
+      log('🔸 handleTrackEnd called but not loaded - ignoring');
       return;
     }
 
-    log(`handleTrackEnd: tracks=${this.tracks.length}, currentIndex=${this.currentTrackIndex}`);
+    const currentPlayerPos = this.player?.currentTime || 0;
+    const playerDuration = this.player?.duration || 0;
+    log(`🔸 handleTrackEnd ENTRY: tracks=${this.tracks.length}, currentIndex=${this.currentTrackIndex}, playerPos=${currentPlayerPos.toFixed(1)}s, playerDur=${playerDuration.toFixed(1)}s, totalDur=${this.totalDuration.toFixed(1)}s`);
 
     // Check if there are more tracks in the queue
     if (this.tracks.length > 0 && this.currentTrackIndex < this.tracks.length - 1) {
@@ -224,11 +382,16 @@ class AudioService {
       // Single-track mode - check if we're actually at the end
       const currentPos = await this.getPosition();
       const nearEnd = this.totalDuration > 0 && currentPos >= this.totalDuration - 5;
+      const playerPos = this.player?.currentTime || 0;
+      const playerDur = this.player?.duration || 0;
+      const playerPlaying = this.player?.playing || false;
+
+      log(`🔹 SINGLE-TRACK MODE: globalPos=${currentPos.toFixed(1)}s, playerPos=${playerPos.toFixed(1)}s, playerDur=${playerDur.toFixed(1)}s, totalDur=${this.totalDuration.toFixed(1)}s, nearEnd=${nearEnd}, playerPlaying=${playerPlaying}`);
 
       if (nearEnd) {
         // Actually finished the book
         this.hasReachedEnd = true;
-        log('Single track finished - book complete');
+        log('✅ Single track finished - book complete');
         this.statusCallback?.({
           isPlaying: false,
           position: this.totalDuration,
@@ -238,8 +401,22 @@ class AudioService {
         });
       } else {
         // Stream segment ended but book not finished - resume playback
-        log(`Stream segment ended at ${currentPos}s of ${this.totalDuration}s - resuming`);
-        this.player?.play();
+        log(`⏯️ Stream segment ended at ${currentPos.toFixed(1)}s of ${this.totalDuration.toFixed(1)}s - attempting resume...`);
+
+        // Check player state before resuming
+        if (this.player) {
+          log(`⏯️ Player state before resume: playing=${this.player.playing}, currentTime=${this.player.currentTime.toFixed(1)}, duration=${this.player.duration?.toFixed(1) || 'unknown'}`);
+          this.player.play();
+
+          // Log state after play() call
+          setTimeout(() => {
+            if (this.player) {
+              log(`⏯️ Player state 100ms after resume: playing=${this.player.playing}, currentTime=${this.player.currentTime.toFixed(1)}`);
+            }
+          }, 100);
+        } else {
+          log(`⚠️ Cannot resume - player is null!`);
+        }
       }
     } else {
       // Last track in multi-track mode finished
@@ -285,8 +462,13 @@ class AudioService {
     }
   }
 
+  // Track last logged position for periodic debug output
+  private lastLoggedPosition: number = 0;
+  private playbackStartTime: number = 0;
+
   private startProgressUpdates(): void {
     this.stopProgressUpdates();
+    this.playbackStartTime = Date.now();
 
     const updateProgress = () => {
       if (!this.isLoaded || !this.player) return;
@@ -295,6 +477,13 @@ class AudioService {
         const position = this.getGlobalPositionSync();
         const isPlaying = this.player.playing;
         const isBuffering = this.player.isBuffering;
+
+        // DEBUG: Log every 60 seconds of playback progress
+        if (isPlaying && position - this.lastLoggedPosition >= 60) {
+          const elapsed = ((Date.now() - this.playbackStartTime) / 1000).toFixed(0);
+          log(`📍 PROGRESS: pos=${position.toFixed(1)}s (${(position/60).toFixed(1)}min) / ${this.totalDuration.toFixed(1)}s | wallTime=${elapsed}s | playing=${isPlaying} | buffering=${isBuffering}`);
+          this.lastLoggedPosition = position;
+        }
 
         // Dynamic polling: faster when playing, slower when paused
         const targetRate = isPlaying ? this.POLL_RATE_PLAYING : this.POLL_RATE_PAUSED;
@@ -313,6 +502,15 @@ class AudioService {
             if (timeRemaining > 0 && timeRemaining < this.PRELOAD_THRESHOLD) {
               this.preloadNextTrack();
             }
+          }
+        }
+
+        // Periodically sync position with media controls (for lock screen progress)
+        if (isPlaying && this.mediaControlEnabled && MediaControl && MediaPlaybackState) {
+          this.mediaControlUpdateCounter++;
+          if (this.mediaControlUpdateCounter >= this.MEDIA_CONTROL_UPDATE_INTERVAL) {
+            this.mediaControlUpdateCounter = 0;
+            MediaControl.updatePlaybackState(MediaPlaybackState.PLAYING, position).catch(() => {});
           }
         }
 
@@ -379,6 +577,9 @@ class AudioService {
       this.hasReachedEnd = false; // Reset end flag for new load
       // Use known duration immediately if provided
       this.totalDuration = knownDuration || 0;
+      // Reset debug tracking
+      this.lastLoggedPosition = 0;
+      this.playbackStartTime = Date.now();
 
       timing('Loading audio');
       if (this.player) {
@@ -439,6 +640,10 @@ class AudioService {
           }
         }, 1000);
       }
+
+      // Update media controls with metadata
+      await this.updateMediaControlMetadata();
+      await this.updateMediaControlPlaybackState(autoPlay, startPositionSec);
     } catch (error: any) {
       if (this.loadId === thisLoadId) {
         audioLog.error('Load failed:', error.message);
@@ -557,6 +762,10 @@ class AudioService {
         log('Ready (paused, primed for playback)');
       }
       timing('Load complete');
+
+      // Update media controls with metadata
+      await this.updateMediaControlMetadata();
+      await this.updateMediaControlPlaybackState(autoPlay, startPositionSec);
     } catch (error: any) {
       if (this.loadId === thisLoadId) {
         audioLog.error('Load tracks failed:', error.message);
@@ -637,11 +846,13 @@ class AudioService {
   async play(): Promise<void> {
     log('▶ Play');
     this.player?.play();
+    this.updateMediaControlPlaybackState(true);
   }
 
   async pause(): Promise<void> {
     log('⏸ Pause');
     this.player?.pause();
+    this.updateMediaControlPlaybackState(false);
   }
 
   async seekTo(positionSec: number): Promise<void> {
@@ -694,6 +905,15 @@ class AudioService {
       this.preloadPlayer.replace({ uri: '' });
     }
 
+    // Update media controls to stopped state
+    if (this.mediaControlEnabled && MediaControl && MediaPlaybackState) {
+      try {
+        await MediaControl.updatePlaybackState(MediaPlaybackState.STOPPED);
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+
     this.currentUrl = null;
     this.isLoaded = false;
     this.tracks = [];
@@ -702,6 +922,29 @@ class AudioService {
     this.preloadedTrackIndex = -1;
     this.currentPollRate = 500; // Reset poll rate
     this.hasReachedEnd = false; // Reset end flag
+  }
+
+  /**
+   * Clean up media controls (call on app unmount if needed)
+   */
+  async cleanup(): Promise<void> {
+    await this.unloadAudio();
+
+    // Remove media control listener
+    if (this.removeMediaControlListener) {
+      this.removeMediaControlListener();
+      this.removeMediaControlListener = null;
+    }
+
+    // Disable media controls
+    if (this.mediaControlEnabled && MediaControl) {
+      try {
+        await MediaControl.disableMediaControls();
+        this.mediaControlEnabled = false;
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
   }
 }
 

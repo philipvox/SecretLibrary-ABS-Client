@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { LibraryItem } from '@/core/types';
 import { usePlayerStore } from '@/features/player';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
@@ -9,6 +10,38 @@ import { theme } from '@/shared/theme';
 
 interface BookActionsProps {
   book: LibraryItem;
+}
+
+// Download progress button with animated progress bar
+function DownloadProgressButton({
+  progress,
+  onPress
+}: {
+  progress: number;
+  onPress: () => void;
+}) {
+  const progressStyle = useAnimatedStyle(() => ({
+    width: `${withTiming(progress * 100, { duration: 200 })}%`,
+  }));
+
+  return (
+    <TouchableOpacity
+      style={styles.progressButton}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {/* Background track */}
+      <View style={styles.progressTrack}>
+        {/* Animated fill */}
+        <Animated.View style={[styles.progressFill, progressStyle]} />
+      </View>
+      {/* Text overlay */}
+      <View style={styles.progressContent}>
+        <Icon name="pause" size={16} color="#FFFFFF" set="ionicons" />
+        <Text style={styles.progressText}>{Math.round(progress * 100)}%</Text>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 export function BookActions({ book }: BookActionsProps) {
@@ -128,20 +161,27 @@ export function BookActions({ book }: BookActionsProps) {
       </TouchableOpacity>
 
       <View style={styles.secondaryRow}>
-        <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: downloadState.bgColor }]}
-          onPress={handleDownload}
-          activeOpacity={0.7}
-        >
-          {isPending ? (
-            <ActivityIndicator size="small" color={downloadState.color} />
-          ) : (
-            <Icon name={downloadState.icon} size={18} color={downloadState.color} set="ionicons" />
-          )}
-          <Text style={[styles.secondaryButtonText, { color: downloadState.color }]}>
-            {downloadState.text}
-          </Text>
-        </TouchableOpacity>
+        {isDownloading ? (
+          <DownloadProgressButton
+            progress={downloadProgress}
+            onPress={handleDownload}
+          />
+        ) : (
+          <TouchableOpacity
+            style={[styles.secondaryButton, { backgroundColor: downloadState.bgColor }]}
+            onPress={handleDownload}
+            activeOpacity={0.7}
+          >
+            {isPending ? (
+              <ActivityIndicator size="small" color={downloadState.color} />
+            ) : (
+              <Icon name={downloadState.icon} size={18} color={downloadState.color} set="ionicons" />
+            )}
+            <Text style={[styles.secondaryButtonText, { color: downloadState.color }]}>
+              {downloadState.text}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity 
           style={[styles.secondaryButton, isFinished && styles.finishedButton]} 
@@ -208,5 +248,38 @@ const styles = StyleSheet.create({
   },
   finishedButtonText: {
     color: theme.colors.primary[500],
+  },
+  // Progress button styles
+  progressButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: theme.radius.large,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  progressTrack: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+  },
+  progressFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    backgroundColor: theme.colors.primary[500],
+    opacity: 0.9,
+  },
+  progressContent: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing[2],
+  },
+  progressText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
   },
 });

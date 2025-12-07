@@ -18,11 +18,8 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache } from '@/core/cache';
-import { usePlayerStore } from '@/features/player';
-import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { BookListItem } from '@/shared/components';
-import { LibraryItem } from '@/core/types';
+import { BookCard } from '@/shared/components/BookCard';
 
 const BG_COLOR = '#000000';
 const CARD_COLOR = '#2a2a2a';
@@ -41,7 +38,6 @@ export function GenreDetailScreen() {
   const route = useRoute<RouteProp<{ GenreDetail: GenreDetailParams }, 'GenreDetail'>>();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
-  const { loadBook, viewBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
 
   const genreName = route.params?.genreName || '';
 
@@ -111,23 +107,9 @@ export function GenreDetailScreen() {
     }
   };
 
-  const handleBookPress = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await viewBook(fullBook);
-    } catch {
-      await viewBook(book);
-    }
-  }, [viewBook]);
-
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
-    try {
-      const fullBook = await apiClient.getItem(book.id);
-      await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-    } catch {
-      await loadBook(book, { autoPlay: true, showPlayer: false });
-    }
-  }, [loadBook]);
+  const handleBookPress = useCallback((bookId: string) => {
+    navigation.navigate('BookDetail', { id: bookId });
+  }, [navigation]);
 
   const handleSortPress = (type: SortType) => {
     if (sortBy === type) {
@@ -252,14 +234,11 @@ export function GenreDetailScreen() {
         }
       >
         {sortedBooks.map((book) => (
-          <BookListItem
+          <BookCard
             key={book.id}
             book={book}
-            onPress={() => handleBookPress(book)}
-            onPlayPress={() => handlePlayBook(book)}
-            showProgress={true}
-            showSwipe={false}
-            isLoadingThisBook={isPlayerLoading && currentBook?.id === book.id}
+            onPress={() => handleBookPress(book.id)}
+            showListeningProgress={true}
           />
         ))}
 
