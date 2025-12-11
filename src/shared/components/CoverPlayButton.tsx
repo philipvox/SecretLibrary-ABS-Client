@@ -70,7 +70,7 @@ const SCRUB_CONFIG = {
 // Visual constants
 const BUTTON_SIZE = 48;
 const COVER_SIZE = 44;
-const GREEN_BORDER = '#34C759';
+const ACCENT_COLOR = '#F4B60C';
 
 // ============================================================================
 // ICONS
@@ -167,13 +167,16 @@ function getSpeedZoneIndex(displacement: number): number {
 // ============================================================================
 
 interface CoverPlayButtonProps {
-  onOpenPlayer: () => void;
+  onOpenPlayer?: () => void;
   size?: number;
+  /** Called with scrub speed in degrees per second (negative = backward) */
+  onScrubSpeedChange?: (speed: number) => void;
 }
 
 export function CoverPlayButton({
   onOpenPlayer,
-  size = BUTTON_SIZE
+  size = BUTTON_SIZE,
+  onScrubSpeedChange,
 }: CoverPlayButtonProps) {
   const currentBook = usePlayerStore((s) => s.currentBook);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -280,6 +283,11 @@ export function CoverPlayButton({
         setSpeedLabel(SCRUB_CONFIG.SPEED_ZONES[newZone].label);
       }
 
+      // When in dead zone, stop disc rotation
+      if (baseSpeed === 0) {
+        onScrubSpeedChange?.(0);
+      }
+
       if (baseSpeed !== 0) {
         // Time ramp at max displacement
         if (absDisplacement >= SCRUB_CONFIG.RAMP_THRESHOLD) {
@@ -305,6 +313,12 @@ export function CoverPlayButton({
             setSpeedLabel('5m');
           }
         }
+
+        // Notify parent of scrub speed for disc rotation visualization
+        // Map audio speed (seconds/second) to disc rotation (degrees/second)
+        // 1x audio speed = 60 deg/s (one rotation in 6 seconds)
+        const discRotationSpeed = speed * 60;
+        onScrubSpeedChange?.(discRotationSpeed);
 
         const deltaPosition = speed * deltaTime;
         const newOffset = currentScrubOffset.value + deltaPosition;
@@ -346,6 +360,9 @@ export function CoverPlayButton({
       scrubIntervalRef.current = null;
     }
 
+    // Reset disc rotation speed
+    onScrubSpeedChange?.(0);
+
     const finalPosition = clamp(
       scrubStartPosition.value + currentScrubOffset.value,
       0,
@@ -362,7 +379,7 @@ export function CoverPlayButton({
     }
 
     haptics.buttonPress();
-  }, [duration, play]);
+  }, [duration, play, onScrubSpeedChange]);
 
   const handlePlayPause = useCallback(async () => {
     haptics.playbackToggle();
@@ -374,8 +391,10 @@ export function CoverPlayButton({
   }, [isPlaying, play, pause]);
 
   const handleLongPress = useCallback(() => {
-    haptics.longPress();
-    onOpenPlayer();
+    if (onOpenPlayer) {
+      haptics.longPress();
+      onOpenPlayer();
+    }
   }, [onOpenPlayer]);
 
   // ============================================================================
@@ -596,7 +615,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: BUTTON_SIZE / 2,
     borderWidth: 2,
-    borderColor: GREEN_BORDER,
+    borderColor: ACCENT_COLOR,
     backgroundColor: 'transparent',
   },
   iconOverlay: {
@@ -651,7 +670,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 12,
-    backgroundColor: GREEN_BORDER,
+    backgroundColor: ACCENT_COLOR,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
@@ -669,7 +688,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: GREEN_BORDER,
+    backgroundColor: ACCENT_COLOR,
     borderRadius: 3,
   },
   progressLabels: {
@@ -685,7 +704,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   progressTimeOffset: {
-    color: GREEN_BORDER,
+    color: ACCENT_COLOR,
     fontSize: 16,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
