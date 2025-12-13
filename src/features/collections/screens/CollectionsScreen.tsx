@@ -17,7 +17,6 @@ import {
   TextInput,
   Modal,
   Pressable,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,13 +28,13 @@ import { useCollections } from '../hooks/useCollections';
 import { Collection } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, wp, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const SCREEN_WIDTH = wp(100);
 
-const BG_COLOR = '#1a1a1a';
-const CARD_COLOR = 'rgba(255,255,255,0.08)';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundSecondary;
+const CARD_COLOR = colors.cardBackground;
+const ACCENT = colors.accent;
 const CARD_WIDTH = (SCREEN_WIDTH - scale(48)) / 2;
 
 // Format duration helper

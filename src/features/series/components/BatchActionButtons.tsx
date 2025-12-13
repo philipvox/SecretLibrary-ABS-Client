@@ -15,7 +15,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,11 +23,9 @@ import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { usePlayerStore } from '@/features/player';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 const MAX_BATCH_DOWNLOAD = 3;
 
 interface BatchActionButtonsProps {

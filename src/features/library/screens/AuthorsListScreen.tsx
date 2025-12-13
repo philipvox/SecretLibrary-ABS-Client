@@ -19,7 +19,6 @@ import {
   StatusBar,
   RefreshControl,
   TextInput,
-  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -30,11 +29,11 @@ import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
 import { AlphabetScrubber } from '@/shared/components/AlphabetScrubber';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BG_COLOR = '#000000';
-const CARD_COLOR = '#2a2a2a';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundPrimary;
+const CARD_COLOR = colors.backgroundTertiary;
+const ACCENT = colors.accent;
 
 type SortType = 'name' | 'bookCount' | 'recent';
 
@@ -344,7 +343,7 @@ export function AuthorsListScreen() {
           ListHeaderComponent={
             !isSearching && yourAuthors.length > 0 ? (
               <View style={styles.yourAuthorsSection}>
-                <Text style={styles.sectionTitle}>YOUR AUTHORS</Text>
+                <Text style={styles.sectionTitle}>Your Authors</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -469,10 +468,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     paddingHorizontal: 16,
     marginBottom: 12,
   },

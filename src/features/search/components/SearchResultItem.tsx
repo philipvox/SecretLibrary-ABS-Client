@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius, elevation } from '@/shared/theme';
 import { getTitle, getAuthorName, getFormattedDuration } from '@/shared/utils/metadata';
 import { HeartButton } from '@/shared/components';
 
@@ -66,18 +66,18 @@ export function SearchResultItem({ item }: SearchResultItemProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingVertical: theme.spacing[3],
-    paddingHorizontal: theme.spacing[4],
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
+    borderBottomColor: colors.borderLight,
   },
   coverContainer: {
     width: 60,
     height: 90,
-    borderRadius: theme.radius.medium,
+    borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: theme.colors.neutral[200],
-    ...theme.elevation.small,
+    backgroundColor: colors.progressTrack,
+    ...elevation.small,
   },
   cover: {
     width: '100%',
@@ -86,34 +86,34 @@ const styles = StyleSheet.create({
   placeholderCover: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[300],
+    backgroundColor: colors.progressTrack,
   },
   placeholderText: {
     fontSize: 24,
   },
   info: {
     flex: 1,
-    marginLeft: theme.spacing[3],
+    marginLeft: spacing.sm,
     justifyContent: 'center',
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+    color: colors.textPrimary,
+    marginBottom: 4,
     lineHeight: 20,
   },
   author: {
     fontSize: 14,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing[1],
+    color: colors.textSecondary,
+    marginBottom: 4,
   },
   duration: {
     fontSize: 13,
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
   },
   heartButton: {
     alignSelf: 'center',
-    padding: theme.spacing[2],
+    padding: spacing.xs,
   },
 });

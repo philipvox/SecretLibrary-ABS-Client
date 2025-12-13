@@ -9,7 +9,7 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { theme } from '../../theme';
+import { colors, radius, elevation } from '../../theme';
 
 type IconButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type IconButtonSize = 'small' | 'medium' | 'large';
@@ -57,7 +57,7 @@ export function IconButton({
         {
           width: dimensions.button,
           height: dimensions.button,
-          borderRadius: rounded ? dimensions.button / 2 : theme.radius.medium,
+          borderRadius: rounded ? dimensions.button / 2 : radius.md,
         },
         isDisabled && styles.disabled,
         style,
@@ -71,8 +71,8 @@ export function IconButton({
       {loading ? (
         <ActivityIndicator
           color={variant === 'primary' || variant === 'danger'
-            ? theme.colors.text.inverse
-            : theme.colors.primary[500]}
+            ? '#FFFFFF'
+            : colors.accent}
           size={size === 'large' ? 'small' : 'small'}
         />
       ) : (
@@ -90,25 +90,24 @@ const styles = StyleSheet.create({
 
   // Variants
   primary: {
-    backgroundColor: theme.colors.primary[500],
-    ...theme.elevation.small,
+    backgroundColor: colors.accent,
+    ...elevation.small,
   },
   secondary: {
-    backgroundColor: theme.colors.neutral[100],
+    backgroundColor: colors.progressTrack,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: colors.borderLight,
   },
   ghost: {
     backgroundColor: 'transparent',
   },
   danger: {
-    backgroundColor: theme.colors.semantic.error,
-    ...theme.elevation.small,
+    backgroundColor: '#EF4444',
+    ...elevation.small,
   },
 
   // States
   disabled: {
     opacity: 0.5,
-    ...theme.elevation.none,
   },
 });

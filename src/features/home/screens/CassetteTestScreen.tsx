@@ -12,7 +12,6 @@ import {
   Text,
   SafeAreaView,
   TouchableOpacity,
-  Dimensions,
   Image,
   ScrollView,
 } from 'react-native';
@@ -21,9 +20,11 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import CassettePlayer from '../components/CassettePlayer';
-import { COLORS } from '../homeDesign';
+import { colors, wp, hp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
+const COLORS = { background: colors.backgroundPrimary, accent: colors.accent };
 
 // Scale to 80% of previous size
 const CASSETTE_SCALE = (SCREEN_WIDTH * 0.85 * 0.8) / 263;

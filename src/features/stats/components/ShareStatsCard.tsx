@@ -11,23 +11,23 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { Icon } from '@/shared/components/Icon';
 import { formatDuration } from '../hooks/useListeningStats';
 import { shareWeeklyStats, shareStreak, shareMilestone } from '../services/shareService';
+import { colors, wp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
 
 // Share card colors
 const COLORS = {
-  background: '#1A1A2E',
+  background: colors.backgroundTertiary,
   cardGradientStart: '#16213E',
   cardGradientEnd: '#0F3460',
-  accent: '#F4B60C',
-  text: '#FFFFFF',
-  textSecondary: '#B8B8D1',
+  accent: colors.accent,
+  text: colors.textPrimary,
+  textSecondary: colors.textSecondary,
 };
 
 interface ShareStatsCardProps {

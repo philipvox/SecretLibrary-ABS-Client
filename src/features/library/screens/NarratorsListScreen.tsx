@@ -19,7 +19,6 @@ import {
   StatusBar,
   RefreshControl,
   TextInput,
-  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,11 +27,11 @@ import { useContinueListening } from '@/features/home/hooks/useContinueListening
 import { Icon } from '@/shared/components/Icon';
 import { AlphabetScrubber } from '@/shared/components/AlphabetScrubber';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BG_COLOR = '#000000';
-const CARD_COLOR = '#2a2a2a';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundPrimary;
+const CARD_COLOR = colors.backgroundElevated;
+const ACCENT = colors.accent;
 
 type SortType = 'name' | 'bookCount' | 'recent';
 
@@ -323,7 +322,7 @@ export function NarratorsListScreen() {
           ListHeaderComponent={
             !isSearching && yourNarrators.length > 0 ? (
               <View style={styles.yourNarratorsSection}>
-                <Text style={styles.sectionTitle}>YOUR NARRATORS</Text>
+                <Text style={styles.sectionTitle}>Your Narrators</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -448,10 +447,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     paddingHorizontal: 16,
     marginBottom: 12,
   },

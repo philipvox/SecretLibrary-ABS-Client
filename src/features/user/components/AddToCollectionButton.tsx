@@ -21,7 +21,7 @@ import {
   useAddToCollection,
   useRemoveFromCollection,
 } from '../hooks/useCollectionMutations';
-import { theme } from '@/shared/theme';
+import { colors } from '@/shared/theme';
 import { Collection } from '@/core/types';
 
 interface AddToCollectionButtonProps {
@@ -72,9 +72,9 @@ export function AddToCollectionButton({
         </View>
         <View style={styles.checkContainer}>
           {inCollection ? (
-            <Feather name="check" size={20} color={theme.colors.accent.primary} />
+            <Feather name="check" size={20} color={colors.accent} />
           ) : (
-            <Feather name="plus" size={20} color={theme.colors.text.secondary} />
+            <Feather name="plus" size={20} color={colors.textSecondary} />
           )}
         </View>
       </TouchableOpacity>
@@ -104,17 +104,17 @@ export function AddToCollectionButton({
                 onPress={() => setModalVisible(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="x" size={24} color={theme.colors.text.primary} />
+                <Feather name="x" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
 
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+                <ActivityIndicator size="large" color={colors.accent} />
               </View>
             ) : collections.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Feather name="folder-plus" size={48} color={theme.colors.text.secondary} />
+                <Feather name="folder-plus" size={48} color={colors.textSecondary} />
                 <Text style={styles.emptyText}>No collections yet</Text>
                 <Text style={styles.emptySubtext}>
                   Create a collection on the server to organize your books
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: colors.backgroundPrimary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
@@ -156,12 +156,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.neutral[800],
+    borderBottomColor: colors.progressTrack,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
   loadingContainer: {
     flex: 1,
@@ -179,12 +179,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -199,14 +199,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: theme.colors.neutral[900],
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 12,
     marginBottom: 8,
   },
   collectionItemActive: {
-    backgroundColor: theme.colors.neutral[800],
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: theme.colors.accent.primary,
+    borderColor: colors.accent,
   },
   collectionInfo: {
     flex: 1,
@@ -215,18 +215,18 @@ const styles = StyleSheet.create({
   collectionName: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
   itemCount: {
     fontSize: 13,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   checkContainer: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.neutral[800],
+    backgroundColor: colors.progressTrack,
     justifyContent: 'center',
     alignItems: 'center',
   },

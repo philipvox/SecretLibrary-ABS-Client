@@ -17,7 +17,7 @@ import Animated, {
   useSharedValue,
   runOnJS,
 } from 'react-native-reanimated';
-import { theme } from '../../theme';
+import { colors, spacing, radius, elevation } from '../../theme';
 
 interface TabBarProps<T extends string> {
   tabs: readonly T[];
@@ -134,63 +134,63 @@ export function TabBar<T extends string>({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.md,
   },
   container: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.radius.full,
-    padding: theme.spacing[1],
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.xl,
+    padding: 4,
     position: 'relative',
   },
   containerUnderline: {
     backgroundColor: 'transparent',
     borderRadius: 0,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.default,
+    borderBottomColor: colors.borderLight,
     padding: 0,
   },
   scrollContent: {
-    paddingHorizontal: theme.spacing[2],
+    paddingHorizontal: spacing.xs,
   },
   tab: {
-    paddingVertical: theme.spacing[2],
-    paddingHorizontal: theme.spacing[4],
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
     zIndex: 1,
   },
   tabPills: {
-    borderRadius: theme.radius.full,
+    borderRadius: radius.xl,
   },
   tabUnderline: {
-    paddingBottom: theme.spacing[3],
-    marginRight: theme.spacing[4],
+    paddingBottom: spacing.sm,
+    marginRight: spacing.md,
   },
   tabText: {
-    ...theme.textStyles.bodySmall,
-    color: theme.colors.text.secondary,
+    fontSize: 14,
+    color: colors.textSecondary,
     fontWeight: '500',
     textAlign: 'center',
   },
   tabTextActive: {
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
     fontWeight: '600',
   },
   tabTextUnderlineActive: {
-    color: theme.colors.primary[500],
+    color: colors.accent,
   },
   pillIndicator: {
     position: 'absolute',
-    top: theme.spacing[1],
-    bottom: theme.spacing[1],
-    backgroundColor: theme.colors.card.background,
-    borderRadius: theme.radius.full,
-    ...theme.elevation.small,
+    top: 4,
+    bottom: 4,
+    backgroundColor: colors.backgroundPrimary,
+    borderRadius: radius.xl,
+    ...elevation.small,
   },
   underlineIndicator: {
     position: 'absolute',
     bottom: 0,
     height: 2,
-    backgroundColor: theme.colors.primary[500],
+    backgroundColor: colors.accent,
     borderRadius: 1,
   },
 });

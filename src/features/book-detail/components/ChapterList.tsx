@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { BookChapter } from '@/core/types';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius } from '@/shared/theme';
 
 interface ChapterListProps {
   chapters: BookChapter[];
@@ -78,42 +78,42 @@ export function ChapterList({ chapters, currentPosition = 0 }: ChapterListProps)
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[8],
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[4],
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
   chapterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing[3],
+    paddingVertical: spacing.sm,
   },
   currentChapter: {
-    backgroundColor: theme.colors.primary[50],
-    marginHorizontal: -theme.spacing[3],
-    paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.radius.medium,
+    backgroundColor: colors.accentSubtle,
+    marginHorizontal: -spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
   },
   chapterNumber: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.neutral[100],
+    backgroundColor: colors.progressTrack,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: theme.spacing[3],
+    marginRight: spacing.sm,
   },
   currentChapterNumber: {
-    backgroundColor: theme.colors.primary[500],
+    backgroundColor: colors.accent,
   },
   chapterNumberText: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
   },
   currentChapterNumberText: {
     color: '#FFFFFF',
@@ -123,21 +123,21 @@ const styles = StyleSheet.create({
   },
   chapterTitle: {
     fontSize: 15,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+    color: colors.textPrimary,
+    marginBottom: 4,
     lineHeight: 20,
   },
   currentChapterTitle: {
     fontWeight: '600',
-    color: theme.colors.primary[600],
+    color: colors.accentDark,
   },
   chapterDuration: {
     fontSize: 13,
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
   },
   separator: {
     height: 1,
-    backgroundColor: theme.colors.border.light,
-    marginLeft: 32 + theme.spacing[3],
+    backgroundColor: colors.borderLight,
+    marginLeft: 32 + spacing.sm,
   },
 });

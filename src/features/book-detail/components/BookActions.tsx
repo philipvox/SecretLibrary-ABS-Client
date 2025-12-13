@@ -6,7 +6,7 @@ import { usePlayerStore } from '@/features/player';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius, elevation } from '@/shared/theme';
 
 interface BookActionsProps {
   book: LibraryItem;
@@ -71,11 +71,11 @@ function DownloadProgressButton({
       <View style={styles.downloadProgressHeader}>
         <View style={styles.downloadStatusRow}>
           {status === 'preparing' ? (
-            <ActivityIndicator size="small" color={theme.colors.text.secondary} style={styles.downloadSpinner} />
+            <ActivityIndicator size="small" color={colors.textSecondary} style={styles.downloadSpinner} />
           ) : status === 'paused' ? (
-            <Icon name="play" size={14} color={theme.colors.text.secondary} set="ionicons" />
+            <Icon name="play" size={14} color={colors.textSecondary} set="ionicons" />
           ) : (
-            <Icon name="pause" size={14} color={theme.colors.text.secondary} set="ionicons" />
+            <Icon name="pause" size={14} color={colors.textSecondary} set="ionicons" />
           )}
           <Text style={styles.downloadStatusText}>{getStatusLabel()}</Text>
         </View>
@@ -167,8 +167,8 @@ export function BookActions({ book }: BookActionsProps) {
       return {
         icon: 'time-outline' as const,
         text: 'Queued',
-        color: theme.colors.text.secondary,
-        bgColor: theme.colors.neutral[100],
+        color: colors.textSecondary,
+        bgColor: colors.progressTrack,
       };
     }
     if (hasError) {
@@ -182,8 +182,8 @@ export function BookActions({ book }: BookActionsProps) {
     return {
       icon: 'download-outline' as const,
       text: 'Download',
-      color: theme.colors.text.secondary,
-      bgColor: theme.colors.neutral[100],
+      color: colors.textSecondary,
+      bgColor: colors.progressTrack,
     };
   };
 
@@ -239,7 +239,7 @@ export function BookActions({ book }: BookActionsProps) {
           <Icon
             name="checkmark"
             size={18}
-            color={isFinished ? theme.colors.primary[500] : theme.colors.text.secondary}
+            color={isFinished ? colors.accent : colors.textSecondary}
             set="ionicons"
           />
           <Text style={[styles.secondaryButtonText, isFinished && styles.finishedButtonText]}>
@@ -253,19 +253,19 @@ export function BookActions({ book }: BookActionsProps) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[5],
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   playButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.primary[500],
-    borderRadius: theme.radius.large,
-    paddingVertical: theme.spacing[4],
-    marginBottom: theme.spacing[3],
-    gap: theme.spacing[2],
-    ...theme.elevation.small,
+    backgroundColor: colors.accent,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+    ...elevation.small,
   },
   playButtonText: {
     fontSize: 17,
@@ -274,36 +274,36 @@ const styles = StyleSheet.create({
   },
   secondaryRow: {
     flexDirection: 'row',
-    gap: theme.spacing[3],
+    gap: spacing.sm,
   },
   secondaryButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.radius.large,
-    paddingVertical: theme.spacing[3],
-    gap: theme.spacing[2],
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
   },
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
   },
   finishedButton: {
-    backgroundColor: theme.colors.primary[50],
+    backgroundColor: colors.accentSubtle,
   },
   finishedButtonText: {
-    color: theme.colors.primary[500],
+    color: colors.accent,
   },
   // Download progress button - clean minimal design
   downloadProgressButton: {
     flex: 1,
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.radius.large,
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2],
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   downloadProgressHeader: {
     flexDirection: 'row',
@@ -322,12 +322,12 @@ const styles = StyleSheet.create({
   downloadStatusText: {
     fontSize: 13,
     fontWeight: '500',
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
   },
   downloadPercentText: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
   downloadProgressTrack: {
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   },
   downloadProgressFill: {
     height: '100%',
-    backgroundColor: theme.colors.primary[500],
+    backgroundColor: colors.accent,
     borderRadius: 2,
   },
   downloadProgressFillPaused: {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   downloadBytesText: {
     fontSize: 11,
     fontWeight: '400',
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
     marginTop: 4,
     fontVariant: ['tabular-nums'],
   },

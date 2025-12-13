@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -27,8 +27,9 @@ import { usePlayerStore } from '@/features/player';
 import { useCoverUrl } from '@/core/cache';
 import { haptics } from '@/core/native/haptics';
 import { audioService } from '@/features/player/services/audioService';
+import { colors, wp, radius, spacing } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
 
 // ============================================================================
 // CONFIGURATION
@@ -69,7 +70,6 @@ const SCRUB_CONFIG = {
 
 // Visual constants
 const DEFAULT_BUTTON_SIZE = 80;
-const ACCENT_COLOR = '#F4B60C';
 
 // ============================================================================
 // ICONS
@@ -79,15 +79,15 @@ const PlayIcon: React.FC<{ size?: number }> = ({ size = 32 }) => (
   <Svg width={size} height={size} viewBox="0 0 37 45" fill="none">
     <Path
       d="M0.5 2.50407C0.5 0.926681 2.24075 -0.0298878 3.57227 0.815811L34.8419 20.6762C36.0789 21.4619 36.0789 23.2671 34.8419 24.0528L3.57228 43.9132C2.24075 44.7589 0.5 43.8023 0.5 42.2249V2.50407Z"
-      fill={ACCENT_COLOR}
+      fill={colors.accent}
     />
   </Svg>
 );
 
 const PauseIcon: React.FC<{ size?: number }> = ({ size = 32 }) => (
   <Svg width={size} height={size} viewBox="0 0 30 45" fill="none">
-    <Rect x="0" y="0" width="10" height="45" rx="2" fill={ACCENT_COLOR} />
-    <Rect x="20" y="0" width="10" height="45" rx="2" fill={ACCENT_COLOR} />
+    <Rect x="0" y="0" width="10" height="45" rx="2" fill={colors.accent} />
+    <Rect x="20" y="0" width="10" height="45" rx="2" fill={colors.accent} />
   </Svg>
 );
 
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   border: {
     position: 'absolute',
     borderWidth: 2,
-    borderColor: ACCENT_COLOR,
+    borderColor: colors.accent,
     backgroundColor: 'transparent',
   },
   iconOverlay: {
@@ -634,13 +634,13 @@ const styles = StyleSheet.create({
   tooltip: {
     position: 'absolute',
     top: -45,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: colors.overlay.dark,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
   },
   tooltipText: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 14,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
@@ -650,67 +650,67 @@ const styles = StyleSheet.create({
     bottom: DEFAULT_BUTTON_SIZE + 30,
     width: SCREEN_WIDTH - 44,
     backgroundColor: 'rgba(0,0,0,0.9)',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   chapterTitle: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
   speedBadge: {
     position: 'absolute',
     top: 14,
-    right: 16,
-    backgroundColor: ACCENT_COLOR,
-    paddingHorizontal: 10,
+    right: spacing.md,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: radius.md,
   },
   speedBadgeText: {
-    color: '#000000',
+    color: colors.backgroundPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
   progressTrack: {
     height: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 4,
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.xs,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: ACCENT_COLOR,
-    borderRadius: 4,
+    backgroundColor: colors.progressFill,
+    borderRadius: radius.xs,
   },
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: spacing.sm,
   },
   progressTime: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
   progressTimeOffset: {
-    color: ACCENT_COLOR,
+    color: colors.accent,
     fontSize: 18,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
   overallTime: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '400',
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
 });
 

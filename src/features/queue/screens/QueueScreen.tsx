@@ -10,7 +10,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   FlatList,
   TouchableOpacity,
   SafeAreaView,
@@ -24,11 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueue, useQueueStore } from '../stores/queueStore';
 import { SwipeableQueueItem } from '../components/SwipeableQueueItem';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 // Format duration to human readable
 function formatDuration(seconds: number): string {

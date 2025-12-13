@@ -5,12 +5,15 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Image } from 'expo-image';
-import { COLORS } from '../homeDesign';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import {
+  colors,
+  spacing,
+  radius,
+  scale,
+  elevation,
+} from '@/shared/theme';
 
 interface CoverArtworkProps {
   coverUrl?: string;
@@ -62,33 +65,28 @@ export function CoverArtwork({
 
 const styles = StyleSheet.create({
   container: {
-    // Anima shadow: 0px 8px 20px rgba(0,0,0,0.45)
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 12,
+    ...elevation.large,
     zIndex: 100,
     position: 'relative',
   },
   image: {
-    backgroundColor: '#7D7D7D',
+    backgroundColor: colors.backgroundTertiary,
   },
   placeholder: {
-    backgroundColor: '#7D7D7D',
+    backgroundColor: colors.backgroundTertiary,
   },
   seriesBadge: {
     position: 'absolute',
-    top: scale(8),
-    right: scale(8),
-    backgroundColor: '#F4B60C',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(4),
-    borderRadius: scale(6),
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
   },
   seriesText: {
     fontSize: scale(14),
     fontWeight: '700',
-    color: '#000000',
+    color: colors.backgroundPrimary,
   },
 });

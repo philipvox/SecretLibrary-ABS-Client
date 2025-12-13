@@ -11,17 +11,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { getAllAuthors, useLibraryCache } from '@/core/cache';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { COLORS, DIMENSIONS, TYPOGRAPHY, LAYOUT } from '@/features/home/homeDesign';
+import { colors, scale, spacing, radius, layout } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const COLORS = { playButton: colors.accent, textPrimary: colors.textPrimary, textTertiary: colors.textTertiary };
+const DIMENSIONS = { sectionGap: layout.sectionGap };
+const TYPOGRAPHY = { sectionTitle: { fontSize: scale(13), fontWeight: '600' as const }, cardTitle: { fontSize: scale(14), fontWeight: '500' as const } };
+const LAYOUT = { carouselPaddingHorizontal: layout.screenPaddingH, sectionHeaderMarginBottom: spacing.md };
 
 const AVATAR_SIZE = scale(80);
 

@@ -5,6 +5,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Icon } from '@/shared/components/Icon';
+import { spacing, radius } from '@/shared/theme';
 
 // =============================================================================
 // TYPES
@@ -196,52 +197,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 0,
   },
   title: {
     fontSize: 32,
     fontWeight: '700',
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   toggleRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.sm,
   },
   toggleOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    gap: spacing.sm,
   },
   toggleText: {
     fontSize: 15,
     fontWeight: '600',
   },
   linksSection: {
-    marginBottom: 20,
-    gap: 10,
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
   linkButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    gap: spacing.md,
   },
   linkText: {
     flex: 1,

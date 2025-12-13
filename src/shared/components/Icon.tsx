@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { theme } from '@/shared/theme';
+import { colors } from '@/shared/theme';
 
 type IconSet = 'ionicons' | 'feather' | 'material';
 
@@ -15,7 +15,7 @@ interface IconProps {
   set?: IconSet;
 }
 
-export function Icon({ name, size = 24, color = theme.colors.text.primary, set = 'ionicons' }: IconProps) {
+export function Icon({ name, size = 24, color = colors.textPrimary, set = 'ionicons' }: IconProps) {
   const IconComponent = {
     ionicons: Ionicons,
     feather: Feather,

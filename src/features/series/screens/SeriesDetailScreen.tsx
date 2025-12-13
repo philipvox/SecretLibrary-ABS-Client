@@ -12,7 +12,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
   RefreshControl,
   FlatList,
 } from 'react-native';
@@ -34,18 +33,19 @@ import { SeriesProgressHeader } from '../components/SeriesProgressHeader';
 import { BatchActionButtons } from '../components/BatchActionButtons';
 import { SeriesBookRow } from '../components/SeriesBookRow';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, wp, hp, spacing, radius } from '@/shared/theme';
 
 type SeriesDetailRouteParams = {
   SeriesDetail: { seriesName: string };
 };
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
 
-const BG_COLOR = '#000000';
-const CARD_COLOR = '#2a2a2a';
-const ACCENT = '#F4B60C';
-const CARD_RADIUS = 5;
+const BG_COLOR = colors.backgroundPrimary;
+const CARD_COLOR = colors.backgroundTertiary;
+const ACCENT = colors.accent;
+const CARD_RADIUS = radius.sm;
 
 // Stacked covers constants
 const STACK_COVER_SIZE = SCREEN_WIDTH * 0.35;

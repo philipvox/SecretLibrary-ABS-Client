@@ -11,7 +11,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   StatusBar,
   Animated,
@@ -45,11 +44,12 @@ import { useCoverUrl } from '@/core/cache';
 import { useIsOfflineAvailable } from '@/core/hooks/useDownloads';
 import { CoverPlayButton } from '@/shared/components/CoverPlayButton';
 import { haptics } from '@/core/native/haptics';
+import { colors, spacing, radius, scale, wp, hp, layout } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
 
-const ACCENT_COLOR = '#F4B60C';
+const ACCENT_COLOR = colors.accent;
 const DISC_SIZE = SCREEN_WIDTH - scale(20); // Slightly smaller than screen width
 const HOLE_SIZE = DISC_SIZE * 0.22;
 const GRAY_RING_COLOR = '#6B6B6B';
@@ -682,15 +682,18 @@ export function CDPlayerScreen() {
     >
       <StatusBar barStyle="light-content" />
 
-      {/* Background blur layer */}
+      {/* Background blur layer - same pattern as HomeScreen */}
       <View style={styles.backgroundContainer}>
         {coverUrl && (
           <Image
             source={coverUrl}
-            style={styles.backgroundImage}
-            blurRadius={60}
+            style={StyleSheet.absoluteFill}
+            blurRadius={50}
+            contentFit="cover"
           />
         )}
+        {/* BlurView overlay for Android (blurRadius only works on iOS) */}
+        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
           locations={[0, 0.1, 0.54]}
@@ -963,15 +966,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#000',
+    backgroundColor: colors.backgroundPrimary,
   },
   backgroundContainer: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.5,
-  },
-  backgroundImage: {
-    width: '100%',
-    height: '100%',
   },
   arrowCenter: {
     position: 'absolute',
@@ -995,30 +994,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(4),
-    minWidth: scale(44),
+    minWidth: layout.minTouchTarget,
   },
   sourceText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: scale(11),
     fontWeight: '500',
   },
   sourceTextDownloaded: {
-    color: '#34C759',
+    color: colors.success,
   },
   settingsButton: {
-    width: scale(44),
-    height: scale(44),
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: scale(15),
     fontWeight: '500',
     textAlign: 'center',
   },
   author: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: scale(14),
     fontWeight: '400',
     marginTop: scale(6),
@@ -1054,12 +1053,12 @@ const styles = StyleSheet.create({
   },
   discHole: {
     position: 'absolute',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   discCenterDot: {
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
   },
   holderShadow: {
     position: 'absolute',
@@ -1083,7 +1082,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: colors.borderLight,
   },
   discCenterOverlay: {
     position: 'absolute',
@@ -1106,7 +1105,7 @@ const styles = StyleSheet.create({
     width: DISC_SIZE * 0.20,
     height: DISC_SIZE * 0.20,
     borderRadius: (DISC_SIZE * 0.20) / 2,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1133,7 +1132,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(10),
   },
   overviewTitle: {
-    color: 'rgba(255,255,255,0.9)',
+    color: colors.textPrimary,
     fontSize: scale(13),
     fontWeight: '400',
     letterSpacing: 0,
@@ -1141,12 +1140,12 @@ const styles = StyleSheet.create({
   },
   overviewDivider: {
     height: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: colors.overlay.medium,
     borderRadius: scale(14),
     marginBottom: scale(5),
   },
   overviewText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: colors.textSecondary,
     fontSize: scale(12),
     lineHeight: scale(18),
     fontWeight: '400',
@@ -1160,19 +1159,19 @@ const styles = StyleSheet.create({
     marginBottom: scale(8),
   },
   chapter: {
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
     fontSize: scale(13),
     letterSpacing: 0.28,
     maxWidth: SCREEN_WIDTH * 0.5,
   },
   time: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: scale(13),
     letterSpacing: 0.28,
     fontVariant: ['tabular-nums'],
   },
   chapterRemaining: {
-    color: ACCENT_COLOR,
+    color: colors.accent,
     fontSize: scale(14),
     letterSpacing: 0.28,
     fontVariant: ['tabular-nums'],
@@ -1188,7 +1187,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(6),
   },
   progressTimeText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: scale(9),
     letterSpacing: 0.18,
     fontVariant: ['tabular-nums'],
@@ -1221,7 +1220,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     height: scale(2),
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.progressFill,
     borderRadius: scale(14),
   },
   chapterMarker: {
@@ -1229,7 +1228,7 @@ const styles = StyleSheet.create({
     top: scale(6),
     width: 1,
     height: scale(4),
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: colors.textMuted,
     zIndex: 5,
   },
   progressShadow: {
@@ -1240,9 +1239,9 @@ const styles = StyleSheet.create({
     top: 0,
     width: scale(16),
     height: scale(16),
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
     borderRadius: scale(8),
-    shadowColor: '#000',
+    shadowColor: colors.backgroundPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -1274,14 +1273,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(80,80,80,0.5)',
   },
   pillText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: scale(14),
   },
   pillTextActive: {
-    color: ACCENT_COLOR,
+    color: colors.accent,
   },
   pillTextSmall: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: scale(13),
   },
   speedPill: {
@@ -1297,31 +1296,31 @@ const styles = StyleSheet.create({
     height: scale(76),
     borderRadius: scale(38),
     borderWidth: 2,
-    borderColor: ACCENT_COLOR,
+    borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay.light,
     overflow: 'visible',
   },
 
   // Bottom Sheet styles
   sheetOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.medium,
     justifyContent: 'flex-end',
     zIndex: 100,
   },
   sheetContainer: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    paddingTop: 8,
-    paddingBottom: 20,
+    backgroundColor: colors.backgroundTertiary,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   sheet: {
-    padding: 20,
+    padding: spacing.lg,
   },
   chaptersSheet: {
     maxHeight: SCREEN_HEIGHT * 0.6,
@@ -1335,11 +1334,11 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   sheetClose: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1352,21 +1351,21 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     width: (SCREEN_WIDTH - 80) / 3,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   optionButtonActive: {
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
   },
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   optionTextActive: {
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
 
   // Options List (Sleep)
@@ -1378,18 +1377,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
   },
   listOptionActive: {
-    backgroundColor: `${ACCENT_COLOR}20`,
+    backgroundColor: colors.accentSubtle,
   },
   listOptionText: {
     fontSize: 16,
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   listOptionTextActive: {
-    color: ACCENT_COLOR,
+    color: colors.accent,
     fontWeight: '600',
   },
 
@@ -1400,34 +1399,34 @@ const styles = StyleSheet.create({
   chapterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
   },
   chapterItemActive: {
-    backgroundColor: `${ACCENT_COLOR}20`,
+    backgroundColor: colors.accentSubtle,
   },
   chapterNumber: {
     width: 28,
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
   chapterInfo: {
     flex: 1,
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   chapterTitle: {
     fontSize: 15,
-    color: '#FFF',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   chapterTitleActive: {
-    color: ACCENT_COLOR,
+    color: colors.accent,
     fontWeight: '600',
   },
   chapterDuration: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 
   // Settings Sheet
@@ -1450,18 +1449,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
   },
   settingsOptionActive: {
-    backgroundColor: `${ACCENT_COLOR}20`,
+    backgroundColor: colors.accentSubtle,
   },
   settingsOptionText: {
     fontSize: 16,
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   settingsOptionTextActive: {
-    color: ACCENT_COLOR,
+    color: colors.accent,
     fontWeight: '600',
   },
 
@@ -1511,13 +1510,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(4),
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
     paddingHorizontal: scale(10),
     paddingVertical: scale(4),
     borderRadius: scale(12),
   },
   playingBadgeText: {
-    color: '#000',
+    color: colors.backgroundPrimary,
     fontSize: scale(11),
     fontWeight: '700',
   },
@@ -1527,13 +1526,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(20),
     right: scale(20),
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
     paddingHorizontal: scale(8),
     paddingVertical: scale(3),
     borderRadius: scale(10),
   },
   speedBadgeOnDiscText: {
-    color: '#000',
+    color: colors.backgroundPrimary,
     fontSize: scale(11),
     fontWeight: '700',
   },
@@ -1548,7 +1547,7 @@ const styles = StyleSheet.create({
     width: scale(6),
     height: scale(6),
     borderRadius: scale(3),
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
   },
 });
 

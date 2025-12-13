@@ -7,12 +7,11 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { COLORS } from '../homeDesign';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { colors, scale } from '@/shared/theme';
 import { SectionHeaderProps } from '../types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const COLORS = { textPrimary: colors.textPrimary, textSecondary: colors.textSecondary };
 
 // NN/g: Larger section headers for clear content hierarchy
 const SECTION_PADDING = scale(20);

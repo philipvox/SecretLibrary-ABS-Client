@@ -13,7 +13,6 @@ import {
   Alert,
   StatusBar,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,11 +20,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/core/auth';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 // Safe import - store may not exist yet
 let usePreferencesStore: any;
@@ -185,8 +182,8 @@ export function ProfileScreen() {
           serverUrl={serverUrl || ''}
         />
 
-        {/* MY STUFF Section */}
-        <SectionGroup title="MY STUFF">
+        {/* My Stuff Section */}
+        <SectionGroup title="My Stuff">
           <ProfileLink
             icon="download-outline"
             label="Downloads"
@@ -209,8 +206,8 @@ export function ProfileScreen() {
           />
         </SectionGroup>
 
-        {/* SETTINGS Section */}
-        <SectionGroup title="SETTINGS">
+        {/* Settings Section */}
+        <SectionGroup title="Settings">
           <ProfileLink
             icon="play-circle-outline"
             label="Playback"
@@ -225,8 +222,8 @@ export function ProfileScreen() {
           />
         </SectionGroup>
 
-        {/* DEVELOPER Section - keep for testing */}
-        <SectionGroup title="DEVELOPER">
+        {/* Developer Section - keep for testing */}
+        <SectionGroup title="Developer">
           <ProfileLink
             icon="musical-notes-outline"
             label="Cassette Player Test"
@@ -333,10 +330,10 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   sectionTitle: {
-    fontSize: scale(12),
+    fontSize: scale(13),
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 0.5,
     marginHorizontal: scale(20),
     marginBottom: scale(8),
   },

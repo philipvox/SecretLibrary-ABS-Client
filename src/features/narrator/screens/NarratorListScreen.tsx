@@ -6,7 +6,7 @@ import { useNarrators, NarratorInfo } from '../hooks/useNarrators';
 import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
 import { SearchBar } from '@/features/search/components/SearchBar';
 import { FilterSortBar, SortOption, LoadingSpinner, EmptyState, ErrorView } from '@/shared/components';
-import { theme } from '@/shared/theme';
+import { colors, spacing } from '@/shared/theme';
 
 export function NarratorListScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,7 +45,7 @@ export function NarratorListScreen() {
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={theme.colors.primary[500]} />}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.accent} />}
         ListEmptyComponent={<EmptyState icon="🔍" message="No narrators found" description={`No narrators match "${searchQuery}"`} />}
       />
     </SafeAreaView>
@@ -53,8 +53,8 @@ export function NarratorListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background.primary },
-  header: { paddingHorizontal: theme.spacing[5], paddingVertical: theme.spacing[4], borderBottomWidth: 1, borderBottomColor: theme.colors.border.light },
-  listContent: { paddingHorizontal: theme.spacing[5], paddingTop: theme.spacing[4], paddingBottom: theme.spacing[32] + 60 },
+  container: { flex: 1, backgroundColor: colors.backgroundPrimary },
+  header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  listContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 188 },
   row: { justifyContent: 'space-between' },
 });

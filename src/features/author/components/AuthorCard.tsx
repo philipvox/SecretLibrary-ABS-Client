@@ -10,7 +10,7 @@ import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Author } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius, elevation } from '@/shared/theme';
 
 interface AuthorInfo {
   id: string;
@@ -46,11 +46,11 @@ function AuthorCardComponent({ author }: AuthorCardProps) {
   // Generate a consistent color based on name
   const colorIndex = author.name.charCodeAt(0) % 5;
   const avatarColors = [
-    theme.colors.primary[500],
-    theme.colors.semantic.success,
-    theme.colors.semantic.warning,
-    theme.colors.semantic.info,
-    theme.colors.neutral[600],
+    colors.accent,
+    '#4CAF50',
+    '#FF9800',
+    '#2196F3',
+    colors.progressTrack,
   ];
 
   const bookCount = (author as AuthorInfo).bookCount;
@@ -90,17 +90,17 @@ export const AuthorCard = memo(AuthorCardComponent);
 const styles = StyleSheet.create({
   container: {
     width: '48%',
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.md,
   },
   pressed: {
     opacity: 0.7,
   },
   avatarContainer: {
     aspectRatio: 1,
-    borderRadius: theme.radius.large,
+    borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: theme.colors.neutral[200],
-    ...theme.elevation.small,
+    backgroundColor: colors.progressTrack,
+    ...elevation.small,
   },
   avatar: {
     width: '100%',
@@ -113,20 +113,20 @@ const styles = StyleSheet.create({
   initials: {
     fontSize: 36,
     fontWeight: '700',
-    color: theme.colors.text.inverse,
+    color: '#FFFFFF',
   },
   info: {
-    marginTop: theme.spacing[2],
+    marginTop: spacing.xs,
   },
   name: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+    color: colors.textPrimary,
+    marginBottom: 4,
     lineHeight: 20,
   },
   bookCount: {
     fontSize: 13,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
   },
 });

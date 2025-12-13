@@ -6,11 +6,10 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { COLORS } from '../homeDesign';
+import { View, Text, StyleSheet } from 'react-native';
+import { colors, scale } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const COLORS = { textPrimary: colors.textPrimary, textSecondary: colors.textSecondary };
 
 interface GreetingProps {
   username?: string | null;

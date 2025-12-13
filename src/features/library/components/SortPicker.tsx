@@ -12,16 +12,13 @@ import {
   TouchableOpacity,
   Modal,
   StyleSheet,
-  Dimensions,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 export type SortOption =
   | 'recently-played'
@@ -119,71 +116,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingBottom: scale(12),
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
   },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(4),
+    gap: spacing.xs,
   },
   sortLabel: {
     fontSize: scale(13),
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
   sortValue: {
     fontSize: scale(13),
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
+    color: colors.textSecondary,
   },
   bookCount: {
     fontSize: scale(13),
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlay.dark,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: scale(20),
-    borderTopRightRadius: scale(20),
-    paddingTop: scale(12),
+    backgroundColor: colors.backgroundSecondary,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: spacing.md,
   },
   modalHandle: {
     width: scale(40),
     height: scale(4),
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: scale(2),
+    backgroundColor: colors.textMuted,
+    borderRadius: radius.xs,
     alignSelf: 'center',
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   modalTitle: {
     fontSize: scale(18),
     fontWeight: '600',
-    color: '#fff',
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   optionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: scale(14),
-    paddingHorizontal: scale(20),
+    paddingHorizontal: spacing.xl,
   },
   optionRowSelected: {
-    backgroundColor: 'rgba(193, 244, 12, 0.1)',
+    backgroundColor: colors.accentSubtle,
   },
   optionText: {
     fontSize: scale(15),
-    color: 'rgba(255,255,255,0.8)',
+    color: colors.textSecondary,
   },
   optionTextSelected: {
-    color: ACCENT,
+    color: colors.accent,
     fontWeight: '600',
   },
 });

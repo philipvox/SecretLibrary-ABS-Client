@@ -1,15 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius, elevation, wp } from '@/shared/theme';
 
 interface BookHeaderProps {
   book: LibraryItem;
 }
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_WIDTH = wp(100);
 const COVER_WIDTH = SCREEN_WIDTH * 0.55;
 const COVER_HEIGHT = COVER_WIDTH * 1.5;
 
@@ -38,18 +38,18 @@ export function BookHeader({ book }: BookHeaderProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[4],
-    paddingBottom: theme.spacing[5],
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   coverContainer: {
     width: COVER_WIDTH,
     height: COVER_HEIGHT,
-    borderRadius: theme.radius.xlarge,
-    backgroundColor: theme.colors.neutral[200],
+    borderRadius: radius.xl,
+    backgroundColor: colors.backgroundTertiary,
     overflow: 'hidden',
-    marginBottom: theme.spacing[5],
-    ...theme.elevation.medium,
+    marginBottom: spacing.xl,
+    ...elevation.medium,
   },
   cover: {
     width: '100%',
@@ -58,20 +58,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: theme.spacing[2],
-    paddingHorizontal: theme.spacing[4],
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   author: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: theme.spacing[1],
+    marginBottom: spacing.xs,
   },
   narrator: {
     fontSize: 14,
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
   },
 });

@@ -97,6 +97,58 @@ export const sizes = {
 } as const;
 
 // =============================================================================
+// CARD TOKENS
+// =============================================================================
+
+/** Standardized card sizes and patterns */
+export const cardTokens = {
+  /** Cover sizes by context */
+  cover: {
+    listRow: 56,     // Compact list rows
+    preview: 100,    // Card previews with info
+    grid: 120,       // Grid view cards
+    hero: 200,       // Featured/hero cards
+  },
+
+  /** Avatar sizes by context */
+  avatar: {
+    listRow: 48,
+    preview: 64,
+    hero: 96,
+  },
+
+  /** Stacked covers for series/collections */
+  stackedCovers: {
+    count: 3,         // Max covers to show
+    offset: 12,       // Pixel offset between covers
+    size: 40,         // Size of each cover in stack
+    sizeSmall: 32,    // Compact variant
+    sizeLarge: 56,    // Large variant
+  },
+
+  /** Progress dots */
+  progressDots: {
+    size: 6,
+    gap: 4,
+    maxDots: 5,
+  },
+
+  /** Row heights */
+  rowHeight: {
+    compact: 64,      // Single line with cover
+    standard: 80,     // Two lines with cover
+    expanded: 100,    // Three lines or extra info
+  },
+
+  /** Card aspect ratios (width:height) */
+  aspectRatio: {
+    book: 0.67,       // 2:3 portrait
+    square: 1,        // 1:1 square
+    wide: 1.5,        // 3:2 landscape
+  },
+} as const;
+
+// =============================================================================
 // TYPE EXPORTS
 // =============================================================================
 
@@ -104,3 +156,4 @@ export type Sizes = typeof sizes;
 export type SizeKey = keyof typeof sizes;
 export type CoverSizeKey = keyof typeof coverSizes;
 export type IconSizeKey = keyof typeof iconSizes;
+export type CardTokens = typeof cardTokens;

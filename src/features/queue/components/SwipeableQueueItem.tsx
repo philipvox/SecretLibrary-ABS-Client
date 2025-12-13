@@ -7,19 +7,17 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable, TouchableOpacity, Animated as RNAnimated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity, Animated as RNAnimated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale } from '@/shared/theme';
 
 const ACTION_WIDTH = 80;
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 interface SwipeableQueueItemProps {
   book: LibraryItem;
@@ -44,11 +42,14 @@ export function SwipeableQueueItem({
   const title = metadata?.title || 'Untitled';
   const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
 
-  // Calculate duration
+  // Calculate duration using consistent format
   const duration = (book.media as any)?.duration || 0;
   const hours = Math.floor(duration / 3600);
   const minutes = Math.floor((duration % 3600) / 60);
   const durationText = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+  // Subtitle in "Author · Duration" format
+  const subtitle = duration > 0 ? `${author} · ${durationText}` : author;
 
   const handleRemove = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -116,10 +117,9 @@ export function SwipeableQueueItem({
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.author} numberOfLines={1}>
-            {author}
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {subtitle}
           </Text>
-          <Text style={styles.duration}>{durationText}</Text>
         </View>
 
         {/* Action buttons */}
@@ -175,14 +175,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: scale(2),
   },
-  author: {
+  subtitle: {
     fontSize: scale(12),
     color: 'rgba(255,255,255,0.6)',
-    marginBottom: scale(2),
-  },
-  duration: {
-    fontSize: scale(11),
-    color: 'rgba(255,255,255,0.4)',
   },
   actions: {
     flexDirection: 'row',

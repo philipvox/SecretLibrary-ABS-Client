@@ -4,12 +4,10 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Icon } from '@/shared/components/Icon';
 import { formatTime } from '../utils';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { scale, spacing, radius } from '@/shared/theme';
 
 // =============================================================================
 // TYPES
@@ -177,10 +175,10 @@ export function ChaptersPanel({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: scale(10),
+    paddingHorizontal: spacing.sm,
   },
   header: {
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: scale(32),
@@ -188,22 +186,22 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: scale(15),
-    marginTop: scale(4),
+    marginTop: spacing.xs,
   },
   list: {
     flex: 1,
   },
   listContent: {
-    paddingBottom: scale(16),
+    paddingBottom: spacing.lg,
   },
   chapterItem: {
     flexDirection: 'row',
     alignItems: 'center',
     height: scale(56),
-    paddingHorizontal: scale(12),
-    borderRadius: scale(12),
-    marginBottom: scale(4),
-    gap: scale(12),
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
+    gap: spacing.md,
   },
   chapterNumber: {
     width: scale(32),
@@ -222,7 +220,7 @@ const styles = StyleSheet.create({
   chapterName: {
     fontSize: scale(15),
     fontWeight: '500',
-    marginBottom: scale(2),
+    marginBottom: spacing.xxs,
   },
   chapterNameActive: {
     fontWeight: '600',
@@ -232,13 +230,13 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   footer: {
-    paddingVertical: scale(16),
+    paddingVertical: spacing.lg,
     alignItems: 'center',
   },
   closeButton: {
-    paddingVertical: scale(16),
+    paddingVertical: spacing.lg,
     paddingHorizontal: scale(48),
-    borderRadius: scale(24),
+    borderRadius: radius.xxl,
   },
   closeButtonText: {
     fontSize: scale(17),

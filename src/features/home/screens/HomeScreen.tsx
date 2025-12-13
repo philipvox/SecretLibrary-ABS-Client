@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Animated, {
@@ -36,7 +37,7 @@ import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 import { usePlayerStore, SleepTimerSheet, SpeedSheet } from '@/features/player';
 import { useCoverUrl } from '@/core/cache';
-import { wp, hp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, hp } from '@/shared/theme';
 import { useImageColors } from '@/shared/hooks/useImageColors';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 
@@ -56,7 +57,7 @@ import { SeriesWithBooks } from '../types';
 // Hooks
 import { useHomeData } from '../hooks/useHomeData';
 
-const ACCENT = COLORS.accent;
+const ACCENT = colors.accent;
 
 export function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -98,8 +99,8 @@ export function HomeScreen() {
 
   // Extract colors from cover image
   const imageColors = useImageColors(coverUrl);
-  const accentColor = imageColors?.dominant || COLORS.accent;
-  const backgroundTint = imageColors?.darkMuted || '#1a1f1a';
+  const accentColor = imageColors?.dominant || colors.accent;
+  const backgroundTint = imageColors?.darkMuted || colors.backgroundTertiary;
 
   // Local state for sheet visibility
   const [showSleepSheet, setShowSleepSheet] = useState(false);
@@ -191,19 +192,6 @@ export function HomeScreen() {
     navigation.navigate('SeriesDetail', { seriesName: series.name });
   }, [navigation]);
 
-  // Play first in-progress book from series
-  const handlePlaySeries = useCallback(async (series: SeriesWithBooks) => {
-    if (series.books.length > 0) {
-      const book = series.books[0];
-      try {
-        const fullBook = await apiClient.getItem(book.id);
-        await loadBook(fullBook, { autoPlay: true, showPlayer: false });
-      } catch {
-        await loadBook(book, { autoPlay: true, showPlayer: false });
-      }
-    }
-  }, [loadBook]);
-
   // Pills handlers
   const handleSleepPress = () => setShowSleepSheet(true);
   const handleSpeedPress = () => setShowSpeedSheet(true);
@@ -248,6 +236,8 @@ export function HomeScreen() {
               contentFit="cover"
             />
           )}
+          {/* BlurView overlay for Android (blurRadius only works on iOS) */}
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
           {/* Gradient: smooth fade to black */}
           <LinearGradient
             colors={[
@@ -324,12 +314,11 @@ export function HomeScreen() {
           />
         )}
 
-        {/* Your Series Section */}
+        {/* Your Series Section - No Play button per NNGroup research */}
         {userSeries.length > 0 && (
           <YourSeriesSection
             series={userSeries}
             onSeriesPress={handleSeriesPress}
-            onPlayPress={handlePlaySeries}
             maxItems={5}
           />
         )}
@@ -346,7 +335,7 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.backgroundPrimary,
   },
   scrollContent: {
     flexGrow: 1,

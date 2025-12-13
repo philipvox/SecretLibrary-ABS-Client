@@ -12,16 +12,13 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '../stores/playerStore';
 import { haptics } from '@/core/native/haptics';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ACCENT_COLOR = '#F4B60C';
+import { colors, spacing, radius, wp, layout } from '@/shared/theme';
 
 // =============================================================================
 // CONSTANTS
@@ -151,66 +148,66 @@ export function SpeedSheet({ visible, onClose }: SpeedSheetProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.medium,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: colors.backgroundTertiary,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   closeButton: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',
   },
   currentSpeed: {
     fontSize: 48,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   optionButton: {
-    width: (SCREEN_WIDTH - 80) / 3,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    width: (wp(100) - 80) / 3,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   optionButtonActive: {
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
   },
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   optionTextActive: {
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
   optionLabel: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     marginTop: 2,
   },
   optionLabelActive: {
@@ -220,15 +217,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: spacing.sm,
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.md,
+    backgroundColor: colors.cardBackground,
   },
   resetButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
 });
 

@@ -12,7 +12,7 @@ import {
   TextInputProps as RNTextInputProps,
   TouchableOpacity,
 } from 'react-native';
-import { theme } from '../../theme';
+import { colors, spacing, radius } from '../../theme';
 
 interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
   label?: string;
@@ -78,7 +78,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(
               isDisabled && styles.inputDisabled,
               inputStyle,
             ]}
-            placeholderTextColor={theme.colors.text.tertiary}
+            placeholderTextColor={colors.textTertiary}
             editable={editable}
             onFocus={(e) => {
               setIsFocused(true);
@@ -116,66 +116,66 @@ TextInput.displayName = 'TextInput';
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.md,
   },
   label: {
-    ...theme.textStyles.caption,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing[1],
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
     fontWeight: '500',
   },
   labelError: {
-    color: theme.colors.semantic.error,
+    color: '#EF4444',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.radius.medium,
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: colors.borderLight,
     minHeight: 48,
   },
   inputContainerFocused: {
-    borderColor: theme.colors.primary[500],
+    borderColor: colors.accent,
     borderWidth: 2,
   },
   inputContainerError: {
-    borderColor: theme.colors.semantic.error,
+    borderColor: '#EF4444',
   },
   inputContainerDisabled: {
-    backgroundColor: theme.colors.neutral[50],
+    backgroundColor: colors.backgroundSecondary,
     opacity: 0.6,
   },
   input: {
     flex: 1,
-    ...theme.textStyles.body,
-    color: theme.colors.text.primary,
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[3],
+    fontSize: 15,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     minHeight: 46,
   },
   inputWithLeftIcon: {
-    paddingLeft: theme.spacing[1],
+    paddingLeft: 4,
   },
   inputWithRightIcon: {
-    paddingRight: theme.spacing[1],
+    paddingRight: 4,
   },
   inputDisabled: {
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
   },
   leftIcon: {
-    paddingLeft: theme.spacing[3],
+    paddingLeft: spacing.sm,
   },
   rightIcon: {
-    paddingRight: theme.spacing[3],
+    paddingRight: spacing.sm,
   },
   hint: {
-    ...theme.textStyles.caption,
-    color: theme.colors.text.tertiary,
-    marginTop: theme.spacing[1],
+    fontSize: 12,
+    color: colors.textTertiary,
+    marginTop: 4,
   },
   hintError: {
-    color: theme.colors.semantic.error,
+    color: '#EF4444',
   },
 });

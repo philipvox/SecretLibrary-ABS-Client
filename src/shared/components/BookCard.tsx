@@ -11,7 +11,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   Animated,
   TouchableOpacity,
@@ -25,18 +24,16 @@ import { useDownloadStatus } from '@/core/hooks/useDownloads';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
 import { usePlayerStore } from '@/features/player';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-// Colors - minimal accent usage
-const COLORS = {
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  textTertiary: 'rgba(255, 255, 255, 0.4)',
-  accent: '#F4B60C',
-  coverOverlay: 'rgba(0,0,0,0.5)',
-};
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  typography,
+  scale,
+  formatProgress,
+  formatDuration,
+} from '@/shared/theme';
 
 // Download Icon
 const DownloadIcon = ({ size = 20, color = '#fff' }: { size?: number; color?: string }) => (
@@ -47,6 +44,16 @@ const DownloadIcon = ({ size = 20, color = '#fff' }: { size?: number; color?: st
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// Play Icon
+const PlayIcon = ({ size = 20, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M5 4.99l14 7-14 7V5z"
+      fill={color}
     />
   </Svg>
 );
@@ -79,11 +86,10 @@ const CheckIcon = ({ size = 14, color = '#000' }: { size?: number; color?: strin
 // Progress Ring for downloading
 const ProgressRing = ({ progress, size = 28 }: { progress: number; size?: number }) => {
   const strokeWidth = 2.5;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
+  const ringRadius = (size - strokeWidth) / 2;
+  const circumference = ringRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
   const progressPct = Math.round(progress);
-  // Show "..." when preparing (0%), otherwise show percentage
   const displayText = progressPct === 0 ? '...' : `${progressPct}%`;
 
   return (
@@ -92,16 +98,16 @@ const ProgressRing = ({ progress, size = 28 }: { progress: number; size?: number
         <Circle
           cx={size / 2}
           cy={size / 2}
-          r={radius}
-          stroke="rgba(255,255,255,0.2)"
+          r={ringRadius}
+          stroke={colors.progressTrack}
           strokeWidth={strokeWidth}
           fill="none"
         />
         <Circle
           cx={size / 2}
           cy={size / 2}
-          r={radius}
-          stroke="#fff"
+          r={ringRadius}
+          stroke={colors.textPrimary}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={`${circumference} ${circumference}`}
@@ -115,16 +121,38 @@ const ProgressRing = ({ progress, size = 28 }: { progress: number; size?: number
   );
 };
 
+export type BookCardActionType = 'auto' | 'download' | 'play';
+
+/** Page context for context-aware secondary info (NNGroup Heuristic #8 - Minimalist Design) */
+export type BookCardContext = 'browse' | 'library' | 'author_detail' | 'narrator_detail' | 'series_detail';
+
 export interface BookCardProps {
   book: LibraryItem;
   onPress: () => void;
   showListeningProgress?: boolean;
+  /** Action shown on right side:
+   * - 'auto': Download for browse, nothing for library (default)
+   * - 'download': Always show download if not downloaded
+   * - 'play': Show play button for downloaded books
+   */
+  actionType?: BookCardActionType;
+  /** Callback when play button is pressed (when actionType='play') */
+  onPlayPress?: () => void;
+  /** Page context - determines secondary info shown:
+   * - author_detail: Shows narrator (author already on page)
+   * - narrator_detail: Shows author (narrator already on page)
+   * - default: Shows author
+   */
+  context?: BookCardContext;
 }
 
 export function BookCard({
   book,
   onPress,
   showListeningProgress = true,
+  actionType = 'auto',
+  onPlayPress,
+  context = 'browse',
 }: BookCardProps) {
   // State from hooks
   const { isDownloaded, isDownloading, progress } = useDownloadStatus(book.id);
@@ -145,6 +173,25 @@ export function BookCard({
   const metadata = book.media?.metadata as any;
   const title = metadata?.title || 'Untitled';
   const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
+  const narrator = metadata?.narratorName || metadata?.narrators?.[0]?.name || '';
+  const duration = (book.media as any)?.duration || 0;
+  const durationText = duration > 0 ? formatDuration.short(duration) : null;
+
+  // Context-aware secondary info (NNGroup Heuristic #8 - Minimalist Design)
+  // On Author Detail: show narrator (author already on page)
+  // On Narrator Detail: show author (narrator already on page)
+  // Default: show author
+  const getSecondaryPerson = (): string => {
+    switch (context) {
+      case 'author_detail':
+        return narrator || author; // Show narrator, fallback to author
+      case 'narrator_detail':
+        return author; // Show author
+      default:
+        return author; // Default to author
+    }
+  };
+  const secondaryPerson = getSecondaryPerson();
 
   // Get listening progress
   const userProgress = (book as any).userMediaProgress;
@@ -155,6 +202,12 @@ export function BookCard({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     queueDownload(book);
   }, [book, queueDownload]);
+
+  // Handle play press
+  const handlePlayPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPlayPress?.();
+  }, [onPlayPress]);
 
   // Handle queue toggle on cover
   const handleQueuePress = useCallback(() => {
@@ -202,9 +255,9 @@ export function BookCard({
             >
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 {isInQueue ? (
-                  <CheckIcon size={12} color="#000" />
+                  <CheckIcon size={12} color={colors.backgroundPrimary} />
                 ) : (
-                  <SmallPlusIcon size={12} color="#fff" />
+                  <SmallPlusIcon size={12} color={colors.textPrimary} />
                 )}
               </Animated.View>
             </TouchableOpacity>
@@ -216,17 +269,20 @@ export function BookCard({
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.author} numberOfLines={1}>
-            {author}
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {secondaryPerson}{durationText ? ` · ${durationText}` : ''}
           </Text>
           {showListeningProgress && progressPercent > 0 && (
-            <Text style={styles.listeningProgress}>{progressPercent}% complete</Text>
+            <Text style={styles.listeningProgress}>
+              {formatProgress.percent(progressPercent / 100)} complete
+            </Text>
           )}
         </View>
       </Pressable>
 
-      {/* Right side action - download or progress */}
-      {!isDownloaded && (
+      {/* Right side action - context-dependent */}
+      {/* Download action (browse context) */}
+      {(actionType === 'auto' || actionType === 'download') && !isDownloaded && (
         <TouchableOpacity
           style={styles.actionButton}
           onPress={isDownloading ? undefined : handleDownloadPress}
@@ -235,8 +291,18 @@ export function BookCard({
           {isDownloading ? (
             <ProgressRing progress={progress * 100} size={scale(28)} />
           ) : (
-            <DownloadIcon size={scale(20)} color="rgba(255,255,255,0.7)" />
+            <DownloadIcon size={scale(20)} color={colors.textSecondary} />
           )}
+        </TouchableOpacity>
+      )}
+
+      {/* Play action (library context) */}
+      {actionType === 'play' && isDownloaded && !isNowPlaying && onPlayPress && (
+        <TouchableOpacity
+          style={styles.playButton}
+          onPress={handlePlayPress}
+        >
+          <PlayIcon size={scale(16)} color={colors.backgroundPrimary} />
         </TouchableOpacity>
       )}
     </View>
@@ -252,8 +318,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(10),
-    paddingHorizontal: scale(16),
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   cardPressable: {
     flexDirection: 'row',
@@ -266,59 +332,67 @@ const styles = StyleSheet.create({
   cover: {
     width: scale(50),
     height: scale(50),
-    borderRadius: scale(6),
-    backgroundColor: '#262626',
+    borderRadius: radius.cover,
+    backgroundColor: colors.backgroundElevated,
   },
   coverNotDownloaded: {
     opacity: 0.7,
   },
   queueButton: {
     position: 'absolute',
-    bottom: scale(2),
-    right: scale(2),
+    bottom: spacing.xxs,
+    right: spacing.xxs,
     width: scale(22),
     height: scale(22),
     borderRadius: scale(11),
-    backgroundColor: COLORS.coverOverlay,
+    backgroundColor: colors.overlay.medium,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: colors.border,
   },
   queueButtonActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   info: {
     flex: 1,
-    marginLeft: scale(12),
+    marginLeft: spacing.md,
     justifyContent: 'center',
   },
   title: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: scale(2),
+    ...typography.headlineSmall,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
   },
-  author: {
-    fontSize: scale(12),
-    color: COLORS.textSecondary,
-    marginBottom: scale(2),
+  subtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginBottom: spacing.xxs,
   },
   listeningProgress: {
-    fontSize: scale(11),
-    color: COLORS.textTertiary,
+    ...typography.labelSmall,
+    color: colors.textTertiary,
   },
   actionButton: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  playButton: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: scale(2), // Offset for visual centering of play icon
+  },
   progressText: {
-    fontSize: scale(8),
+    ...typography.caption,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.textPrimary,
   },
 });
 

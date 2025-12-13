@@ -25,7 +25,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { wp, hp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, hp, moderateScale, layout } from '@/shared/theme';
 
 // Layout constants from revised spec
 const MARGIN_H = wp(3.25);       // 3.25%w horizontal margin
@@ -34,10 +34,8 @@ const RADIUS = wp(2.5);          // 2.5%w border radius
 const COVER_SIZE = wp(17);       // 17%w square
 const COVER_RADIUS = wp(1.5);    // Small radius (~8% of cover size)
 const GAP = wp(3);               // 3%w gap between cover and text
-const TOUCH_TARGET = Math.max(wp(8), 44);
+const TOUCH_TARGET = Math.max(wp(8), layout.minTouchTarget);
 const ROW_GAP = wp(3);           // 3%w vertical gap between rows
-
-const ACCENT = COLORS.accent;
 
 interface RecentlyAddedSectionProps {
   /** List of recently added books */
@@ -202,7 +200,7 @@ const styles = StyleSheet.create({
     padding: PADDING,
   },
   header: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(16),
     fontWeight: '600',
     marginBottom: GAP,
@@ -226,17 +224,17 @@ const styles = StyleSheet.create({
     marginRight: wp(2),
   },
   title: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(14),
     fontWeight: '600',
   },
   author: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.textSecondary,
     fontSize: moderateScale(13),
     marginTop: hp(0.2),
   },
   duration: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: moderateScale(12),
     marginTop: hp(0.1),
   },
@@ -253,7 +251,7 @@ const styles = StyleSheet.create({
     height: wp(6),
     borderRadius: wp(3),
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.8)',
+    borderColor: colors.textSecondary,
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',

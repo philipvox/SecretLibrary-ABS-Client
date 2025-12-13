@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { colors } from '@/shared/theme';
 
 interface PlayButtonWithProgressProps {
   coverUrl: string;
@@ -19,7 +19,7 @@ export function PlayButtonWithProgress({
   progress,
   size = 56,
   onPress,
-  accentColor = theme.colors.primary[500],
+  accentColor = colors.accent,
   isPlaying = false,
 }: PlayButtonWithProgressProps) {
   const borderWidth = 3;

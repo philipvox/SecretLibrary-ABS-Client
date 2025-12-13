@@ -5,12 +5,10 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { NowPlayingCardProps } from '../types';
 import { PlayerModule } from '@/features/player/components/PlayerModule';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { scale } from '@/shared/theme';
 
 export function NowPlayingCard({
   book,

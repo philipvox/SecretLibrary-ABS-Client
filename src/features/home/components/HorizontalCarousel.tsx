@@ -6,8 +6,11 @@
 
 import React, { useCallback } from 'react';
 import { View, FlatList, StyleSheet, ListRenderItem } from 'react-native';
-import { DIMENSIONS, LAYOUT } from '../homeDesign';
+import { layout, spacing } from '@/shared/theme';
 import { HorizontalCarouselProps } from '../types';
+
+const DIMENSIONS = { carouselItemGap: spacing.md };
+const LAYOUT = { carouselPaddingHorizontal: layout.screenPaddingH };
 
 export function HorizontalCarousel<T>({
   data,

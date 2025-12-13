@@ -6,12 +6,15 @@
  */
 
 import React, { useCallback } from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { haptics } from '@/core/native/haptics';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import {
+  colors,
+  spacing,
+  scale,
+  layout,
+} from '@/shared/theme';
 
 interface PlaybackControlsProps {
   isPlaying: boolean;
@@ -87,7 +90,7 @@ export function PlaybackControls({
         activeOpacity={0.7}
         style={[styles.button, controlsDisabled && styles.disabled]}
       >
-        <Ionicons name="play-back" size={iconSize} color={controlsDisabled ? 'rgba(255,255,255,0.4)' : '#FFFFFF'} />
+        <Ionicons name="play-back" size={iconSize} color={controlsDisabled ? colors.textMuted : colors.textPrimary} />
       </TouchableOpacity>
 
       {/* Fast Forward */}
@@ -99,7 +102,7 @@ export function PlaybackControls({
         activeOpacity={0.7}
         style={[styles.button, controlsDisabled && styles.disabled]}
       >
-        <Ionicons name="play-forward" size={iconSize} color={controlsDisabled ? 'rgba(255,255,255,0.4)' : '#FFFFFF'} />
+        <Ionicons name="play-forward" size={iconSize} color={controlsDisabled ? colors.textMuted : colors.textPrimary} />
       </TouchableOpacity>
 
       {/* Play/Pause - shows spinner when loading */}
@@ -110,12 +113,12 @@ export function PlaybackControls({
         style={styles.playButton}
       >
         {isLoading ? (
-          <ActivityIndicator size={playIconSize} color="#F4B60C" />
+          <ActivityIndicator size={playIconSize} color={colors.accent} />
         ) : (
           <Ionicons
             name={isPlaying ? 'pause' : 'play'}
             size={playIconSize}
-            color="#F4B60C"
+            color={colors.accent}
           />
         )}
       </TouchableOpacity>
@@ -128,12 +131,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(20),
+    gap: spacing.xl,
   },
   // NN/g: Minimum 44×44px touch targets
   button: {
-    minWidth: 48,
-    minHeight: 48,
+    minWidth: layout.minTouchTarget,
+    minHeight: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },

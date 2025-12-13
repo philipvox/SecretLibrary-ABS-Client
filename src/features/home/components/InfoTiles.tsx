@@ -7,12 +7,9 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { COLORS } from '../homeDesign';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale } from '@/shared/theme';
 
 interface InfoTilesProps {
   title: string;
@@ -237,7 +234,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PixelOperator',
     fontSize: scale(FONT_SIZE),
     fontWeight: '400',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     lineHeight: scale(LINE_HEIGHT),
     // Subtle glow on main text
     textShadowColor: 'rgba(255, 255, 255, 0.5)',
@@ -251,7 +248,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PixelOperator',
     fontSize: scale(FONT_SIZE),
     fontWeight: '400',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     lineHeight: scale(LINE_HEIGHT),
     textAlign: 'right',
     // Subtle glow
@@ -267,7 +264,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PixelOperator',
     fontSize: scale(FONT_SIZE),
     fontWeight: '400',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     lineHeight: scale(LINE_HEIGHT),
     // Subtle glow
     textShadowColor: 'rgba(255, 255, 255, 0.5)',
@@ -275,7 +272,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   seekDeltaText: {
-    color: '#F4B60C', // Golden yellow like PlayerScreen
+    color: colors.accent, // Golden yellow like PlayerScreen
     textShadowColor: 'rgba(244, 182, 12, 1)',
   },
   bottomRow: {
@@ -287,7 +284,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PixelOperator',
     fontSize: scale(FONT_SIZE),
     fontWeight: '400',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     lineHeight: scale(LINE_HEIGHT),
     // Subtle glow
     textShadowColor: 'rgba(255, 255, 255, 0.5)',
@@ -298,7 +295,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PixelOperator',
     fontSize: scale(FONT_SIZE),
     fontWeight: '400',
-    color: '#F12802',
+    color: colors.sleepTimer,
     lineHeight: scale(LINE_HEIGHT),
     // Red glow for timer
     textShadowColor: 'rgba(241, 40, 2, 0.5)',

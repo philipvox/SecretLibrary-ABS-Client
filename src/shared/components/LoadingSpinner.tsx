@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
-import { theme } from '../theme';
+import { colors, spacing } from '../theme';
 
 interface LoadingSpinnerProps {
   text?: string;
@@ -18,7 +18,7 @@ interface LoadingSpinnerProps {
 export function LoadingSpinner({
   text,
   size = 'large',
-  color = theme.colors.primary[500],
+  color = colors.accent,
 }: LoadingSpinnerProps) {
   return (
     <View style={styles.container}>
@@ -33,13 +33,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background.primary,
-    padding: theme.spacing[6],
+    backgroundColor: colors.backgroundPrimary,
+    padding: spacing.xl,
   },
   text: {
-    ...theme.textStyles.body,
-    color: theme.colors.text.secondary,
-    marginTop: theme.spacing[3],
+    fontSize: 15,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
 });

@@ -7,8 +7,11 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { COLORS, DIMENSIONS } from '../homeDesign';
+import { colors, radius, scale } from '@/shared/theme';
 import { CoverGridProps } from '../types';
+
+const COLORS = { controlButtonBg: colors.cardBackground };
+const DIMENSIONS = { playlistCardWidth: scale(110), coverRadius: radius.sm };
 
 export function CoverGrid({
   covers,

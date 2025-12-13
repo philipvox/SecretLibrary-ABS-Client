@@ -14,18 +14,15 @@ import {
   TouchableOpacity,
   Modal,
   Switch,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 // Playback speed options
 const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
@@ -219,7 +216,7 @@ export function PlaybackSettingsScreen() {
       >
         {/* Speed Section */}
         <View style={styles.section}>
-          <SectionHeader title="SPEED" />
+          <SectionHeader title="Speed" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="speedometer-outline"
@@ -233,7 +230,7 @@ export function PlaybackSettingsScreen() {
 
         {/* Skip Intervals Section */}
         <View style={styles.section}>
-          <SectionHeader title="SKIP INTERVALS" />
+          <SectionHeader title="Skip Intervals" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="play-forward-outline"
@@ -252,7 +249,7 @@ export function PlaybackSettingsScreen() {
 
         {/* Sleep Timer Section */}
         <View style={styles.section}>
-          <SectionHeader title="SLEEP TIMER" />
+          <SectionHeader title="Sleep Timer" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="phone-portrait-outline"
@@ -346,10 +343,10 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   sectionHeader: {
-    fontSize: scale(12),
+    fontSize: scale(13),
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 0.5,
     marginHorizontal: scale(20),
     marginBottom: scale(8),
   },

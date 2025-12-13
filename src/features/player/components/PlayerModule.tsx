@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions, Pressable, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Pressable, Text } from 'react-native';
 import { useCoverUrl } from '@/core/cache';
 import type { LibraryItem } from '@/core/types';
 import { CoverArtwork } from '@/features/home/components/CoverArtwork';
@@ -14,9 +14,7 @@ import { InfoTiles } from '@/features/home/components/InfoTiles';
 import { PlaybackControls } from '@/features/home/components/PlaybackControls';
 import { ProgressBar } from './ProgressBar';
 import { HeartButton, CircularDownloadButton } from '@/shared/components';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale, layout } from '@/shared/theme';
 
 
 export interface PlayerModuleProgress {
@@ -203,9 +201,9 @@ export function PlayerModule({
           {/* Progress Bar - always visible for system status visibility (NN/g #1) */}
           <View style={styles.progressBarContainer}>
             <ProgressBar
-              textColor="rgba(255, 255, 255, 0.6)"
-              trackColor="rgba(255, 255, 255, 0.2)"
-              fillColor="#FFFFFF"
+              textColor={colors.textSecondary}
+              trackColor={colors.progressTrack}
+              fillColor={colors.textPrimary}
             />
           </View>
 
@@ -283,14 +281,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
   panelCloseText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.textSecondary,
     fontSize: scale(20),
     fontWeight: '300',
   },
@@ -304,8 +302,8 @@ const styles = StyleSheet.create({
   },
   // NN/g: Minimum 44×44px touch target for action buttons
   actionButton: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -5,29 +5,30 @@
  */
 
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withTiming,
-  interpolate,
   Easing,
 } from 'react-native-reanimated';
 import { Icon } from '@/shared/components/Icon';
+import { wp, hp, spacing, radius, elevation } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
 
 // Panel configuration - adjust these to customize panel sizes
 export const PANEL_CONFIG = {
   // Horizontal margins from screen edge
-  marginHorizontal: 16,
+  marginHorizontal: spacing.lg,
   // Top position (from top of screen)
   topOffset: 120,
   // Bottom padding (from bottom of screen, before safe area)
   bottomPadding: 100,
   // Border radius
-  borderRadius: 24,
+  borderRadius: radius.xxl,
   // Padding inside panel
-  innerPadding: 16,
+  innerPadding: spacing.lg,
 };
 
 // Calculate panel dimensions
@@ -113,19 +114,14 @@ const styles = StyleSheet.create({
     borderRadius: PANEL_CONFIG.borderRadius,
     padding: PANEL_CONFIG.innerPadding,
     overflow: 'hidden',
-    // Shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 16,
+    ...elevation.large,
   },
   closeButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: spacing.lg,
+    right: spacing.lg,
     zIndex: 10,
-    padding: 4,
+    padding: spacing.xs,
   },
   content: {
     flex: 1,

@@ -15,18 +15,15 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LibraryItem } from '@/core/types';
 import { useCoverUrl } from '@/core/cache';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
-const ACCENT_DIM = 'rgba(244,182,12,0.5)';
+const ACCENT = colors.accent;
+const ACCENT_DIM = 'rgba(243,182,12,0.5)';
 
 interface SeriesProgressHeaderProps {
   books: LibraryItem[];
@@ -254,7 +251,7 @@ export function SeriesProgressHeader({
   // STATE B & C: In Progress or Between Books
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>YOUR PROGRESS</Text>
+      <Text style={styles.sectionLabel}>Your Progress</Text>
 
       {/* Progress Dots */}
       <View style={styles.dotsRow}>
@@ -386,10 +383,10 @@ const styles = StyleSheet.create({
     borderRadius: scale(12),
   },
   sectionLabel: {
-    fontSize: scale(10),
+    fontSize: scale(13),
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 0.5,
     marginBottom: scale(12),
   },
 

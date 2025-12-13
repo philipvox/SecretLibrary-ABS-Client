@@ -9,7 +9,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   withTiming,
@@ -17,9 +17,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { haptics } from '@/core/native/haptics';
 import { Chapter } from '../stores/playerStore';
+import { colors, wp, spacing } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BAR_WIDTH = SCREEN_WIDTH - 48; // 24px padding on each side
+const BAR_WIDTH = wp(100) - 48; // 24px padding on each side
 const SEGMENT_GAP = 2;
 const BAR_HEIGHT = 6;
 
@@ -30,11 +30,10 @@ interface ChapterProgressBarProps {
   onChapterPress: (chapterStart: number) => void;
 }
 
-// Accent color
-const ACCENT_COLOR = '#F4B60C';
-const UNFILLED_COLOR = 'rgba(255,255,255,0.15)';
-const FILLED_COLOR = ACCENT_COLOR;
-const CURRENT_CHAPTER_BG = 'rgba(244,182,12,0.25)';
+// Use theme colors
+const UNFILLED_COLOR = colors.progressTrack;
+const FILLED_COLOR = colors.progressFill;
+const CURRENT_CHAPTER_BG = colors.accentSubtle;
 
 /**
  * Calculate the fill percentage for a chapter based on current position.
@@ -190,7 +189,7 @@ export function ChapterProgressBar({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   segmentsContainer: {
     flexDirection: 'row',
@@ -205,8 +204,6 @@ const styles = StyleSheet.create({
   },
   currentSegment: {
     // Slightly taller for emphasis
-    // borderWidth: 1,
-    // borderColor: ACCENT_COLOR,
   },
   segmentFill: {
     position: 'absolute',
@@ -221,15 +218,15 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   labelContainer: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     alignItems: 'center',
   },
   chapterLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
   },
   chapterTitle: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 });
 

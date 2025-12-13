@@ -1,150 +1,84 @@
 /**
  * src/features/home/constants.ts
  *
- * Design tokens and configuration for the Home screen
- * Based on Figma mockups
+ * @deprecated Import from '@/shared/theme' instead.
+ * This file re-exports theme values for backward compatibility.
  */
 
-import { Dimensions } from 'react-native';
+import {
+  colors,
+  spacing as themeSpacing,
+  layout,
+  radius,
+  animation,
+  wp,
+} from '@/shared/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Log deprecation warning in development
+if (__DEV__) {
+  console.warn(
+    '[home/constants.ts] DEPRECATED: Import from "@/shared/theme" instead.'
+  );
+}
 
 // =============================================================================
-// SPACING
+// SPACING - Re-exported from theme
 // =============================================================================
 
 export const SPACING = {
-  screenPadding: 16,
-  cardGap: 12,
-  sectionGap: 24,
-  componentGap: 8,
+  screenPadding: layout.screenPaddingH,
+  cardGap: themeSpacing.md,
+  sectionGap: layout.sectionGap,
+  componentGap: layout.componentGap,
 };
 
 // =============================================================================
-// COLORS
+// COLORS - Re-exported from theme
 // =============================================================================
 
-export const COLORS = {
-  // Background
-  background: '#000000',
-  cardBackground: 'rgba(255, 255, 255, 0.08)',
-  cardBackgroundHover: 'rgba(255, 255, 255, 0.12)',
-
-  // Accent (golden yellow from design)
-  accent: '#F4B60C',
-  accentDark: '#D9A00A',
-  accentDim: 'rgba(244, 182, 12, 0.3)',
-
-  // Heart/Favorite
-  heartFill: '#4ADE80',
-  heartOutline: 'rgba(255, 255, 255, 0.5)',
-
-  // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.7)',
-  textTertiary: 'rgba(255, 255, 255, 0.5)',
-  textMuted: 'rgba(255, 255, 255, 0.3)',
-
-  // Controls
-  controlBackground: 'rgba(255, 255, 255, 0.1)',
-  controlBackgroundActive: 'rgba(255, 255, 255, 0.15)',
-
-  // Sleep timer (red from design)
-  sleepTimer: '#FF6B6B',
-
-  // Borders
-  border: 'rgba(255, 255, 255, 0.1)',
-  borderLight: 'rgba(255, 255, 255, 0.05)',
-};
+export const COLORS = colors;
 
 // =============================================================================
-// TYPOGRAPHY
+// TYPOGRAPHY - Use typography from '@/shared/theme' instead
 // =============================================================================
+
+import { typography } from '@/shared/theme';
 
 export const TYPOGRAPHY = {
-  // Now Playing Card
-  nowPlayingTitle: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    lineHeight: 22,
-  },
-  nowPlayingChapter: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-    lineHeight: 18,
-  },
-  nowPlayingTime: {
-    fontSize: 14,
-    fontFamily: 'monospace',
-    fontWeight: '500' as const,
-  },
-  nowPlayingSpeed: {
-    fontSize: 14,
-    fontFamily: 'monospace',
-    fontWeight: '400' as const,
-  },
-
-  // Section headers
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600' as const,
-    lineHeight: 22,
-  },
-  sectionAction: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-  },
-
-  // Card titles
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: '500' as const,
-    lineHeight: 16,
-  },
-  cardSubtitle: {
-    fontSize: 11,
-    fontWeight: '400' as const,
-    lineHeight: 14,
-  },
-
-  // Empty state
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600' as const,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    fontWeight: '400' as const,
-    lineHeight: 20,
-  },
+  nowPlayingTitle: typography.displaySmall,
+  nowPlayingChapter: typography.labelLarge,
+  nowPlayingTime: typography.labelLarge,
+  nowPlayingSpeed: typography.labelMedium,
+  sectionTitle: typography.headlineLarge,
+  sectionAction: typography.labelLarge,
+  cardTitle: typography.labelMedium,
+  cardSubtitle: typography.labelSmall,
+  emptyTitle: typography.displayMedium,
+  emptySubtitle: typography.bodyMedium,
 };
 
 // =============================================================================
 // NOW PLAYING CARD
 // =============================================================================
 
+const SCREEN_WIDTH = wp(100);
+
 export const NOW_PLAYING = {
   width: SCREEN_WIDTH - SPACING.screenPadding * 2,
-  borderRadius: 16,
-  padding: 16,
-
-  // Cover image
+  borderRadius: radius.lg,
+  padding: themeSpacing.lg,
   coverMaxWidth: SCREEN_WIDTH - 80,
-  coverAspectRatio: 1, // Square
-  coverBorderRadius: 12,
+  coverAspectRatio: 1,
+  coverBorderRadius: radius.md,
   coverShadowRadius: 20,
   coverShadowOpacity: 0.4,
-
-  // Controls
-  controlSize: 44,
+  controlSize: layout.minTouchTarget,
   controlIconSize: 24,
   playButtonSize: 56,
   playIconSize: 28,
-  controlGap: 24,
-
-  // Header layout
+  controlGap: themeSpacing.xxl,
   headerHeight: 48,
-  headerGap: 16,
+  headerGap: themeSpacing.lg,
 };
 
 // =============================================================================
@@ -152,8 +86,8 @@ export const NOW_PLAYING = {
 // =============================================================================
 
 export const SECTION_HEADER = {
-  paddingTop: 24,
-  paddingBottom: 12,
+  paddingTop: themeSpacing.xxl,
+  paddingBottom: themeSpacing.md,
   paddingHorizontal: SPACING.screenPadding,
 };
 
@@ -163,12 +97,12 @@ export const SECTION_HEADER = {
 
 export const BOOK_CARD = {
   width: 120,
-  coverAspectRatio: 1, // Square audiobook covers
-  coverBorderRadius: 8,
+  coverAspectRatio: 1,
+  coverBorderRadius: radius.sm,
   titleMaxLines: 2,
-  titleMarginTop: 8,
+  titleMarginTop: themeSpacing.sm,
   heartBadgeSize: 22,
-  heartBadgeOffset: 8,
+  heartBadgeOffset: themeSpacing.sm,
 };
 
 // =============================================================================
@@ -178,35 +112,11 @@ export const BOOK_CARD = {
 export const SERIES_CARD = {
   width: 130,
   coverSize: 55,
-  coverOverlap: 12,
-  coverBorderRadius: 6,
-  outerBorderRadius: 8,
+  coverOverlap: themeSpacing.md,
+  coverBorderRadius: radius.sm,
+  outerBorderRadius: radius.sm,
   titleMaxLines: 2,
-  titleMarginTop: 8,
-};
-
-// =============================================================================
-// PLAYLIST CARD
-// =============================================================================
-
-export const PLAYLIST_CARD = {
-  width: 140,
-  gridSize: 2, // 2x2 grid
-  gridGap: 4,
-  coverBorderRadius: 4,
-  outerBorderRadius: 8,
-  titleMaxLines: 2,
-  titleMarginTop: 8,
-};
-
-// =============================================================================
-// HEART BADGE
-// =============================================================================
-
-export const HEART_BADGE = {
-  size: 22,
-  iconSize: 14,
-  offset: 8,
+  titleMarginTop: themeSpacing.sm,
 };
 
 // =============================================================================
@@ -222,31 +132,12 @@ export const CAROUSEL = {
 };
 
 // =============================================================================
-// BOTTOM GRADIENT
-// =============================================================================
-
-export const BOTTOM_GRADIENT = {
-  height: 200,
-  colors: ['transparent', 'rgba(0,0,0,0.8)', '#000000'] as const,
-  locations: [0, 0.5, 1] as const,
-};
-
-// =============================================================================
-// TAB BAR (for spacing reference)
-// =============================================================================
-
-export const TAB_BAR = {
-  height: 80,
-  bottomPadding: 100, // Extra space for content to scroll above tab bar
-};
-
-// =============================================================================
 // EMPTY STATE
 // =============================================================================
 
 export const EMPTY_STATE = {
   iconSize: 64,
-  gap: 16,
+  gap: themeSpacing.lg,
   maxWidth: 280,
 };
 
@@ -256,19 +147,11 @@ export const EMPTY_STATE = {
 
 export const LOADING = {
   indicatorSize: 'large' as const,
-  indicatorColor: COLORS.accent,
+  indicatorColor: colors.accent,
 };
 
 // =============================================================================
 // ANIMATIONS
 // =============================================================================
 
-export const ANIMATIONS = {
-  spring: {
-    damping: 15,
-    stiffness: 150,
-  },
-  timing: {
-    duration: 200,
-  },
-};
+export const ANIMATIONS = animation;

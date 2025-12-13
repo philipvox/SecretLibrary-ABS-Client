@@ -13,7 +13,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { wp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, moderateScale, radius } from '@/shared/theme';
 
 interface HomePillsRowProps {
   /** Current sleep timer remaining in seconds (null if off) */
@@ -29,7 +29,7 @@ interface HomePillsRowProps {
 }
 
 const ICON_SIZE = wp(3.5);
-const ACCENT = COLORS.accent;
+const ACCENT = colors.accent;
 
 /**
  * Moon icon for sleep timer
@@ -118,19 +118,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(40,40,40,0.9)',
-    borderRadius: wp(4),
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radius.lg,
     paddingVertical: wp(2),
     paddingHorizontal: wp(3),
     gap: wp(1.5),
   },
   pillText: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: moderateScale(14),
     fontWeight: '500',
   },
   pillTextActive: {
-    color: ACCENT,
+    color: colors.accent,
   },
 });
 

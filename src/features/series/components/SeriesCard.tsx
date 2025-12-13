@@ -9,20 +9,17 @@
  */
 
 import React, { memo, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { SeriesInfo } from '../services/seriesAdapter';
 import { apiClient } from '@/core/api';
-import { theme } from '@/shared/theme';
+import { colors, scale, spacing, radius, elevation, cardTokens } from '@/shared/theme';
+import { StackedCovers } from '@/shared/components';
 import { formatDuration } from '@/shared/utils/metadata';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
-const ACCENT_DIM = 'rgba(244,182,12,0.5)';
+const ACCENT = colors.accent;
+const ACCENT_DIM = 'rgba(243,182,12,0.5)';
 
 interface SeriesCardProps {
   series: SeriesInfo;
@@ -67,9 +64,14 @@ function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
     navigation.navigate('SeriesDetail', { seriesName: series.name });
   };
 
-  const coverUrl = series.coverUrl
-    ? apiClient.getItemCoverUrl(series.coverUrl)
-    : undefined;
+  // Get cover URLs from books for stacked display
+  const coverUrls = useMemo(() => {
+    if (series.books && series.books.length > 0) {
+      return series.books.slice(0, 3).map(book => apiClient.getItemCoverUrl(book.id));
+    }
+    // Fallback to series cover
+    return series.coverUrl ? [apiClient.getItemCoverUrl(series.coverUrl)] : [];
+  }, [series.books, series.coverUrl]);
 
   // Calculate progress stats from books
   const progressStats = useMemo(() => {
@@ -123,13 +125,13 @@ function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
       onPress={handlePress}
     >
       <View style={styles.coverContainer}>
-        {coverUrl ? (
-          <Image source={coverUrl} style={styles.cover} contentFit="cover" transition={200} />
-        ) : (
-          <View style={[styles.cover, styles.placeholderCover]}>
-            <Text style={styles.placeholderText}>📚</Text>
-          </View>
-        )}
+        <StackedCovers
+          coverUrls={coverUrls}
+          size={cardTokens.stackedCovers.sizeLarge}
+          offset={cardTokens.stackedCovers.offset}
+          maxCovers={3}
+          borderRadius={radius.md}
+        />
 
         {/* Complete badge */}
         {isComplete && (
@@ -188,33 +190,26 @@ function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
 // Memoize to prevent unnecessary re-renders in lists
 export const SeriesCard = memo(SeriesCardComponent);
 
+// Stacked cover dimensions
+const COVER_SIZE = cardTokens.stackedCovers.sizeLarge;
+const COVER_OFFSET = cardTokens.stackedCovers.offset;
+const STACK_WIDTH = COVER_SIZE + (COVER_OFFSET * 2);
+const STACK_HEIGHT = COVER_SIZE * 1.5; // 2:3 aspect ratio
+
 const styles = StyleSheet.create({
   container: {
     width: '48%',
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.lg,
   },
   pressed: {
     opacity: 0.7,
   },
   coverContainer: {
-    aspectRatio: 1,
-    borderRadius: theme.radius.large,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.neutral[200],
-    ...theme.elevation.small,
-    position: 'relative',
-  },
-  cover: {
     width: '100%',
-    height: '100%',
-  },
-  placeholderCover: {
-    justifyContent: 'center',
+    aspectRatio: STACK_WIDTH / STACK_HEIGHT,
+    position: 'relative',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[300],
-  },
-  placeholderText: {
-    fontSize: 48,
+    justifyContent: 'center',
   },
   completeBadge: {
     position: 'absolute',
@@ -233,20 +228,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   info: {
-    marginTop: theme.spacing[2],
+    marginTop: spacing.sm,
   },
   name: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
     lineHeight: 20,
   },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing[1],
+    marginBottom: spacing.xs,
   },
   progressDots: {
     flexDirection: 'row',
@@ -255,7 +250,7 @@ const styles = StyleSheet.create({
   },
   moreText: {
     fontSize: scale(10),
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     marginLeft: scale(2),
   },
   progressCount: {
@@ -265,6 +260,6 @@ const styles = StyleSheet.create({
   },
   bookCount: {
     fontSize: 13,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
   },
 });

@@ -6,17 +6,13 @@
  */
 
 import React, { memo, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Collection } from '@/core/types';
 import { apiClient } from '@/core/api';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+import { colors, scale, spacing, radius, elevation } from '@/shared/theme';
 
 interface CollectionCardProps {
   collection: Collection;
@@ -71,15 +67,16 @@ export const CollectionCard = memo(function CollectionCard({ collection }: Colle
 const styles = StyleSheet.create({
   container: {
     width: scale(160),
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   coverContainer: {
     position: 'relative',
     width: scale(160),
     height: scale(160),
-    borderRadius: scale(12),
-    backgroundColor: '#262626',
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
     overflow: 'hidden',
+    ...elevation.small,
   },
   cover: {
     width: '100%',
@@ -88,37 +85,37 @@ const styles = StyleSheet.create({
   placeholderCover: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#262626',
+    backgroundColor: colors.backgroundElevated,
   },
   countBadge: {
     position: 'absolute',
-    bottom: scale(8),
-    right: scale(8),
+    bottom: spacing.sm,
+    right: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(4),
-    backgroundColor: ACCENT,
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(4),
-    borderRadius: scale(10),
+    gap: spacing.xs,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
   },
   countText: {
     fontSize: scale(11),
     fontWeight: '700',
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
   info: {
-    marginTop: scale(8),
+    marginTop: spacing.sm,
   },
   name: {
     fontSize: scale(14),
     fontWeight: '600',
-    color: '#fff',
-    marginBottom: scale(2),
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
     lineHeight: scale(18),
   },
   description: {
     fontSize: scale(12),
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 });

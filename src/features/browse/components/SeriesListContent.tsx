@@ -7,7 +7,7 @@ import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
 import { SearchBar } from '@/features/search/components/SearchBar';
 import { LoadingSpinner, EmptyState, ErrorView } from '@/shared/components';
 import { SeriesInfo } from '@/features/series';
-import { theme } from '@/shared/theme';
+import { colors, spacing } from '@/shared/theme';
 
 export function SeriesListContent() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,7 +62,7 @@ export function SeriesListContent() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={refetch}
-            tintColor={theme.colors.primary[500]}
+            tintColor={colors.accent}
           />
         }
         ListEmptyComponent={
@@ -80,18 +80,18 @@ export function SeriesListContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background.primary,
+    backgroundColor: colors.backgroundPrimary,
   },
   searchContainer: {
-    paddingHorizontal: theme.spacing[5],
-    paddingVertical: theme.spacing[3],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   listContent: {
-    paddingHorizontal: theme.spacing[5],
-    paddingBottom: theme.spacing[32] + 60,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 188,
   },
   itemWrapper: {
     flex: 1,
-    paddingHorizontal: theme.spacing[1],
+    paddingHorizontal: 4,
   },
 });

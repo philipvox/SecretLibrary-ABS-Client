@@ -6,16 +6,20 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useNetInfo } from '@react-native-community/netinfo';
-import { theme } from '../theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  typography,
+  scale,
+} from '@/shared/theme';
 
 // Icon components
-const WifiOffIcon = ({ size = 48, color = '#FF6B6B' }: { size?: number; color?: string }) => (
+const WifiOffIcon = ({ size = 48, color = colors.error }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M1 9l2 2a14.5 14.5 0 0118 0l2-2A17.5 17.5 0 001 9z"
@@ -41,7 +45,7 @@ const WifiOffIcon = ({ size = 48, color = '#FF6B6B' }: { size?: number; color?: 
   </Svg>
 );
 
-const AlertIcon = ({ size = 48, color = '#FF6B6B' }: { size?: number; color?: string }) => (
+const AlertIcon = ({ size = 48, color = colors.error }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
@@ -55,7 +59,7 @@ const AlertIcon = ({ size = 48, color = '#FF6B6B' }: { size?: number; color?: st
   </Svg>
 );
 
-const ServerIcon = ({ size = 48, color = '#FF6B6B' }: { size?: number; color?: string }) => (
+const ServerIcon = ({ size = 48, color = colors.error }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M2 5a2 2 0 012-2h16a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"
@@ -200,84 +204,82 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    padding: scale(24),
+    backgroundColor: colors.backgroundTertiary,
+    padding: spacing.xxl,
   },
   iconContainer: {
-    marginBottom: scale(20),
+    marginBottom: spacing.xl,
     opacity: 0.9,
   },
   title: {
-    fontSize: scale(20),
+    ...typography.displaySmall,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: scale(8),
+    marginBottom: spacing.sm,
   },
   message: {
-    fontSize: scale(14),
-    color: 'rgba(255, 255, 255, 0.6)',
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: scale(20),
     maxWidth: scale(280),
-    marginBottom: scale(28),
+    marginBottom: spacing['3xl'],
   },
   actions: {
-    gap: scale(12),
+    gap: spacing.md,
     width: '100%',
     maxWidth: scale(240),
   },
   // NN/g: 44px minimum touch targets
   primaryButton: {
-    backgroundColor: '#F4B60C',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(24),
-    borderRadius: scale(12),
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.card,
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: layout.minTouchTarget,
     justifyContent: 'center',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   primaryButtonText: {
-    fontSize: scale(15),
+    ...typography.labelLarge,
     fontWeight: '600',
-    color: '#000000',
+    color: colors.backgroundPrimary,
   },
   secondaryButton: {
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(24),
-    borderRadius: scale(12),
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.card,
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: layout.minTouchTarget,
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: colors.cardBackground,
   },
   secondaryButtonText: {
-    fontSize: scale(15),
+    ...typography.labelLarge,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: colors.textSecondary,
   },
   offlineIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scale(24),
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    backgroundColor: 'rgba(255, 107, 107, 0.15)',
-    borderRadius: scale(20),
+    marginTop: spacing.xxl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: 'rgba(255, 59, 48, 0.15)',
+    borderRadius: spacing.xl,
   },
   offlineDot: {
-    width: scale(8),
-    height: scale(8),
-    borderRadius: scale(4),
-    backgroundColor: '#FF6B6B',
-    marginRight: scale(6),
+    width: spacing.sm,
+    height: spacing.sm,
+    borderRadius: spacing.xs,
+    backgroundColor: colors.error,
+    marginRight: spacing.xs,
   },
   offlineText: {
-    fontSize: scale(12),
-    fontWeight: '500',
-    color: '#FF6B6B',
+    ...typography.labelMedium,
+    color: colors.error,
   },
 });

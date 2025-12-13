@@ -5,20 +5,18 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale } from '@/shared/theme';
 
 const COLORS = {
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  accent: '#4ADE80',
-  cardBg: 'rgba(255, 255, 255, 0.08)',
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  accent: colors.success,
+  cardBg: colors.cardBackground,
 };
 
 // Drag handle icon

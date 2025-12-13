@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet, Dimensions } from 'react-native';
+import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, Path, G } from 'react-native-svg';
 import Animated, {
   useAnimatedProps,
@@ -25,9 +25,7 @@ import { downloadManager } from '@/core/services/downloadManager';
 import { LibraryItem } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
 import { formatBytes } from '@/shared/utils/format';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { scale } from '@/shared/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 

@@ -1,10 +1,10 @@
 // File: src/features/player/components/SleepTimer.tsx
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayerStore } from '../stores/playerStore';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius, layout } from '@/shared/theme';
 
 const SLEEP_OPTIONS = [
   { label: '5 min', minutes: 5 },
@@ -54,24 +54,24 @@ export function SleepTimer({ visible, onClose }: SleepTimerProps) {
     >
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.dismissArea} onPress={onClose} activeOpacity={1} />
-        
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + theme.spacing[2] }]}>
+
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.sm }]}>
           <View style={styles.header}>
             <View style={styles.handle} />
             <View style={styles.headerRow}>
               <Text style={styles.title}>Sleep Timer</Text>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Icon name="close" size={22} color={theme.colors.text.secondary} set="ionicons" />
+                <Icon name="close" size={22} color={colors.textSecondary} set="ionicons" />
               </TouchableOpacity>
             </View>
           </View>
 
           {sleepTimer !== null && (
             <View style={styles.activeTimer}>
-              <Icon name="moon" size={20} color={theme.colors.primary[500]} set="ionicons" />
+              <Icon name="moon" size={20} color={colors.accent} set="ionicons" />
               <Text style={styles.activeTimerText}>
-                {sleepTimer === -1 
-                  ? 'End of chapter' 
+                {sleepTimer === -1
+                  ? 'End of chapter'
                   : `${formatTimeRemaining(sleepTimer)} remaining`
                 }
               </Text>
@@ -99,7 +99,7 @@ export function SleepTimer({ visible, onClose }: SleepTimerProps) {
             onPress={handleEndOfChapter}
             activeOpacity={0.7}
           >
-            <Icon name="bookmark-outline" size={18} color={theme.colors.text.primary} set="ionicons" />
+            <Icon name="bookmark-outline" size={18} color={colors.textPrimary} set="ionicons" />
             <Text style={styles.endOfChapterText}>End of chapter</Text>
           </TouchableOpacity>
         </View>
@@ -112,15 +112,16 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
+    backgroundColor: colors.overlay.medium,
   },
   dismissArea: {
     flex: 1,
   },
   sheet: {
-    backgroundColor: theme.colors.background.primary,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: theme.spacing[4],
+    backgroundColor: colors.backgroundTertiary,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
@@ -129,15 +130,15 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingTop: theme.spacing[2],
-    paddingBottom: theme.spacing[3],
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   handle: {
     width: 36,
     height: 4,
-    backgroundColor: theme.colors.neutral[300],
+    backgroundColor: colors.border,
     borderRadius: 2,
-    marginBottom: theme.spacing[2],
+    marginBottom: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -146,66 +147,66 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   title: {
-    ...theme.textStyles.body,
+    fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
   activeTimer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.primary[50],
-    paddingVertical: theme.spacing[3],
-    paddingHorizontal: theme.spacing[4],
-    borderRadius: theme.radius.medium,
-    marginBottom: theme.spacing[3],
-    gap: theme.spacing[2],
+    backgroundColor: colors.accentSubtle,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   activeTimerText: {
-    ...theme.textStyles.bodySmall,
-    color: theme.colors.primary[600],
+    fontSize: 14,
+    color: colors.accent,
     flex: 1,
   },
   clearButton: {
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[1],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   clearButtonText: {
-    ...theme.textStyles.bodySmall,
-    color: theme.colors.primary[500],
+    fontSize: 14,
+    color: colors.accent,
     fontWeight: '600',
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing[2],
-    marginBottom: theme.spacing[3],
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   optionButton: {
-    paddingVertical: theme.spacing[3],
-    paddingHorizontal: theme.spacing[4],
-    borderRadius: theme.radius.medium,
-    backgroundColor: theme.colors.neutral[100],
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.cardBackground,
     minWidth: 80,
     alignItems: 'center',
   },
   optionText: {
-    ...theme.textStyles.body,
+    fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
   endOfChapterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing[3],
-    borderRadius: theme.radius.medium,
-    backgroundColor: theme.colors.neutral[100],
-    gap: theme.spacing[2],
-    marginBottom: theme.spacing[2],
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.cardBackground,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   endOfChapterText: {
-    ...theme.textStyles.body,
+    fontSize: 16,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
 });

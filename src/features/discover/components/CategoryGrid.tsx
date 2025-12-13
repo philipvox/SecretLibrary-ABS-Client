@@ -11,18 +11,20 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Icon } from '@/shared/components/Icon';
 import { useLibraryCache, getAllAuthors, getAllSeries, getAllNarrators, getAllGenres } from '@/core/cache';
-import { COLORS, DIMENSIONS, TYPOGRAPHY, LAYOUT } from '@/features/home/homeDesign';
+import { colors, scale, wp, spacing, radius, layout, typography } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
+const SCREEN_WIDTH = wp(100);
 const GAP = scale(10);
-const COLUMN_WIDTH = (SCREEN_WIDTH - LAYOUT.carouselPaddingHorizontal * 2 - GAP) / 2;
+const COLUMN_WIDTH = (SCREEN_WIDTH - layout.screenPaddingH * 2 - GAP) / 2;
+
+const COLORS = { playButton: colors.accent, textPrimary: colors.textPrimary, textTertiary: colors.textTertiary };
+const DIMENSIONS = { sectionGap: layout.sectionGap, cardRadius: radius.card };
+const TYPOGRAPHY = { sectionTitle: { fontSize: scale(13), fontWeight: '600' as const }, cardTitle: { fontSize: scale(14), fontWeight: '500' as const } };
+const LAYOUT = { carouselPaddingHorizontal: layout.screenPaddingH, sectionHeaderMarginBottom: spacing.md };
 
 interface BrowseCategory {
   id: string;

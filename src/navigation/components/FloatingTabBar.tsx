@@ -6,22 +6,30 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { usePlayerStore } from '@/features/player';
 import { useShallow } from 'zustand/react/shallow';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import {
+  colors,
+  spacing,
+  sizes,
+  typography,
+  wp,
+} from '@/shared/theme';
 
 // Design constants
-const ICON_COLOR = '#FFFFFF';
-const ICON_SIZE = 24;
+const ICON_COLOR = colors.textPrimary;
+const ICON_COLOR_INACTIVE = colors.textSecondary;
+const ICON_SIZE = sizes.iconMd;
 const BAR_HEIGHT = 82;
-const BAR_RADIUS = 10;
-const BAR_BOTTOM_PADDING = -0; // Extra padding at bottom for touch UX
+const BAR_BOTTOM_PADDING = 0; // Extra padding at bottom for touch UX
+
+// Screen width for layout
+const SCREEN_WIDTH = wp(100);
 
 // Nav bar background using the provided SVG
 const NavBarBackground: React.FC<{ width: number; height: number }> = ({ width, height }) => (
@@ -231,7 +239,7 @@ function FloatingTabBarInner() {
             >
               <IconComponent
                 size={ICON_SIZE}
-                color={isActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)'}
+                color={isActive ? ICON_COLOR : ICON_COLOR_INACTIVE}
               />
               <Text style={[
                 styles.label,
@@ -288,7 +296,7 @@ export function FloatingTabBar() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: 8,
+    bottom: spacing.sm,
     left: 0,
     right: 0,
     zIndex: 9999,
@@ -299,7 +307,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     minHeight: BAR_HEIGHT,
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.sm,
     paddingTop: 0,
     overflow: 'hidden',
   },
@@ -307,18 +315,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm,
     minHeight: 60,
-    gap:10,
+    gap: spacing.sm,
   },
   label: {
-    fontSize: 10,
+    ...typography.labelSmall,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.textSecondary,
     letterSpacing: 0.2,
   },
   labelActive: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontWeight: '600',
   },
 });

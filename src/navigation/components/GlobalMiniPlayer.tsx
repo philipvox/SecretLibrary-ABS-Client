@@ -25,30 +25,36 @@ import Animated, {
   withTiming,
   withSpring,
   runOnJS,
-  FadeIn,
-  FadeOut,
   SlideInDown,
   SlideOutDown,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { wp, hp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import {
+  colors,
+  spacing,
+  layout,
+  typography,
+  wp,
+  hp,
+  moderateScale,
+  sizes,
+} from '@/shared/theme';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { useCoverUrl } from '@/core/cache';
 import { getTitle, getAuthorName } from '@/shared/utils/metadata';
 
 // Mini disc size
-const MINI_DISC_SIZE = hp(6);
+const MINI_DISC_SIZE = sizes.coverMini;
 const MINI_HOLE_SIZE = MINI_DISC_SIZE * 0.12;
 const MINI_SPINDLE_SIZE = MINI_DISC_SIZE * 0.22;
 
 // Layout constants
-const MINI_PLAYER_HEIGHT = hp(8);
-const NAV_BAR_HEIGHT = hp(13.5); // Position directly above nav bar
-const SWIPE_THRESHOLD = -50; // Negative because swiping up
+const MINI_PLAYER_HEIGHT = layout.miniPlayerHeight;
+const NAV_BAR_HEIGHT = hp(13.5);
+const SWIPE_THRESHOLD = -50;
 
-const ACCENT = COLORS.accent;
-const TOUCH_TARGET = Math.max(44, hp(5));
+const TOUCH_TARGET = layout.minTouchTarget;
 
 // Mini CD Disc component
 const MiniCDDisc = ({
@@ -90,7 +96,7 @@ const MiniCDDisc = ({
             contentFit="cover"
           />
         ) : (
-          <View style={[miniDiscStyles.cover, { backgroundColor: '#333' }]} />
+          <View style={[miniDiscStyles.cover, { backgroundColor: colors.backgroundTertiary }]} />
         )}
       </Animated.View>
       {/* Chrome spindle center - static */}
@@ -150,7 +156,7 @@ const miniDiscStyles = StyleSheet.create({
     width: MINI_HOLE_SIZE,
     height: MINI_HOLE_SIZE,
     borderRadius: MINI_HOLE_SIZE / 2,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundTertiary,
   },
 });
 
@@ -295,7 +301,7 @@ export function GlobalMiniPlayer() {
                 accessibilityRole="button"
                 accessibilityLabel="Skip back 30 seconds"
               >
-                <RewindIcon size={skipIconSize} color="white" />
+                <RewindIcon size={skipIconSize} color={colors.textPrimary} />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -307,11 +313,11 @@ export function GlobalMiniPlayer() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small" color={ACCENT} />
+                  <ActivityIndicator size="small" color={colors.accent} />
                 ) : isPlaying ? (
-                  <Ionicons name="pause" size={playIconSize} color={ACCENT} />
+                  <Ionicons name="pause" size={playIconSize} color={colors.accent} />
                 ) : (
-                  <PlayIcon size={playIconSize} color={ACCENT} />
+                  <PlayIcon size={playIconSize} color={colors.accent} />
                 )}
               </TouchableOpacity>
             </View>
@@ -331,39 +337,39 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#000',
+    backgroundColor: colors.backgroundPrimary,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(102,102,102,0.5)',
+    borderTopColor: colors.border,
     overflow: 'hidden',
     zIndex: 9998,
   },
   innerContainer: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.cardBackground,
   },
   progressTrack: {
-    height: hp(0.4),
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    height: sizes.progressHeightMini,
+    backgroundColor: colors.progressTrack,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: ACCENT,
+    backgroundColor: colors.accent,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1),
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   textContainer: {
     flex: 1,
-    marginLeft: wp(3),
-    marginRight: wp(2),
+    marginLeft: spacing.md,
+    marginRight: spacing.sm,
   },
   title: {
-    color: COLORS.textPrimary,
-    fontSize: moderateScale(14),
+    ...typography.bodyMedium,
     fontWeight: '500',
+    color: colors.textPrimary,
   },
   controls: {
     flexDirection: 'row',
@@ -374,8 +380,8 @@ const styles = StyleSheet.create({
     height: TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: layout.minTouchTarget,
+    minHeight: layout.minTouchTarget,
   },
 });
 

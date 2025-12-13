@@ -19,7 +19,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Dimensions,
   Keyboard,
   Pressable,
 } from 'react-native';
@@ -37,14 +36,15 @@ import { BookCard } from '@/shared/components/BookCard';
 import { LibraryItem } from '@/core/types';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { fuzzyMatch, findSuggestions, expandAbbreviations } from '../utils/fuzzySearch';
+import { colors, wp, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BG_COLOR = '#000000';
-const CARD_COLOR = '#2a2a2a';
-const ACCENT = '#F4B60C';
-const GAP = 8;
-const CARD_RADIUS = 5;
-const PADDING = 16;
+const SCREEN_WIDTH = wp(100);
+const BG_COLOR = colors.backgroundPrimary;
+const CARD_COLOR = colors.backgroundTertiary;
+const ACCENT = colors.accent;
+const GAP = spacing.sm;
+const CARD_RADIUS = radius.sm;
+const PADDING = spacing.lg;
 
 const SEARCH_HISTORY_KEY = 'search_history_v1';
 const MAX_HISTORY = 10;

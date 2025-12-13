@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFavorite, useToggleFavorite } from '../hooks/useFavorites';
-import { theme } from '@/shared/theme';
+import { colors } from '@/shared/theme';
 
 interface FavoriteButtonProps {
   itemId: string;
@@ -157,7 +157,7 @@ export function FavoriteButton({
       <View
         style={[
           styles.toastContent,
-          { backgroundColor: isFavorite ? activeColor : theme.colors.neutral[600] },
+          { backgroundColor: isFavorite ? activeColor : colors.progressTrack },
         ]}
       >
         <Text style={styles.toastText}>{toastMessage}</Text>

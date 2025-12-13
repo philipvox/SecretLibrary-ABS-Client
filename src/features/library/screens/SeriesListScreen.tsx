@@ -13,7 +13,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
   RefreshControl,
   TextInput,
 } from 'react-native';
@@ -26,17 +25,80 @@ import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
 import { SeriesHeartButton } from '@/shared/components';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, wp, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const BG_COLOR = '#000000';
-const CARD_COLOR = '#2a2a2a';
-const ACCENT = '#F4B60C';
+const SCREEN_WIDTH = wp(100);
+const BG_COLOR = colors.backgroundPrimary;
+const CARD_COLOR = colors.backgroundTertiary;
+const ACCENT = colors.accent;
+const ACCENT_DIM = 'rgba(243,182,12,0.5)';
 const PADDING = 16;
 const GAP = 12;
 const COLUMNS = 2;
 const CARD_WIDTH = (SCREEN_WIDTH - PADDING * 2 - GAP) / COLUMNS;
 const COVER_SIZE = CARD_WIDTH * 0.55;
 const MAX_VISIBLE_BOOKS = 10;
+const MAX_PROGRESS_DOTS = 8;
+
+// Progress dot component
+function ProgressDot({ status, size = 5 }: { status: 'completed' | 'in_progress' | 'not_started'; size?: number }) {
+  const getColor = () => {
+    switch (status) {
+      case 'completed':
+        return ACCENT;
+      case 'in_progress':
+        return ACCENT_DIM;
+      default:
+        return 'rgba(255,255,255,0.25)';
+    }
+  };
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: getColor(),
+      }}
+    />
+  );
+}
+
+// Calculate series progress
+function getSeriesProgress(books: any[]) {
+  if (!books || books.length === 0) {
+    return { completed: 0, inProgress: 0, notStarted: 0, totalListened: 0, totalDuration: 0 };
+  }
+
+  let completed = 0;
+  let inProgress = 0;
+  let totalListened = 0;
+  let totalDuration = 0;
+
+  books.forEach(book => {
+    const progress = book.userMediaProgress?.progress || 0;
+    const duration = book.media?.duration || 0;
+    totalDuration += duration;
+    totalListened += duration * progress;
+
+    if (progress >= 0.95) {
+      completed++;
+    } else if (progress > 0) {
+      inProgress++;
+    }
+  });
+
+  const notStarted = books.length - completed - inProgress;
+  return { completed, inProgress, notStarted, totalListened, totalDuration };
+}
+
+function formatDurationShort(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
 
 type SortType = 'name' | 'bookCount';
 type SortDirection = 'asc' | 'desc';
@@ -217,6 +279,14 @@ export function SeriesListScreen() {
             ? (CARD_WIDTH - COVER_SIZE) / (numCovers - 1)
             : 0;
 
+          // Calculate progress
+          const progress = getSeriesProgress(series.books);
+          const hasProgress = progress.completed > 0 || progress.inProgress > 0;
+          const isComplete = progress.completed === series.bookCount;
+          const remainingDuration = progress.totalDuration - progress.totalListened;
+          const dotsToShow = Math.min(series.bookCount, MAX_PROGRESS_DOTS);
+          const showMoreIndicator = series.bookCount > MAX_PROGRESS_DOTS;
+
           return (
             <TouchableOpacity
               style={styles.seriesCard}
@@ -244,6 +314,12 @@ export function SeriesListScreen() {
                     />
                   </View>
                 ))}
+                {/* Complete badge */}
+                {isComplete && (
+                  <View style={styles.completeBadge}>
+                    <Icon name="checkmark" size={10} color="#000" set="ionicons" />
+                  </View>
+                )}
               </View>
 
               <View style={styles.titleRow}>
@@ -254,6 +330,39 @@ export function SeriesListScreen() {
                   style={styles.heartButton}
                 />
               </View>
+
+              {/* Progress dots - only show if there's progress */}
+              {hasProgress && (
+                <View style={styles.progressRow}>
+                  <View style={styles.progressDots}>
+                    {Array.from({ length: dotsToShow }).map((_, i) => {
+                      let status: 'completed' | 'in_progress' | 'not_started';
+                      if (i < progress.completed) {
+                        status = 'completed';
+                      } else if (i < progress.completed + progress.inProgress) {
+                        status = 'in_progress';
+                      } else {
+                        status = 'not_started';
+                      }
+                      return <ProgressDot key={i} status={status} />;
+                    })}
+                    {showMoreIndicator && (
+                      <Text style={styles.moreText}>+{series.bookCount - MAX_PROGRESS_DOTS}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.progressCount}>
+                    {progress.completed}/{series.bookCount}
+                  </Text>
+                </View>
+              )}
+
+              {/* Book count or remaining time */}
+              <Text style={styles.bookCountText} numberOfLines={1}>
+                {hasProgress && remainingDuration > 0
+                  ? `~${formatDurationShort(remainingDuration)} left`
+                  : `${series.bookCount} ${series.bookCount === 1 ? 'book' : 'books'}`
+                }
+              </Text>
 
               {isFavorite && <View style={styles.favoriteBadge} />}
             </TouchableOpacity>
@@ -393,6 +502,50 @@ const styles = StyleSheet.create({
     height: 26,
     justifyContent: 'flex-start',
     paddingTop: 1,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  progressDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  moreText: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.4)',
+    marginLeft: 2,
+  },
+  progressCount: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: ACCENT,
+  },
+  bookCountText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  completeBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   favoriteBadge: {
     position: 'absolute',

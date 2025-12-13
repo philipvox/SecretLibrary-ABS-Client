@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { wp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, moderateScale } from '@/shared/theme';
 
 interface HomeHeaderProps {
   /** Book title - null when nothing playing */
@@ -77,19 +77,19 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(17),
     fontWeight: '600',
     marginRight: wp(3),
   },
   time: {
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
     fontSize: moderateScale(14),
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontVariant: ['tabular-nums'],
   },
   author: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: moderateScale(14),
     marginTop: wp(1),
   },
@@ -101,13 +101,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(24),
     fontWeight: '700',
     textAlign: 'center',
   },
   emptySubtitle: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: moderateScale(14),
     textAlign: 'center',
     marginTop: wp(1),

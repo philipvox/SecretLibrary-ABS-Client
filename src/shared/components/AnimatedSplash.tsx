@@ -6,11 +6,12 @@
  */
 
 import React, { useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { colors, wp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ACCENT = '#F4B60C';
-const BG_COLOR = '#1a1a1a';
+const SCREEN_WIDTH = wp(100);
+const ACCENT = colors.accent;
+const BG_COLOR = colors.backgroundTertiary;
 const LOADING_BAR_WIDTH = SCREEN_WIDTH * 0.5;
 
 interface AnimatedSplashProps {

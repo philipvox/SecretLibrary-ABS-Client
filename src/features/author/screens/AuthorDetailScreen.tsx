@@ -18,7 +18,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
   FlatList,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
@@ -32,16 +31,14 @@ import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 import { usePlayerStore } from '@/features/player';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale } from '@/shared/theme';
 
 type AuthorDetailRouteParams = {
   AuthorDetail: { authorName: string } | { name: string };
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const BG_COLOR = '#0a0a0a';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundPrimary;
+const ACCENT = colors.accent;
 const AVATAR_SIZE = scale(120);
 const BIO_TRUNCATE_LENGTH = 150;
 

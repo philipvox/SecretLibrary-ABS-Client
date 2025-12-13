@@ -7,7 +7,7 @@
  * - PopularGenresSection: Top genres grid
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import {
   GenreCardCompact,
 } from './GenreCards';
 import { MetaCategory, GenreWithData } from '../constants/genreCategories';
+import { StackedCovers } from '@/shared/components';
+import { apiClient } from '@/core/api';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -56,6 +58,22 @@ export function MetaCategorySection({
     onToggle();
   }, [onToggle]);
 
+  // Get cover URLs from genres in this category (up to 3 unique covers)
+  const coverUrls = useMemo(() => {
+    const urls: string[] = [];
+    for (const genre of genres) {
+      for (const coverId of genre.coverIds) {
+        if (urls.length >= 3) break;
+        const url = apiClient.getItemCoverUrl(coverId);
+        if (!urls.includes(url)) {
+          urls.push(url);
+        }
+      }
+      if (urls.length >= 3) break;
+    }
+    return urls;
+  }, [genres]);
+
   return (
     <View style={styles.metaSection}>
       {/* Header */}
@@ -65,11 +83,14 @@ export function MetaCategorySection({
         activeOpacity={0.7}
       >
         <View style={styles.metaHeaderLeft}>
-          <View style={[styles.metaIcon, { backgroundColor: metaCategory.color + '20' }]}>
-            <Ionicons
-              name={metaCategory.icon as any}
-              size={18}
-              color={metaCategory.color}
+          {/* Stacked covers instead of icon - NNGroup research: visual scent */}
+          <View style={styles.metaCoversContainer}>
+            <StackedCovers
+              coverUrls={coverUrls}
+              size={28}
+              offset={6}
+              maxCovers={3}
+              borderRadius={4}
             />
           </View>
           <View>
@@ -125,7 +146,7 @@ export function YourGenresSection({
     <View style={styles.section}>
       {/* Header */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>YOUR GENRES</Text>
+        <Text style={styles.sectionTitle}>Your Genres</Text>
         {onSeeAll && (
           <TouchableOpacity onPress={onSeeAll}>
             <Text style={styles.seeAllText}>See all</Text>
@@ -170,7 +191,7 @@ export function PopularGenresSection({
     <View style={styles.section}>
       {/* Header */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>POPULAR GENRES</Text>
+        <Text style={styles.sectionTitle}>Popular Genres</Text>
       </View>
 
       {/* Horizontal Scroll - same as Your Genres */}
@@ -264,10 +285,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   seeAllText: {
     fontSize: 13,
@@ -297,13 +318,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  metaIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+  metaCoversContainer: {
+    width: 44, // Account for stacked offset
+    height: 42, // 28 * 1.5 = 42 for aspect ratio
     marginRight: 12,
+    justifyContent: 'center',
   },
   metaTitle: {
     fontSize: 16,

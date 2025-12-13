@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,9 +20,20 @@ import { useAllLibraryItems } from '@/features/search/hooks/useAllLibraryItems';
 import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
 import { extractGenres } from '@/shared/utils/genreUtils';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Create theme compat object for styles that use old theme structure
+const theme = {
+  colors: {
+    text: { primary: colors.textPrimary, secondary: colors.textSecondary, tertiary: colors.textTertiary },
+    background: { primary: colors.backgroundPrimary, secondary: colors.backgroundSecondary },
+    border: { light: colors.borderLight },
+    neutral: { 200: colors.progressTrack },
+    primary: { 50: colors.accentSubtle, 500: colors.accent, 700: colors.accentDark },
+  },
+  spacing: { 2: spacing.xs, 3: spacing.sm, 4: spacing.md, 5: spacing.lg, 6: spacing.xl, 8: spacing.xxl },
+  radius: { medium: radius.md },
+};
 
 interface Question {
   id: string;

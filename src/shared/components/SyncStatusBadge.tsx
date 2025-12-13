@@ -8,7 +8,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSyncStatus } from '@/core/hooks/useSyncStatus';
-import { theme } from '@/shared/theme';
+import { colors } from '@/shared/theme';
 import Animated, {
   useAnimatedStyle,
   withRepeat,
@@ -82,9 +82,9 @@ export function SyncStatusBadge({
       default:
         if (pendingCount > 0) {
           return {
-            icon: <Feather name="cloud" size={iconSize} color={theme.colors.text.secondary} />,
+            icon: <Feather name="cloud" size={iconSize} color={colors.textSecondary} />,
             text: `${pendingCount} pending`,
-            color: theme.colors.text.secondary,
+            color: colors.textSecondary,
             bgColor: 'rgba(255, 255, 255, 0.08)',
           };
         }

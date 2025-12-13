@@ -11,13 +11,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { COLORS, LAYOUT } from '@/features/home/homeDesign';
+import { colors, scale, layout } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const COLORS = { playButton: colors.accent, textSecondary: colors.textSecondary };
+const LAYOUT = { carouselPaddingHorizontal: layout.screenPaddingH };
 
 interface QuickFilterChipsProps {
   chips: string[];

@@ -16,7 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
 import { LibraryItem } from '@/core/types';
-import { theme } from '@/shared/theme';
+import { colors } from '@/shared/theme';
 import Animated, {
   useAnimatedStyle,
   withRepeat,
@@ -75,15 +75,15 @@ export function DownloadButton({
     if (isDownloading) {
       const progressPct = Math.round(progress * 100);
       return {
-        icon: <Feather name="pause" size={iconSize} color={theme.colors.accent.primary} />,
-        color: theme.colors.accent.primary,
+        icon: <Feather name="pause" size={iconSize} color={colors.accent} />,
+        color: colors.accent,
         label: progressPct === 0 ? 'Preparing...' : `${progressPct}%`,
       };
     }
     if (isPending) {
       return {
-        icon: <ActivityIndicator size="small" color={theme.colors.text.secondary} />,
-        color: theme.colors.text.secondary,
+        icon: <ActivityIndicator size="small" color={colors.textSecondary} />,
+        color: colors.textSecondary,
         label: 'Queued',
       };
     }
@@ -102,8 +102,8 @@ export function DownloadButton({
       };
     }
     return {
-      icon: <Feather name="download" size={iconSize} color={theme.colors.text.secondary} />,
-      color: theme.colors.text.secondary,
+      icon: <Feather name="download" size={iconSize} color={colors.textSecondary} />,
+      color: colors.textSecondary,
       label: 'Download',
     };
   };

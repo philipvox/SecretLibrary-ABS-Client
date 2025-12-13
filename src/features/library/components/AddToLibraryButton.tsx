@@ -6,7 +6,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useMyLibraryStore } from '../stores/myLibraryStore';
 import { Icon } from '@/shared/components/Icon';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius } from '@/shared/theme';
 
 interface AddToLibraryButtonProps {
   bookId: string;
@@ -38,11 +38,11 @@ export function AddToLibraryButton({
         onPress={handlePress}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Icon 
-          name={inLibrary ? "heart" : "heart-outline"} 
-          size={iconSize} 
-          color={inLibrary ? "#EF4444" : theme.colors.text.secondary} 
-          set="ionicons" 
+        <Icon
+          name={inLibrary ? "heart" : "heart-outline"}
+          size={iconSize}
+          color={inLibrary ? "#EF4444" : colors.textSecondary}
+          set="ionicons"
         />
       </TouchableOpacity>
     );
@@ -58,11 +58,11 @@ export function AddToLibraryButton({
       ]} 
       onPress={handlePress}
     >
-      <Icon 
-        name={inLibrary ? "heart" : "heart-outline"} 
-        size={size === 'small' ? 16 : 20} 
-        color={inLibrary ? '#FFFFFF' : theme.colors.text.primary} 
-        set="ionicons" 
+      <Icon
+        name={inLibrary ? "heart" : "heart-outline"}
+        size={size === 'small' ? 16 : 20}
+        color={inLibrary ? '#FFFFFF' : colors.textPrimary}
+        set="ionicons"
       />
       <Text style={[
         styles.buttonText,
@@ -80,27 +80,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.background.secondary,
-    borderRadius: theme.radius.medium,
-    paddingVertical: theme.spacing[3],
-    paddingHorizontal: theme.spacing[4],
-    gap: theme.spacing[2],
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
   },
   buttonActive: {
     backgroundColor: '#EF4444',
   },
   buttonSmall: {
-    paddingVertical: theme.spacing[2],
-    paddingHorizontal: theme.spacing[3],
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   buttonLarge: {
-    paddingVertical: theme.spacing[4],
-    paddingHorizontal: theme.spacing[5],
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   buttonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
   buttonTextActive: {
     color: '#FFFFFF',

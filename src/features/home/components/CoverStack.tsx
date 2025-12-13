@@ -7,8 +7,11 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { COLORS, DIMENSIONS, SHADOWS } from '../homeDesign';
+import { colors, radius } from '@/shared/theme';
 import { CoverStackProps } from '../types';
+
+const COLORS = { controlButtonBg: colors.cardBackground };
+const DIMENSIONS = { smallRadius: radius.xs };
 
 export function CoverStack({
   covers,

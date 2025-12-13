@@ -12,7 +12,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Modal,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
@@ -20,9 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore, useCurrentChapterIndex } from '../stores/playerStore';
 import { haptics } from '@/core/native/haptics';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ACCENT_COLOR = '#F4B60C';
+import { colors, spacing, radius, layout } from '@/shared/theme';
 
 // =============================================================================
 // CONSTANTS
@@ -184,9 +181,9 @@ export function SleepTimerSheet({ visible, onClose }: SleepTimerSheetProps) {
                 setSliderValue(value);
                 setEndOfChapter(false);
               }}
-              minimumTrackTintColor={ACCENT_COLOR}
-              maximumTrackTintColor="rgba(255,255,255,0.2)"
-              thumbTintColor={ACCENT_COLOR}
+              minimumTrackTintColor={colors.accent}
+              maximumTrackTintColor={colors.progressTrack}
+              thumbTintColor={colors.accent}
             />
             <View style={styles.sliderLabels}>
               <Text style={styles.sliderLabel}>Off</Text>
@@ -275,46 +272,46 @@ export function SleepTimerSheet({ visible, onClose }: SleepTimerSheetProps) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.medium,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: colors.backgroundTertiary,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   headerAction: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: ACCENT_COLOR,
-    borderRadius: 16,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.accent,
+    borderRadius: radius.lg,
   },
   headerActionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
   valueText: {
     fontSize: 48,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sliderContainer: {
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   slider: {
     width: '100%',
@@ -323,74 +320,74 @@ const styles = StyleSheet.create({
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    paddingHorizontal: spacing.xs,
     marginTop: -4,
   },
   sliderLabel: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
   presetRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   presetButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.cardBackground,
     alignItems: 'center',
   },
   presetButtonActive: {
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
   },
   presetText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   presetTextActive: {
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
   endOfChapterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: spacing.sm,
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.cardBackground,
+    marginBottom: spacing.sm,
   },
   endOfChapterButtonActive: {
-    backgroundColor: ACCENT_COLOR,
+    backgroundColor: colors.accent,
   },
   endOfChapterText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   endOfChapterTextActive: {
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
   endOfChapterEstimate: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
   endOfChapterEstimateActive: {
     color: 'rgba(0,0,0,0.5)',
   },
   cancelButton: {
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.md,
     backgroundColor: 'rgba(255,80,80,0.2)',
     alignItems: 'center',
   },
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FF5050',
+    color: colors.error,
   },
 });
 

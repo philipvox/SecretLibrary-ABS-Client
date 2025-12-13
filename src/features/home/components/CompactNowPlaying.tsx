@@ -12,17 +12,20 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { COLORS } from '../homeDesign';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import {
+  colors,
+  spacing,
+  radius,
+  scale,
+  elevation,
+} from '@/shared/theme';
 
 // Button assets
 const RewindButtonImage = require('../assets/rewind-button.png');
@@ -32,8 +35,8 @@ const PauseButtonImage = require('../assets/pause-button.png');
 
 const COVER_SIZE = scale(80);
 const BUTTON_SIZE = scale(44);
-const CARD_PADDING = scale(16);
-const ACCENT = '#F4B60C';
+const CARD_PADDING = spacing.lg;
+const ACCENT = colors.accent;
 
 interface CompactNowPlayingProps {
   book: LibraryItem;
@@ -141,6 +144,8 @@ export function CompactNowPlaying({
           contentFit="cover"
           blurRadius={40}
         />
+        {/* BlurView for Android (blurRadius only works on iOS) */}
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
           colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
           style={StyleSheet.absoluteFill}
@@ -274,10 +279,10 @@ export function NothingPlayingCard({ onBrowse }: { onBrowse: () => void }) {
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: scale(16),
-    borderRadius: scale(16),
+    marginHorizontal: spacing.lg,
+    borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundTertiary,
   },
   backgroundImage: {
     ...StyleSheet.absoluteFillObject,
@@ -292,13 +297,9 @@ const styles = StyleSheet.create({
   coverContainer: {
     width: COVER_SIZE,
     height: COVER_SIZE,
-    borderRadius: scale(8),
+    borderRadius: radius.sm,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...elevation.medium,
   },
   cover: {
     width: '100%',
@@ -306,24 +307,24 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     flex: 1,
-    marginLeft: scale(14),
+    marginLeft: spacing.md,
     justifyContent: 'center',
   },
   title: {
     fontSize: scale(16),
     fontWeight: '600',
-    color: '#fff',
-    marginBottom: scale(4),
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   author: {
     fontSize: scale(13),
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: scale(2),
+    color: colors.textSecondary,
+    marginBottom: spacing.xxs,
   },
   chapter: {
     fontSize: scale(12),
-    color: 'rgba(255,255,255,0.5)',
-    marginBottom: scale(8),
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -333,18 +334,18 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     flex: 1,
     height: scale(4),
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: scale(2),
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.xxs,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: ACCENT,
-    borderRadius: scale(2),
+    backgroundColor: colors.progressFill,
+    borderRadius: radius.xxs,
   },
   timeRemaining: {
     fontSize: scale(11),
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
     minWidth: scale(60),
     textAlign: 'right',
   },
@@ -391,38 +392,38 @@ const styles = StyleSheet.create({
 
   // Empty state styles
   emptyContainer: {
-    marginHorizontal: scale(16),
-    borderRadius: scale(16),
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.cardBackground,
     overflow: 'hidden',
   },
   emptyContent: {
     alignItems: 'center',
-    padding: scale(24),
-    gap: scale(8),
+    padding: spacing.xxl,
+    gap: spacing.sm,
   },
   emptyTitle: {
     fontSize: scale(16),
     fontWeight: '600',
-    color: '#fff',
-    marginTop: scale(8),
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
   },
   emptySubtitle: {
     fontSize: scale(13),
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: scale(18),
   },
   emptyButton: {
-    marginTop: scale(12),
-    backgroundColor: ACCENT,
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(10),
-    borderRadius: scale(20),
+    marginTop: spacing.md,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.xl,
   },
   emptyButtonText: {
     fontSize: scale(13),
     fontWeight: '600',
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
 });

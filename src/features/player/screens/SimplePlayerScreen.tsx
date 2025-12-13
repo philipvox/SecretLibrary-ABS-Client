@@ -14,7 +14,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   StatusBar,
   Animated,
@@ -33,8 +32,10 @@ import { useCoverUrl } from '@/core/cache';
 import { haptics } from '@/core/native/haptics';
 import { ChapterProgressBar } from '../components/ChapterProgressBar';
 import { getSeriesName, getSeriesWithSequence } from '@/shared/utils/metadata';
+import { colors, spacing, radius, wp, hp, layout } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
 
 // =============================================================================
 // TYPES
@@ -299,7 +300,7 @@ export function SimplePlayerScreen() {
       <View style={styles.sheetHeader}>
         <Text style={styles.sheetTitle}>Playback Speed</Text>
         <TouchableOpacity onPress={() => setActiveSheet('none')} style={styles.sheetClose}>
-          <Ionicons name="close" size={24} color="#FFF" />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
       <View style={styles.optionsGrid}>
@@ -351,7 +352,7 @@ export function SimplePlayerScreen() {
                 {option.label}
               </Text>
               {currentSleepMins === option.value && (
-                <Ionicons name="checkmark" size={20} color="#F4B60C" />
+                <Ionicons name="checkmark" size={20} color={colors.accent} />
               )}
             </TouchableOpacity>
           ))}
@@ -365,7 +366,7 @@ export function SimplePlayerScreen() {
       <View style={styles.sheetHeader}>
         <Text style={styles.sheetTitle}>Chapters</Text>
         <TouchableOpacity onPress={() => setActiveSheet('none')} style={styles.sheetClose}>
-          <Ionicons name="close" size={24} color="#FFF" />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
       <View style={styles.chaptersList}>
@@ -394,7 +395,7 @@ export function SimplePlayerScreen() {
               </Text>
             </View>
             {index === chapterIndex && (
-              <Ionicons name="volume-high" size={16} color="#F4B60C" />
+              <Ionicons name="volume-high" size={16} color={colors.accent} />
             )}
           </TouchableOpacity>
         ))}
@@ -415,12 +416,18 @@ export function SimplePlayerScreen() {
     >
       <StatusBar barStyle="light-content" />
 
-      {/* Background */}
+      {/* Background - same pattern as HomeScreen */}
       <View style={StyleSheet.absoluteFill}>
         {coverUrl && (
-          <Image source={coverUrl} style={styles.backgroundImage} blurRadius={25} />
+          <Image
+            source={coverUrl}
+            style={StyleSheet.absoluteFill}
+            blurRadius={50}
+            contentFit="cover"
+          />
         )}
-        <BlurView intensity={80} style={StyleSheet.absoluteFill} tint="dark" />
+        {/* BlurView overlay for Android (blurRadius only works on iOS) */}
+        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
           colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)', '#000']}
           style={StyleSheet.absoluteFill}
@@ -432,7 +439,7 @@ export function SimplePlayerScreen() {
         <View style={styles.swipeIndicator} />
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={handleClose} style={styles.headerButton}>
-            <Ionicons name="chevron-down" size={28} color="#FFF" />
+            <Ionicons name="chevron-down" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
             Now Playing
@@ -460,11 +467,11 @@ export function SimplePlayerScreen() {
               onPress={handleSeriesPress}
               activeOpacity={0.7}
             >
-              <Ionicons name="library-outline" size={12} color="#F4B60C" />
+              <Ionicons name="library-outline" size={12} color={colors.accent} />
               <Text style={styles.seriesText} numberOfLines={1}>
                 {seriesWithSequence}
               </Text>
-              <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="chevron-forward" size={12} color={colors.textMuted} />
             </TouchableOpacity>
           )}
           {currentChapter && (
@@ -517,11 +524,11 @@ export function SimplePlayerScreen() {
         {/* Main Controls */}
         <View style={styles.controls}>
           <TouchableOpacity onPress={handlePrevChapter} style={styles.controlButton}>
-            <Ionicons name="play-skip-back" size={28} color="#FFF" />
+            <Ionicons name="play-skip-back" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleSkipBack} style={styles.controlButton}>
             <View style={styles.skipButtonContent}>
-              <Ionicons name="play-back" size={32} color="#FFF" />
+              <Ionicons name="play-back" size={32} color={colors.textPrimary} />
               <Text style={styles.skipLabel}>30</Text>
             </View>
           </TouchableOpacity>
@@ -533,17 +540,17 @@ export function SimplePlayerScreen() {
             <Ionicons
               name={isPlaying ? 'pause' : 'play'}
               size={40}
-              color="#000"
+              color={colors.backgroundPrimary}
             />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleSkipForward} style={styles.controlButton}>
             <View style={styles.skipButtonContent}>
-              <Ionicons name="play-forward" size={32} color="#FFF" />
+              <Ionicons name="play-forward" size={32} color={colors.textPrimary} />
               <Text style={styles.skipLabel}>30</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleNextChapter} style={styles.controlButton}>
-            <Ionicons name="play-skip-forward" size={28} color="#FFF" />
+            <Ionicons name="play-skip-forward" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
@@ -553,7 +560,7 @@ export function SimplePlayerScreen() {
             style={styles.actionButton}
             onPress={() => setActiveSheet('speed')}
           >
-            <Ionicons name="speedometer-outline" size={22} color="#FFF" />
+            <Ionicons name="speedometer-outline" size={22} color={colors.textPrimary} />
             <Text style={styles.actionLabel}>{playbackRate}x</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -561,10 +568,10 @@ export function SimplePlayerScreen() {
             onPress={() => setActiveSheet('sleep')}
           >
             <View style={styles.actionIconContainer}>
-              <Ionicons name="moon-outline" size={22} color={sleepTimer ? '#F4B60C' : '#FFF'} />
+              <Ionicons name="moon-outline" size={22} color={sleepTimer ? colors.accent : colors.textPrimary} />
               {sleepTimerState.isShakeDetectionActive && (
                 <View style={styles.shakeBadge}>
-                  <Ionicons name="phone-portrait-outline" size={10} color="#000" />
+                  <Ionicons name="phone-portrait-outline" size={10} color={colors.backgroundPrimary} />
                 </View>
               )}
             </View>
@@ -579,7 +586,7 @@ export function SimplePlayerScreen() {
             style={styles.actionButton}
             onPress={() => setActiveSheet('chapters')}
           >
-            <Ionicons name="list-outline" size={22} color="#FFF" />
+            <Ionicons name="list-outline" size={22} color={colors.textPrimary} />
             <Text style={styles.actionLabel}>Chapters</Text>
           </TouchableOpacity>
         </View>
@@ -614,24 +621,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#000',
-  },
-  backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.6,
+    backgroundColor: colors.backgroundPrimary,
   },
 
   // Header
   header: {
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
   },
   swipeIndicator: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginBottom: 8,
+    backgroundColor: colors.textMuted,
+    marginBottom: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -639,8 +642,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   headerButton: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -649,74 +652,74 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
   },
 
   // Content
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
   },
 
   // Cover
   coverContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   cover: {
     width: SCREEN_WIDTH - 80,
     height: SCREEN_WIDTH - 80,
-    borderRadius: 8,
-    backgroundColor: '#333',
+    borderRadius: radius.sm,
+    backgroundColor: colors.backgroundTertiary,
   },
 
   // Book Info
   bookInfo: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   bookTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   bookAuthor: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 6,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   seriesBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: 'rgba(200,255,0,0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    gap: 6,
-    marginBottom: 6,
+    backgroundColor: colors.accentSubtle,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.lg,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
   seriesText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#F4B60C',
+    color: colors.accent,
     maxWidth: 200,
   },
   chapterName: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 
   // Scrubber
   scrubberContainer: {
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   scrubberTrack: {
     height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: colors.progressTrack,
     borderRadius: 2,
     position: 'relative',
   },
@@ -725,7 +728,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: '#F4B60C',
+    backgroundColor: colors.progressFill,
     borderRadius: 2,
   },
   scrubberThumb: {
@@ -734,17 +737,17 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.textPrimary,
     marginLeft: -8,
   },
   timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   timeText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
 
@@ -753,8 +756,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
-    gap: 16,
+    marginBottom: spacing['3xl'],
+    gap: spacing.md,
   },
   controlButton: {
     width: 48,
@@ -767,24 +770,24 @@ const styles = StyleSheet.create({
   },
   skipLabel: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
     marginTop: -4,
   },
   playButton: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#F4B60C',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 16,
+    marginHorizontal: spacing.md,
   },
 
   // Quick Actions
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 32,
+    gap: spacing['3xl'],
   },
   actionButton: {
     alignItems: 'center',
@@ -792,11 +795,11 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   actionLabelActive: {
-    color: '#F4B60C',
+    color: colors.accent,
   },
   actionIconContainer: {
     position: 'relative',
@@ -805,8 +808,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -8,
-    backgroundColor: '#F4B60C',
-    borderRadius: 8,
+    backgroundColor: colors.accent,
+    borderRadius: radius.sm,
     width: 16,
     height: 16,
     justifyContent: 'center',
@@ -814,7 +817,7 @@ const styles = StyleSheet.create({
   },
   shakeHint: {
     fontSize: 9,
-    color: '#F4B60C',
+    color: colors.accent,
     marginTop: 2,
   },
 
@@ -823,30 +826,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    marginTop: -16,
-    marginBottom: 16,
-    paddingVertical: 4,
+    gap: spacing.xs,
+    marginTop: -spacing.md,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.xs,
   },
   progressModeText: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 
   // Bottom Sheet
   sheetOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.medium,
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 8,
+    backgroundColor: colors.backgroundTertiary,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: spacing.sm,
   },
   sheet: {
-    padding: 20,
+    padding: spacing.lg,
   },
   chaptersSheet: {
     maxHeight: SCREEN_HEIGHT * 0.6,
@@ -855,16 +858,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   sheetClose: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -873,48 +876,48 @@ const styles = StyleSheet.create({
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.sm,
   },
   optionButton: {
     width: (SCREEN_WIDTH - 80) / 3,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   optionButtonActive: {
-    backgroundColor: '#F4B60C',
+    backgroundColor: colors.accent,
   },
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   optionTextActive: {
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
 
   // Options List (Sleep)
   optionsList: {
-    gap: 4,
+    gap: spacing.xs,
   },
   listOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
   },
   listOptionActive: {
-    backgroundColor: 'rgba(200,255,0,0.1)',
+    backgroundColor: colors.accentSubtle,
   },
   listOptionText: {
     fontSize: 16,
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   listOptionTextActive: {
-    color: '#F4B60C',
+    color: colors.accent,
     fontWeight: '600',
   },
 
@@ -925,34 +928,34 @@ const styles = StyleSheet.create({
   chapterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
   },
   chapterItemActive: {
-    backgroundColor: 'rgba(200,255,0,0.1)',
+    backgroundColor: colors.accentSubtle,
   },
   chapterNumber: {
     width: 28,
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
   chapterInfo: {
     flex: 1,
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   chapterTitle: {
     fontSize: 15,
-    color: '#FFF',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   chapterTitleActive: {
-    color: '#F4B60C',
+    color: colors.accent,
     fontWeight: '600',
   },
   chapterDuration: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
   },
 });
 

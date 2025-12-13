@@ -1,6 +1,6 @@
 /**
  * Standard button component with variants and states
- * 
+ *
  * Variants: primary, secondary, ghost, danger
  * Sizes: small, medium, large
  * States: loading, disabled
@@ -13,9 +13,14 @@ import {
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
-  TextStyle,
 } from 'react-native';
-import { theme } from '../theme';
+import {
+  colors,
+  spacing,
+  radius,
+  typography,
+  elevation,
+} from '@/shared/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type ButtonSize = 'small' | 'medium' | 'large';
@@ -62,7 +67,7 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' || variant === 'danger' ? '#FFFFFF' : theme.colors.primary[500]}
+          color={variant === 'primary' || variant === 'danger' ? colors.backgroundPrimary : colors.accent}
           size="small"
         />
       ) : (
@@ -86,42 +91,42 @@ const styles = StyleSheet.create({
   base: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.radius.large,
+    borderRadius: radius.button,
     borderWidth: 0,
   },
 
   // Variants
   primary: {
-    backgroundColor: theme.colors.primary[500],
-    ...theme.elevation.small,
+    backgroundColor: colors.accent,
+    ...elevation.small,
   },
   secondary: {
-    backgroundColor: theme.colors.neutral[100],
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: colors.border,
   },
   ghost: {
     backgroundColor: 'transparent',
   },
   danger: {
-    backgroundColor: theme.colors.semantic.error,
-    ...theme.elevation.small,
+    backgroundColor: colors.error,
+    ...elevation.small,
   },
 
   // Sizes
   smallSize: {
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     minHeight: 36,
   },
   mediumSize: {
-    paddingHorizontal: theme.spacing[6],
-    paddingVertical: theme.spacing[3],
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
     minHeight: 44,
   },
   largeSize: {
-    paddingHorizontal: theme.spacing[8],
-    paddingVertical: theme.spacing[4],
+    paddingHorizontal: spacing['3xl'],
+    paddingVertical: spacing.lg,
     minHeight: 52,
   },
 
@@ -132,37 +137,42 @@ const styles = StyleSheet.create({
 
   // Text variants
   primaryText: {
-    ...theme.textStyles.button,
-    color: theme.colors.text.inverse,
+    ...typography.labelLarge,
+    fontWeight: '600',
+    color: colors.backgroundPrimary,
   },
   secondaryText: {
-    ...theme.textStyles.button,
-    color: theme.colors.text.primary,
+    ...typography.labelLarge,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
   ghostText: {
-    ...theme.textStyles.button,
-    color: theme.colors.primary[500],
+    ...typography.labelLarge,
+    fontWeight: '600',
+    color: colors.accent,
   },
   dangerText: {
-    ...theme.textStyles.button,
-    color: theme.colors.text.inverse,
+    ...typography.labelLarge,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
 
   // Text sizes
   smallText: {
-    fontSize: theme.fontSize.sm,
+    ...typography.labelMedium,
   },
   mediumText: {
-    fontSize: theme.fontSize.base,
+    ...typography.labelLarge,
   },
   largeText: {
-    fontSize: theme.fontSize.lg,
+    ...typography.bodyLarge,
+    fontWeight: '600',
   },
 
   // States
   disabled: {
     opacity: 0.5,
-    ...theme.elevation.none,
+    ...elevation.none,
   },
   disabledText: {
     opacity: 0.5,

@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NarratorInfo } from '../services/narratorAdapter';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius, elevation } from '@/shared/theme';
 import { Icon } from '@/shared/components/Icon';
 
 interface NarratorCardProps {
@@ -26,11 +26,11 @@ export function NarratorCard({ narrator }: NarratorCardProps) {
 
   const colorIndex = narrator.name.charCodeAt(0) % 5;
   const avatarColors = [
-    theme.colors.primary[500],
-    theme.colors.semantic.success,
-    theme.colors.semantic.warning,
-    theme.colors.semantic.info,
-    theme.colors.neutral[600],
+    colors.accent,
+    '#4CAF50',
+    '#FF9800',
+    '#2196F3',
+    colors.progressTrack,
   ];
 
   return (
@@ -57,35 +57,35 @@ export function NarratorCard({ narrator }: NarratorCardProps) {
 const styles = StyleSheet.create({
   container: {
     width: '48%',
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.md,
   },
   pressed: {
     opacity: 0.7,
   },
   avatar: {
     aspectRatio: 1,
-    borderRadius: theme.radius.large,
+    borderRadius: radius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.elevation.small,
+    ...elevation.small,
   },
   initials: {
     fontSize: 36,
     fontWeight: '700',
-    color: theme.colors.text.inverse,
+    color: '#FFFFFF',
   },
   info: {
-    marginTop: theme.spacing[2],
+    marginTop: spacing.xs,
   },
   name: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[1],
+    color: colors.textPrimary,
+    marginBottom: 4,
     lineHeight: 20,
   },
   bookCount: {
     fontSize: 13,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
   },
 });

@@ -12,7 +12,7 @@ import {
   TextInputProps as RNTextInputProps,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { theme } from '../../theme';
+import { colors, spacing, radius } from '../../theme';
 
 interface SearchInputProps extends Omit<RNTextInputProps, 'style'> {
   value: string;
@@ -58,7 +58,7 @@ export const SearchInput = forwardRef<RNTextInput, SearchInputProps>(
         <Feather
           name="search"
           size={20}
-          color={theme.colors.text.tertiary}
+          color={colors.textTertiary}
           style={styles.searchIcon}
         />
 
@@ -68,7 +68,7 @@ export const SearchInput = forwardRef<RNTextInput, SearchInputProps>(
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={theme.colors.text.tertiary}
+          placeholderTextColor={colors.textTertiary}
           returnKeyType="search"
           onSubmitEditing={onSubmit}
           autoCapitalize="none"
@@ -90,7 +90,7 @@ export const SearchInput = forwardRef<RNTextInput, SearchInputProps>(
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="x" size={18} color={theme.colors.text.tertiary} />
+            <Feather name="x" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
         )}
       </View>
@@ -104,27 +104,27 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.neutral[100],
-    borderRadius: theme.radius.full,
+    backgroundColor: colors.progressTrack,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: colors.borderLight,
     minHeight: 44,
-    paddingHorizontal: theme.spacing[3],
+    paddingHorizontal: spacing.sm,
   },
   containerFocused: {
-    borderColor: theme.colors.primary[500],
+    borderColor: colors.accent,
   },
   searchIcon: {
-    marginRight: theme.spacing[2],
+    marginRight: spacing.xs,
   },
   input: {
     flex: 1,
-    ...theme.textStyles.body,
-    color: theme.colors.text.primary,
-    paddingVertical: theme.spacing[2],
+    fontSize: 15,
+    color: colors.textPrimary,
+    paddingVertical: spacing.xs,
   },
   clearButton: {
-    marginLeft: theme.spacing[2],
-    padding: theme.spacing[1],
+    marginLeft: spacing.xs,
+    padding: 4,
   },
 });

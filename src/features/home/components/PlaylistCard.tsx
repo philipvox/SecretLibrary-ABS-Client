@@ -9,14 +9,13 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { apiClient } from '@/core/api';
-import { COLORS } from '../homeDesign';
+import { colors, scale } from '@/shared/theme';
 import { PlaylistCardProps } from '../types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const COLORS = { textPrimary: colors.textPrimary };
 
 export function PlaylistCard({ playlist, onPress, onLongPress }: PlaylistCardProps) {
   // Get cover URLs for first 4 items

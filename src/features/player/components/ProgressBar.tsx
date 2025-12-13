@@ -10,6 +10,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import Animated from 'react-native-reanimated';
 import { usePlayerStore, useCurrentChapter } from '../stores/playerStore';
+import { colors, spacing, layout } from '@/shared/theme';
 
 function formatTime(seconds: number): string {
   if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '0:00';
@@ -31,9 +32,9 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({
-  textColor = '#999',
-  trackColor = 'rgba(255,255,255,0.2)',
-  fillColor = '#fff',
+  textColor = colors.textTertiary,
+  trackColor = colors.progressTrack,
+  fillColor = colors.textPrimary,
   mode = 'bar',
 }: ProgressBarProps) {
   const { position, duration, seekTo, progressMode, isSeeking, seekPosition } = usePlayerStore();
@@ -158,7 +159,7 @@ export function ProgressBar({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    paddingHorizontal: 20,
+    paddingHorizontal: layout.screenPaddingH,
   },
   trackContainer: {
     height: 30,
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   timeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   timeText: {
     fontSize: 12,

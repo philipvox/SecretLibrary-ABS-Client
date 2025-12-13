@@ -12,7 +12,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -20,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
 import { Icon } from '@/shared/components/Icon';
-import { COLORS, DIMENSIONS, LAYOUT, SHADOWS } from '@/features/home/homeDesign';
+import { colors, scale, spacing, radius, layout, elevation } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/features/completion';
 import { usePlayerStore } from '@/features/player';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
@@ -29,13 +28,10 @@ import { apiClient } from '@/core/api';
 import { haptics } from '@/core/native/haptics';
 import { HeroRecommendation } from '../types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
 // Immersive hero with larger cover
 const COVER_SIZE = scale(250); // Square cover
 
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 // Format duration
 function formatDuration(seconds: number): string {
@@ -160,7 +156,7 @@ export function HeroSection({ hero }: HeroSectionProps) {
       <View style={styles.infoContainer}>
         {/* Recommendation reason */}
         <View style={styles.reasonRow}>
-          <Icon name="sparkles" size={scale(12)} color={COLORS.playButton} set="ionicons" />
+          <Icon name="sparkles" size={scale(12)} color={colors.accent} set="ionicons" />
           <Text style={styles.reason}>{reason || 'Recommended for you'}</Text>
         </View>
 
@@ -170,7 +166,7 @@ export function HeroSection({ hero }: HeroSectionProps) {
         {/* Meta info row */}
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Icon name="time-outline" size={scale(12)} color={COLORS.textTertiary} set="ionicons" />
+            <Icon name="time-outline" size={scale(12)} color={colors.textTertiary} set="ionicons" />
             <Text style={styles.metaText}>{formatDuration(book.duration)}</Text>
           </View>
           {book.genres[0] && (
@@ -278,24 +274,19 @@ export function HeroSection({ hero }: HeroSectionProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingTop: scale(8),
-    paddingBottom: scale(16),
-    marginBottom: DIMENSIONS.sectionGap,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    marginBottom: layout.sectionGap,
   },
   coverWrapper: {
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   coverContainer: {
     width: COVER_SIZE,
     height: COVER_SIZE,
-    borderRadius: scale(12),
+    borderRadius: radius.md,
     overflow: 'hidden',
-    ...SHADOWS.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
+    ...elevation.large,
   },
   cover: {
     width: '100%',
@@ -303,55 +294,55 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     alignItems: 'center',
-    paddingHorizontal: LAYOUT.carouselPaddingHorizontal,
+    paddingHorizontal: layout.screenPaddingH,
     width: '100%',
   },
   reasonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(6),
-    marginBottom: scale(8),
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   reason: {
     fontSize: scale(11),
-    color: COLORS.playButton,
+    color: colors.accent,
     fontWeight: '500',
     letterSpacing: 0.3,
   },
   title: {
     fontSize: scale(20),
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
     lineHeight: scale(26),
-    marginBottom: scale(4),
+    marginBottom: spacing.xs,
   },
   author: {
     fontSize: scale(14),
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: scale(8),
+    marginBottom: spacing.sm,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(4),
+    gap: spacing.xs,
   },
   metaDot: {
     width: scale(3),
     height: scale(3),
     borderRadius: scale(1.5),
-    backgroundColor: COLORS.textTertiary,
-    marginHorizontal: scale(8),
+    backgroundColor: colors.textTertiary,
+    marginHorizontal: spacing.sm,
   },
   metaText: {
     fontSize: scale(12),
-    color: COLORS.textTertiary,
+    color: colors.textTertiary,
   },
   actionRow: {
     flexDirection: 'row',

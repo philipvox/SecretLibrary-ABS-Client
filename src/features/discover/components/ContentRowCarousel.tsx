@@ -12,26 +12,21 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Dimensions,
   ListRenderItem,
-  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
 import { Icon } from '@/shared/components/Icon';
-import { COLORS, DIMENSIONS, LAYOUT } from '@/features/home/homeDesign';
+import { colors, scale, spacing, radius, layout } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/features/completion';
 import { BookSummary, ContentRow } from '../types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 // Card dimensions - smaller square covers with more spacing
 const CARD_WIDTH = scale(100); // Smaller than default 125
 const CARD_HEIGHT = CARD_WIDTH; // Square
 const GAP = scale(14); // More spacing between cards
-const PADDING = LAYOUT.carouselPaddingHorizontal;
+const PADDING = layout.screenPaddingH;
 
 // Format duration
 function formatDuration(seconds: number): string {
@@ -67,7 +62,7 @@ const DiscoverBookCard = React.memo(function DiscoverBookCard({ book, onPress }:
         {/* Downloaded badge */}
         {book.isDownloaded && (
           <View style={styles.downloadedBadge}>
-            <Icon name="checkmark-circle" size={14} color={COLORS.playButton} set="ionicons" />
+            <Icon name="checkmark-circle" size={14} color={colors.accent} set="ionicons" />
           </View>
         )}
         {/* Progress bar */}
@@ -159,36 +154,36 @@ export function ContentRowCarousel({ row, onSeeAll }: ContentRowCarouselProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: DIMENSIONS.sectionGap,
+    marginBottom: layout.sectionGap,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: PADDING,
-    marginBottom: LAYOUT.sectionHeaderMarginBottom,
+    marginBottom: spacing.md,
   },
   headerTextContainer: {
     flex: 1,
-    marginRight: scale(12),
+    marginRight: spacing.md,
   },
   rowTitle: {
     fontSize: scale(13),
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     letterSpacing: 0.3,
   },
   rowSubtitle: {
     fontSize: scale(10),
-    color: COLORS.textTertiary,
-    marginTop: scale(2),
+    color: colors.textTertiary,
+    marginTop: spacing.xxs,
   },
   seeAllButton: {
-    paddingVertical: scale(4),
-    paddingHorizontal: scale(8),
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   seeAllText: {
     fontSize: scale(11),
-    color: COLORS.textTertiary,
+    color: colors.textTertiary,
   },
   carouselContent: {
     paddingHorizontal: PADDING,
@@ -200,9 +195,9 @@ const styles = StyleSheet.create({
   coverContainer: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: DIMENSIONS.coverRadius,
+    borderRadius: radius.sm,
     overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundSecondary,
   },
   cover: {
     width: '100%',
@@ -210,9 +205,9 @@ const styles = StyleSheet.create({
   },
   downloadedBadge: {
     position: 'absolute',
-    bottom: scale(6),
-    right: scale(6),
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    bottom: spacing.xs,
+    right: spacing.xs,
+    backgroundColor: colors.overlay.dark,
     borderRadius: scale(10),
     padding: scale(3),
   },
@@ -222,21 +217,21 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: scale(3),
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay.medium,
   },
   progressBar: {
     height: '100%',
-    backgroundColor: COLORS.playButton,
+    backgroundColor: colors.accent,
   },
   title: {
     fontSize: scale(12),
     fontWeight: '500',
-    color: COLORS.textPrimary,
-    marginTop: scale(6),
+    color: colors.textPrimary,
+    marginTop: spacing.xs,
   },
   subtitle: {
     fontSize: scale(11),
-    color: COLORS.textTertiary,
-    marginTop: scale(2),
+    color: colors.textTertiary,
+    marginTop: spacing.xxs,
   },
 });

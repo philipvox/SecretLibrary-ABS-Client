@@ -9,17 +9,16 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { apiClient } from '@/core/api';
-import { COLORS } from '../homeDesign';
+import { colors, scale } from '@/shared/theme';
 import { SeriesCardProps } from '../types';
 import { SeriesHeartButton } from '@/shared/components';
 import { useQueueStore } from '@/features/queue';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const COLORS = { textPrimary: colors.textPrimary, heart: colors.heartFill };
 
 // Queue Plus icon SVG
 const QueuePlusIcon = ({ size = 12, color = '#FFFFFF' }: { size?: number; color?: string }) => (

@@ -18,7 +18,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
   RefreshControl,
   FlatList,
   Alert,
@@ -39,22 +38,21 @@ import { apiClient } from '@/core/api';
 import { usePlayerStore } from '@/features/player';
 import { DownloadItem } from '@/features/downloads/components/DownloadItem';
 import { SectionHeader } from '@/features/home/components/SectionHeader';
+import { SeriesProgressBadge, StackedCovers } from '@/shared/components';
 import { SortPicker, SortOption } from '../components/SortPicker';
 import { StorageSummary } from '../components/StorageSummary';
 import { useMyLibraryStore } from '../stores/myLibraryStore';
 import { usePreferencesStore } from '@/features/recommendations/stores/preferencesStore';
 import { useContinueListening } from '@/features/home/hooks/useContinueListening';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
 const COLORS = {
-  background: '#000000',
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  accent: '#F4B60C',
-  cardBg: 'rgba(255, 255, 255, 0.08)',
+  background: colors.backgroundPrimary,
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  accent: colors.accent,
+  cardBg: colors.cardBackground,
 };
 
 const HORIZONTAL_CARD_WIDTH = scale(110);
@@ -489,7 +487,7 @@ export function MyLibraryScreen() {
   const handleHomePress = () => navigation.navigate('Main', { screen: 'HomeTab' });
   const handleBrowse = () => navigation.navigate('DiscoverTab');
   const handleBookPress = (itemId: string) => navigation.navigate('BookDetail', { id: itemId });
-  const handleSeriesPress = (seriesName: string) => navigation.navigate('SeriesDetail', { name: seriesName });
+  const handleSeriesPress = (seriesName: string) => navigation.navigate('SeriesDetail', { seriesName });
   const handleManageStorage = () => navigation.navigate('Main', { screen: 'ProfileTab' });
 
   // Resume book playback
@@ -690,11 +688,14 @@ export function MyLibraryScreen() {
     );
   }, [navigation]);
 
-  // Render favorite series card
+  // Render favorite series card - uses StackedCovers per design spec
   const renderFavoriteSeriesCard = useCallback((series: any) => {
     if (!series) return null;
     const bookCount = series.books?.length || 0;
-    const firstBookId = series.books?.[0]?.id;
+    // Get cover URLs for stacked display (up to 3 books)
+    const coverUrls = (series.books || []).slice(0, 3).map((book: any) =>
+      apiClient.getItemCoverUrl(book.id)
+    );
 
     return (
       <TouchableOpacity
@@ -703,16 +704,13 @@ export function MyLibraryScreen() {
         onPress={() => handleSeriesPress(series.name)}
         activeOpacity={0.7}
       >
-        <View style={styles.seriesImageContainer}>
-          {firstBookId ? (
-            <Image
-              source={apiClient.getItemCoverUrl(firstBookId)}
-              style={styles.seriesImage}
-              contentFit="cover"
-            />
-          ) : (
-            <Ionicons name="library" size={scale(24)} color={COLORS.textSecondary} />
-          )}
+        <View style={styles.seriesCoversContainer}>
+          <StackedCovers
+            coverUrls={coverUrls}
+            size={40}
+            offset={10}
+            maxCovers={3}
+          />
         </View>
         <View style={styles.favoriteSeriesInfo}>
           <Text style={styles.favoriteSeriesName} numberOfLines={1}>{series.name}</Text>
@@ -725,11 +723,16 @@ export function MyLibraryScreen() {
 
   // Render series card
   const renderSeriesCard = useCallback((series: SeriesGroup) => {
-    const firstBook = series.books[0];
-    const coverUrl = firstBook ? apiClient.getItemCoverUrl(firstBook.id) : undefined;
-    const progressPercent = series.totalBooks > 0
-      ? Math.round((series.completedCount / series.totalBooks) * 100)
-      : 0;
+    // Calculate time remaining for in-progress books
+    const timeRemaining = series.books.reduce((total, book) => {
+      if (book.progress > 0 && book.progress < 0.95) {
+        return total + book.duration * (1 - book.progress);
+      }
+      return total;
+    }, 0);
+
+    // Get cover URLs for stacked display
+    const coverUrls = series.books.slice(0, 3).map(book => apiClient.getItemCoverUrl(book.id));
 
     return (
       <TouchableOpacity
@@ -739,22 +742,12 @@ export function MyLibraryScreen() {
         activeOpacity={0.8}
       >
         <View style={styles.seriesCoversContainer}>
-          {/* Stacked covers */}
-          {series.books.slice(0, 2).reverse().map((book, idx) => (
-            <View
-              key={book.id}
-              style={[
-                styles.seriesCover,
-                { left: idx * 8, top: idx * 4, zIndex: 2 - idx },
-              ]}
-            >
-              <Image
-                source={apiClient.getItemCoverUrl(book.id)}
-                style={styles.seriesCoverImage}
-                contentFit="cover"
-              />
-            </View>
-          ))}
+          <StackedCovers
+            coverUrls={coverUrls}
+            size={40}
+            offset={10}
+            maxCovers={3}
+          />
         </View>
 
         <View style={styles.seriesInfo}>
@@ -762,14 +755,14 @@ export function MyLibraryScreen() {
           <Text style={styles.seriesStats}>
             {series.downloadedCount} of {series.totalBooks} downloaded
           </Text>
-          <Text style={styles.seriesProgress}>
-            {series.completedCount} listened · {series.inProgressCount} in progress
-          </Text>
 
-          {/* Progress bar */}
-          <View style={styles.seriesProgressBar}>
-            <View style={[styles.seriesProgressFill, { width: `${progressPercent}%` }]} />
-          </View>
+          {/* Series Progress Badge */}
+          <SeriesProgressBadge
+            completed={series.completedCount}
+            inProgress={series.inProgressCount}
+            total={series.totalBooks}
+            timeRemaining={timeRemaining}
+          />
         </View>
       </TouchableOpacity>
     );
@@ -890,7 +883,7 @@ export function MyLibraryScreen() {
                 style={styles.heroGradient}
               />
               <View style={styles.heroContent}>
-                <Text style={styles.heroLabel}>CONTINUE LISTENING</Text>
+                <Text style={styles.heroLabel}>Continue Listening</Text>
                 <Text style={styles.heroTitle} numberOfLines={2}>{heroItem.title}</Text>
                 <Text style={styles.heroAuthor}>{heroItem.author}</Text>
                 <View style={styles.heroProgressContainer}>
@@ -1432,23 +1425,8 @@ const styles = StyleSheet.create({
   seriesCoversContainer: {
     width: scale(70),
     height: scale(70),
-    position: 'relative',
-  },
-  seriesCover: {
-    position: 'absolute',
-    width: scale(55),
-    height: scale(55),
-    borderRadius: scale(6),
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  seriesCoverImage: {
-    width: '100%',
-    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   seriesInfo: {
     flex: 1,
@@ -1462,23 +1440,7 @@ const styles = StyleSheet.create({
   seriesStats: {
     fontSize: scale(12),
     color: COLORS.textSecondary,
-  },
-  seriesProgress: {
-    fontSize: scale(11),
-    color: COLORS.textSecondary,
-    marginTop: scale(2),
-    marginBottom: scale(8),
-  },
-  seriesProgressBar: {
-    height: scale(4),
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: scale(2),
-    overflow: 'hidden',
-  },
-  seriesProgressFill: {
-    height: '100%',
-    backgroundColor: COLORS.accent,
-    borderRadius: scale(2),
+    marginBottom: scale(6),
   },
 
   // Empty state
@@ -1594,10 +1556,10 @@ const styles = StyleSheet.create({
     right: scale(70),
   },
   heroLabel: {
-    fontSize: scale(10),
-    fontWeight: '700',
+    fontSize: scale(13),
+    fontWeight: '600',
     color: COLORS.accent,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: scale(4),
   },
   heroTitle: {

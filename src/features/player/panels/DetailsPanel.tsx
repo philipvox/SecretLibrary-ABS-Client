@@ -14,6 +14,7 @@ import {
   getSeriesName,
   getSeriesWithSequence,
 } from '@/shared/utils/metadata';
+import { spacing, radius } from '@/shared/theme';
 
 interface DetailsPanelProps {
   book: any;
@@ -190,16 +191,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   headerRow: {
     flexDirection: 'row',
-    marginBottom: 20,
-    gap: 40,
+    marginBottom: spacing.xl,
+    gap: spacing['3xl'],
   },
   headerItem: {
-    gap: 4,
+    gap: spacing.xs,
   },
   label: {
     fontSize: 14,
@@ -213,24 +214,24 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   description: {
     fontSize: 18,
     lineHeight: 26,
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontWeight: '400',
   },
   pillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 10,
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.xl,
     borderWidth: 1,
   },
   pillText: {
@@ -241,8 +242,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
   },
   metadataText: {
     fontSize: 16,

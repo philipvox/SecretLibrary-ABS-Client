@@ -6,6 +6,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, Keyboard } from 'react-native';
 import { LiquidSlider } from '../components/LiquidSlider';
 import { haptics } from '@/core/native/haptics';
+import { spacing, radius } from '@/shared/theme';
 
 // =============================================================================
 // TYPES
@@ -225,13 +226,13 @@ export function SpeedPanel({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 0,
   },
   // NN/g: Tappable value display for precision input
   valueButton: {
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   valueText: {
     fontSize: 64,
@@ -240,29 +241,29 @@ const styles = StyleSheet.create({
   tapHint: {
     fontSize: 12,
     marginTop: -4,
-    marginLeft: 2,
+    marginLeft: spacing.xxs,
   },
   // NN/g: Precision input field
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   valueInput: {
     fontSize: 64,
     fontWeight: '700',
     borderBottomWidth: 2,
     minWidth: 120,
-    paddingBottom: 4,
+    paddingBottom: spacing.xs,
   },
   inputSuffix: {
     fontSize: 48,
     fontWeight: '700',
-    marginLeft: 4,
-    marginBottom: 8,
+    marginLeft: spacing.xs,
+    marginBottom: spacing.sm,
   },
   sliderSection: {
-    marginBottom: 10,
+    marginBottom: spacing.sm,
     width: '100%',
     overflow: 'visible',
   },
@@ -277,15 +278,15 @@ const styles = StyleSheet.create({
   },
   presetRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    marginTop: 4,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    marginTop: spacing.xs,
     width: '100%',
   },
   presetButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   presetText: {
@@ -298,9 +299,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cancelButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 28,
-    borderRadius: 24,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.xxl,
   },
   cancelButtonText: {
     fontSize: 17,
@@ -309,7 +310,7 @@ const styles = StyleSheet.create({
   applyButton: {
     width: 125,
     height: 125,
-    borderRadius: 100,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '-7deg' }],

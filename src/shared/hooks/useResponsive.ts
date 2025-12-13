@@ -1,168 +1,146 @@
 /**
- * src/shared/hooks/useResponsive.ts
+ * useResponsive Hook
  *
- * Responsive design system based on 402pt design canvas
- * All measurements scale proportionally to device width
+ * Re-exports design tokens from the central theme.
+ * Kept for backwards compatibility - prefer importing directly from '@/shared/theme'.
  */
 
+// Re-export scale functions from theme (single source of truth)
+export {
+  scale,
+  wp,
+  hp,
+  verticalScale,
+  moderateScale,
+  DESIGN_WIDTH,
+  DESIGN_HEIGHT,
+} from '@/shared/theme';
+
+// Re-export token objects
+export { spacing, layout, radius, elevation } from '@/shared/theme';
+export { colors } from '@/shared/theme';
+export { typography, fontSize } from '@/shared/theme';
+export { sizes, coverSizes, iconSizes } from '@/shared/theme';
+export { formatDuration, formatProgress } from '@/shared/theme';
+
+// Import for hook return
+import {
+  scale,
+  wp,
+  hp,
+  verticalScale,
+  moderateScale,
+  spacing,
+  layout,
+  radius,
+  colors,
+  typography,
+  sizes,
+  formatDuration,
+  formatProgress,
+} from '@/shared/theme';
 import { Dimensions } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DESIGN_WIDTH = 402;
-const DESIGN_HEIGHT = 874;
 
 // =============================================================================
-// CORE SCALE FUNCTIONS
+// LEGACY COMPATIBILITY EXPORTS
 // =============================================================================
-
-/** Scale a value proportionally to screen width (base: 402pt design canvas) */
-export const scale = (size: number) => (size / DESIGN_WIDTH) * SCREEN_WIDTH;
-
-/** Width-percentage: returns X% of screen width */
-export const wp = (percent: number) => SCREEN_WIDTH * (percent / 100);
-
-/** Height-percentage: returns X% of screen height */
-export const hp = (percent: number) => SCREEN_HEIGHT * (percent / 100);
-
-/** Scale for vertical measurements relative to design height */
-export const verticalScale = (size: number) => (size / DESIGN_HEIGHT) * SCREEN_HEIGHT;
 
 /**
- * Moderate scale for text - doesn't scale as aggressively
- * Factor 0 = no scaling, 1 = full scaling
+ * @deprecated Use `layout` from '@/shared/theme' instead
+ * Kept for backwards compatibility during migration
  */
-export const moderateScale = (size: number, factor = 0.5) =>
-  size + (scale(size) - size) * factor;
-
-// =============================================================================
-// LAYOUT CONSTANTS (as percentages/ratios)
-// =============================================================================
-
 export const LAYOUT = {
-  // Screen dimensions
   screenWidth: SCREEN_WIDTH,
   screenHeight: SCREEN_HEIGHT,
-
-  // Disc sizes as percentage of screen width
-  homeDiscRatio: 0.70,      // 70% of screen width
-  playerDiscRatio: 0.95,    // 95% of screen width
-  discHoleRatio: 0.18,      // 18% of disc diameter
-
-  // Spacing as percentage of screen width
-  horizontalPadding: 0.055,  // 5.5% (~22px on 402)
-  sectionGap: 0.04,          // 4% (~16px on 402)
-  itemGap: 0.03,             // 3% (~12px on 402)
-
-  // Card dimensions as percentage of screen width
-  compactCard: 0.24,         // 24% (~95px on 402)
-  coverThumb: 0.12,          // 12% (~48px on 402)
-
-  // Mini player as percentage of screen height
-  miniPlayerHeight: 0.075,   // 7.5% (~65px on 874)
-
-  // Bottom nav as percentage of screen height
-  bottomNavHeight: 0.094,    // 9.4% (~82px on 874)
-
-  // Pill controls as percentage of screen width
-  pillHeight: 0.077,         // 7.7% (~31px on 402)
-  pillBorderRadius: 0.035,   // 3.5% (~14px on 402)
-
-  // Border radii as ratio of parent element
-  cardRadius: 0.08,          // 8% of card size
-  coverRadius: 0.125,        // 12.5% of cover size
-
-  // Minimum touch target (iOS HIG / Android Material)
-  minTouchTarget: 44,
+  homeDiscRatio: layout.homeDiscRatio,
+  playerDiscRatio: layout.playerDiscRatio,
+  discHoleRatio: layout.discHoleRatio,
+  horizontalPadding: layout.screenPaddingH / SCREEN_WIDTH,
+  sectionGap: layout.sectionGap / SCREEN_WIDTH,
+  itemGap: layout.itemGap / SCREEN_WIDTH,
+  compactCard: layout.compactCardRatio,
+  coverThumb: layout.coverThumbRatio,
+  miniPlayerHeight: layout.miniPlayerHeight / SCREEN_HEIGHT,
+  bottomNavHeight: layout.bottomNavHeight / SCREEN_HEIGHT,
+  pillHeight: layout.pillHeight / SCREEN_WIDTH,
+  pillBorderRadius: layout.pillBorderRadius / SCREEN_WIDTH,
+  cardRadius: 0.08,
+  coverRadius: 0.125,
+  minTouchTarget: layout.minTouchTarget,
 };
 
-// =============================================================================
-// COMPUTED DIMENSIONS
-// =============================================================================
-
+/**
+ * @deprecated Use `sizes` from '@/shared/theme' instead
+ */
 export const DIMENSIONS = {
-  // Disc sizes
   homeDiscSize: wp(70),
   playerDiscSize: wp(95),
-
-  // Padding
-  horizontalPadding: wp(5.5),
-  sectionGap: wp(4),
-  itemGap: wp(3),
-
-  // Cards
-  compactCardSize: wp(24),
-  coverThumbSize: wp(12),
-
-  // Mini player
-  miniPlayerHeight: hp(7.5),
-  bottomNavHeight: hp(9.4),
-
-  // Pills
-  pillHeight: wp(7.7),
-  pillBorderRadius: wp(3.5),
+  horizontalPadding: layout.screenPaddingH,
+  sectionGap: layout.sectionGap,
+  itemGap: layout.itemGap,
+  compactCardSize: sizes.coverCard,
+  coverThumbSize: sizes.coverRow,
+  miniPlayerHeight: layout.miniPlayerHeight,
+  bottomNavHeight: layout.bottomNavHeight,
+  pillHeight: layout.pillHeight,
+  pillBorderRadius: layout.pillBorderRadius,
 };
 
-// =============================================================================
-// TYPOGRAPHY
-// =============================================================================
-
+/**
+ * @deprecated Use `typography` from '@/shared/theme' instead
+ */
 export const TYPOGRAPHY = {
-  title: moderateScale(17),
-  subtitle: moderateScale(15),
-  sectionHeader: moderateScale(16),
-  body: moderateScale(14),
-  caption: moderateScale(12),
-  small: moderateScale(11),
-  tiny: moderateScale(8),
+  title: typography.headlineLarge.fontSize,
+  subtitle: typography.headlineMedium.fontSize,
+  sectionHeader: typography.bodyLarge.fontSize,
+  body: typography.bodyMedium.fontSize,
+  caption: typography.bodySmall.fontSize,
+  small: typography.labelSmall.fontSize,
+  tiny: typography.caption.fontSize,
 };
 
-// =============================================================================
-// SPACING SCALE
-// =============================================================================
-
+/**
+ * @deprecated Use `spacing` from '@/shared/theme' instead
+ */
 export const SPACING = {
-  xs: wp(1),      // ~4px
-  sm: wp(2),      // ~8px
-  md: wp(3),      // ~12px
-  lg: wp(4),      // ~16px
-  xl: wp(5),      // ~20px
-  xxl: wp(6),     // ~24px
+  xs: wp(1),
+  sm: wp(2),
+  md: wp(3),
+  lg: wp(4),
+  xl: wp(5),
+  xxl: wp(6),
 };
 
-// =============================================================================
-// COLORS
-// =============================================================================
-
+/**
+ * @deprecated Use `colors` from '@/shared/theme' instead
+ */
 export const COLORS = {
-  // Primary accent
-  accent: '#F4B60C',
-  accentDark: '#D9A00A',
-
-  // Backgrounds
-  background: '#000000',
-  cardBackground: 'rgba(255, 255, 255, 0.05)',
-  cardBackgroundHover: 'rgba(255, 255, 255, 0.08)',
-
-  // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.7)',
-  textTertiary: 'rgba(255, 255, 255, 0.5)',
-  textMuted: 'rgba(255, 255, 255, 0.3)',
-
-  // Borders
-  border: 'rgba(255, 255, 255, 0.1)',
-  borderLight: 'rgba(255, 255, 255, 0.08)',
-
-  // States
-  success: '#34C759',
-  error: '#FF3B30',
-  warning: '#FF9500',
+  accent: colors.accent,
+  accentDark: colors.accentDark,
+  background: colors.backgroundPrimary,
+  cardBackground: colors.cardBackground,
+  cardBackgroundHover: colors.cardBackgroundHover,
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  textTertiary: colors.textTertiary,
+  textMuted: colors.textMuted,
+  border: colors.border,
+  borderLight: colors.borderLight,
+  success: colors.success,
+  error: colors.error,
+  warning: colors.warning,
 };
 
 // =============================================================================
-// HOOK (for components that need reactive updates)
+// HOOK
 // =============================================================================
 
+/**
+ * Hook for responsive design utilities
+ * @deprecated Prefer direct imports from '@/shared/theme' for tree-shaking
+ */
 export function useResponsive() {
   return {
     // Screen dimensions
@@ -176,12 +154,20 @@ export function useResponsive() {
     verticalScale,
     moderateScale,
 
-    // Pre-computed values
-    layout: LAYOUT,
+    // Design tokens
+    layout,
+    spacing,
+    radius,
+    colors,
+    typography,
+    sizes,
+
+    // Formatting utilities
+    formatDuration,
+    formatProgress,
+
+    // Legacy exports (deprecated)
     dimensions: DIMENSIONS,
-    typography: TYPOGRAPHY,
-    spacing: SPACING,
-    colors: COLORS,
   };
 }
 

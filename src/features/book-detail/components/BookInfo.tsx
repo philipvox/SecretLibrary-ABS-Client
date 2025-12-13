@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LibraryItem } from '@/core/types';
-import { theme } from '@/shared/theme';
+import { colors, spacing, radius } from '@/shared/theme';
 import {
   getTitle,
   getAuthorName,
@@ -107,92 +107,92 @@ export function BookInfo({ book }: BookInfoProps) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: theme.spacing[5],
-    paddingTop: theme.spacing[4],
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: theme.spacing[2],
+    marginBottom: spacing.xs,
   },
   author: {
     fontSize: 16,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: theme.spacing[1],
+    marginBottom: 4,
   },
   narrator: {
     fontSize: 14,
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.md,
   },
   metadataRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingVertical: theme.spacing[4],
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: theme.colors.border.light,
-    marginBottom: theme.spacing[4],
+    borderColor: colors.borderLight,
+    marginBottom: spacing.md,
   },
   metadataItem: {
     alignItems: 'center',
-    paddingHorizontal: theme.spacing[4],
+    paddingHorizontal: spacing.md,
     borderRightWidth: 1,
-    borderRightColor: theme.colors.border.light,
+    borderRightColor: colors.borderLight,
   },
   metadataLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: theme.colors.text.tertiary,
+    color: colors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: theme.spacing[1],
+    marginBottom: 4,
   },
   metadataValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme.colors.text.primary,
+    color: colors.textPrimary,
   },
   genresContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginBottom: theme.spacing[4],
-    gap: theme.spacing[2],
+    marginBottom: spacing.md,
+    gap: spacing.xs,
   },
   genreTag: {
-    backgroundColor: theme.colors.primary[100],
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[1],
-    borderRadius: theme.radius.full,
+    backgroundColor: colors.accentSubtle,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.xl,
   },
   genreText: {
     fontSize: 13,
-    color: theme.colors.primary[700],
+    color: colors.accentDark,
     fontWeight: '500',
   },
   descriptionContainer: {
-    marginBottom: theme.spacing[4],
+    marginBottom: spacing.md,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing[2],
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   description: {
     fontSize: 15,
-    color: theme.colors.text.secondary,
+    color: colors.textSecondary,
     lineHeight: 22,
   },
   readMore: {
     fontSize: 15,
-    color: theme.colors.primary[500],
+    color: colors.accent,
     fontWeight: '600',
-    marginTop: theme.spacing[2],
+    marginTop: spacing.xs,
   },
 });

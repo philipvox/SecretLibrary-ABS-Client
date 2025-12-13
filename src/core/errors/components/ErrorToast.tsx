@@ -12,13 +12,10 @@ import {
   StyleSheet,
   Animated,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppError, ErrorSeverity } from '../types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface ErrorToastProps {
   error: AppError;

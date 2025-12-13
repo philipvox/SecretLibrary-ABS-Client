@@ -13,7 +13,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   TouchableOpacity,
   Animated as RNAnimated,
@@ -40,23 +39,20 @@ import type { LibraryItem } from '@/core/types';
 import { useDownloadStatus, useDownloads } from '@/core/hooks/useDownloads';
 import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
 import { usePlayerStore } from '@/features/player';
-import { theme } from '@/shared/theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale, formatDuration } from '@/shared/theme';
 
 const ACTION_WIDTH = 70;
 const SWIPE_THRESHOLD = 40;
 
 const COLORS = {
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  textTertiary: 'rgba(255, 255, 255, 0.4)',
-  accent: '#F4B60C',
-  download: '#4CAF50',
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  textTertiary: colors.textTertiary,
+  accent: colors.accent,
+  download: colors.success,
   queue: '#2196F3',
-  delete: '#F44336',
-  background: '#303030',
+  delete: colors.error,
+  background: colors.backgroundTertiary,
 };
 
 // Icons
@@ -139,6 +135,8 @@ export function SwipeableBookCard({
   const metadata = book.media?.metadata as any;
   const title = metadata?.title || 'Untitled';
   const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
+  const duration = (book.media as any)?.duration || 0;
+  const durationText = duration > 0 ? formatDuration.short(duration) : null;
 
   // Get listening progress
   const userProgress = (book as any).userMediaProgress;
@@ -280,8 +278,8 @@ export function SwipeableBookCard({
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.author} numberOfLines={1}>
-            {author}
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {author}{durationText ? ` · ${durationText}` : ''}
           </Text>
           {showListeningProgress && progressPercent > 0 && (
             <View style={styles.progressRow}>
@@ -360,7 +358,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
-  author: {
+  subtitle: {
     fontSize: scale(13),
     color: COLORS.textSecondary,
   },

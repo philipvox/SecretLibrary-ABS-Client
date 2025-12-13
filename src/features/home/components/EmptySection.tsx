@@ -6,11 +6,14 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { COLORS } from '../homeDesign';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  colors,
+  spacing,
+  radius,
+  scale,
+  layout,
+} from '@/shared/theme';
 
 interface EmptySectionProps {
   title: string;
@@ -40,33 +43,33 @@ export function EmptySection({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(24),
+    paddingHorizontal: layout.screenPaddingH,
+    paddingVertical: spacing.xxl,
     alignItems: 'center',
   },
   title: {
     fontSize: scale(14),
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: scale(4),
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   description: {
     fontSize: scale(12),
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: scale(18),
     maxWidth: scale(280),
   },
   ctaButton: {
-    marginTop: scale(12),
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(16),
+    marginTop: spacing.md,
+    backgroundColor: colors.cardBackground,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.lg,
   },
   ctaText: {
     fontSize: scale(12),
     fontWeight: '600',
-    color: '#F4B60C',
+    color: colors.accent,
   },
 });

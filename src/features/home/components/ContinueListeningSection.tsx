@@ -24,7 +24,7 @@ import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { wp, hp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, hp, moderateScale } from '@/shared/theme';
 
 // Layout constants matching other card sections
 const MARGIN_H = wp(3.25);       // 3.25%w horizontal margin
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     marginTop: hp(2),
   },
   header: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(16),
     fontWeight: '600',
     marginBottom: GAP,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     width: CARD.titleWidth,
     textAlign: 'left',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(11),
     marginTop: hp(0.6),
   },

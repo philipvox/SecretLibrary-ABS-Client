@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { useCoverUrl } from '@/core/cache';
@@ -13,19 +13,17 @@ import { DownloadTask } from '@/core/services/downloadManager';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { LibraryItem } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale } from '@/shared/theme';
 
 const COLORS = {
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  accent: '#4ADE80',
-  warning: '#FF9800',
-  error: '#F44336',
-  cardBg: 'rgba(255, 255, 255, 0.08)',
-  progressBg: 'rgba(255, 255, 255, 0.1)',
-  progressFill: '#4ADE80',
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  accent: colors.success,
+  warning: colors.warning,
+  error: colors.error,
+  cardBg: colors.cardBackground,
+  progressBg: colors.progressTrack,
+  progressFill: colors.success,
 };
 
 // Pause icon

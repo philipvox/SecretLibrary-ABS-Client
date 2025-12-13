@@ -75,6 +75,10 @@ class DownloadManager {
   // In-memory progress tracking with byte info
   private progressInfo: Map<string, ProgressInfo> = new Map();
 
+  // Throttle notifications to avoid excessive UI updates
+  private lastNotifyTime = 0;
+  private readonly NOTIFY_THROTTLE_MS = 500; // Notify UI every 500ms max
+
   // Directory for downloaded files
   private readonly DOWNLOAD_DIR = `${FileSystem.documentDirectory}audiobooks/`;
 
@@ -886,9 +890,17 @@ class DownloadManager {
 
     await sqliteCache.updateDownloadProgress(itemId, progress);
 
-    // Notify progress listeners
+    // Notify progress listeners (for useDownloadProgress hook)
     for (const listener of this.progressListeners) {
       listener(itemId, progress, bytesDownloaded, totalBytes);
+    }
+
+    // Throttled notification to main listeners (for useDownloadStatus hook)
+    // This ensures UI components like BookCard update during downloads
+    const now = Date.now();
+    if (now - this.lastNotifyTime >= this.NOTIFY_THROTTLE_MS) {
+      this.lastNotifyTime = now;
+      this.notifyListeners();
     }
   }
 

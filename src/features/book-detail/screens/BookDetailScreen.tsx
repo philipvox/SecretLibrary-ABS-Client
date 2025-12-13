@@ -18,12 +18,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
@@ -39,13 +39,13 @@ import { useDownloadStatus as useDownloadStatusHook } from '@/core/hooks/useDown
 import { downloadManager } from '@/core/services/downloadManager';
 import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, wp, hp, spacing, radius, layout } from '@/shared/theme';
 
 // Design constants
-const ACCENT = '#F4B60C';
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const ACCENT = colors.accent;
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
 const COVER_SIZE = SCREEN_WIDTH * 0.5; // 50% width per design spec
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 type BookDetailRouteParams = {
   BookDetail: { id: string };
@@ -318,6 +318,8 @@ export function BookDetailScreen() {
             contentFit="cover"
             blurRadius={60}
           />
+          {/* BlurView for Android (blurRadius only works on iOS) */}
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
           <LinearGradient
             colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
             style={StyleSheet.absoluteFill}

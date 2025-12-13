@@ -27,16 +27,12 @@ import Animated, {
   useFrameCallback,
   SharedValue,
 } from 'react-native-reanimated';
-import { wp, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, layout } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-// Home disc is 70% of screen width
-const HOME_DISC_SIZE = wp(70);
+// Home disc is 70% of screen width (from layout.homeDiscRatio)
+const HOME_DISC_SIZE = wp(layout.homeDiscRatio * 100);
 const HOLE_SIZE = HOME_DISC_SIZE * 0.12;
 const SPINDLE_SIZE = HOME_DISC_SIZE * 0.18;
-const GRAY_RING_COLOR = '#8A8A8A';
 
 interface HomeDiscSectionProps {
   /** Cover image URL */
@@ -110,7 +106,7 @@ const CDDisc: React.FC<{
           contentPosition="top"
         />
       ) : (
-        <View style={[styles.discCover, { backgroundColor: '#333', borderRadius: size / 2 }]} />
+        <View style={[styles.discCover, { backgroundColor: colors.backgroundTertiary, borderRadius: size / 2 }]} />
       )}
     </Animated.View>
   );
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
     width: HOLE_SIZE,
     height: HOLE_SIZE,
     borderRadius: HOLE_SIZE / 2,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundTertiary,
   },
 
   // Empty state
@@ -269,9 +265,9 @@ const styles = StyleSheet.create({
   },
   emptyDisc: {
     borderRadius: HOME_DISC_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.cardBackground,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -279,7 +275,7 @@ const styles = StyleSheet.create({
     width: HOLE_SIZE,
     height: HOLE_SIZE,
     borderRadius: HOLE_SIZE / 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.cardBackground,
   },
 });
 

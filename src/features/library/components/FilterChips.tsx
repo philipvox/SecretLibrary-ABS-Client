@@ -12,13 +12,10 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 export type FilterOption = 'all' | 'in-progress' | 'not-started' | 'completed';
 
@@ -82,29 +79,29 @@ export function FilterChips({ selected, onSelect, counts }: FilterChipsProps) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(12),
-    gap: scale(8),
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
   chip: {
     paddingHorizontal: scale(14),
-    paddingVertical: scale(8),
-    borderRadius: scale(20),
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.backgroundTertiary,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   chipSelected: {
-    backgroundColor: 'rgba(193, 244, 12, 0.15)',
-    borderColor: ACCENT,
+    backgroundColor: colors.accentSubtle,
+    borderColor: colors.accent,
   },
   chipText: {
     fontSize: scale(13),
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: ACCENT,
+    color: colors.accent,
     fontWeight: '600',
   },
 });

@@ -22,21 +22,19 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { apiClient } from '@/core/api';
-import { wp, hp, moderateScale, COLORS } from '@/shared/hooks/useResponsive';
+import { colors, wp, hp, moderateScale, layout, cardTokens } from '@/shared/theme';
+import { StackedCovers, ProgressDots } from '@/shared/components';
 import { SeriesWithBooks } from '../types';
 
 // Layout constants (same as RecentlyAddedSection)
 const MARGIN_H = wp(3.25);       // 3.25%w horizontal margin
 const PADDING = wp(4);           // 4%w internal padding
 const RADIUS = wp(2.5);          // 2.5%w border radius
-const COVER_SIZE = wp(17);       // 17%w square
-const COVER_RADIUS = wp(1.5);    // Small radius
 const GAP = wp(3);               // 3%w gap between cover and text
-const TOUCH_TARGET = Math.max(wp(8), 44);
+const TOUCH_TARGET = Math.max(wp(8), layout.minTouchTarget);
 const ROW_GAP = wp(3);           // 3%w vertical gap between rows
 
 interface YourSeriesSectionProps {
@@ -44,22 +42,15 @@ interface YourSeriesSectionProps {
   series: SeriesWithBooks[];
   /** Callback when a series row is pressed (view details) */
   onSeriesPress: (series: SeriesWithBooks) => void;
-  /** Callback when play button is pressed (play first in-progress book) */
-  onPlayPress?: (series: SeriesWithBooks) => void;
-  /** Callback when more button is pressed */
-  onMorePress?: (series: SeriesWithBooks) => void;
   /** Maximum number of items to show */
   maxItems?: number;
 }
 
 /**
- * Get the cover URL for a series (use first book's cover)
+ * Get cover URLs for a series (up to 3 books)
  */
-function getSeriesCoverUrl(series: SeriesWithBooks): string | null {
-  if (series.books.length > 0) {
-    return apiClient.getItemCoverUrl(series.books[0].id);
-  }
-  return null;
+function getSeriesCoverUrls(series: SeriesWithBooks): string[] {
+  return series.books.slice(0, 3).map(book => apiClient.getItemCoverUrl(book.id));
 }
 
 /**
@@ -77,42 +68,58 @@ function getSeriesAuthor(series: SeriesWithBooks): string {
 }
 
 /**
- * Format book count for display
+ * Calculate time remaining in series (in seconds)
  */
-function formatBookCount(series: SeriesWithBooks): string {
-  const { totalBooks, booksInProgress, booksCompleted } = series;
+function getTimeRemaining(series: SeriesWithBooks): number {
+  return series.books.reduce((total, book) => {
+    const progress = (book as any).userMediaProgress?.progress || 0;
+    const duration = (book.media as any)?.duration || 0;
+    if (progress > 0 && progress < 0.95) {
+      return total + duration * (1 - progress);
+    } else if (progress === 0) {
+      return total + duration;
+    }
+    return total;
+  }, 0);
+}
 
-  if (booksCompleted > 0 && booksInProgress > 0) {
-    return `${booksCompleted} of ${totalBooks} completed`;
+/**
+ * Format time remaining as "~Xh Ym left"
+ */
+function formatTimeRemaining(seconds: number): string {
+  if (seconds <= 0) return '';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0 && minutes > 0) {
+    return `~${hours}h ${minutes}m left`;
+  } else if (hours > 0) {
+    return `~${hours}h left`;
   }
-  if (booksInProgress > 0) {
-    return `${booksInProgress} in progress`;
-  }
-  if (totalBooks > 1) {
-    return `${totalBooks} books`;
-  }
-  return '1 book';
+  return `~${minutes}m left`;
 }
 
 /**
  * Single series row in the list
  */
+// Stacked cover size for rows
+const STACKED_SIZE = cardTokens.stackedCovers.sizeSmall;
+const STACKED_OFFSET = 8;
+
 const SeriesRow = ({
   series,
   onPress,
-  onPlayPress,
-  onMorePress,
   isFirst,
 }: {
   series: SeriesWithBooks;
   onPress: () => void;
-  onPlayPress?: () => void;
-  onMorePress?: () => void;
   isFirst: boolean;
 }) => {
-  const coverUrl = getSeriesCoverUrl(series);
+  const coverUrls = getSeriesCoverUrls(series);
   const author = getSeriesAuthor(series);
-  const bookCount = formatBookCount(series);
+  const timeRemaining = getTimeRemaining(series);
+  const timeText = formatTimeRemaining(timeRemaining);
+  const hasProgress = series.booksCompleted > 0 || series.booksInProgress > 0;
+  const isComplete = series.booksCompleted === series.totalBooks && series.totalBooks > 0;
 
   return (
     <TouchableOpacity
@@ -120,69 +127,53 @@ const SeriesRow = ({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {/* Cover thumbnail */}
-      {coverUrl ? (
-        <Image
-          source={coverUrl}
-          style={styles.cover}
-          contentFit="cover"
-          transition={150}
+      {/* Stacked covers */}
+      <View style={styles.coverContainer}>
+        <StackedCovers
+          coverUrls={coverUrls}
+          size={STACKED_SIZE}
+          offset={STACKED_OFFSET}
+          maxCovers={3}
         />
-      ) : (
-        <View style={[styles.cover, styles.coverPlaceholder]}>
-          <Ionicons name="library" size={wp(6)} color="rgba(255,255,255,0.3)" />
-        </View>
-      )}
+      </View>
 
       {/* Info */}
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
-          {series.name}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>
+            {series.name}
+          </Text>
+          {isComplete && (
+            <View style={styles.completeBadge}>
+              <Ionicons name="checkmark" size={12} color="#000" />
+            </View>
+          )}
+        </View>
         <Text style={styles.author} numberOfLines={1}>
           {author}
         </Text>
-        <Text style={styles.bookCount} numberOfLines={1}>
-          {bookCount}
-        </Text>
+        {/* Progress indicator - Research: Zeigarnik Effect & Goal Gradient */}
+        {hasProgress ? (
+          <View style={styles.progressRow}>
+            <ProgressDots
+              completed={series.booksCompleted}
+              inProgress={series.booksInProgress}
+              total={series.totalBooks}
+              showCount={true}
+            />
+            {timeText && <Text style={styles.timeRemaining}>{timeText}</Text>}
+          </View>
+        ) : (
+          <Text style={styles.bookCount}>
+            {series.totalBooks} {series.totalBooks === 1 ? 'book' : 'books'}
+          </Text>
+        )}
       </View>
 
-      {/* Play button - circle outline */}
-      {onPlayPress && (
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onPlayPress();
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={styles.playCircle}>
-            <Ionicons name="play" size={wp(3)} color="#fff" style={{ marginLeft: 2 }} />
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* More button - vertical dots */}
-      {onMorePress && (
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onMorePress();
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="ellipsis-vertical" size={wp(5)} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
-      )}
-
-      {/* Chevron for navigation (if no more button) */}
-      {!onMorePress && (
-        <View style={styles.chevron}>
-          <Ionicons name="chevron-forward" size={wp(5)} color="rgba(255,255,255,0.5)" />
-        </View>
-      )}
+      {/* Chevron for navigation - Research: Series are containers, not playable */}
+      <View style={styles.chevron}>
+        <Ionicons name="chevron-forward" size={wp(5)} color="rgba(255,255,255,0.5)" />
+      </View>
     </TouchableOpacity>
   );
 };
@@ -190,8 +181,6 @@ const SeriesRow = ({
 export function YourSeriesSection({
   series,
   onSeriesPress,
-  onPlayPress,
-  onMorePress,
   maxItems = 5,
 }: YourSeriesSectionProps) {
   if (series.length === 0) return null;
@@ -204,14 +193,12 @@ export function YourSeriesSection({
         {/* Header */}
         <Text style={styles.header}>Your Series</Text>
 
-        {/* Series rows */}
+        {/* Series rows - NO Play button per NNGroup research */}
         {displaySeries.map((item, index) => (
           <SeriesRow
             key={item.id}
             series={item}
             onPress={() => onSeriesPress(item)}
-            onPlayPress={onPlayPress ? () => onPlayPress(item) : undefined}
-            onMorePress={onMorePress ? () => onMorePress(item) : undefined}
             isFirst={index === 0}
           />
         ))}
@@ -233,7 +220,7 @@ const styles = StyleSheet.create({
     padding: PADDING,
   },
   header: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: moderateScale(16),
     fontWeight: '600',
     marginBottom: GAP,
@@ -245,14 +232,10 @@ const styles = StyleSheet.create({
   rowWithGap: {
     marginTop: ROW_GAP,
   },
-  cover: {
-    width: COVER_SIZE,
-    height: COVER_SIZE,
-    borderRadius: COVER_RADIUS,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  coverPlaceholder: {
-    alignItems: 'center',
+  coverContainer: {
+    width: STACKED_SIZE + (STACKED_OFFSET * 2), // Account for stacked offset
+    height: STACKED_SIZE * 1.5, // 2:3 aspect ratio
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   info: {
@@ -260,38 +243,44 @@ const styles = StyleSheet.create({
     marginLeft: GAP,
     marginRight: wp(2),
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   title: {
-    color: COLORS.textPrimary,
+    flex: 1,
+    color: colors.textPrimary,
     fontSize: moderateScale(14),
     fontWeight: '600',
   },
+  completeBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#4ADE80', // Success green
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   author: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.textSecondary,
     fontSize: moderateScale(13),
     marginTop: hp(0.2),
   },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: hp(0.3),
+  },
+  timeRemaining: {
+    color: colors.textTertiary,
+    fontSize: moderateScale(11),
+  },
   bookCount: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.textTertiary,
     fontSize: moderateScale(12),
     marginTop: hp(0.1),
-  },
-  actionButton: {
-    width: TOUCH_TARGET,
-    height: TOUCH_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 44,
-    minHeight: 44,
-  },
-  playCircle: {
-    width: wp(6),
-    height: wp(6),
-    borderRadius: wp(3),
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.8)',
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   chevron: {
     width: TOUCH_TARGET,

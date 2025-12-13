@@ -13,7 +13,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   ActivityIndicator,
   Modal,
   Pressable,
@@ -24,11 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LibraryItem } from '@/core/types';
 import { useIsComplete, useToggleComplete } from '@/features/completion';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 // Format bytes to human readable string
 function formatBytes(bytes: number): string {

@@ -6,14 +6,19 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import {
+  colors,
+  spacing,
+  radius,
+  layout,
+  typography,
+  scale,
+} from '@/shared/theme';
 
 // Built-in icon components
-const BookIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: number; color?: string }) => (
+const BookIcon = ({ size = 64, color = colors.textMuted }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M4 19.5A2.5 2.5 0 016.5 17H20"
@@ -32,14 +37,14 @@ const BookIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: numbe
   </Svg>
 );
 
-const SearchIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: number; color?: string }) => (
+const SearchIcon = ({ size = 64, color = colors.textMuted }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="11" cy="11" r="8" stroke={color} strokeWidth={1.5} />
     <Path d="M21 21l-4.35-4.35" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
   </Svg>
 );
 
-const HeartIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: number; color?: string }) => (
+const HeartIcon = ({ size = 64, color = colors.textMuted }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"
@@ -51,7 +56,7 @@ const HeartIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: numb
   </Svg>
 );
 
-const DownloadIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: number; color?: string }) => (
+const DownloadIcon = ({ size = 64, color = colors.textMuted }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     <Path d="M7 10l5 5 5-5" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -59,7 +64,7 @@ const DownloadIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: n
   </Svg>
 );
 
-const ListIcon = ({ size = 64, color = 'rgba(255,255,255,0.3)' }: { size?: number; color?: string }) => (
+const ListIcon = ({ size = 64, color = colors.textMuted }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={1.5} />
     <Rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={1.5} />
@@ -156,56 +161,54 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: scale(24),
+    padding: spacing.xxl,
   },
   fullScreen: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.backgroundTertiary,
   },
   iconContainer: {
-    marginBottom: scale(20),
+    marginBottom: spacing.xl,
   },
   title: {
-    fontSize: scale(18),
-    fontWeight: '600',
-    color: '#FFFFFF',
+    ...typography.displaySmall,
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: scale(8),
+    marginBottom: spacing.sm,
   },
   description: {
-    fontSize: scale(14),
-    color: 'rgba(255, 255, 255, 0.5)',
+    ...typography.bodyMedium,
+    color: colors.textTertiary,
     textAlign: 'center',
-    lineHeight: scale(20),
     maxWidth: scale(280),
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   // NN/g: 44px minimum touch targets
   actionButton: {
-    backgroundColor: '#F4B60C',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(28),
-    borderRadius: scale(12),
-    minHeight: 44,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing['3xl'],
+    borderRadius: radius.card,
+    minHeight: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: spacing.md,
   },
   actionButtonText: {
-    fontSize: scale(15),
+    ...typography.labelLarge,
     fontWeight: '600',
-    color: '#000000',
+    color: colors.backgroundPrimary,
   },
   secondaryButton: {
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(24),
-    minHeight: 44,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    minHeight: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
   },
   secondaryButtonText: {
-    fontSize: scale(14),
+    ...typography.bodyMedium,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.textSecondary,
   },
 });

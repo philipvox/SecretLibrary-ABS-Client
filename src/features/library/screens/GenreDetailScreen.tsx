@@ -17,22 +17,20 @@ import {
   TextInput,
   Modal,
   Pressable,
-  Dimensions,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useLibraryCache } from '@/core/cache';
+import { useLibraryCache, getCoverUrl } from '@/core/cache';
 import { BookCard } from '@/shared/components/BookCard';
+import { Image } from 'expo-image';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const BG_COLOR = '#1a1a1a';
-const CARD_COLOR = 'rgba(255,255,255,0.08)';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundSecondary;
+const CARD_COLOR = colors.cardBackground;
+const ACCENT = colors.accent;
 const PADDING = 16;
 
 type SortOption =
@@ -72,6 +70,70 @@ function formatDuration(seconds: number): string {
   }
   return `${minutes}m`;
 }
+
+// Stacked covers component for genre header
+interface StackedCoversProps {
+  bookIds: string[];
+  size?: number;
+}
+
+function StackedCovers({ bookIds, size = 32 }: StackedCoversProps) {
+  const displayIds = bookIds.slice(0, 3);
+  const offset = size * 0.35;
+  const totalWidth = size + (displayIds.length - 1) * offset;
+
+  if (displayIds.length === 0) {
+    // Fallback to music icon if no books
+    return (
+      <View style={[stackedStyles.fallback, { width: scale(48), height: scale(48) }]}>
+        <Ionicons name="musical-notes" size={scale(24)} color={ACCENT} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[stackedStyles.container, { width: totalWidth, height: size }]}>
+      {displayIds.map((bookId, index) => (
+        <Image
+          key={bookId}
+          source={{ uri: getCoverUrl(bookId) }}
+          style={[
+            stackedStyles.cover,
+            {
+              width: size,
+              height: size,
+              left: index * offset,
+              zIndex: displayIds.length - index,
+            },
+          ]}
+          contentFit="cover"
+          transition={200}
+        />
+      ))}
+    </View>
+  );
+}
+
+const stackedStyles = StyleSheet.create({
+  container: {
+    position: 'relative',
+  },
+  cover: {
+    position: 'absolute',
+    borderRadius: scale(4),
+    shadowColor: '#000',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  fallback: {
+    borderRadius: scale(12),
+    backgroundColor: 'rgba(193,244,12,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export function GenreDetailScreen() {
   const navigation = useNavigation<any>();
@@ -171,6 +233,11 @@ export function GenreDetailScreen() {
     }, 0);
   }, [genreBooks]);
 
+  // Get book IDs for stacked covers header
+  const coverBookIds = useMemo(() => {
+    return genreBooks.slice(0, 3).map((book) => book.id);
+  }, [genreBooks]);
+
   // Get current sort config
   const currentSortConfig = SORT_OPTIONS.find((opt) => opt.id === sortOption) || SORT_OPTIONS[0];
 
@@ -249,9 +316,7 @@ export function GenreDetailScreen() {
 
       {/* Genre Title and Stats */}
       <View style={styles.titleSection}>
-        <View style={styles.genreIcon}>
-          <Ionicons name="musical-notes" size={scale(24)} color={ACCENT} />
-        </View>
+        <StackedCovers bookIds={coverBookIds} size={scale(44)} />
         <View style={styles.titleInfo}>
           <Text style={styles.genreTitle}>{genreName}</Text>
           <Text style={styles.genreStats}>
@@ -393,17 +458,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: PADDING,
     marginBottom: scale(16),
-  },
-  genreIcon: {
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(12),
-    backgroundColor: 'rgba(193,244,12,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: scale(12),
   },
   titleInfo: {
-    marginLeft: scale(12),
+    flex: 1,
   },
   genreTitle: {
     fontSize: scale(22),

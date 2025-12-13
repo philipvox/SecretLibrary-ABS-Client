@@ -11,7 +11,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   Switch,
 } from 'react-native';
@@ -19,15 +18,13 @@ import Svg, { Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { useQueue, useQueueStore, useAutoplayEnabled, useAutoSeriesBookId } from '../stores/queueStore';
 import { BookCard } from '@/shared/components/BookCard';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale } from '@/shared/theme';
 
 const COLORS = {
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  accent: '#4ADE80',
-  cardBg: 'rgba(255, 255, 255, 0.08)',
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  accent: colors.success,
+  cardBg: colors.cardBackground,
 };
 
 // Queue icon

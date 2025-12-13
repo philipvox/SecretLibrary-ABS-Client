@@ -16,7 +16,6 @@ import {
   Modal,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -25,11 +24,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
+import { colors, scale, wp, hp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const SCREEN_WIDTH = wp(100);
+const SCREEN_HEIGHT = hp(100);
 
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 type CelebrationType = 'book_complete' | 'series_complete' | 'milestone';
 

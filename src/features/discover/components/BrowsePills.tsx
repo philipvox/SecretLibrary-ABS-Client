@@ -12,16 +12,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { Icon } from '@/shared/components/Icon';
 import { useLibraryCache, getAllAuthors, getAllSeries, getAllNarrators, getAllGenres } from '@/core/cache';
-import { COLORS, LAYOUT } from '@/features/home/homeDesign';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale, layout, radius, spacing } from '@/shared/theme';
 
 interface BrowseCategory {
   id: string;
@@ -48,7 +44,7 @@ const BrowsePill = React.memo(function BrowsePill({ category, onPress }: PillPro
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <Icon name={category.icon} size={scale(16)} color={COLORS.playButton} set="ionicons" />
+      <Icon name={category.icon} size={scale(16)} color={colors.accent} set="ionicons" />
       <Text style={styles.pillText}>{category.name}</Text>
       {category.count > 0 && (
         <View style={styles.countBadge}>
@@ -111,40 +107,40 @@ export function BrowsePills() {
 
 const styles = StyleSheet.create({
   scrollView: {
-    marginBottom: scale(8),
+    marginBottom: spacing.sm,
   },
   container: {
-    paddingHorizontal: LAYOUT.carouselPaddingHorizontal,
-    gap: scale(10),
+    paddingHorizontal: layout.screenPaddingH,
+    gap: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(6),
+    gap: spacing.xs,
     paddingHorizontal: scale(14),
-    paddingVertical: scale(10),
-    borderRadius: scale(20),
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.backgroundTertiary,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.borderLight,
   },
   pillText: {
     fontSize: scale(13),
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
   },
   countBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(2),
-    borderRadius: scale(8),
-    marginLeft: scale(2),
+    backgroundColor: colors.backgroundElevated,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
+    marginLeft: spacing.xxs,
   },
   countText: {
     fontSize: scale(11),
     fontWeight: '500',
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
   },
 });

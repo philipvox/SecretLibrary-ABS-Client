@@ -13,16 +13,16 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
 import { Icon } from '@/shared/components/Icon';
 import { Shimmer } from '@/shared/components';
-import { COLORS, DIMENSIONS, LAYOUT } from '@/features/home/homeDesign';
+import { colors, scale, spacing, layout } from '@/shared/theme';
 import {
   useDiscoverData,
   HeroSection,
@@ -35,9 +35,6 @@ import {
   GENRE_CHIPS,
 } from '@/features/discover';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
 
 export function BrowseScreen() {
   const insets = useSafeAreaInsets();
@@ -88,6 +85,8 @@ export function BrowseScreen() {
             contentFit="cover"
             blurRadius={60}
           />
+          {/* BlurView for Android (blurRadius only works on iOS) */}
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
           <LinearGradient
             colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
             style={StyleSheet.absoluteFill}
@@ -109,7 +108,7 @@ export function BrowseScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={COLORS.playButton}
+            tintColor={colors.accent}
           />
         }
       >
@@ -210,7 +209,7 @@ export function BrowseScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.backgroundPrimary,
   },
   heroBackground: {
     position: 'absolute',
@@ -232,20 +231,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: LAYOUT.carouselPaddingHorizontal,
-    paddingBottom: scale(12),
+    paddingHorizontal: layout.screenPaddingH,
+    paddingBottom: spacing.md,
     zIndex: 1,
   },
   headerTitle: {
     fontSize: scale(28),
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
   },
   headerButton: {
-    width: scale(40),
-    height: scale(40),
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     borderRadius: scale(20),
-    backgroundColor: COLORS.controlButtonBg,
+    backgroundColor: colors.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -257,24 +256,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(40),
   },
   emptyTitle: {
-    marginTop: scale(16),
+    marginTop: spacing.lg,
     fontSize: scale(16),
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
   },
   emptySubtitle: {
-    marginTop: scale(8),
+    marginTop: spacing.sm,
     fontSize: scale(13),
-    color: COLORS.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: scale(18),
   },
   clearFilterButton: {
-    marginTop: scale(20),
-    backgroundColor: COLORS.playButton,
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(10),
+    marginTop: spacing.xl,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
     borderRadius: scale(20),
   },
   clearFilterText: {
@@ -285,17 +284,17 @@ const styles = StyleSheet.create({
 
   // Skeleton styles
   skeletonContainer: {
-    paddingTop: scale(16),
+    paddingTop: spacing.lg,
   },
   heroSkeleton: {
     alignItems: 'center',
-    paddingHorizontal: scale(16),
-    marginBottom: scale(24),
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   heroSkeletonText: {
     alignItems: 'center',
   },
   rowSkeleton: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
 });

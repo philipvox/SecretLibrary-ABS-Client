@@ -13,7 +13,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
   RefreshControl,
 } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
@@ -26,12 +25,12 @@ import { useCollectionDetails } from '../hooks/useCollectionDetails';
 import { BookCard } from '@/shared/components/BookCard';
 import { apiClient } from '@/core/api';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, wp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+const SCREEN_WIDTH = wp(100);
 
-const BG_COLOR = '#1a1a1a';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundTertiary;
+const ACCENT = colors.accent;
 
 type CollectionDetailRouteParams = {
   CollectionDetail: {
@@ -185,6 +184,8 @@ export function CollectionDetailScreen() {
               contentFit="cover"
               blurRadius={40}
             />
+            {/* BlurView for Android (blurRadius only works on iOS) */}
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={styles.backgroundOverlay} />
           </>
         )}

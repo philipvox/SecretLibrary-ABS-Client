@@ -72,7 +72,7 @@ export type { SeriesHeartButtonProps } from './SeriesHeartButton';
 // BOOK CARDS
 // =============================================================================
 export { BookCard, BookCardWithState } from './BookCard';
-export type { BookCardProps } from './BookCard';
+export type { BookCardProps, BookCardActionType, BookCardContext } from './BookCard';
 export { SwipeableBookCard } from './SwipeableBookCard';
 export type { SwipeableBookCardProps } from './SwipeableBookCard';
 
@@ -91,3 +91,14 @@ export { CassetteRefreshView } from './CassetteRefreshView';
 // NAVIGATION
 // =============================================================================
 export { AlphabetScrubber } from './AlphabetScrubber';
+
+// =============================================================================
+// PROGRESS INDICATORS
+// =============================================================================
+export { ProgressDots } from './ProgressDots';
+export { SeriesProgressBadge } from './SeriesProgressBadge';
+
+// =============================================================================
+// STACKED COVERS
+// =============================================================================
+export { StackedCovers } from './StackedCovers';

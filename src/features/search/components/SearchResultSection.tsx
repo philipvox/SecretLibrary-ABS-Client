@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getColors } from 'react-native-image-colors';
@@ -24,8 +23,9 @@ import { BookCard } from '@/shared/components/BookCard';
 import { getTitle, getAuthorName } from '@/shared/utils/metadata';
 import { matchToPalette } from '@/shared/utils/colorPalette';
 import { isColorLight, pickMostSaturated } from '@/features/player/utils';
+import { wp } from '@/shared/theme';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_WIDTH = wp(100);
 const GAP = 5;
 const CARD_SIZE = (SCREEN_WIDTH - GAP * 4) / 3;
 const CARD_RADIUS = 5;

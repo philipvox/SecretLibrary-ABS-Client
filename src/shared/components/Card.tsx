@@ -1,6 +1,6 @@
 /**
  * Card component for content containers
- * 
+ *
  * Used for book cards, list items, info sections
  */
 
@@ -11,13 +11,20 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { theme } from '../theme';
+import {
+  colors,
+  spacing,
+  radius,
+  elevation,
+} from '@/shared/theme';
+
+type SpacingKey = keyof typeof spacing;
 
 interface CardProps {
   children: ReactNode;
   onPress?: () => void;
   variant?: 'elevated' | 'outlined' | 'flat';
-  padding?: keyof typeof theme.spacing;
+  padding?: SpacingKey;
   style?: ViewStyle;
 }
 
@@ -28,7 +35,7 @@ export function Card({
   children,
   onPress,
   variant = 'elevated',
-  padding = 4,
+  padding = 'lg',
   style,
 }: CardProps) {
   const Container = onPress ? TouchableOpacity : View;
@@ -38,7 +45,7 @@ export function Card({
       style={[
         styles.base,
         styles[variant],
-        { padding: theme.spacing[padding] },
+        { padding: spacing[padding] },
         style,
       ]}
       onPress={onPress}
@@ -51,18 +58,18 @@ export function Card({
 
 const styles = StyleSheet.create({
   base: {
-    backgroundColor: theme.colors.card.background,
-    borderRadius: theme.radius.large,
+    backgroundColor: colors.cardBackground,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
   elevated: {
-    ...theme.elevation.small,
+    ...elevation.small,
   },
   outlined: {
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: colors.border,
   },
   flat: {
-    backgroundColor: theme.colors.background.secondary,
+    backgroundColor: colors.backgroundSecondary,
   },
 });

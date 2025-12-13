@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
@@ -26,8 +26,9 @@ import { usePlayerStore } from '@/features/player';
 import { useCoverUrl } from '@/core/cache';
 import { haptics } from '@/core/native/haptics';
 import { audioService } from '@/features/player/services/audioService';
+import { colors, wp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
 
 // ============================================================================
 // CONFIGURATION
@@ -71,7 +72,7 @@ const SCRUB_CONFIG = {
 // Visual constants
 const BUTTON_SIZE = 48;
 const COVER_SIZE = 44;
-const ACCENT_COLOR = '#F4B60C';
+const ACCENT_COLOR = colors.accent;
 
 // ============================================================================
 // ICONS

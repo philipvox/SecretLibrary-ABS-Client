@@ -41,10 +41,11 @@ import {
   PopularGenresSection,
 } from '../components/GenreSections';
 import { GenreListItem } from '../components/GenreCards';
+import { colors, spacing, radius } from '@/shared/theme';
 
-const BG_COLOR = '#000000';
-const CARD_COLOR = '#2a2a2a';
-const ACCENT = '#F4B60C';
+const BG_COLOR = colors.backgroundPrimary;
+const CARD_COLOR = colors.backgroundTertiary;
+const ACCENT = colors.accent;
 
 type ViewMode = 'grouped' | 'flat';
 
@@ -271,7 +272,7 @@ export function GenresListScreen() {
       {/* Browse by Category Header */}
       {!isSearching && (
         <View style={styles.browseHeader}>
-          <Text style={styles.browseTitle}>BROWSE BY CATEGORY</Text>
+          <Text style={styles.browseTitle}>Browse by Category</Text>
         </View>
       )}
 
@@ -530,10 +531,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   browseTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   emptyState: {
     flex: 1,

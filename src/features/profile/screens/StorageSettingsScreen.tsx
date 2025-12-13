@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -23,11 +22,9 @@ import { useDownloads } from '@/core/hooks/useDownloads';
 import { useLibraryCache } from '@/core/cache';
 import { networkMonitor } from '@/core/services/networkMonitor';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+const ACCENT = colors.accent;
 
 // Format bytes to human readable
 function formatBytes(bytes: number): string {
@@ -229,7 +226,7 @@ export function StorageSettingsScreen() {
 
         {/* Downloads Section */}
         <View style={styles.section}>
-          <SectionHeader title="DOWNLOADS" />
+          <SectionHeader title="Downloads" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="download-outline"
@@ -256,7 +253,7 @@ export function StorageSettingsScreen() {
 
         {/* Cache Section */}
         <View style={styles.section}>
-          <SectionHeader title="CACHE" />
+          <SectionHeader title="Cache" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="refresh-outline"
@@ -271,7 +268,7 @@ export function StorageSettingsScreen() {
 
         {/* Danger Zone Section */}
         <View style={styles.section}>
-          <SectionHeader title="DANGER ZONE" />
+          <SectionHeader title="Danger Zone" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="trash-outline"
@@ -365,10 +362,10 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   sectionHeader: {
-    fontSize: scale(12),
+    fontSize: scale(13),
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
-    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 0.5,
     marginHorizontal: scale(20),
     marginBottom: scale(8),
   },

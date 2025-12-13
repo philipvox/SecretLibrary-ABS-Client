@@ -6,12 +6,10 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Icon } from '@/shared/components/Icon';
 import { ProgressBar } from '../components/ProgressBar';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { scale, spacing, radius } from '@/shared/theme';
 
 interface ProgressPanelProps {
   isLight?: boolean;
@@ -207,10 +205,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: scale(10),
+    paddingHorizontal: spacing.sm,
   },
   header: {
-    marginBottom: scale(16),
+    marginBottom: spacing.lg,
   },
   title: {
     fontSize: scale(32),
@@ -218,52 +216,52 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: scale(15),
-    marginTop: scale(4),
+    marginTop: spacing.xs,
   },
   progressContainer: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   settingsSection: {
-    marginTop: scale(8),
+    marginTop: spacing.sm,
   },
   section: {
-    marginBottom: scale(20),
+    marginBottom: spacing.xl,
   },
   sectionLabel: {
     fontSize: scale(13),
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: scale(10),
+    marginBottom: spacing.sm,
   },
   toggleRow: {
     flexDirection: 'row',
-    gap: scale(10),
+    gap: spacing.sm,
   },
   toggleOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(14),
-    borderRadius: scale(12),
-    gap: scale(8),
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    gap: spacing.sm,
   },
   toggleText: {
     fontSize: scale(15),
     fontWeight: '600',
   },
   linksSection: {
-    marginBottom: scale(20),
-    gap: scale(10),
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
   },
   linkButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
-    borderRadius: scale(12),
-    gap: scale(12),
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    gap: spacing.md,
   },
   linkText: {
     flex: 1,

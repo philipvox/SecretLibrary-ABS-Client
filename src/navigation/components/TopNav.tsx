@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,11 +15,14 @@ import { useNavigation } from '@react-navigation/native';
 import { usePlayerStore } from '@/features/player';
 import { useQueue } from '@/features/queue/stores/queueStore';
 import { useShallow } from 'zustand/react/shallow';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
-
-const ACCENT = '#F4B60C';
+import {
+  colors,
+  spacing,
+  radius,
+  typography,
+  scale,
+  layout,
+} from '@/shared/theme';
 
 // Height of the nav content (without safe area)
 export const TOP_NAV_CONTENT_HEIGHT = 52;
@@ -116,7 +119,7 @@ function TopNavInner() {
             <Ionicons
               name={isProfile ? 'person' : 'person-outline'}
               size={22}
-              color={isProfile ? ACCENT : '#fff'}
+              color={isProfile ? colors.accent : colors.textPrimary}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -127,7 +130,7 @@ function TopNavInner() {
             <Ionicons
               name={isDiscover ? 'compass' : 'compass-outline'}
               size={22}
-              color={isDiscover ? ACCENT : '#fff'}
+              color={isDiscover ? colors.accent : colors.textPrimary}
             />
           </TouchableOpacity>
         </View>
@@ -219,7 +222,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: scale(16),
-    paddingBottom: 12,
+    paddingBottom: spacing.md,
   },
   leftGroup: {
     flexDirection: 'row',
@@ -227,53 +230,53 @@ const styles = StyleSheet.create({
     gap: scale(12),
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: layout.minTouchTarget / 2,
   },
   iconButtonActive: {
-    backgroundColor: 'rgba(193,244,12,0.15)',
+    backgroundColor: colors.accentSubtle,
   },
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   queueButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: ACCENT,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
   },
   queueText: {
-    fontSize: 12,
+    ...typography.labelMedium,
     fontWeight: '700',
-    color: '#000',
+    color: colors.backgroundPrimary,
   },
   libraryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 100,
-    gap: 8,
+    backgroundColor: colors.cardBackground,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    gap: spacing.sm,
   },
   libraryButtonActive: {
-    backgroundColor: ACCENT,
+    backgroundColor: colors.accent,
   },
   libraryButtonText: {
-    color: '#fff',
-    fontSize: 10,
+    ...typography.labelSmall,
+    color: colors.textPrimary,
     letterSpacing: 0.2,
   },
   libraryButtonTextActive: {
-    color: '#000',
+    color: colors.backgroundPrimary,
     fontWeight: '600',
   },
   libraryIcon: {
@@ -287,9 +290,9 @@ const styles = StyleSheet.create({
     left: 2,
     width: 10,
     height: 14,
-    borderRadius: 2,
+    borderRadius: radius.xxs,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: colors.textTertiary,
     backgroundColor: 'transparent',
   },
   libraryIconBackActive: {
@@ -301,13 +304,13 @@ const styles = StyleSheet.create({
     left: 0,
     width: 10,
     height: 14,
-    borderRadius: 2,
+    borderRadius: radius.xxs,
     borderWidth: 1,
-    borderColor: '#fff',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.textPrimary,
+    backgroundColor: colors.cardBackground,
   },
   libraryIconFrontActive: {
-    borderColor: '#000',
+    borderColor: colors.backgroundPrimary,
     backgroundColor: 'rgba(0,0,0,0.1)',
   },
 });

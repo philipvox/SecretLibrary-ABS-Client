@@ -13,7 +13,6 @@ import {
   StyleSheet,
   StatusBar,
   RefreshControl,
-  Dimensions,
   TouchableOpacity,
   Modal,
 } from 'react-native';
@@ -27,21 +26,22 @@ import {
 } from '../hooks/useListeningStats';
 import { ShareStatsCard } from '../components/ShareStatsCard';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, wp } from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCREEN_WIDTH = wp(100);
 
-// Dark theme colors (matching ProfileScreen)
+// Dark theme colors using theme tokens
 const COLORS = {
-  background: '#303030',
-  card: '#404040',
-  cardBorder: '#505050',
-  text: '#FFFFFF',
-  textSecondary: '#AAAAAA',
-  textTertiary: '#888888',
-  accent: '#F4B60C',
-  accentDim: 'rgba(244, 182, 12, 0.3)',
-  streakActive: '#FF9500',
-  success: '#22c55e',
+  background: colors.backgroundTertiary,
+  card: colors.backgroundElevated,
+  cardBorder: 'rgba(255,255,255,0.12)',
+  text: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  textTertiary: colors.textTertiary,
+  accent: colors.accent,
+  accentDim: colors.accentSubtle,
+  streakActive: colors.warning,
+  success: colors.success,
 };
 
 // Stat card component

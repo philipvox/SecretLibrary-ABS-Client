@@ -13,7 +13,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
@@ -32,17 +31,15 @@ import { formatBytes } from '@/shared/utils/format';
 import { LibraryItem } from '@/core/types';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const scale = (size: number) => (size / 402) * SCREEN_WIDTH;
+import { colors, scale, spacing, radius } from '@/shared/theme';
 
 const COLORS = {
-  background: '#000000',
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.6)',
-  accent: '#4ADE80',
-  danger: '#DC2626',
-  cardBg: 'rgba(255, 255, 255, 0.08)',
+  background: colors.backgroundPrimary,
+  textPrimary: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  accent: colors.success,
+  danger: colors.error,
+  cardBg: colors.cardBackground,
 };
 
 // Helper to extract metadata safely

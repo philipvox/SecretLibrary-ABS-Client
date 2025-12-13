@@ -8,17 +8,19 @@
  */
 
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
+import {
+  colors,
+  spacing,
+  elevation,
+  sizes,
+} from '@/shared/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Design constants - matching Anima design
+// Design constants
 const TAB_BAR_HEIGHT = 56;
-const ACCENT_COLOR = '#F4B60C'; // Golden yellow accent
-const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.6)';
 
 interface BottomTabBarProps {
   currentRoute: string;
@@ -55,8 +57,8 @@ export function BottomTabBar({ currentRoute, onNavigate, bottomOffset = 0 }: Bot
         >
           <Ionicons
             name={isSearchActive ? 'search' : 'search-outline'}
-            size={26}
-            color={isSearchActive ? ACCENT_COLOR : INACTIVE_COLOR}
+            size={sizes.iconLg}
+            color={isSearchActive ? colors.accent : colors.textSecondary}
           />
         </TouchableOpacity>
 
@@ -69,8 +71,8 @@ export function BottomTabBar({ currentRoute, onNavigate, bottomOffset = 0 }: Bot
         >
           <Ionicons
             name={isPlaying ? 'pause' : 'play'}
-            size={28}
-            color={hasAudio ? '#000' : 'rgba(0,0,0,0.3)'}
+            size={sizes.iconLg}
+            color={hasAudio ? colors.backgroundPrimary : colors.textMuted}
           />
         </TouchableOpacity>
 
@@ -82,8 +84,8 @@ export function BottomTabBar({ currentRoute, onNavigate, bottomOffset = 0 }: Bot
         >
           <Ionicons
             name={isHomeActive ? 'home' : 'home-outline'}
-            size={26}
-            color={isHomeActive ? ACCENT_COLOR : INACTIVE_COLOR}
+            size={sizes.iconLg}
+            color={isHomeActive ? colors.accent : colors.textSecondary}
           />
         </TouchableOpacity>
       </View>
@@ -103,29 +105,25 @@ const styles = StyleSheet.create({
     height: TAB_BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing['4xl'],
   },
   tab: {
-    width: 56,
-    height: 56,
+    width: TAB_BAR_HEIGHT,
+    height: TAB_BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: ACCENT_COLOR,
+    width: TAB_BAR_HEIGHT,
+    height: TAB_BAR_HEIGHT,
+    borderRadius: TAB_BAR_HEIGHT / 2,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACCENT_COLOR,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    ...elevation.glow,
   },
   playButtonDisabled: {
-    backgroundColor: 'rgba(200, 255, 0, 0.3)',
+    backgroundColor: colors.accentSubtle,
     shadowOpacity: 0,
   },
 });
