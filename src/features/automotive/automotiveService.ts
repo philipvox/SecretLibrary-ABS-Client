@@ -42,6 +42,9 @@ class AutomotiveService {
 
   // CarPlay-specific state (when react-native-carplay is installed)
   private carPlayModule: any = null;
+  private continueListeningTemplate: any = null;
+  private downloadsTemplate: any = null;
+  private libraryCacheUnsubscribe: (() => void) | null = null;
 
   /**
    * Initialize the automotive service

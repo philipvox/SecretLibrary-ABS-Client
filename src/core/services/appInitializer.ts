@@ -111,6 +111,11 @@ class AppInitializer {
     });
 
     this.isReady = true;
+
+    // Initialize automotive (CarPlay/Android Auto) in background
+    // Don't await - this doesn't need to block app startup
+    this.initAutomotive();
+
     return result;
   }
 
@@ -149,6 +154,20 @@ class AppInitializer {
       console.log('[AppInitializer] Completion store hydrated');
     } catch (err) {
       console.warn('[AppInitializer] Completion store hydration failed:', err);
+    }
+  }
+
+  private async initAutomotive(): Promise<void> {
+    try {
+      const { automotiveService } = await import('@/features/automotive');
+      await automotiveService.init({
+        appName: 'Secret Library',
+        enableCarPlay: true,
+        enableAndroidAuto: true,
+      });
+      console.log('[AppInitializer] Automotive service initialized');
+    } catch (err) {
+      console.warn('[AppInitializer] Automotive initialization failed:', err);
     }
   }
 
