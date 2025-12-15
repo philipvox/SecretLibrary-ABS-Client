@@ -24,6 +24,14 @@ const ACCENT_DIM = 'rgba(243,182,12,0.5)';
 interface SeriesCardProps {
   series: SeriesInfo;
   showProgress?: boolean;
+  /** Set of downloaded book IDs (for download status indicator) */
+  downloadedIds?: Set<string>;
+}
+
+interface UpNextInfo {
+  title: string;
+  duration: number;
+  id: string;
 }
 
 // Progress dot component
@@ -57,7 +65,7 @@ function ProgressDot({
   );
 }
 
-function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
+function SeriesCardComponent({ series, showProgress = true, downloadedIds }: SeriesCardProps) {
   const navigation = useNavigation<any>();
 
   const handlePress = () => {
@@ -106,6 +114,52 @@ function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
   const hasProgress = progressStats.completed > 0 || progressStats.inProgress > 0;
   const isComplete = progressStats.completed === series.bookCount;
 
+  // Calculate completion percentage for progress bar
+  const completionPercent = series.bookCount > 0
+    ? Math.round((progressStats.completed / series.bookCount) * 100)
+    : 0;
+
+  // Find the "Up next" book (first not-started or first in-progress)
+  const upNextBook = useMemo((): UpNextInfo | null => {
+    if (!series.books || isComplete) return null;
+
+    // Sort by sequence
+    const sortedBooks = [...series.books].sort((a, b) => {
+      const aSeq = (a.media?.metadata as any)?.series?.[0]?.sequence || 0;
+      const bSeq = (b.media?.metadata as any)?.series?.[0]?.sequence || 0;
+      return parseFloat(aSeq) - parseFloat(bSeq);
+    });
+
+    // First, look for a book in progress
+    const inProgressBook = sortedBooks.find(book => {
+      const progress = (book as any).userMediaProgress?.progress || 0;
+      return progress > 0 && progress < 0.95;
+    });
+
+    if (inProgressBook) {
+      const title = (inProgressBook.media?.metadata as any)?.title || 'Unknown';
+      const duration = (inProgressBook.media as any)?.duration || 0;
+      return { title, duration, id: inProgressBook.id };
+    }
+
+    // Then look for first not started
+    const nextBook = sortedBooks.find(book => {
+      const progress = (book as any).userMediaProgress?.progress || 0;
+      return progress < 0.95;
+    });
+
+    if (nextBook) {
+      const title = (nextBook.media?.metadata as any)?.title || 'Unknown';
+      const duration = (nextBook.media as any)?.duration || 0;
+      return { title, duration, id: nextBook.id };
+    }
+
+    return null;
+  }, [series.books, isComplete]);
+
+  // Check if up next book is downloaded
+  const upNextIsDownloaded = upNextBook && downloadedIds?.has(upNextBook.id);
+
   // Limit dots shown (max 10, then show indicator)
   const maxDots = 10;
   const showAllDots = series.bookCount <= maxDots;
@@ -119,10 +173,19 @@ function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
     ? formatDuration(progressStats.remainingDuration)
     : null;
 
+  // Build accessibility label
+  const progressLabel = hasProgress
+    ? isComplete
+      ? 'Complete'
+      : `${progressStats.completed} of ${series.bookCount} books completed`
+    : `${series.bookCount} books`;
+
   return (
     <Pressable
       style={({ pressed }) => [styles.container, pressed && styles.pressed]}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${series.name} series, ${progressLabel}${upNextBook && !isComplete ? `, up next: ${upNextBook.title}${upNextIsDownloaded ? ', downloaded' : ''}` : ''}`}
     >
       <View style={styles.coverContainer}>
         <StackedCovers
@@ -146,42 +209,57 @@ function SeriesCardComponent({ series, showProgress = true }: SeriesCardProps) {
           {series.name}
         </Text>
 
-        {/* Progress dots - only show if there's progress */}
+        {/* Progress Section - show if there's any progress */}
         {showProgress && hasProgress && (
-          <View style={styles.progressRow}>
-            <View style={styles.progressDots}>
-              {Array.from({ length: dotsToShow }).map((_, i) => {
-                let status: 'completed' | 'in_progress' | 'not_started';
-                if (i < progressStats.completed) {
-                  status = 'completed';
-                } else if (i < progressStats.completed + progressStats.inProgress) {
-                  status = 'in_progress';
-                } else {
-                  status = 'not_started';
-                }
-                return <ProgressDot key={i} status={status} />;
-              })}
-              {!showAllDots && (
-                <Text style={styles.moreText}>+{series.bookCount - maxDots + 1}</Text>
+          <View style={styles.progressSection}>
+            {/* Progress bar */}
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarBg}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${completionPercent}%` }
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* Progress text */}
+            <View style={styles.progressTextRow}>
+              <Text style={styles.progressText}>
+                {isComplete ? (
+                  '✓ Complete!'
+                ) : (
+                  `${progressStats.completed} of ${series.bookCount} completed`
+                )}
+              </Text>
+              {!isComplete && remainingText && (
+                <Text style={styles.remainingText}>~{remainingText}</Text>
               )}
             </View>
-            <Text style={styles.progressCount}>
-              {progressStats.completed}/{series.bookCount}
-            </Text>
+
+            {/* Up next indicator */}
+            {upNextBook && !isComplete && (
+              <View style={styles.upNextContainer}>
+                <Text style={styles.upNextText} numberOfLines={1}>
+                  ↳ Up next: {upNextBook.title}
+                </Text>
+                <Text style={styles.upNextMeta}>
+                  {formatDuration(upNextBook.duration)}
+                  {upNextIsDownloaded && ' · Downloaded ✓'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
-        {/* Book count and duration */}
-        <Text style={styles.bookCount} numberOfLines={1}>
-          {hasProgress && remainingText ? (
-            `~${remainingText} left`
-          ) : (
-            <>
-              {series.bookCount} {series.bookCount === 1 ? 'book' : 'books'}
-              {durationText && ` • ${durationText}`}
-            </>
-          )}
-        </Text>
+        {/* Book count and duration - show if no progress */}
+        {!hasProgress && (
+          <Text style={styles.bookCount} numberOfLines={1}>
+            {series.bookCount} {series.bookCount === 1 ? 'book' : 'books'}
+            {durationText && ` • ${durationText}`}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -237,29 +315,53 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     lineHeight: 20,
   },
-  progressRow: {
+  progressSection: {
+    marginTop: spacing.xs,
+  },
+  progressBarContainer: {
+    marginBottom: spacing.xs,
+  },
+  progressBarBg: {
+    height: scale(4),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: scale(2),
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: ACCENT,
+    borderRadius: scale(2),
+  },
+  progressTextRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs,
   },
-  progressDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(3),
+  progressText: {
+    fontSize: scale(11),
+    fontWeight: '500',
+    color: ACCENT,
   },
-  moreText: {
+  remainingText: {
     fontSize: scale(10),
     color: colors.textTertiary,
-    marginLeft: scale(2),
   },
-  progressCount: {
-    fontSize: scale(11),
-    fontWeight: '600',
-    color: ACCENT,
+  upNextContainer: {
+    marginTop: scale(4),
+  },
+  upNextText: {
+    fontSize: scale(10),
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  upNextMeta: {
+    fontSize: scale(9),
+    color: colors.textTertiary,
+    marginTop: scale(1),
   },
   bookCount: {
     fontSize: 13,
     color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 });

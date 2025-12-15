@@ -97,6 +97,7 @@ export { AlphabetScrubber } from './AlphabetScrubber';
 // =============================================================================
 export { ProgressDots } from './ProgressDots';
 export { SeriesProgressBadge } from './SeriesProgressBadge';
+export { ThumbnailProgressBar } from './ThumbnailProgressBar';
 
 // =============================================================================
 // STACKED COVERS

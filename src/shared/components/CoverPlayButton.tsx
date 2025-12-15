@@ -36,30 +36,32 @@ const SCREEN_WIDTH = wp(100);
 
 const SCRUB_CONFIG = {
   DRAG_THRESHOLD: 8,        // pt - movement needed to enter scrub mode
-  MAX_DISPLACEMENT: 140,    // pt - maximum drag distance from center (to pill edges)
-  DEAD_ZONE: 15,            // pt - no scrub in this zone
+  MAX_DISPLACEMENT: 200,    // pt - maximum drag distance (per UX spec)
+  DEAD_ZONE: 20,            // pt - no scrub in this zone (per UX spec)
   LONG_PRESS_DURATION: 500, // ms - threshold for opening player
   HAPTIC_INTERVAL_MS: 30000,// ms of audio scrubbed between haptic ticks
 
-  // Speed zones: displacement → seconds of audio per second of real time
-  // Spread across full 140pt range to reach pill edges
+  // Speed zones per UX spec: displacement → speed multiplier
+  // 0-20px: dead, 20-60px: 1x, 60-100px: 2x, 100-150px: 5x, 150-200px: 10x, 200px+: 20x
   SPEED_ZONES: [
-    { displacement: 15, speed: 0, label: 'dead' },
-    { displacement: 45, speed: 0.5, label: '0.5x' },   // 0.5x realtime
-    { displacement: 75, speed: 2, label: '2x' },       // 2x realtime
-    { displacement: 105, speed: 30, label: '30s/s' },  // 30 seconds per second
-    { displacement: 125, speed: 120, label: '2m/s' },  // 2 minutes per second
-    { displacement: 140, speed: 300, label: '5m/s' },  // 5 minutes per second
+    { displacement: 20, speed: 0, label: '' },          // Dead zone
+    { displacement: 60, speed: 1, label: '1x' },        // 1x realtime
+    { displacement: 100, speed: 2, label: '2x' },       // 2x realtime
+    { displacement: 150, speed: 5, label: '5x' },       // 5x realtime
+    { displacement: 200, speed: 10, label: '10x' },     // 10x realtime
   ],
+
+  // Max speed when held at max displacement
+  MAX_SPEED: 20, // 20x realtime
 
   // Max playback rate for audible scrubbing
   MAX_AUDIBLE_RATE: 4,
 
-  // Time-based ramp at max displacement
-  RAMP_THRESHOLD: 125,
-  RAMP_DELAY_MS: 2000,
+  // Time-based ramp at max displacement (accelerate over time)
+  RAMP_THRESHOLD: 180,
+  RAMP_DELAY_MS: 1500,
   RAMP_DURATION_MS: 1000,
-  RAMP_MAX_SPEED: 600,  // 10 minutes per second at max ramp
+  RAMP_MAX_SPEED: 20,  // 20x realtime at max ramp
 
   // Spring animation for snap back
   SPRING_CONFIG: {
@@ -168,6 +170,16 @@ function getSpeedZoneIndex(displacement: number): number {
 // COMPONENT
 // ============================================================================
 
+export interface JogState {
+  isActive: boolean;
+  direction: 'forward' | 'backward' | null;
+  speedMultiplier: number;  // 1x, 2x, 5x, etc.
+  speedLabel: string;       // "2x", "5x", etc.
+  currentPosition: number;
+  targetPosition: number;
+  offset: number;           // seconds offset from start
+}
+
 interface CoverPlayButtonProps {
   onOpenPlayer?: () => void;
   size?: number;
@@ -175,6 +187,8 @@ interface CoverPlayButtonProps {
   onScrubSpeedChange?: (speed: number) => void;
   /** Called with scrub offset in seconds (negative = backward) during scrubbing */
   onScrubOffsetChange?: (offset: number, isScrubbing: boolean) => void;
+  /** Called with full jog state for parent to render overlay */
+  onJogStateChange?: (state: JogState) => void;
 }
 
 export function CoverPlayButton({
@@ -182,6 +196,7 @@ export function CoverPlayButton({
   size = BUTTON_SIZE,
   onScrubSpeedChange,
   onScrubOffsetChange,
+  onJogStateChange,
 }: CoverPlayButtonProps) {
   const currentBook = usePlayerStore((s) => s.currentBook);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -207,6 +222,9 @@ export function CoverPlayButton({
   const [tooltipText, setTooltipText] = useState('+00:00');
   const [scrubPosition, setScrubPosition] = useState(0);
   const [speedLabel, setSpeedLabel] = useState('');
+  const [scrubDirection, setScrubDirection] = useState<'forward' | 'backward' | null>(null);
+  const [currentSpeedMultiplier, setCurrentSpeedMultiplier] = useState(0);
+  const [isJogActive, setIsJogActive] = useState(false);
 
   // Refs
   const scrubIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -215,9 +233,10 @@ export function CoverPlayButton({
   const timeAtMaxRef = useRef(0);
   const currentSpeedZoneRef = useRef(0);
   const hasTriggeredRampHapticRef = useRef(false);
-  const isAudioPlayingRef = useRef(false);  // Track if audio is playing during scrub
   const lastSeekTimeRef = useRef(0);  // Throttle seek calls
   const lastSeekPositionRef = useRef(0);  // Track last seeked position
+  // Chapter boundary refs - store bounds at scrub start to prevent scrubbing past chapter
+  const chapterBoundsRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
   const positionRef = useRef(position);
   useEffect(() => {
@@ -252,6 +271,9 @@ export function CoverPlayButton({
     setTooltipText('+00:00');
     setScrubPosition(positionRef.current);
     setSpeedLabel('');
+    setScrubDirection(null);
+    setCurrentSpeedMultiplier(0);
+    setIsJogActive(true);
     lastHapticPositionRef.current = positionRef.current;
     wasPlayingRef.current = isPlaying;
     timeAtMaxRef.current = 0;
@@ -260,8 +282,27 @@ export function CoverPlayButton({
     lastSeekTimeRef.current = 0;
     lastSeekPositionRef.current = positionRef.current;
 
+    // Store chapter bounds at scrub start to prevent scrubbing past chapter
+    const chapter = findChapterAtPosition(positionRef.current);
+    if (chapter) {
+      chapterBoundsRef.current = { start: chapter.start, end: chapter.end };
+    } else {
+      chapterBoundsRef.current = { start: 0, end: duration };
+    }
+
     // Notify parent that scrubbing started
     onScrubOffsetChange?.(0, true);
+
+    // Notify parent of initial jog state
+    onJogStateChange?.({
+      isActive: true,
+      direction: null,
+      speedMultiplier: 0,
+      speedLabel: '',
+      currentPosition: positionRef.current,
+      targetPosition: positionRef.current,
+      offset: 0,
+    });
 
     // Tell audio service we're scrubbing (enables optimizations)
     audioService.setScrubbing(true);
@@ -282,7 +323,10 @@ export function CoverPlayButton({
       const baseSpeed = calculateScrubSpeed(translateX.value);
       const absDisplacement = Math.abs(translateX.value);
 
-      // Speed zone haptic
+      // Determine direction
+      const direction: 'forward' | 'backward' | null = baseSpeed > 0 ? 'forward' : baseSpeed < 0 ? 'backward' : null;
+
+      // Speed zone haptic and label update
       const newZone = getSpeedZoneIndex(translateX.value);
       if (newZone !== currentSpeedZoneRef.current && newZone > 0) {
         if (newZone > currentSpeedZoneRef.current) {
@@ -291,12 +335,19 @@ export function CoverPlayButton({
           haptics.impact('light');
         }
         currentSpeedZoneRef.current = newZone;
-        setSpeedLabel(SCRUB_CONFIG.SPEED_ZONES[newZone].label);
+        const label = SCRUB_CONFIG.SPEED_ZONES[newZone].label;
+        setSpeedLabel(label);
+        setCurrentSpeedMultiplier(SCRUB_CONFIG.SPEED_ZONES[newZone].speed);
       }
+
+      // Update direction state
+      setScrubDirection(direction);
 
       // When in dead zone, stop disc rotation
       if (baseSpeed === 0) {
         onScrubSpeedChange?.(0);
+        setScrubDirection(null);
+        setCurrentSpeedMultiplier(0);
       }
 
       if (baseSpeed !== 0) {
@@ -333,11 +384,16 @@ export function CoverPlayButton({
 
         const deltaPosition = speed * deltaTime;
         const newOffset = currentScrubOffset.value + deltaPosition;
+        // Clamp to chapter bounds - can't scrub past current chapter
         const newPosition = clamp(
           scrubStartPosition.value + newOffset,
-          0,
-          duration
+          chapterBoundsRef.current.start,
+          chapterBoundsRef.current.end
         );
+
+        // Check if we've hit a chapter boundary
+        const atBoundary = (speed > 0 && newPosition >= chapterBoundsRef.current.end - 0.1) ||
+                          (speed < 0 && newPosition <= chapterBoundsRef.current.start + 0.1);
 
         currentScrubOffset.value = newPosition - scrubStartPosition.value;
 
@@ -348,48 +404,36 @@ export function CoverPlayButton({
         // Notify parent of scrub offset
         onScrubOffsetChange?.(offset, true);
 
-        // Audio feedback during scrubbing - tape-style sound
-        // Rapid seeking while playing creates choppy tape FF/RW effect
+        // Notify parent of full jog state
+        onJogStateChange?.({
+          isActive: true,
+          direction,
+          speedMultiplier: Math.abs(speed),
+          speedLabel: speedLabel || `${Math.abs(speed).toFixed(0)}x`,
+          currentPosition: scrubStartPosition.value,
+          targetPosition: newPosition,
+          offset,
+        });
 
-        if (speed !== 0) {
-          // Throttle audio seeks to every 16ms (60fps) for smooth performance
-          // Animation continues at full speed via onScrubSpeedChange
-          const now = Date.now();
-          const timeSinceLastSeek = now - lastSeekTimeRef.current;
-          const positionDelta = Math.abs(newPosition - lastSeekPositionRef.current);
-
-          // Seek if: 16ms passed AND position changed by at least 0.1s
-          // This reduces seek calls while maintaining responsiveness
-          if (timeSinceLastSeek >= 16 && positionDelta >= 0.1) {
-            lastSeekTimeRef.current = now;
-            lastSeekPositionRef.current = newPosition;
-
-            // Play at 2x for energetic tape sound
-            if (!isAudioPlayingRef.current) {
-              audioService.setPlaybackRate(2);
-              audioService.play();
-              isAudioPlayingRef.current = true;
-            }
-            audioService.seekTo(newPosition);
+        // If at boundary, stop disc rotation
+        if (atBoundary) {
+          onScrubSpeedChange?.(0);
+          // Haptic feedback for hitting boundary (only once)
+          if (Math.abs(newPosition - lastHapticPositionRef.current) > 0.5) {
+            haptics.error();
+            lastHapticPositionRef.current = newPosition;
           }
-        } else {
-          // Dead zone - pause audio
-          if (isAudioPlayingRef.current) {
-            audioService.pause();
-            isAudioPlayingRef.current = false;
-          }
+          return; // Don't try to seek further
         }
+
+        // NOTE: Audio feedback during scrubbing disabled - caused duplicate audio bug
+        // when scrubbing for extended periods. The seek will be performed at endScrub.
 
         // Haptic tick every 30s
         const scrubbed = Math.abs(newPosition - lastHapticPositionRef.current);
         if (scrubbed >= SCRUB_CONFIG.HAPTIC_INTERVAL_MS / 1000) {
           haptics.seek();
           lastHapticPositionRef.current = newPosition;
-        }
-
-        // Boundary haptic
-        if (newPosition <= 0 || newPosition >= duration) {
-          haptics.error();
         }
       }
     }, 1); // Ultra-fast for aggressive tape sound effect
@@ -401,24 +445,34 @@ export function CoverPlayButton({
       scrubIntervalRef.current = null;
     }
 
-    // Stop scrub audio and reset playback rate
-    if (isAudioPlayingRef.current) {
-      audioService.pause();
-      isAudioPlayingRef.current = false;
-    }
-    // Reset to user's preferred playback rate
-    audioService.setPlaybackRate(playbackRate);
-
     // Reset disc rotation speed
     onScrubSpeedChange?.(0);
+
+    // Reset jog state
+    setIsJogActive(false);
+    setScrubDirection(null);
+    setCurrentSpeedMultiplier(0);
+    setSpeedLabel('');
 
     // Notify parent that scrubbing ended
     onScrubOffsetChange?.(0, false);
 
+    // Notify parent jog ended
+    onJogStateChange?.({
+      isActive: false,
+      direction: null,
+      speedMultiplier: 0,
+      speedLabel: '',
+      currentPosition: 0,
+      targetPosition: 0,
+      offset: 0,
+    });
+
+    // Clamp to chapter bounds
     const finalPosition = clamp(
       scrubStartPosition.value + currentScrubOffset.value,
-      0,
-      duration
+      chapterBoundsRef.current.start,
+      chapterBoundsRef.current.end
     );
 
     // Tell audio service scrubbing ended (triggers any pending track switch)

@@ -5,7 +5,7 @@
  * Options: All, In Progress, Not Started, Completed
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { colors, scale, spacing, radius } from '@/shared/theme';
 
 const ACCENT = colors.accent;
@@ -49,6 +50,11 @@ export function FilterChips({ selected, onSelect, counts }: FilterChipsProps) {
     }
   };
 
+  const handleSelect = useCallback((filter: FilterOption) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSelect(filter);
+  }, [onSelect]);
+
   return (
     <ScrollView
       horizontal
@@ -63,8 +69,11 @@ export function FilterChips({ selected, onSelect, counts }: FilterChipsProps) {
           <TouchableOpacity
             key={filter.value}
             style={[styles.chip, isSelected && styles.chipSelected]}
-            onPress={() => onSelect(filter.value)}
+            onPress={() => handleSelect(filter.value)}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
+            accessibilityLabel={`Filter by ${filter.label}${count !== undefined ? `, ${count} items` : ''}`}
           >
             <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
               {filter.label}

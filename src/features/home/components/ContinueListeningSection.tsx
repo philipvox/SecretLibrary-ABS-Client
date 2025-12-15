@@ -132,7 +132,7 @@ export function ContinueListeningSection({
       <FlatList
         data={books}
         renderItem={renderCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}

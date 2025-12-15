@@ -288,6 +288,11 @@ let currentLoadId = 0;
 let lastProgressSave = 0;
 let lastFinishedBookId: string | null = null; // Track which book we've already handled finish for
 let seekInterval: NodeJS.Timeout | null = null;
+
+// Track when seek was last committed to prevent stale position updates
+// Position updates are ignored for SEEK_SETTLING_MS after a seek completes
+let lastSeekCommitTime = 0;
+const SEEK_SETTLING_MS = 300; // Ignore position updates for 300ms after seeking
 let lastLoadTime = 0;
 let lastBookFinishTime = 0;
 const LOAD_DEBOUNCE_MS = 300;
@@ -1255,6 +1260,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Ensure audio is at final position
       await audioService.seekTo(seekPosition);
 
+      // Record when we committed the seek - prevents stale position overwrites
+      lastSeekCommitTime = Date.now();
+
       // Exit seeking mode and commit position
       set({
         isSeeking: false,
@@ -1276,6 +1284,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Return to original position
       await audioService.seekTo(seekStartPosition);
 
+      // Record when we committed the seek - prevents stale position overwrites
+      lastSeekCommitTime = Date.now();
+
       set({
         isSeeking: false,
         seekPosition: seekStartPosition,
@@ -1292,6 +1303,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Brief seeking state for instant seek
       set({ isSeeking: true });
       await audioService.seekTo(clampedPosition);
+
+      // Record when we committed the seek - prevents stale position overwrites
+      lastSeekCommitTime = Date.now();
+
       set({
         isSeeking: false,
         position: clampedPosition,
@@ -1693,18 +1708,24 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       }
 
       // =====================================================================
-      // CRITICAL: Don't update position while seeking
+      // CRITICAL: Don't update position while seeking OR during settling period
       // This is the key fix for the rewind/chapter jump bug
       // =====================================================================
-      if (isSeeking) {
+      const timeSinceSeek = Date.now() - lastSeekCommitTime;
+      const inSettlingPeriod = timeSinceSeek < SEEK_SETTLING_MS;
+
+      if (isSeeking || inSettlingPeriod) {
         // Only update non-position state
+        if (inSettlingPeriod && !isSeeking) {
+          audioLog.debug(`Position update ignored (settling: ${timeSinceSeek}ms since seek)`);
+        }
         if (!isLoading) {
           const newIsPlaying = state.isBuffering ? wasPlaying : state.isPlaying;
           set({
             isPlaying: newIsPlaying,
             ...(shouldUpdateDuration && { duration: displayDuration }),
             isBuffering: state.isBuffering,
-            // DO NOT update position - we're seeking
+            // DO NOT update position - we're seeking or settling
           });
         } else {
           set({

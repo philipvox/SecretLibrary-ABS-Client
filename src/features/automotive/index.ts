@@ -11,3 +11,8 @@ export {
   useAutomotiveActions,
   useAutomotive,
 } from './useAutomotive';
+export {
+  updateAndroidAutoBrowseData,
+  getAndroidAutoBrowseData,
+  clearAndroidAutoBrowseData,
+} from './androidAutoBridge';

@@ -99,6 +99,10 @@ class AudioService {
   private pendingTrackSwitch: { trackIndex: number; positionInTrack: number } | null = null;
   private trackSwitchTimeout: NodeJS.Timeout | null = null;
 
+  // Track switch synchronization - prevents stale position updates during switch
+  private trackSwitchInProgress = false;
+  private trackSwitchStartTime = 0;
+
   constructor() {
     // Pre-warm on construction - don't await, let it run in background
     this.setupPromise = this.setup();
@@ -511,6 +515,18 @@ class AudioService {
     const updateProgress = () => {
       if (!this.isLoaded || !this.player) return;
 
+      // Skip position updates during track switch to prevent stale values
+      // Allow updates after 500ms timeout as a fallback
+      if (this.trackSwitchInProgress) {
+        const elapsed = Date.now() - this.trackSwitchStartTime;
+        if (elapsed < 500) {
+          return; // Skip this update
+        }
+        // Fallback: clear the flag after timeout
+        log('Track switch timeout - clearing flag');
+        this.trackSwitchInProgress = false;
+      }
+
       try {
         const position = this.getGlobalPositionSync();
         const isPlaying = this.player.playing;
@@ -893,6 +909,7 @@ class AudioService {
 
   /**
    * Execute a track switch - separated for debouncing during scrubbing
+   * Uses pendingSeekAfterLoad to ensure seek happens after track is ready
    */
   private async executeTrackSwitch(targetTrackIndex: number, positionInTrack: number): Promise<void> {
     if (!this.player) return;
@@ -902,6 +919,10 @@ class AudioService {
     const newTrack = this.tracks[targetTrackIndex];
 
     log(`⏩ Track switch → ${targetTrackIndex}, pos ${positionInTrack.toFixed(1)}s`);
+
+    // Set flag to suppress stale position updates during switch
+    this.trackSwitchInProgress = true;
+    this.trackSwitchStartTime = Date.now();
 
     // Check if we have this track preloaded for instant switch
     if (this.preloadedTrackIndex === targetTrackIndex && this.preloadPlayer) {
@@ -915,19 +936,52 @@ class AudioService {
       if (wasPlaying) {
         this.player.play();
       }
+      // Clear flag after a short delay to let the seek take effect
+      setTimeout(() => {
+        this.trackSwitchInProgress = false;
+      }, 100);
       return;
     }
+
+    // Store the desired seek position - will be applied after track loads
+    this.pendingSeekAfterLoad = positionInTrack;
 
     // Load the new track
     this.player.replace({ uri: newTrack.url });
 
-    // Minimal wait - just enough for player to initialize
-    // Don't block - seek and play immediately
-    this.player.seekTo(positionInTrack);
+    // Wait for the player to be ready before seeking
+    // expo-audio needs time to initialize after replace()
+    await this.waitForTrackReady();
+
+    // Now perform the seek
+    if (this.pendingSeekAfterLoad !== null) {
+      log(`📍 Applying pending seek to ${this.pendingSeekAfterLoad.toFixed(1)}s`);
+      this.player.seekTo(this.pendingSeekAfterLoad);
+      this.pendingSeekAfterLoad = null;
+    }
 
     if (wasPlaying) {
       this.player.play();
     }
+
+    // Clear flag after seek is complete
+    this.trackSwitchInProgress = false;
+  }
+
+  /**
+   * Wait for the current track to be ready for seeking
+   * Polls player.duration until it's available (indicates track is loaded)
+   */
+  private async waitForTrackReady(maxWaitMs: number = 300): Promise<void> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWaitMs) {
+      if (this.player && this.player.duration > 0) {
+        log(`Track ready after ${Date.now() - startTime}ms, duration: ${this.player.duration.toFixed(1)}s`);
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    log(`Warning: Track ready timeout after ${maxWaitMs}ms`);
   }
 
   /**

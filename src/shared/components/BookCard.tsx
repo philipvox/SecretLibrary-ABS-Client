@@ -34,6 +34,7 @@ import {
   formatProgress,
   formatDuration,
 } from '@/shared/theme';
+import { ThumbnailProgressBar } from './ThumbnailProgressBar';
 
 // Download Icon
 const DownloadIcon = ({ size = 20, color = '#fff' }: { size?: number; color?: string }) => (
@@ -77,6 +78,19 @@ const CheckIcon = ({ size = 14, color = '#000' }: { size?: number; color?: strin
       d="M5 12l5 5 9-9"
       stroke={color}
       strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+// Cloud Icon for streaming
+const CloudIcon = ({ size = 14, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"
+      stroke={color}
+      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
     />
@@ -144,6 +158,11 @@ export interface BookCardProps {
    * - default: Shows author
    */
   context?: BookCardContext;
+  /** Show download/stream status badge on cover:
+   * - Downloaded: gold checkmark ✓
+   * - Streaming: blue cloud ☁
+   */
+  showStatusBadge?: boolean;
 }
 
 export function BookCard({
@@ -153,6 +172,7 @@ export function BookCard({
   actionType = 'auto',
   onPlayPress,
   context = 'browse',
+  showStatusBadge = false,
 }: BookCardProps) {
   // State from hooks
   const { isDownloaded, isDownloading, progress } = useDownloadStatus(book.id);
@@ -246,6 +266,11 @@ export function BookCard({
             contentFit="cover"
           />
 
+          {/* Progress bar overlay at bottom of cover */}
+          {showListeningProgress && (
+            <ThumbnailProgressBar progress={userProgress?.progress || 0} />
+          )}
+
           {/* Queue button on cover - only for downloaded books */}
           {isDownloaded && !isNowPlaying && (
             <TouchableOpacity
@@ -261,6 +286,17 @@ export function BookCard({
                 )}
               </Animated.View>
             </TouchableOpacity>
+          )}
+
+          {/* Download/Stream status badge */}
+          {showStatusBadge && !isDownloading && (
+            <View style={[styles.statusBadge, isDownloaded ? styles.downloadedBadge : styles.streamBadge]}>
+              {isDownloaded ? (
+                <CheckIcon size={10} color="#000" />
+              ) : (
+                <CloudIcon size={10} color="#fff" />
+              )}
+            </View>
           )}
         </View>
 
@@ -354,6 +390,22 @@ const styles = StyleSheet.create({
   queueButtonActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: spacing.xxs,
+    left: spacing.xxs,
+    width: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadedBadge: {
+    backgroundColor: colors.accent,
+  },
+  streamBadge: {
+    backgroundColor: 'rgba(100, 150, 255, 0.9)',
   },
   info: {
     flex: 1,

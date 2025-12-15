@@ -1,10 +1,13 @@
 /**
  * src/features/library/components/StorageSummary.tsx
  *
- * Storage summary component showing download storage usage
+ * Enhanced storage summary component with:
+ * - Visual progress bar showing device storage usage
+ * - Book count
+ * - Available space indicator
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,12 +15,14 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, scale, spacing, radius } from '@/shared/theme';
+import * as FileSystem from 'expo-file-system';
+import { colors, scale } from '@/shared/theme';
 
 const ACCENT = colors.accent;
 
 interface StorageSummaryProps {
   usedBytes: number;
+  bookCount?: number;
   onManagePress?: () => void;
 }
 
@@ -29,35 +34,62 @@ function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-export function StorageSummary({ usedBytes, onManagePress }: StorageSummaryProps) {
+export function StorageSummary({ usedBytes, bookCount = 0, onManagePress }: StorageSummaryProps) {
+  const [availableBytes, setAvailableBytes] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchStorageInfo() {
+      try {
+        const info = await FileSystem.getFreeDiskStorageAsync();
+        setAvailableBytes(info);
+      } catch {
+        // Fallback if we can't get storage info
+        setAvailableBytes(null);
+      }
+    }
+    fetchStorageInfo();
+  }, []);
+
   if (usedBytes === 0) return null;
+
+  // Calculate percentage of device storage used by downloads
+  const totalStorage = availableBytes ? availableBytes + usedBytes : null;
+  const usagePercent = totalStorage ? Math.min((usedBytes / totalStorage) * 100, 100) : 5;
 
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
-        <View style={styles.infoRow}>
-          <Ionicons name="folder-outline" size={scale(18)} color="rgba(255,255,255,0.6)" />
-          <Text style={styles.label}>Storage</Text>
+      {/* Header row */}
+      <View style={styles.headerRow}>
+        <View style={styles.iconLabel}>
+          <Ionicons name="cloud-download" size={scale(16)} color={ACCENT} />
+          <Text style={styles.headerText}>Downloaded</Text>
         </View>
+        <Text style={styles.usedText}>{formatBytes(usedBytes)}</Text>
+      </View>
 
-        <View style={styles.valueRow}>
-          <Text style={styles.value}>{formatBytes(usedBytes)} used</Text>
-          {onManagePress && (
-            <TouchableOpacity
-              style={styles.manageButton}
-              onPress={onManagePress}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.manageText}>Manage</Text>
-              <Ionicons name="chevron-forward" size={14} color={ACCENT} />
-            </TouchableOpacity>
-          )}
+      {/* Progress bar */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${usagePercent}%` }]} />
         </View>
       </View>
 
-      {/* Progress bar showing approximate usage */}
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: '30%' }]} />
+      {/* Details row */}
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailText}>
+          {bookCount} {bookCount === 1 ? 'book' : 'books'}
+          {availableBytes && ` · ${formatBytes(availableBytes)} available`}
+        </Text>
+        {onManagePress && (
+          <TouchableOpacity
+            style={styles.manageButton}
+            onPress={onManagePress}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.manageText}>Manage</Text>
+            <Ionicons name="chevron-forward" size={scale(12)} color={ACCENT} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -67,34 +99,55 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: scale(20),
     marginVertical: scale(16),
-    padding: scale(16),
+    padding: scale(14),
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: scale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  row: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: scale(10),
   },
-  infoRow: {
+  iconLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(8),
   },
-  label: {
+  headerText: {
     fontSize: scale(14),
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
-  valueRow: {
+  usedText: {
+    fontSize: scale(14),
+    fontWeight: '600',
+    color: ACCENT,
+  },
+  progressContainer: {
+    marginBottom: scale(10),
+  },
+  progressBar: {
+    height: scale(6),
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: scale(3),
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: ACCENT,
+    borderRadius: scale(3),
+  },
+  detailsRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: scale(12),
   },
-  value: {
-    fontSize: scale(13),
-    color: 'rgba(255,255,255,0.6)',
+  detailText: {
+    fontSize: scale(12),
+    color: colors.textSecondary,
   },
   manageButton: {
     flexDirection: 'row',
@@ -102,19 +155,8 @@ const styles = StyleSheet.create({
     gap: scale(4),
   },
   manageText: {
-    fontSize: scale(13),
+    fontSize: scale(12),
     fontWeight: '500',
     color: ACCENT,
-  },
-  progressBar: {
-    height: scale(4),
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: scale(2),
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: ACCENT,
-    borderRadius: scale(2),
   },
 });

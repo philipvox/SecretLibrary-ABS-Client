@@ -17,6 +17,7 @@ import {
   PanResponder,
   ScrollView,
   Easing,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,7 +43,7 @@ import { SleepTimerSheet, SpeedSheet } from '../sheets';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useCoverUrl } from '@/core/cache';
 import { useIsOfflineAvailable } from '@/core/hooks/useDownloads';
-import { CoverPlayButton } from '@/shared/components/CoverPlayButton';
+import { CoverPlayButton, JogState } from '@/shared/components/CoverPlayButton';
 import { haptics } from '@/core/native/haptics';
 import { colors, spacing, radius, scale, wp, hp, layout } from '@/shared/theme';
 
@@ -87,7 +88,12 @@ const formatScrubOffset = (seconds: number): string => {
   const absSeconds = Math.abs(seconds);
   const m = Math.floor(absSeconds / 60);
   const s = Math.floor(absSeconds % 60);
-  return `${sign}${m}:${s.toString().padStart(2, '0')}`;
+
+  // Human-readable format: +20s, -1m 23s, +5m 0s
+  if (m === 0) {
+    return `${sign}${s}s`;
+  }
+  return `${sign}${m}m ${s}s`;
 };
 
 // =============================================================================
@@ -170,6 +176,7 @@ interface CDDiscProps {
   coverUrl: string | null;
   size?: number;
   isPlaying?: boolean;
+  isBuffering?: boolean;
   playbackRate?: number;
   reducedMotion?: boolean;
   /** External scrub speed in degrees per second (overrides normal rotation when non-zero) */
@@ -182,6 +189,7 @@ const CDDisc: React.FC<CDDiscProps> = ({
   coverUrl,
   size = DISC_SIZE,
   isPlaying = false,
+  isBuffering = false,
   playbackRate = 1,
   reducedMotion = false,
   scrubSpeed,
@@ -191,6 +199,10 @@ const CDDisc: React.FC<CDDiscProps> = ({
   const rotation = useSharedValue(0);
   const baseDegreesPerMs = useSharedValue(0);
   const lastFrameTime = useSharedValue(Date.now());
+
+  // Buffering oscillation state
+  const oscillationPhase = useSharedValue(0);
+  const isOscillating = useSharedValue(false);
 
   // Calculate base rotation speed based on isPlaying and playbackRate
   // Base: 12 deg/s (1 rotation per 30 seconds), scaled by playbackRate
@@ -206,6 +218,11 @@ const CDDisc: React.FC<CDDiscProps> = ({
     baseDegreesPerMs.value = withTiming(degreesPerSecond / 1000, { duration: 200 });
   }, [isPlaying, playbackRate, reducedMotion]);
 
+  // Update oscillation state when buffering changes
+  useEffect(() => {
+    isOscillating.value = isBuffering && !reducedMotion;
+  }, [isBuffering, reducedMotion]);
+
   // UI thread frame callback for buttery smooth 60fps animation
   useFrameCallback((frameInfo) => {
     'worklet';
@@ -220,6 +237,14 @@ const CDDisc: React.FC<CDDiscProps> = ({
     if (spinBurst && Math.abs(spinBurst.value) > 0.1) {
       rotation.value = rotation.value + spinBurst.value;
       spinBurst.value = 0; // Consume the burst
+    }
+
+    // Buffering oscillation: small back-forth wiggle (±3 degrees at 2Hz)
+    if (isOscillating.value) {
+      oscillationPhase.value = (oscillationPhase.value + clampedDelta * 0.012) % (2 * Math.PI);
+      const oscillation = Math.sin(oscillationPhase.value) * 3; // ±3 degrees
+      rotation.value = rotation.value + oscillation * 0.1;
+      return; // Don't apply normal rotation during buffering
     }
 
     // Determine rotation speed: use scrub speed if scrubbing, otherwise base speed
@@ -375,6 +400,7 @@ export function CDPlayerScreen() {
     isPlayerVisible,
     isPlaying,
     isLoading,
+    isBuffering,
     position,
     duration,
     playbackRate,
@@ -386,6 +412,7 @@ export function CDPlayerScreen() {
       isPlayerVisible: s.isPlayerVisible,
       isPlaying: s.isPlaying,
       isLoading: s.isLoading,
+      isBuffering: s.isBuffering,
       position: s.position,
       duration: s.duration,
       playbackRate: s.playbackRate,
@@ -426,6 +453,7 @@ export function CDPlayerScreen() {
   const [scrubOffset, setScrubOffset] = useState<number | null>(null);
   const [showSleepSheet, setShowSleepSheet] = useState(false);
   const [showSpeedSheet, setShowSpeedSheet] = useState(false);
+  const [jogState, setJogState] = useState<JogState | null>(null);
 
   // Book metadata
   const metadata = currentBook?.media?.metadata as any;
@@ -742,16 +770,29 @@ export function CDPlayerScreen() {
       />
 
       {/* Blur overlay - starts from center of disc, extends to bottom */}
-      <BlurView intensity={50} tint="dark" style={[styles.discBlurOverlay, { top: discCenterY }]}>
+      <View style={[styles.discBlurOverlay, { top: discCenterY }]}>
+        {/* Blurred cover image for Android (BlurView doesn't blur content behind it on Android) */}
+        {coverUrl && (
+          <Image
+            source={coverUrl}
+            style={styles.discBlurImage}
+            blurRadius={Platform.OS === 'android' ? 25 : 80}
+            contentFit="cover"
+          />
+        )}
+        <BlurView intensity={Platform.OS === 'android' ? 100 : 50} tint="dark" style={StyleSheet.absoluteFill} />
+        {/* Semi-transparent overlay to darken */}
+        <View style={styles.discBlurDarkOverlay} />
         {/* Subtle white line at top of blur */}
         <View style={styles.blurTopLine} />
-      </BlurView>
+      </View>
 
       {/* CD Disc */}
       <View style={styles.discContainer}>
         <CDDisc
           coverUrl={coverUrl}
           isPlaying={isPlaying}
+          isBuffering={isBuffering && !isDownloaded}
           playbackRate={playbackRate}
           reducedMotion={reducedMotion ?? false}
           scrubSpeed={discScrubSpeed}
@@ -787,6 +828,16 @@ export function CDPlayerScreen() {
           contentFit="contain"
         />
       </View>
+
+      {/* Buffering indicator - only show when streaming (not for downloaded files) */}
+      {isBuffering && !isDownloaded && (
+        <View style={[styles.bufferingBadgeContainer, { top: discCenterY + scale(60) }]}>
+          <View style={styles.bufferingBadge}>
+            <Ionicons name="hourglass-outline" size={scale(10)} color="#FFF" />
+            <Text style={styles.bufferingBadgeText}>Buffering...</Text>
+          </View>
+        </View>
+      )}
 
       {/* Content area - positioned to appear in blurred zone */}
       <View style={[styles.contentArea, { marginTop: -(DISC_SIZE * 0.45) }]}>
@@ -865,6 +916,23 @@ export function CDPlayerScreen() {
           </Text>
         </View>
 
+        {/* Jog Overlay - Direction arrows and offset when scrubbing */}
+        {jogState?.isActive && jogState.direction && (
+          <View style={styles.jogOverlay}>
+            <View style={styles.jogIndicator}>
+              {jogState.direction === 'backward' ? (
+                <RewindIcon />
+              ) : (
+                <FastForwardIcon />
+              )}
+              <Text style={styles.jogSpeedText}>{formatScrubOffset(jogState.offset)}</Text>
+            </View>
+            <Text style={styles.jogTimePreview}>
+              {formatTime(jogState.currentPosition)} → {formatTime(jogState.targetPosition)}
+            </Text>
+          </View>
+        )}
+
         {/* Playback Controls - Skip at edges, Play in center */}
         <View style={styles.controlsRow}>
           {/* Skip Back 30s - far left */}
@@ -894,6 +962,7 @@ export function CDPlayerScreen() {
                 onScrubOffsetChange={(offset, isScrubbing) => {
                   setScrubOffset(isScrubbing ? offset : null);
                 }}
+                onJogStateChange={setJogState}
               />
             </View>
           </View>
@@ -1075,6 +1144,15 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0, // Extend to bottom of screen
     zIndex: 5, // Above disc cover, below gray ring
+    overflow: 'hidden',
+  },
+  discBlurImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.6,
+  },
+  discBlurDarkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   blurTopLine: {
     position: 'absolute',
@@ -1537,6 +1615,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  // Buffering badge container - positioned absolutely above all layers
+  bufferingBadgeContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 50,
+    elevation: 50,
+  },
+  bufferingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(4),
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(4),
+    borderRadius: scale(12),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  bufferingBadgeText: {
+    color: colors.textSecondary,
+    fontSize: scale(11),
+    fontWeight: '500',
+  },
+
   // Timer countdown indicator
   timerCountdownContainer: {
     flexDirection: 'row',
@@ -1548,6 +1652,35 @@ const styles = StyleSheet.create({
     height: scale(6),
     borderRadius: scale(3),
     backgroundColor: colors.accent,
+  },
+
+  // Jog overlay styles
+  jogOverlay: {
+    alignItems: 'center',
+    marginBottom: scale(8),
+  },
+  jogIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(8),
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(8),
+    borderRadius: scale(20),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  jogSpeedText: {
+    color: colors.accent,
+    fontSize: scale(18),
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  jogTimePreview: {
+    color: colors.textSecondary,
+    fontSize: scale(12),
+    fontVariant: ['tabular-nums'],
+    marginTop: scale(6),
   },
 });
 

@@ -41,14 +41,14 @@ const SCRUB_CONFIG = {
   DEAD_ZONE: 10,            // pt - no scrub in this zone
   HAPTIC_INTERVAL_MS: 30000,// ms of audio scrubbed between haptic ticks
 
-  // Speed zones: displacement → seconds of audio per second of real time
+  // Speed zones: displacement → seconds of audio per second of real time (halved for smoother control)
   SPEED_ZONES: [
     { displacement: 10, speed: 0, label: 'dead' },
-    { displacement: 30, speed: 0.5, label: '0.5x' },
-    { displacement: 50, speed: 1, label: '1x' },
-    { displacement: 70, speed: 2, label: '2x' },
-    { displacement: 85, speed: 4, label: '4x' },
-    { displacement: 100, speed: 30, label: '30s' },
+    { displacement: 30, speed: 0.25, label: '0.25x' },
+    { displacement: 50, speed: 0.5, label: '0.5x' },
+    { displacement: 70, speed: 1, label: '1x' },
+    { displacement: 85, speed: 2, label: '2x' },
+    { displacement: 100, speed: 15, label: '15s' },
   ],
 
   // Max playback rate for audible scrubbing
@@ -58,7 +58,7 @@ const SCRUB_CONFIG = {
   RAMP_THRESHOLD: 85,
   RAMP_DELAY_MS: 2000,
   RAMP_DURATION_MS: 1000,
-  RAMP_MAX_SPEED: 300,
+  RAMP_MAX_SPEED: 150, // Halved from 300
 
   // Spring animation for snap back
   SPRING_CONFIG: {
@@ -212,6 +212,8 @@ export function PlayerScrubButton({
   const hasTriggeredRampHapticRef = useRef(false);
   const lastReportedSpeedRef = useRef(0);
   const lastReportedDirectionRef = useRef<'forward' | 'backward' | null>(null);
+  // Chapter boundary refs - store bounds at scrub start to prevent scrubbing past chapter
+  const chapterBoundsRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
   const positionRef = useRef(position);
   useEffect(() => {
@@ -255,6 +257,19 @@ export function PlayerScrubButton({
 
     const chapter = findChapterAtPosition(positionRef.current);
     setCurrentChapter(chapter);
+
+    // Store chapter bounds at scrub start to prevent scrubbing past chapter
+    if (chapter) {
+      chapterBoundsRef.current = { start: chapter.start, end: chapter.end };
+    } else {
+      chapterBoundsRef.current = { start: 0, end: duration };
+    }
+
+    // Set seeking state in store so ProgressBar syncs
+    usePlayerStore.setState({
+      isSeeking: true,
+      seekPosition: positionRef.current,
+    });
 
     // Pause playback during scrub
     if (isPlaying) {
@@ -336,19 +351,39 @@ export function PlayerScrubButton({
 
         const deltaPosition = speed * deltaTime;
         const newOffset = currentScrubOffset.value + deltaPosition;
+        // Clamp to chapter bounds - can't scrub past current chapter
         const newPosition = clamp(
           scrubStartPosition.value + newOffset,
-          0,
-          duration
+          chapterBoundsRef.current.start,
+          chapterBoundsRef.current.end
         );
+
+        // Check if we've hit a chapter boundary
+        const atBoundary = (speed > 0 && newPosition >= chapterBoundsRef.current.end - 0.1) ||
+                          (speed < 0 && newPosition <= chapterBoundsRef.current.start + 0.1);
 
         currentScrubOffset.value = newPosition - scrubStartPosition.value;
 
         setTooltipText(formatTimeOffset(newPosition - scrubStartPosition.value));
         setScrubPosition(newPosition);
 
+        // Update store so ProgressBar syncs
+        usePlayerStore.setState({ seekPosition: newPosition });
+
         const chapter = findChapterAtPosition(newPosition);
         setCurrentChapter(chapter);
+
+        // If at boundary, stop and don't seek further
+        if (atBoundary) {
+          // Report zero speed to stop disc rotation
+          onScrubChange?.(null, 0);
+          // Haptic feedback for hitting boundary (only once)
+          if (Math.abs(newPosition - lastHapticPositionRef.current) > 0.5) {
+            haptics.error();
+            lastHapticPositionRef.current = newPosition;
+          }
+          return; // Don't try to seek further
+        }
 
         // Seek to position (silent scrubbing - no audio during scrub)
         audioService.seekTo(newPosition);
@@ -358,11 +393,6 @@ export function PlayerScrubButton({
         if (scrubbed >= SCRUB_CONFIG.HAPTIC_INTERVAL_MS / 1000) {
           haptics.seek();
           lastHapticPositionRef.current = newPosition;
-        }
-
-        // Boundary haptic
-        if (newPosition <= 0 || newPosition >= duration) {
-          haptics.error();
         }
       }
     }, 50); // 20fps for seeking
@@ -377,14 +407,19 @@ export function PlayerScrubButton({
     // Notify parent scrub ended
     onScrubChange?.(null, 0);
 
+    // Clamp to chapter bounds
     const finalPosition = clamp(
       scrubStartPosition.value + currentScrubOffset.value,
-      0,
-      duration
+      chapterBoundsRef.current.start,
+      chapterBoundsRef.current.end
     );
 
     audioService.seekTo(finalPosition);
-    usePlayerStore.setState({ position: finalPosition });
+    usePlayerStore.setState({
+      position: finalPosition,
+      isSeeking: false,
+      seekPosition: 0,
+    });
 
     setTimeout(() => setShowProgressBar(false), 200);
 

@@ -81,6 +81,17 @@ class AutomotiveService {
    */
   private async initCarPlay(): Promise<void> {
     try {
+      // First check if the native module exists before requiring the package
+      const { NativeModules } = require('react-native');
+      if (!NativeModules.RNCarPlay) {
+        log('CarPlay native module not linked - skipping CarPlay init');
+        log('To enable CarPlay:');
+        log('1. Get CarPlay entitlement from Apple');
+        log('2. Install: npm install react-native-carplay');
+        log('3. Run pod install and rebuild');
+        return;
+      }
+
       // Try to require react-native-carplay
       this.carPlayModule = require('react-native-carplay');
       log('CarPlay module loaded');
@@ -101,6 +112,9 @@ class AutomotiveService {
         this.callbacks?.onDisconnect();
       });
 
+      // Subscribe to library cache changes to refresh lists
+      this.setupLibraryCacheListener();
+
     } catch (error: any) {
       log('CarPlay module not available:', error.message);
       log('To enable CarPlay:');
@@ -111,63 +125,173 @@ class AutomotiveService {
   }
 
   /**
+   * Set up listener for library cache changes
+   */
+  private async setupLibraryCacheListener(): Promise<void> {
+    try {
+      const { useLibraryCache } = await import('@/core/cache/libraryCache');
+
+      // Unsubscribe from previous listener if any
+      if (this.libraryCacheUnsubscribe) {
+        this.libraryCacheUnsubscribe();
+      }
+
+      // Subscribe to changes
+      this.libraryCacheUnsubscribe = useLibraryCache.subscribe(
+        (state) => state.items,
+        () => {
+          log('Library changed, refreshing automotive data');
+
+          // Refresh CarPlay lists when library changes
+          if (this.isConnected() && this.connectedPlatform === 'carplay') {
+            this.updateCarPlayLists();
+          }
+
+          // Sync Android Auto browse data
+          if (Platform.OS === 'android') {
+            this.syncAndroidAutoBrowseData();
+          }
+        }
+      );
+      log('Library cache listener set up');
+    } catch (error) {
+      log('Failed to set up library cache listener:', error);
+    }
+  }
+
+  /**
    * Initialize Android Auto integration
    */
   private async initAndroidAuto(): Promise<void> {
-    // Android Auto requires native MediaBrowserService implementation
-    // This is primarily done in native code
-    log('Android Auto support requires native MediaBrowserService');
-    log('See: android/app/src/main/java/.../MediaPlaybackService.java');
+    log('Initializing Android Auto support...');
+
+    // Set up library cache listener for Android
+    this.setupLibraryCacheListener();
+
+    // Set up listener for play events from native Android Auto
+    this.setupAndroidAutoEventListener();
+
+    // Initial sync of browse data
+    await this.syncAndroidAutoBrowseData();
+
+    log('Android Auto initialized - browse data synced');
+  }
+
+  /**
+   * Set up listener for events from native Android Auto module
+   */
+  private setupAndroidAutoEventListener(): void {
+    if (Platform.OS !== 'android') return;
+
+    try {
+      const { NativeEventEmitter, NativeModules } = require('react-native');
+      const { AndroidAutoModule } = NativeModules;
+
+      if (!AndroidAutoModule) {
+        log('AndroidAutoModule not available');
+        return;
+      }
+
+      const eventEmitter = new NativeEventEmitter(AndroidAutoModule);
+
+      // Listen for play item events from Android Auto
+      eventEmitter.addListener('androidAutoPlayItem', async (event: { itemId: string }) => {
+        log('Received play item event from Android Auto:', event.itemId);
+        await this.playItem(event.itemId);
+      });
+
+      // Listen for connection state changes
+      eventEmitter.addListener('androidAutoConnectionChanged', (event: { isConnected: boolean }) => {
+        log('Android Auto connection changed:', event.isConnected);
+        if (event.isConnected) {
+          this.connectionState = 'connected';
+          this.connectedPlatform = 'android-auto';
+          this.callbacks?.onConnect('android-auto');
+        } else {
+          this.connectionState = 'disconnected';
+          this.connectedPlatform = 'none';
+          this.callbacks?.onDisconnect();
+        }
+      });
+
+      log('Android Auto event listeners set up');
+    } catch (error) {
+      log('Failed to set up Android Auto event listeners:', error);
+    }
+  }
+
+  /**
+   * Sync browse data to native Android for Android Auto
+   */
+  private async syncAndroidAutoBrowseData(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+
+    try {
+      const { updateAndroidAutoBrowseData } = await import('./androidAutoBridge');
+      const sections = await this.getBrowseSections();
+      await updateAndroidAutoBrowseData(sections);
+      log('Android Auto browse data synced');
+    } catch (error) {
+      log('Failed to sync Android Auto browse data:', error);
+    }
   }
 
   /**
    * Set up CarPlay templates when connected
    */
-  private setupCarPlayTemplates(): void {
+  private async setupCarPlayTemplates(): Promise<void> {
     if (!this.carPlayModule) return;
 
     const { TabBarTemplate, ListTemplate, NowPlayingTemplate } = this.carPlayModule;
 
-    // Create Now Playing template
-    const nowPlayingTemplate = new NowPlayingTemplate({
-      buttons: [
-        {
-          id: 'speed',
-          type: 'more', // Shows "..." menu
-        },
-      ],
-      upNextTitle: 'Up Next',
-      upNextItems: [],
+    // Get initial data
+    const sections = await this.getBrowseSections();
+    const continueSection = sections.find(s => s.id === 'continue-listening');
+    const downloadsSection = sections.find(s => s.id === 'downloads');
+
+    log('Setting up CarPlay templates with:', {
+      continueItems: continueSection?.items.length || 0,
+      downloadItems: downloadsSection?.items.length || 0,
     });
 
-    // Create Continue Listening tab
-    const continueListeningTemplate = new ListTemplate({
+    // Create Continue Listening tab with data
+    this.continueListeningTemplate = new ListTemplate({
       title: 'Continue',
-      sections: [],
-      onItemSelect: async ({ index, section }: { index: number; section: number }) => {
-        const sections = await this.getBrowseSections();
-        const continueSection = sections.find(s => s.id === 'continue-listening');
-        if (continueSection && continueSection.items[index]) {
-          this.callbacks?.onAction({
-            type: 'playItem',
-            itemId: continueSection.items[index].id,
-          });
+      sections: [{
+        header: 'In Progress',
+        items: (continueSection?.items || []).map(item => ({
+          text: item.title,
+          detailText: item.subtitle,
+          image: item.imageUrl,
+          showsDisclosureIndicator: false,
+        })),
+      }],
+      onItemSelect: async ({ index }: { index: number }) => {
+        const currentSections = await this.getBrowseSections();
+        const section = currentSections.find(s => s.id === 'continue-listening');
+        if (section && section.items[index]) {
+          await this.playItem(section.items[index].id);
         }
       },
     });
 
-    // Create Downloads tab
-    const downloadsTemplate = new ListTemplate({
+    // Create Downloads tab with data
+    this.downloadsTemplate = new ListTemplate({
       title: 'Downloads',
-      sections: [],
+      sections: [{
+        header: 'Offline Books',
+        items: (downloadsSection?.items || []).map(item => ({
+          text: item.title,
+          detailText: item.subtitle,
+          image: item.imageUrl,
+          showsDisclosureIndicator: false,
+        })),
+      }],
       onItemSelect: async ({ index }: { index: number }) => {
-        const sections = await this.getBrowseSections();
-        const downloadsSection = sections.find(s => s.id === 'downloads');
-        if (downloadsSection && downloadsSection.items[index]) {
-          this.callbacks?.onAction({
-            type: 'playItem',
-            itemId: downloadsSection.items[index].id,
-          });
+        const currentSections = await this.getBrowseSections();
+        const section = currentSections.find(s => s.id === 'downloads');
+        if (section && section.items[index]) {
+          await this.playItem(section.items[index].id);
         }
       },
     });
@@ -177,12 +301,12 @@ class AutomotiveService {
       title: this.config.appName,
       templates: [
         {
-          ...continueListeningTemplate,
+          ...this.continueListeningTemplate,
           tabSystemImageName: 'book.fill',
           tabTitle: 'Continue',
         },
         {
-          ...downloadsTemplate,
+          ...this.downloadsTemplate,
           tabSystemImageName: 'arrow.down.circle.fill',
           tabTitle: 'Downloads',
         },
@@ -191,9 +315,40 @@ class AutomotiveService {
 
     // Set root template
     this.carPlayModule.CarPlay.setRootTemplate(tabBarTemplate);
+    log('CarPlay templates set up successfully');
+  }
 
-    // Update lists with data
-    this.updateCarPlayLists();
+  /**
+   * Play a library item
+   */
+  private async playItem(itemId: string): Promise<void> {
+    log('Playing item:', itemId);
+
+    try {
+      const { useLibraryCache } = await import('@/core/cache/libraryCache');
+      const { usePlayerStore } = await import('@/features/player/stores/playerStore');
+
+      const item = useLibraryCache.getState().items.find(i => i.id === itemId);
+      if (!item) {
+        log('Item not found in library cache:', itemId);
+        return;
+      }
+
+      await usePlayerStore.getState().loadBook(item, {
+        autoPlay: true,
+        showPlayer: false, // Don't show phone player when in car
+      });
+
+      log('Item started playing:', item.media?.metadata?.title);
+
+      // Also notify callbacks if set
+      this.callbacks?.onAction({
+        type: 'playItem',
+        itemId,
+      });
+    } catch (error) {
+      log('Failed to play item:', error);
+    }
   }
 
   /**
@@ -205,16 +360,33 @@ class AutomotiveService {
     try {
       const sections = await this.getBrowseSections();
 
-      // Update Continue Listening
+      // Update Continue Listening template
       const continueSection = sections.find(s => s.id === 'continue-listening');
-      if (continueSection) {
-        // Template updates would go here
+      if (this.continueListeningTemplate && continueSection) {
+        this.continueListeningTemplate.updateSections([{
+          header: 'In Progress',
+          items: continueSection.items.map(item => ({
+            text: item.title,
+            detailText: item.subtitle,
+            image: item.imageUrl,
+            showsDisclosureIndicator: false,
+          })),
+        }]);
         log('Updated continue listening with', continueSection.items.length, 'items');
       }
 
-      // Update Downloads
+      // Update Downloads template
       const downloadsSection = sections.find(s => s.id === 'downloads');
-      if (downloadsSection) {
+      if (this.downloadsTemplate && downloadsSection) {
+        this.downloadsTemplate.updateSections([{
+          header: 'Offline Books',
+          items: downloadsSection.items.map(item => ({
+            text: item.title,
+            detailText: item.subtitle,
+            image: item.imageUrl,
+            showsDisclosureIndicator: false,
+          })),
+        }]);
         log('Updated downloads with', downloadsSection.items.length, 'items');
       }
     } catch (error) {
@@ -359,10 +531,15 @@ class AutomotiveService {
    * Clean up resources
    */
   async cleanup(): Promise<void> {
-    // Clean up CarPlay
-    if (this.carPlayModule) {
-      // Unregister listeners
+    // Unsubscribe from library cache
+    if (this.libraryCacheUnsubscribe) {
+      this.libraryCacheUnsubscribe();
+      this.libraryCacheUnsubscribe = null;
     }
+
+    // Clear template references
+    this.continueListeningTemplate = null;
+    this.downloadsTemplate = null;
 
     this.connectionState = 'disconnected';
     this.connectedPlatform = 'none';

@@ -22,6 +22,7 @@ import {
   FlatList,
   Alert,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -41,6 +42,10 @@ import { SectionHeader } from '@/features/home/components/SectionHeader';
 import { SeriesProgressBadge, StackedCovers } from '@/shared/components';
 import { SortPicker, SortOption } from '../components/SortPicker';
 import { StorageSummary } from '../components/StorageSummary';
+import { ContinueListeningHero } from '../components/ContinueListeningHero';
+import { FilterChips, FilterOption } from '../components/FilterChips';
+import { AppliedFilters } from '../components/AppliedFilters';
+import { LibraryEmptyState } from '../components/LibraryEmptyState';
 import { useMyLibraryStore } from '../stores/myLibraryStore';
 import { usePreferencesStore } from '@/features/recommendations/stores/preferencesStore';
 import { useContinueListening } from '@/features/home/hooks/useContinueListening';
@@ -241,9 +246,11 @@ export function MyLibraryScreen() {
   // Continue listening data
   const { items: continueListeningItems } = useContinueListening();
 
-  // Tab and sort state
+  // Tab, sort, filter, and search state
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortOption>('recently-played');
+  const [listenFilter, setListenFilter] = useState<FilterOption>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Separate active downloads from completed
   const activeDownloads = useMemo(
@@ -415,11 +422,71 @@ export function MyLibraryScreen() {
     }
   }, [currentTabBooks, sort]);
 
+  // Calculate filter counts for FilterChips
+  const filterCounts = useMemo(() => ({
+    all: sortedBooks.length,
+    inProgress: sortedBooks.filter(b => b.progress > 0 && b.progress < 0.95).length,
+    notStarted: sortedBooks.filter(b => b.progress === 0 || b.progress === undefined).length,
+    completed: sortedBooks.filter(b => b.progress >= 0.95).length,
+  }), [sortedBooks]);
+
+  // Apply listen filter and search filter
+  const filteredBooks = useMemo(() => {
+    let result = sortedBooks;
+
+    // Apply listen filter
+    switch (listenFilter) {
+      case 'in-progress':
+        result = result.filter(b => b.progress > 0 && b.progress < 0.95);
+        break;
+      case 'not-started':
+        result = result.filter(b => b.progress === 0 || b.progress === undefined);
+        break;
+      case 'completed':
+        result = result.filter(b => b.progress >= 0.95);
+        break;
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(b =>
+        b.title.toLowerCase().includes(query) ||
+        b.author.toLowerCase().includes(query) ||
+        b.seriesName?.toLowerCase().includes(query)
+      );
+    }
+
+    return result;
+  }, [sortedBooks, listenFilter, searchQuery]);
+
+  // Get applied filters for display
+  const appliedFilters = useMemo(() => {
+    const filters: { key: string; label: string }[] = [];
+    if (listenFilter !== 'all') {
+      const labelMap: Record<FilterOption, string> = {
+        'all': 'All',
+        'in-progress': 'In Progress',
+        'not-started': 'Not Started',
+        'completed': 'Completed',
+      };
+      filters.push({ key: 'listen', label: labelMap[listenFilter] });
+    }
+    return filters;
+  }, [listenFilter]);
+
+  // Handle filter removal
+  const handleRemoveFilter = useCallback((filterKey: string) => {
+    if (filterKey === 'listen') {
+      setListenFilter('all');
+    }
+  }, []);
+
   // In-progress books for Continue Listening section
   const inProgressBooks = useMemo(() => {
     if (activeTab === 'favorites') return [];
-    return sortedBooks.filter(b => b.progress > 0 && b.progress < 0.95);
-  }, [sortedBooks, activeTab]);
+    return filteredBooks.filter(b => b.progress > 0 && b.progress < 0.95);
+  }, [filteredBooks, activeTab]);
 
   // Get favorite authors/series/narrators data
   const favoriteAuthorData = useMemo(() => {
@@ -450,7 +517,7 @@ export function MyLibraryScreen() {
   const seriesGroups = useMemo<SeriesGroup[]>(() => {
     const seriesMap = new Map<string, EnrichedBook[]>();
 
-    for (const book of sortedBooks) {
+    for (const book of filteredBooks) {
       if (book.seriesName) {
         const existing = seriesMap.get(book.seriesName) || [];
         existing.push(book);
@@ -472,7 +539,7 @@ export function MyLibraryScreen() {
         inProgressCount: books.filter(b => b.progress > 0 && b.progress < 0.95).length,
       };
     });
-  }, [sortedBooks, getSeries]);
+  }, [filteredBooks, getSeries]);
 
   // Refresh handler
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -782,15 +849,7 @@ export function MyLibraryScreen() {
     const hasAnyFavorites = hasFavoriteBooks || hasFavoriteAuthors || hasFavoriteSeries || hasFavoriteNarrators;
 
     if (!hasAnyFavorites) {
-      return (
-        <View style={styles.emptyTabContainer}>
-          <Ionicons name="heart-outline" size={scale(48)} color="rgba(255,255,255,0.3)" />
-          <Text style={styles.emptyTabTitle}>No favorites yet</Text>
-          <Text style={styles.emptyTabSubtitle}>
-            Tap the heart icon on books, authors, series, or narrators to add them to your favorites.
-          </Text>
-        </View>
-      );
+      return <LibraryEmptyState tab="favorites" onAction={handleBrowse} />;
     }
 
     return (
@@ -847,15 +906,7 @@ export function MyLibraryScreen() {
     const inProgressItems = enrichedBooks.filter(b => b.progress > 0 && b.progress < 0.95);
 
     if (inProgressItems.length === 0) {
-      return (
-        <View style={styles.emptyTabContainer}>
-          <Ionicons name="play-circle-outline" size={scale(48)} color="rgba(255,255,255,0.3)" />
-          <Text style={styles.emptyTabTitle}>Nothing in progress</Text>
-          <Text style={styles.emptyTabSubtitle}>
-            Start listening to a book and your progress will appear here.
-          </Text>
-        </View>
-      );
+      return <LibraryEmptyState tab="in-progress" onAction={handleBrowse} />;
     }
 
     // Sort by most recently played
@@ -923,15 +974,7 @@ export function MyLibraryScreen() {
       {/* Content */}
       {!hasAnyContent ? (
         <View style={[styles.emptyContainer, { paddingTop: insets.top + TOP_NAV_HEIGHT + 16 }]}>
-          <DownloadIcon size={scale(64)} />
-          <Text style={styles.emptyTitle}>Your library is empty</Text>
-          <Text style={styles.emptySubtitle}>
-            Download books from Discover to build your collection and listen offline.
-          </Text>
-          <TouchableOpacity style={styles.browseButton} onPress={handleBrowse}>
-            <BrowseIcon size={20} color="#000" />
-            <Text style={styles.browseButtonText}>Browse Books</Text>
-          </TouchableOpacity>
+          <LibraryEmptyState tab="all" onAction={handleBrowse} />
         </View>
       ) : (
         <ScrollView
@@ -949,6 +992,31 @@ export function MyLibraryScreen() {
           {/* Screen Title */}
           <Text style={styles.screenTitle}>My Library</Text>
 
+          {/* Search Bar */}
+          <View style={styles.searchBarContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={scale(18)} color={COLORS.textSecondary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search library..."
+                placeholderTextColor={COLORS.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close-circle" size={scale(18)} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
           {/* Tab Bar */}
           <TabBar activeTab={activeTab} onTabChange={setActiveTab} counts={tabCounts} />
 
@@ -957,7 +1025,25 @@ export function MyLibraryScreen() {
             <SortPicker
               selected={sort}
               onSelect={setSort}
-              bookCount={sortedBooks.length}
+              bookCount={filteredBooks.length}
+            />
+          )}
+
+          {/* Filter Chips (All and Downloaded tabs only) */}
+          {(activeTab === 'all' || activeTab === 'downloaded') && (
+            <FilterChips
+              selected={listenFilter}
+              onSelect={setListenFilter}
+              counts={filterCounts}
+            />
+          )}
+
+          {/* Applied Filters */}
+          {appliedFilters.length > 0 && (activeTab === 'all' || activeTab === 'downloaded') && (
+            <AppliedFilters
+              filters={appliedFilters}
+              onRemove={handleRemoveFilter}
+              resultCount={filteredBooks.length}
             />
           )}
 
@@ -968,6 +1054,34 @@ export function MyLibraryScreen() {
             renderInProgressContent()
           ) : (
             <>
+              {/* =============== CONTINUE LISTENING HERO (All tab) =============== */}
+              {activeTab === 'all' && continueListeningItems.length > 0 && (() => {
+                const heroItem = continueListeningItems[0];
+                const progress = heroItem.userMediaProgress?.progress || 0;
+                const duration = (heroItem.media as any)?.duration || 0;
+                const remainingSeconds = duration * (1 - progress);
+
+                // Only show if genuinely in progress (not complete)
+                if (progress <= 0 || progress >= 0.95) return null;
+
+                return (
+                  <ContinueListeningHero
+                    book={heroItem}
+                    progress={progress}
+                    remainingSeconds={remainingSeconds}
+                    onPlay={async () => {
+                      try {
+                        const fullBook = await apiClient.getItem(heroItem.id);
+                        await loadBook(fullBook, { autoPlay: true, showPlayer: false });
+                      } catch {
+                        await loadBook(heroItem, { autoPlay: true, showPlayer: false });
+                      }
+                    }}
+                    onPress={() => handleBookPress(heroItem.id)}
+                  />
+                );
+              })()}
+
               {/* =============== 1. DOWNLOADING SECTION =============== */}
               {activeDownloads.length > 0 && (activeTab === 'all' || activeTab === 'downloaded') && (
                 <View style={styles.section}>
@@ -1001,16 +1115,16 @@ export function MyLibraryScreen() {
               )}
 
               {/* =============== 2. BOOKS SECTION =============== */}
-              {sortedBooks.length > 0 && (
+              {filteredBooks.length > 0 && (
                 <View style={styles.section}>
                   <SectionHeader
                     title={activeTab === 'downloaded'
-                      ? `Downloaded Books (${sortedBooks.length})`
-                      : `Books (${sortedBooks.length})`
+                      ? `Downloaded Books (${filteredBooks.length})`
+                      : `Books (${filteredBooks.length})`
                     }
                     showViewAll={false}
                   />
-                  {sortedBooks.map(book => renderBookRow(book, activeTab === 'all'))}
+                  {filteredBooks.map(book => renderBookRow(book, activeTab === 'all'))}
                 </View>
               )}
 
@@ -1072,6 +1186,7 @@ export function MyLibraryScreen() {
               {activeTab === 'downloaded' && (
                 <StorageSummary
                   usedBytes={totalStorageUsed}
+                  bookCount={enrichedBooks.length}
                   onManagePress={handleManageStorage}
                 />
               )}
@@ -1185,7 +1300,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
     paddingHorizontal: scale(20),
-    marginBottom: scale(8),
+    marginBottom: scale(12),
+  },
+
+  // Search bar
+  searchBarContainer: {
+    paddingHorizontal: scale(20),
+    marginBottom: scale(12),
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: scale(12),
+    paddingHorizontal: scale(14),
+    paddingVertical: scale(10),
+    gap: scale(10),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: scale(15),
+    color: COLORS.textPrimary,
+    paddingVertical: 0,
   },
 
   // Tab bar
