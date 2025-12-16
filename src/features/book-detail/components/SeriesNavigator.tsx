@@ -3,6 +3,7 @@
  *
  * Series navigation component for Book Detail screen.
  * Shows previous/next book arrows and series info.
+ * Styled consistently with the duration/chapters info row.
  */
 
 import React, { useCallback, useMemo } from 'react';
@@ -24,41 +25,82 @@ interface SeriesNavigatorProps {
   book: LibraryItem;
 }
 
+/**
+ * Extract series info directly from book metadata.
+ * More reliable than cache lookup which may not be ready.
+ */
+function getSeriesFromMetadata(book: LibraryItem): {
+  seriesName: string;
+  sequence: number;
+} | null {
+  const metadata = (book.media?.metadata as any) || {};
+
+  // Try series array first (expanded API data)
+  if (metadata.series?.length > 0) {
+    const seriesEntry = metadata.series[0];
+    const name = seriesEntry.name || seriesEntry;
+    const seq = parseFloat(seriesEntry.sequence) || 1;
+    if (name && typeof name === 'string') {
+      return { seriesName: name, sequence: seq };
+    }
+  }
+
+  // Try seriesName string (format: "Series Name #N")
+  const seriesNameRaw = metadata.seriesName || '';
+  if (seriesNameRaw) {
+    const seqMatch = seriesNameRaw.match(/#([\d.]+)/);
+    if (seqMatch) {
+      const seq = parseFloat(seqMatch[1]);
+      const name = seriesNameRaw.replace(/\s*#[\d.]+$/, '').trim();
+      return { seriesName: name, sequence: seq };
+    }
+  }
+
+  return null;
+}
+
 export function SeriesNavigator({ book }: SeriesNavigatorProps) {
   const navigation = useNavigation<any>();
 
-  // Get series navigation info
-  const seriesInfo = useMemo(() => {
-    return getSeriesNavigationInfo(book);
-  }, [book]);
+  // Get series info from book metadata (always available if book has series)
+  const metadataSeries = useMemo(() => getSeriesFromMetadata(book), [book]);
+
+  // Get navigation info from cache (may not be immediately available)
+  const navInfo = useMemo(() => getSeriesNavigationInfo(book), [book]);
 
   // Navigate to previous book
   const handlePreviousPress = useCallback(() => {
-    if (seriesInfo?.previousBook) {
-      navigation.replace('BookDetail', { id: seriesInfo.previousBook.id });
+    if (navInfo?.previousBook) {
+      navigation.replace('BookDetail', { id: navInfo.previousBook.id });
     }
-  }, [navigation, seriesInfo?.previousBook]);
+  }, [navigation, navInfo?.previousBook]);
 
   // Navigate to next book
   const handleNextPress = useCallback(() => {
-    if (seriesInfo?.nextBook) {
-      navigation.replace('BookDetail', { id: seriesInfo.nextBook.id });
+    if (navInfo?.nextBook) {
+      navigation.replace('BookDetail', { id: navInfo.nextBook.id });
     }
-  }, [navigation, seriesInfo?.nextBook]);
+  }, [navigation, navInfo?.nextBook]);
 
   // Navigate to series detail
   const handleSeriesPress = useCallback(() => {
-    if (seriesInfo?.seriesName) {
-      navigation.navigate('SeriesDetail', { seriesName: seriesInfo.seriesName });
+    const seriesName = metadataSeries?.seriesName || navInfo?.seriesName;
+    if (seriesName) {
+      navigation.navigate('SeriesDetail', { seriesName });
     }
-  }, [navigation, seriesInfo?.seriesName]);
+  }, [navigation, metadataSeries?.seriesName, navInfo?.seriesName]);
 
-  // Don't render if not part of a series
-  if (!seriesInfo) {
+  // Don't render if book has no series info at all
+  if (!metadataSeries && !navInfo) {
     return null;
   }
 
-  const { seriesName, currentSequence, totalBooks, previousBook, nextBook } = seriesInfo;
+  // Use metadata series as primary source (always available), navInfo for navigation
+  const seriesName = metadataSeries?.seriesName || navInfo?.seriesName || '';
+  const currentSequence = metadataSeries?.sequence || navInfo?.currentSequence || 1;
+  const totalBooks = navInfo?.totalBooks || 0;
+  const previousBook = navInfo?.previousBook || null;
+  const nextBook = navInfo?.nextBook || null;
 
   // Get display text for previous/next
   const getPreviousLabel = () => {
@@ -82,11 +124,13 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
         disabled={!previousBook}
         activeOpacity={0.7}
       >
-        {previousBook && (
+        {previousBook ? (
           <>
-            <Ionicons name="chevron-back" size={scale(18)} color="rgba(255,255,255,0.6)" />
+            <Ionicons name="chevron-back" size={scale(16)} color="rgba(255,255,255,0.5)" />
             <Text style={styles.arrowText}>{getPreviousLabel()}</Text>
           </>
+        ) : (
+          <View style={styles.arrowPlaceholder} />
         )}
       </TouchableOpacity>
 
@@ -100,7 +144,7 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
           {seriesName}
         </Text>
         <Text style={styles.seriesPosition}>
-          #{Math.floor(currentSequence)} of {totalBooks}
+          #{Math.floor(currentSequence)}{totalBooks > 0 ? ` of ${totalBooks}` : ''}
         </Text>
       </TouchableOpacity>
 
@@ -111,11 +155,13 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
         disabled={!nextBook}
         activeOpacity={0.7}
       >
-        {nextBook && (
+        {nextBook ? (
           <>
             <Text style={styles.arrowText}>{getNextLabel()}</Text>
-            <Ionicons name="chevron-forward" size={scale(18)} color="rgba(255,255,255,0.6)" />
+            <Ionicons name="chevron-forward" size={scale(16)} color="rgba(255,255,255,0.5)" />
           </>
+        ) : (
+          <View style={styles.arrowPlaceholder} />
         )}
       </TouchableOpacity>
     </View>
@@ -130,25 +176,28 @@ const styles = StyleSheet.create({
     marginHorizontal: scale(20),
     marginVertical: scale(8),
     paddingVertical: scale(12),
-    paddingHorizontal: scale(8),
+    paddingHorizontal: scale(12),
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: scale(12),
   },
   arrowButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: scale(90),
+    minWidth: scale(80),
     gap: scale(4),
   },
   arrowButtonRight: {
     justifyContent: 'flex-end',
   },
   arrowButtonDisabled: {
-    opacity: 0,
+    // Keep visible but non-interactive
+  },
+  arrowPlaceholder: {
+    width: scale(80),
   },
   arrowText: {
     fontSize: scale(12),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.5)',
   },
   seriesInfo: {
     flex: 1,
