@@ -126,7 +126,7 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
       >
         {previousBook ? (
           <>
-            <Ionicons name="chevron-back" size={scale(16)} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="chevron-back" size={scale(16)} color="rgba(255,255,255,0.7)" />
             <Text style={styles.arrowText}>{getPreviousLabel()}</Text>
           </>
         ) : (
@@ -158,7 +158,7 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
         {nextBook ? (
           <>
             <Text style={styles.arrowText}>{getNextLabel()}</Text>
-            <Ionicons name="chevron-forward" size={scale(16)} color="rgba(255,255,255,0.5)" />
+            <Ionicons name="chevron-forward" size={scale(16)} color="rgba(255,255,255,0.7)" />
           </>
         ) : (
           <View style={styles.arrowPlaceholder} />
@@ -173,31 +173,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: scale(20),
-    marginVertical: scale(8),
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(12),
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: scale(12),
+    paddingHorizontal: scale(20),
+    marginBottom: scale(16),
   },
   arrowButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: scale(80),
+    minWidth: scale(70),
     gap: scale(4),
   },
   arrowButtonRight: {
     justifyContent: 'flex-end',
   },
   arrowButtonDisabled: {
-    // Keep visible but non-interactive
+    // Keep space but hide content
   },
   arrowPlaceholder: {
-    width: scale(80),
+    width: scale(70),
   },
   arrowText: {
-    fontSize: scale(12),
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: scale(13),
+    color: 'rgba(255,255,255,0.7)',
   },
   seriesInfo: {
     flex: 1,
@@ -212,8 +208,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   seriesPosition: {
-    fontSize: scale(11),
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: scale(13),
+    color: 'rgba(255,255,255,0.7)',
     marginTop: scale(2),
   },
 });
