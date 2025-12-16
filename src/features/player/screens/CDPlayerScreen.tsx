@@ -839,6 +839,12 @@ export function CDPlayerScreen() {
         </View>
         {/* Dark overlay on top of blurred disc */}
         <View style={styles.blurDarkOverlay} />
+        {/* Bottom fade - softens the edge where disc meets background */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.8)', colors.backgroundPrimary]}
+          locations={[0, 0.5, 1]}
+          style={styles.blurBottomFade}
+        />
         {/* Glass line at top */}
         <View style={styles.blurTopLine} />
       </View>
@@ -1206,6 +1212,13 @@ const styles = StyleSheet.create({
   blurDarkOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  blurBottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: DISC_SIZE * 0.4,
   },
   blurTopLine: {
     position: 'absolute',
