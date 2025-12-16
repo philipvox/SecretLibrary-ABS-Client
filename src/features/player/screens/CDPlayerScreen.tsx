@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import { Canvas, BackdropBlur, Fill, rect } from '@shopify/react-native-skia';
 import Svg, { Path } from 'react-native-svg';
 import ReanimatedAnimated, {
   useAnimatedStyle,
@@ -784,11 +784,16 @@ export function CDPlayerScreen() {
       />
 
       {/* Blur overlay - starts from center of disc, extends to bottom */}
-      {/* BlurView blurs content behind it, so the spinning disc shows through frosted glass */}
+      {/* Skia BackdropBlur provides true frosted glass effect on both platforms */}
       <View style={[styles.discBlurOverlay, { top: discCenterY }]}>
-        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
-        {/* Semi-transparent overlay to darken */}
-        <View style={styles.discBlurDarkOverlay} />
+        <Canvas style={StyleSheet.absoluteFill}>
+          <BackdropBlur
+            blur={15}
+            clip={rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT - discCenterY)}
+          >
+            <Fill color="rgba(0,0,0,0.3)" />
+          </BackdropBlur>
+        </Canvas>
         {/* Subtle white line at top of blur */}
         <View style={styles.blurTopLine} />
       </View>
@@ -1179,10 +1184,6 @@ const styles = StyleSheet.create({
     bottom: 0, // Extend to bottom of screen
     zIndex: 5, // Above disc cover, below gray ring
     overflow: 'hidden',
-  },
-  discBlurDarkOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   blurTopLine: {
     position: 'absolute',
