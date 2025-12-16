@@ -21,7 +21,6 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { Canvas, BackdropBlur, Fill, rect } from '@shopify/react-native-skia';
 import Svg, { Path } from 'react-native-svg';
 import ReanimatedAnimated, {
   useAnimatedStyle,
@@ -811,16 +810,26 @@ export function CDPlayerScreen() {
       />
 
       {/* Blur overlay - starts from center of disc, extends to bottom */}
-      {/* Skia BackdropBlur blurs content rendered before it in the tree */}
+      {/* Uses blurred cover image positioned to match disc location */}
       <View style={[styles.discBlurOverlay, { top: discCenterY }]}>
-        <Canvas style={StyleSheet.absoluteFill}>
-          <BackdropBlur
-            blur={40}
-            clip={rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT - discCenterY)}
-          >
-            <Fill color="rgba(0,0,0,0.3)" />
-          </BackdropBlur>
-        </Canvas>
+        {coverUrl && (
+          <Image
+            source={coverUrl}
+            style={[
+              styles.discBlurImage,
+              {
+                width: DISC_SIZE,
+                height: DISC_SIZE,
+                top: -(DISC_SIZE / 2),
+                left: (SCREEN_WIDTH - DISC_SIZE) / 2,
+              },
+            ]}
+            blurRadius={30}
+            contentFit="cover"
+          />
+        )}
+        {/* Dark overlay */}
+        <View style={styles.discBlurDarkOverlay} />
         {/* Subtle white line at top of blur */}
         <View style={styles.blurTopLine} />
       </View>
@@ -1185,6 +1194,14 @@ const styles = StyleSheet.create({
     bottom: 0, // Extend to bottom of screen
     zIndex: 5, // Above disc cover, below gray ring
     overflow: 'hidden',
+  },
+  discBlurImage: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  discBlurDarkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   blurTopLine: {
     position: 'absolute',
