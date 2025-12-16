@@ -177,6 +177,12 @@ const SettingsIcon = () => (
 interface CDDiscProps {
   coverUrl: string | null;
   size?: number;
+  /** Shared rotation value - allows syncing multiple discs */
+  rotation: SharedValue<number>;
+  /** Whether this disc drives the animation (only one should be primary) */
+  isPrimary?: boolean;
+  /** Render with blur effect for frosted glass appearance */
+  isBlurred?: boolean;
   isPlaying?: boolean;
   isBuffering?: boolean;
   playbackRate?: number;
@@ -190,6 +196,9 @@ interface CDDiscProps {
 const CDDisc: React.FC<CDDiscProps> = ({
   coverUrl,
   size = DISC_SIZE,
+  rotation,
+  isPrimary = true,
+  isBlurred = false,
   isPlaying = false,
   isBuffering = false,
   playbackRate = 1,
@@ -197,74 +206,69 @@ const CDDisc: React.FC<CDDiscProps> = ({
   scrubSpeed,
   spinBurst,
 }) => {
-  // Use Reanimated shared values for smooth, continuous rotation on UI thread
-  const rotation = useSharedValue(0);
+  // Animation state - only used by primary disc
   const baseDegreesPerMs = useSharedValue(0);
   const lastFrameTime = useSharedValue(Date.now());
-
-  // Buffering oscillation state
   const oscillationPhase = useSharedValue(0);
   const isOscillating = useSharedValue(false);
 
-  // Calculate base rotation speed based on isPlaying and playbackRate
-  // Uses centralized CD_ROTATION token for consistent animation speed
+  // Calculate base rotation speed - only for primary disc
   useEffect(() => {
-    // If reduced motion is enabled, don't spin
+    if (!isPrimary) return;
     if (reducedMotion) {
       baseDegreesPerMs.value = withTiming(0, { duration: DURATION.moderate });
       return;
     }
     const degreesPerSecond = isPlaying ? CD_ROTATION.baseSpeed * playbackRate : 0;
-    // Smoothly transition to new speed
     baseDegreesPerMs.value = withTiming(degreesPerSecond / 1000, { duration: DURATION.moderate });
-  }, [isPlaying, playbackRate, reducedMotion]);
+  }, [isPlaying, playbackRate, reducedMotion, isPrimary]);
 
-  // Update oscillation state when buffering changes
+  // Update oscillation state - only for primary disc
   useEffect(() => {
+    if (!isPrimary) return;
     isOscillating.value = isBuffering && !reducedMotion;
-  }, [isBuffering, reducedMotion]);
+  }, [isBuffering, reducedMotion, isPrimary]);
 
-  // UI thread frame callback for buttery smooth 60fps animation
+  // UI thread frame callback - only run on primary disc
   useFrameCallback((frameInfo) => {
     'worklet';
+    if (!isPrimary) return;
+
     const now = frameInfo.timestamp;
     const deltaMs = now - lastFrameTime.value;
     lastFrameTime.value = now;
 
-    // Clamp delta to avoid huge jumps (e.g., when app was backgrounded)
     const clampedDelta = Math.min(deltaMs, 50);
 
     // Check for spin burst (skip button feedback)
     if (spinBurst && Math.abs(spinBurst.value) > 0.1) {
       rotation.value = rotation.value + spinBurst.value;
-      spinBurst.value = 0; // Consume the burst
+      spinBurst.value = 0;
     }
 
-    // Buffering oscillation: subtle back-forth wiggle using centralized tokens
+    // Buffering oscillation
     if (isOscillating.value) {
       oscillationPhase.value = (oscillationPhase.value + clampedDelta * CD_ROTATION.bufferingFrequency) % (2 * Math.PI);
       const oscillation = Math.sin(oscillationPhase.value) * CD_ROTATION.bufferingAmplitude;
       rotation.value = rotation.value + oscillation * 0.08;
-      return; // Don't apply normal rotation during buffering
+      return;
     }
 
-    // Determine rotation speed: use scrub speed if scrubbing, otherwise base speed
+    // Determine rotation speed
     const scrubDegreesPerMs = scrubSpeed ? scrubSpeed.value / 1000 : 0;
     const effectiveSpeed = Math.abs(scrubDegreesPerMs) > 0.001
       ? scrubDegreesPerMs
       : baseDegreesPerMs.value;
 
-    // Update rotation based on effective speed
     if (Math.abs(effectiveSpeed) > 0.001) {
       rotation.value = (rotation.value + effectiveSpeed * clampedDelta) % 360;
-      // Handle negative modulo
       if (rotation.value < 0) {
         rotation.value += 360;
       }
     }
-  }, true);
+  }, isPrimary); // Only active when isPrimary
 
-  // Main disc rotation style
+  // Main disc rotation style - both discs use the same shared rotation
   const discStyle = useAnimatedStyle(() => {
     'worklet';
     return {
@@ -290,6 +294,7 @@ const CDDisc: React.FC<CDDiscProps> = ({
           style={[styles.discCover, { borderRadius: size / 2 }]}
           contentFit="cover"
           contentPosition="top"
+          blurRadius={isBlurred ? 25 : 0}
         />
       ) : (
         <View style={[styles.discCover, { backgroundColor: '#333', borderRadius: size / 2 }]} />
@@ -447,6 +452,8 @@ export function CDPlayerScreen() {
   const joystickSettings = useJoystickSeekSettings();
 
   // Disc rotation control
+  // Shared rotation value - both sharp and blurred discs use this for sync
+  const discRotation = useSharedValue(0);
   // scrubSpeed: degrees per second when joystick is being dragged (negative = backward)
   // spinBurst: instant rotation delta for skip button feedback
   const discScrubSpeed = useSharedValue(0);
@@ -777,10 +784,12 @@ export function CDPlayerScreen() {
         <Text style={styles.author} numberOfLines={1}>{author}</Text>
       </View>
 
-      {/* CD Disc - rendered first so blur can be applied on top */}
+      {/* Sharp CD Disc - full disc, bottom layer */}
       <View style={styles.discContainer}>
         <CDDisc
           coverUrl={coverUrl}
+          rotation={discRotation}
+          isPrimary={true}
           isPlaying={isPlaying}
           isBuffering={isBuffering && !isDownloaded}
           playbackRate={playbackRate}
@@ -809,28 +818,28 @@ export function CDPlayerScreen() {
         style={[styles.holderShadow, { top: discCenterY - scale(30) }]}
       />
 
-      {/* Blur overlay - starts from center of disc, extends to bottom */}
-      {/* Uses blurred cover image positioned to match disc location */}
-      <View style={[styles.discBlurOverlay, { top: discCenterY }]}>
-        {coverUrl && (
-          <Image
-            source={coverUrl}
-            style={[
-              styles.discBlurImage,
-              {
-                width: DISC_SIZE,
-                height: DISC_SIZE,
-                top: -(DISC_SIZE / 2),
-                left: (SCREEN_WIDTH - DISC_SIZE) / 2,
-              },
-            ]}
-            blurRadius={30}
-            contentFit="cover"
+      {/* Blurred CD Disc - clipped to bottom half only, synced rotation */}
+      <View
+        style={[
+          styles.blurredDiscContainer,
+          {
+            top: discCenterY,
+            height: SCREEN_HEIGHT - discCenterY,
+          }
+        ]}
+      >
+        <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
+          <CDDisc
+            coverUrl={coverUrl}
+            rotation={discRotation}
+            isPrimary={false}
+            isBlurred={true}
+            reducedMotion={reducedMotion ?? false}
           />
-        )}
-        {/* Dark overlay */}
-        <View style={styles.discBlurDarkOverlay} />
-        {/* Subtle white line at top of blur */}
+        </View>
+        {/* Dark overlay on top of blurred disc */}
+        <View style={styles.blurDarkOverlay} />
+        {/* Glass line at top */}
         <View style={styles.blurTopLine} />
       </View>
 
@@ -1186,20 +1195,15 @@ const styles = StyleSheet.create({
     height: scale(30),
     zIndex: 4, // Below blur, above disc
   },
-  discBlurOverlay: {
+  blurredDiscContainer: {
     position: 'absolute',
-    // top is set dynamically
     left: 0,
     right: 0,
-    bottom: 0, // Extend to bottom of screen
-    zIndex: 5, // Above disc cover, below gray ring
-    overflow: 'hidden',
+    overflow: 'hidden',  // Critical: clips the disc to show only bottom half
+    alignItems: 'center',
+    zIndex: 6,  // Above sharp disc, below spindle
   },
-  discBlurImage: {
-    position: 'absolute',
-    borderRadius: 9999,
-  },
-  discBlurDarkOverlay: {
+  blurDarkOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
@@ -1209,7 +1213,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: colors.borderLight,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   discCenterOverlay: {
     position: 'absolute',
@@ -1217,7 +1221,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 4, // Below blur (blur is zIndex 5)
+    zIndex: 7,  // Above blurred disc
   },
   discGrayRingStatic: {
     width: DISC_SIZE * 0.32,
@@ -1242,7 +1246,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 7, // Above blur
+    zIndex: 8, // Above everything
   },
   chromeSpindleImage: {
     width: DISC_SIZE * 0.24,
