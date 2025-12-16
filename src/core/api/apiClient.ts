@@ -90,10 +90,22 @@ class ApiClient extends BaseApiClient {
     return this.get<LibraryItem>(url);
   }
 
-  getItemCoverUrl(itemId: string, bustCache = false): string {
+  /**
+   * Get cover URL with automatic cache busting.
+   * Uses a global cache version that increments on library refresh.
+   */
+  private _coverCacheVersion = 0;
+
+  /** Call this when library is refreshed to bust cover caches */
+  bumpCoverCacheVersion(): void {
+    this._coverCacheVersion = Date.now();
+  }
+
+  getItemCoverUrl(itemId: string): string {
     const baseUrl = `${this.getBaseURL()}${endpoints.items.cover(itemId)}`;
-    if (bustCache) {
-      return `${baseUrl}?t=${Date.now()}`;
+    // Always include cache version to ensure fresh covers after refresh
+    if (this._coverCacheVersion > 0) {
+      return `${baseUrl}?v=${this._coverCacheVersion}`;
     }
     return baseUrl;
   }

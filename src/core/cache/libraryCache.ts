@@ -368,7 +368,10 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
     DEBUG && console.log('[LibraryCache] Refreshing cache for library:', id);
     await get().loadCache(id, true);
     // Set lastRefreshed to bust image caches
-    set({ lastRefreshed: Date.now() });
+    const now = Date.now();
+    set({ lastRefreshed: now });
+    // Also bump apiClient's cache version so all cover URLs get new version
+    apiClient.bumpCoverCacheVersion();
     DEBUG && console.log('[LibraryCache] Cache refresh complete, image caches will be busted');
   },
 
