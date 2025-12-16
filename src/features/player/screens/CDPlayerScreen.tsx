@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Canvas, BackdropBlur, Fill, rect } from '@shopify/react-native-skia';
 import Svg, { Path } from 'react-native-svg';
 import ReanimatedAnimated, {
