@@ -793,19 +793,49 @@ export function CDPlayerScreen() {
         <Text style={styles.author} numberOfLines={1}>{author}</Text>
       </View>
 
-      {/* Sharp CD Disc - full disc, bottom layer */}
-      <View style={styles.discContainer}>
-        <CDDisc
-          coverUrl={coverUrl}
-          rotation={discRotation}
-          isPrimary={true}
-          isPlaying={isPlaying}
-          isBuffering={isBuffering && !isDownloaded}
-          playbackRate={playbackRate}
-          reducedMotion={reducedMotion ?? false}
-          scrubSpeed={discScrubSpeed}
-          spinBurst={discSpinBurst}
-        />
+      {/* Sharp CD Disc - top half visible with radial edge fade */}
+      <View style={[styles.discContainer, { height: DISC_SIZE / 2, overflow: 'hidden' }]}>
+        {MaskedView ? (
+          <MaskedView
+            style={{ width: DISC_SIZE, height: DISC_SIZE / 2 }}
+            maskElement={
+              <Svg width={DISC_SIZE} height={DISC_SIZE}>
+                <Defs>
+                  <RadialGradient id="topEdgeFade" cx="50%" cy="50%" r="50%">
+                    <Stop offset="0" stopColor="white" stopOpacity="1" />
+                    <Stop offset="0.75" stopColor="white" stopOpacity="1" />
+                    <Stop offset="1" stopColor="white" stopOpacity="0" />
+                  </RadialGradient>
+                </Defs>
+                <Circle cx={DISC_SIZE / 2} cy={DISC_SIZE / 2} r={DISC_SIZE / 2} fill="url(#topEdgeFade)" />
+              </Svg>
+            }
+          >
+            <CDDisc
+              coverUrl={coverUrl}
+              rotation={discRotation}
+              isPrimary={true}
+              isPlaying={isPlaying}
+              isBuffering={isBuffering && !isDownloaded}
+              playbackRate={playbackRate}
+              reducedMotion={reducedMotion ?? false}
+              scrubSpeed={discScrubSpeed}
+              spinBurst={discSpinBurst}
+            />
+          </MaskedView>
+        ) : (
+          <CDDisc
+            coverUrl={coverUrl}
+            rotation={discRotation}
+            isPrimary={true}
+            isPlaying={isPlaying}
+            isBuffering={isBuffering && !isDownloaded}
+            playbackRate={playbackRate}
+            reducedMotion={reducedMotion ?? false}
+            scrubSpeed={discScrubSpeed}
+            spinBurst={discSpinBurst}
+          />
+        )}
         {/* Playing indicator for reduced motion mode */}
         {reducedMotion && isPlaying && (
           <View style={styles.playingBadge}>

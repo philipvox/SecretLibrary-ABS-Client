@@ -61,6 +61,8 @@
     </dict>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to visualize audio.</string>
+    <key>NSMotionUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your device motion</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UIBackgroundModes</key>
@@ -95,24 +97,5 @@
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
-    <key>UIApplicationSceneManifest</key>
-    <dict>
-      <key>UIApplicationSupportsMultipleScenes</key>
-      <true/>
-      <key>UISceneConfigurations</key>
-      <dict>
-        <key>CPTemplateApplicationSceneSessionRoleApplication</key>
-        <array>
-          <dict>
-            <key>UISceneClassName</key>
-            <string>CPTemplateApplicationScene</string>
-            <key>UISceneConfigurationName</key>
-            <string>CarPlay</string>
-            <key>UISceneDelegateClassName</key>
-            <string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
-          </dict>
-        </array>
-      </dict>
-    </dict>
   </dict>
 </plist>
