@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/core/auth';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { APP_VERSION, BUILD_NUMBER, VERSION_DATE } from '@/constants/version';
 import { colors, scale } from '@/shared/theme';
 
 const ACCENT = colors.accent;
@@ -248,7 +249,8 @@ export function ProfileScreen() {
         {/* App Footer */}
         <View style={styles.footer}>
           <Text style={styles.appName}>AudiobookShelf</Text>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
+          <Text style={styles.versionText}>v{APP_VERSION} ({BUILD_NUMBER})</Text>
+          <Text style={styles.buildDate}>{VERSION_DATE}</Text>
         </View>
       </ScrollView>
     </View>
@@ -425,5 +427,10 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: scale(12),
     color: 'rgba(255,255,255,0.2)',
+  },
+  buildDate: {
+    fontSize: scale(10),
+    color: 'rgba(255,255,255,0.15)',
+    marginTop: scale(2),
   },
 });

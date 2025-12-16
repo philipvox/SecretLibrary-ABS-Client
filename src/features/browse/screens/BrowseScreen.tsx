@@ -32,8 +32,14 @@ import {
   CategoryGrid,
   PopularSeriesSection,
   TopAuthorsSection,
+  MoodFilterPills,
   GENRE_CHIPS,
 } from '@/features/discover';
+import {
+  MoodDiscoveryCard,
+  useHasActiveSession,
+  useActiveSession,
+} from '@/features/mood-discovery';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 
 export function BrowseScreen() {
@@ -43,7 +49,11 @@ export function BrowseScreen() {
   // Selected genre filter
   const [selectedGenre, setSelectedGenre] = useState('All');
 
-  // Discover data
+  // Mood session state
+  const hasMoodSession = useHasActiveSession();
+  const moodSession = useActiveSession();
+
+  // Discover data (mood-aware when session active)
   const {
     rows,
     hero,
@@ -51,7 +61,7 @@ export function BrowseScreen() {
     isLoading,
     isRefreshing,
     refresh,
-  } = useDiscoverData(selectedGenre);
+  } = useDiscoverData(selectedGenre, moodSession);
 
   // Navigation handlers
   const handleSearchPress = useCallback(() => {
@@ -60,6 +70,15 @@ export function BrowseScreen() {
 
   const handleGenreSelect = useCallback((genre: string) => {
     setSelectedGenre(genre);
+  }, []);
+
+  const handleMoodEdit = useCallback(() => {
+    navigation.navigate('MoodDiscovery');
+  }, [navigation]);
+
+  const handleMoodClear = useCallback(() => {
+    // Session cleared - browse returns to default state
+    // No additional action needed, hasMoodSession will become false
   }, []);
 
   // Show skeleton only on true first load (no cached data exists)
@@ -112,12 +131,25 @@ export function BrowseScreen() {
           />
         }
       >
-        {/* Quick Filter Chips */}
-        <QuickFilterChips
-          chips={availableGenres.length > 0 ? availableGenres : GENRE_CHIPS}
-          selectedChip={selectedGenre}
-          onSelect={handleGenreSelect}
-        />
+        {/* Quick Filter Chips OR Mood Filter Pills */}
+        {hasMoodSession && moodSession ? (
+          <MoodFilterPills
+            session={moodSession}
+            onEditPress={handleMoodEdit}
+            onClear={handleMoodClear}
+          />
+        ) : (
+          <QuickFilterChips
+            chips={availableGenres.length > 0 ? availableGenres : GENRE_CHIPS}
+            selectedChip={selectedGenre}
+            onSelect={handleGenreSelect}
+          />
+        )}
+
+        {/* Mood Discovery Entry Point - only show when NO mood session */}
+        {!showSkeleton && selectedGenre === 'All' && !hasMoodSession && (
+          <MoodDiscoveryCard />
+        )}
 
         {/* Skeleton Loading State */}
         {showSkeleton && (
@@ -152,8 +184,8 @@ export function BrowseScreen() {
           <HeroSection hero={hero} />
         )}
 
-        {/* Browse Pills - Category Navigation */}
-        {!showSkeleton && selectedGenre === 'All' && (
+        {/* Browse Pills - Category Navigation (hidden when mood active) */}
+        {!showSkeleton && selectedGenre === 'All' && !hasMoodSession && (
           <BrowsePills />
         )}
 

@@ -52,6 +52,10 @@ export const audioLog = {
   sync: (msg: string, ...args: any[]) =>
     DEBUG && console.log(`[Sync ${getTimestamp()}] ${msg}`, ...args),
 
+  // General debug - for misc debugging
+  debug: (msg: string, ...args: any[]) =>
+    DEBUG && console.log(`[Debug ${getTimestamp()}] ${msg}`, ...args),
+
   // Errors (always log, even in production)
   error: (msg: string, ...args: any[]) =>
     console.error(`[Audio Error ${getTimestamp()}] ${msg}`, ...args),

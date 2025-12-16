@@ -261,6 +261,19 @@ export function PlaybackSettingsScreen() {
           </View>
         </View>
 
+        {/* Joystick Seek Section */}
+        <View style={styles.section}>
+          <SectionHeader title="Seeking" />
+          <View style={styles.sectionCard}>
+            <SettingsRow
+              icon="game-controller-outline"
+              label="Joystick Seek"
+              onPress={() => (navigation as any).navigate('JoystickSeekSettings')}
+              note="Customize drag-to-seek speed and curve"
+            />
+          </View>
+        </View>
+
         {/* Info Note */}
         <View style={styles.infoSection}>
           <Ionicons name="information-circle-outline" size={scale(16)} color="rgba(255,255,255,0.4)" />

@@ -48,13 +48,11 @@ export function TabBar<T extends string>({
 
   React.useEffect(() => {
     if (tabPositions.length > 0 && tabWidths.length > 0) {
-      indicatorPosition.value = withSpring(tabPositions[activeIndex] || 0, {
-        damping: 20,
-        stiffness: 200,
+      indicatorPosition.value = withTiming(tabPositions[activeIndex] || 0, {
+        duration: 150,
       });
-      indicatorWidth.value = withSpring(tabWidths[activeIndex] || 0, {
-        damping: 20,
-        stiffness: 200,
+      indicatorWidth.value = withTiming(tabWidths[activeIndex] || 0, {
+        duration: 150,
       });
     }
   }, [activeIndex, tabPositions, tabWidths]);

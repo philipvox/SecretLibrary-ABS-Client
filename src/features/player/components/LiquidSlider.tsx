@@ -108,8 +108,8 @@ const MAGNIFY_SCALE = 2.5;
 const MAGNIFIED_TRACK_HEIGHT = TRACK_HEIGHT * MAGNIFY_SCALE;
 
 const SPRING_CONFIG = {
-  damping: 20,
-  stiffness: 300,
+  damping: 25,
+  stiffness: 200,
   mass: 0.8,
 };
 

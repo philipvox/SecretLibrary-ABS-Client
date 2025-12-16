@@ -1,4 +1,3 @@
-export { SimplePlayerScreen } from './screens/SimplePlayerScreen';
 export { CDPlayerScreen } from './screens/CDPlayerScreen';
 export { usePlayerStore, useSleepTimerState, useCurrentChapterIndex, useBookProgress } from './stores/playerStore';
 export { audioService } from './services/audioService';

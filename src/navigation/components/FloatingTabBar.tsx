@@ -1,8 +1,9 @@
 /**
  * src/navigation/components/FloatingTabBar.tsx
  *
- * Floating 4-tab navigation bar: Browse | Library | Profile | Home
+ * Floating 5-tab navigation bar: Home | Library | Search | Browse | Profile
  * Dark pill-shaped bar with outline icons and labels
+ * Active tab uses accent color with underline indicator
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -22,11 +23,11 @@ import {
 } from '@/shared/theme';
 
 // Design constants
-const ICON_COLOR = colors.textPrimary;
+const ICON_COLOR_ACTIVE = colors.accent;
 const ICON_COLOR_INACTIVE = colors.textSecondary;
 const ICON_SIZE = sizes.iconMd;
-const BAR_HEIGHT = 82;
-const BAR_BOTTOM_PADDING = 0; // Extra padding at bottom for touch UX
+const BAR_HEIGHT = 80;
+const BAR_BOTTOM_PADDING = 20; // Extra padding at bottom for touch UX
 
 // Screen width for layout
 const SCREEN_WIDTH = wp(100);
@@ -43,7 +44,7 @@ const NavBarBackground: React.FC<{ width: number; height: number }> = ({ width, 
 // Browse icon (compass) - matches design
 const BrowseIcon: React.FC<{ size?: number; color?: string }> = ({
   size = ICON_SIZE,
-  color = ICON_COLOR
+  color = ICON_COLOR_INACTIVE
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     {/* Outer circle */}
@@ -62,7 +63,7 @@ const BrowseIcon: React.FC<{ size?: number; color?: string }> = ({
 // Library icon (books) - matches design
 const LibraryIcon: React.FC<{ size?: number; color?: string }> = ({
   size = ICON_SIZE,
-  color = ICON_COLOR
+  color = ICON_COLOR_INACTIVE
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     {/* Three book spines */}
@@ -75,7 +76,7 @@ const LibraryIcon: React.FC<{ size?: number; color?: string }> = ({
 // Profile icon (person outline) - matches design
 const ProfileIcon: React.FC<{ size?: number; color?: string }> = ({
   size = ICON_SIZE,
-  color = ICON_COLOR
+  color = ICON_COLOR_INACTIVE
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     {/* Head circle */}
@@ -93,7 +94,7 @@ const ProfileIcon: React.FC<{ size?: number; color?: string }> = ({
 // Home icon (house outline) - matches design
 const HomeIcon: React.FC<{ size?: number; color?: string }> = ({
   size = ICON_SIZE,
-  color = ICON_COLOR
+  color = ICON_COLOR_INACTIVE
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     {/* House roof */}
@@ -126,7 +127,7 @@ const HomeIcon: React.FC<{ size?: number; color?: string }> = ({
 // Search icon (magnifying glass)
 const SearchIcon: React.FC<{ size?: number; color?: string }> = ({
   size = ICON_SIZE,
-  color = ICON_COLOR
+  color = ICON_COLOR_INACTIVE
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     {/* Magnifying glass circle */}
@@ -152,11 +153,11 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { key: 'browse', label: 'Browse', icon: BrowseIcon, route: 'Main', screen: 'DiscoverTab' },
+  { key: 'home', label: 'Home', icon: HomeIcon, route: 'Main', screen: 'HomeTab' },
   { key: 'library', label: 'Library', icon: LibraryIcon, route: 'Main', screen: 'LibraryTab' },
   { key: 'search', label: 'Search', icon: SearchIcon, route: 'Search' },
+  { key: 'browse', label: 'Browse', icon: BrowseIcon, route: 'Main', screen: 'DiscoverTab' },
   { key: 'profile', label: 'Profile', icon: ProfileIcon, route: 'Main', screen: 'ProfileTab' },
-  { key: 'home', label: 'Home', icon: HomeIcon, route: 'Main', screen: 'HomeTab' },
 ];
 
 function FloatingTabBarInner() {
@@ -239,7 +240,7 @@ function FloatingTabBarInner() {
             >
               <IconComponent
                 size={ICON_SIZE}
-                color={isActive ? ICON_COLOR : ICON_COLOR_INACTIVE}
+                color={isActive ? ICON_COLOR_ACTIVE : ICON_COLOR_INACTIVE}
               />
               <Text style={[
                 styles.label,
@@ -247,6 +248,7 @@ function FloatingTabBarInner() {
               ]}>
                 {tab.label}
               </Text>
+              {isActive && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           );
         })}
@@ -296,7 +298,7 @@ export function FloatingTabBar() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: spacing.sm,
+    bottom: -10,
     left: 0,
     right: 0,
     zIndex: 9999,
@@ -326,7 +328,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   labelActive: {
-    color: colors.textPrimary,
+    color: colors.accent,
     fontWeight: '600',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    width: 20,
+    height: 2,
+    backgroundColor: colors.accent,
+    borderRadius: 1,
   },
 });

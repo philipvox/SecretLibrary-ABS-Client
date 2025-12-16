@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDownloads } from '@/core/hooks/useDownloads';
+import { downloadManager } from '@/core/services/downloadManager';
 import { useLibraryCache } from '@/core/cache';
 import { networkMonitor } from '@/core/services/networkMonitor';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
@@ -139,6 +140,7 @@ export function StorageSettingsScreen() {
   // Library cache
   const { refreshCache } = useLibraryCache();
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
+  const [isClearingDownloads, setIsClearingDownloads] = useState(false);
 
   // Network settings
   const [wifiOnlyEnabled, setWifiOnlyEnabled] = useState(networkMonitor.isWifiOnlyEnabled());
@@ -180,6 +182,8 @@ export function StorageSettingsScreen() {
       return;
     }
 
+    if (isClearingDownloads) return;
+
     Alert.alert(
       'Clear All Downloads',
       `This will remove all ${downloadCount} downloaded book${downloadCount !== 1 ? 's' : ''} and free up ${formatBytes(totalStorage)}. Are you sure?`,
@@ -188,14 +192,22 @@ export function StorageSettingsScreen() {
         {
           text: 'Clear All',
           style: 'destructive',
-          onPress: () => {
-            // TODO: Implement clear all downloads
-            Alert.alert('Coming Soon', 'This feature will be available in a future update.');
+          onPress: async () => {
+            setIsClearingDownloads(true);
+            try {
+              await downloadManager.clearAllDownloads();
+              Alert.alert('Success', 'All downloads have been cleared.');
+            } catch (error) {
+              console.error('[StorageSettings] Failed to clear downloads:', error);
+              Alert.alert('Error', 'Failed to clear downloads. Please try again.');
+            } finally {
+              setIsClearingDownloads(false);
+            }
           },
         },
       ]
     );
-  }, [downloadCount, totalStorage]);
+  }, [downloadCount, totalStorage, isClearingDownloads]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -273,7 +285,9 @@ export function StorageSettingsScreen() {
             <SettingsRow
               icon="trash-outline"
               label="Clear All Downloads"
-              onPress={handleClearAllDownloads}
+              onPress={isClearingDownloads ? undefined : handleClearAllDownloads}
+              value={isClearingDownloads ? 'Clearing...' : undefined}
+              valueColor="rgba(255,255,255,0.5)"
               note={`Free up ${formatBytes(totalStorage)}`}
               danger
             />

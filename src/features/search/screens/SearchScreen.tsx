@@ -1072,14 +1072,14 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_COLOR,
     borderRadius: 10,
     paddingHorizontal: 12,
-    height: 40,
+    minHeight: 44,
   },
   searchInput: {
     flex: 1,
     color: '#FFFFFF',
     fontSize: 15,
     marginLeft: 8,
-    paddingVertical: 0,
+    paddingVertical: 8,
   },
   clearButton: {
     padding: 4,

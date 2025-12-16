@@ -131,12 +131,23 @@ export function HomeScreen() {
   // Navigation handlers
   const handleLibraryPress = () => navigation.navigate('Main', { screen: 'LibraryTab' });
 
-  // Open full player
-  const handleDiscPress = useCallback(() => {
-    if (currentBook) {
+  // Open full player for current book
+  const handleDiscPress = useCallback(async () => {
+    if (!currentBook) return;
+
+    // If the book is already loaded in the player, just open it
+    if (playerCurrentBook?.id === currentBook.id) {
       togglePlayer();
+    } else {
+      // Load the book and open the player
+      try {
+        const fullBook = await apiClient.getItem(currentBook.id);
+        await loadBook(fullBook, { autoPlay: false, showPlayer: true });
+      } catch {
+        await loadBook(currentBook, { autoPlay: false, showPlayer: true });
+      }
     }
-  }, [currentBook, togglePlayer]);
+  }, [currentBook, playerCurrentBook, togglePlayer, loadBook]);
 
   // Play/Pause
   const handlePlayPause = useCallback(async () => {

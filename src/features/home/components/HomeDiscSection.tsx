@@ -22,12 +22,11 @@ import { LinearGradient } from 'expo-linear-gradient'; // Still used for spindle
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
   useFrameCallback,
-  SharedValue,
 } from 'react-native-reanimated';
 import { colors, wp, layout } from '@/shared/theme';
+import { DURATION, SCALE, CD_ROTATION, EASING } from '@/shared/animation';
 
 // Home disc is 70% of screen width (from layout.homeDiscRatio)
 const HOME_DISC_SIZE = wp(layout.homeDiscRatio * 100);
@@ -59,11 +58,10 @@ const CDDisc: React.FC<{
   const lastFrameTime = useSharedValue(Date.now());
 
   // Calculate rotation speed based on playing state and playback rate
-  // Base: 12 deg/s (1 rotation per 30 seconds), scaled by playbackRate
+  // Uses centralized CD_ROTATION token for consistent animation speed
   useEffect(() => {
-    const baseDegreesPerSecond = 12;
-    const degreesPerSecond = isPlaying ? baseDegreesPerSecond * playbackRate : 0;
-    baseDegreesPerMs.value = withTiming(degreesPerSecond / 1000, { duration: 200 });
+    const degreesPerSecond = isPlaying ? CD_ROTATION.baseSpeed * playbackRate : 0;
+    baseDegreesPerMs.value = withTiming(degreesPerSecond / 1000, { duration: DURATION.moderate });
   }, [isPlaying, playbackRate]);
 
   // UI thread frame callback for smooth 60fps animation
@@ -141,10 +139,16 @@ export function HomeDiscSection({
       <Pressable
         onPress={onPress}
         onPressIn={() => {
-          scaleAnim.value = withSpring(0.96, { damping: 15, stiffness: 300 });
+          scaleAnim.value = withTiming(SCALE.cardPress, {
+            duration: DURATION.press,
+            easing: EASING.decelerate,
+          });
         }}
         onPressOut={() => {
-          scaleAnim.value = withSpring(1, { damping: 15, stiffness: 300 });
+          scaleAnim.value = withTiming(1, {
+            duration: DURATION.press,
+            easing: EASING.decelerate,
+          });
         }}
       >
         <Animated.View style={animatedStyle}>

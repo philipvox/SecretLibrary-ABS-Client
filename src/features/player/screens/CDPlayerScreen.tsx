@@ -17,7 +17,6 @@ import {
   PanResponder,
   ScrollView,
   Easing,
-  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,13 +24,13 @@ import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
 import ReanimatedAnimated, {
   useAnimatedStyle,
-  withSpring,
   withTiming,
   useSharedValue,
   runOnJS,
   useFrameCallback,
   SharedValue,
 } from 'react-native-reanimated';
+import { DURATION, CD_ROTATION } from '@/shared/animation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +38,10 @@ import { useShallow } from 'zustand/react/shallow';
 import { useNavigation } from '@react-navigation/native';
 
 import { usePlayerStore, useCurrentChapterIndex, useBookProgress, useSleepTimerState } from '../stores/playerStore';
+import { useJoystickSeekSettings } from '../stores/joystickSeekStore';
 import { SleepTimerSheet, SpeedSheet } from '../sheets';
+import { QueuePanel } from '@/features/queue/components/QueuePanel';
+import { useQueueCount } from '@/features/queue/stores/queueStore';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useCoverUrl } from '@/core/cache';
 import { useIsOfflineAvailable } from '@/core/hooks/useDownloads';
@@ -59,7 +61,7 @@ const GRAY_RING_COLOR = '#6B6B6B';
 // TYPES
 // =============================================================================
 
-type SheetType = 'none' | 'chapters' | 'settings';
+type SheetType = 'none' | 'chapters' | 'settings' | 'queue';
 type ProgressMode = 'chapter' | 'book';
 
 // =============================================================================
@@ -205,17 +207,16 @@ const CDDisc: React.FC<CDDiscProps> = ({
   const isOscillating = useSharedValue(false);
 
   // Calculate base rotation speed based on isPlaying and playbackRate
-  // Base: 12 deg/s (1 rotation per 30 seconds), scaled by playbackRate
+  // Uses centralized CD_ROTATION token for consistent animation speed
   useEffect(() => {
     // If reduced motion is enabled, don't spin
     if (reducedMotion) {
-      baseDegreesPerMs.value = withTiming(0, { duration: 200 });
+      baseDegreesPerMs.value = withTiming(0, { duration: DURATION.moderate });
       return;
     }
-    const baseDegreesPerSecond = 12;
-    const degreesPerSecond = isPlaying ? baseDegreesPerSecond * playbackRate : 0;
-    // Smoothly transition to new speed (200ms easing)
-    baseDegreesPerMs.value = withTiming(degreesPerSecond / 1000, { duration: 200 });
+    const degreesPerSecond = isPlaying ? CD_ROTATION.baseSpeed * playbackRate : 0;
+    // Smoothly transition to new speed
+    baseDegreesPerMs.value = withTiming(degreesPerSecond / 1000, { duration: DURATION.moderate });
   }, [isPlaying, playbackRate, reducedMotion]);
 
   // Update oscillation state when buffering changes
@@ -239,11 +240,11 @@ const CDDisc: React.FC<CDDiscProps> = ({
       spinBurst.value = 0; // Consume the burst
     }
 
-    // Buffering oscillation: small back-forth wiggle (±3 degrees at 2Hz)
+    // Buffering oscillation: subtle back-forth wiggle using centralized tokens
     if (isOscillating.value) {
-      oscillationPhase.value = (oscillationPhase.value + clampedDelta * 0.012) % (2 * Math.PI);
-      const oscillation = Math.sin(oscillationPhase.value) * 3; // ±3 degrees
-      rotation.value = rotation.value + oscillation * 0.1;
+      oscillationPhase.value = (oscillationPhase.value + clampedDelta * CD_ROTATION.bufferingFrequency) % (2 * Math.PI);
+      const oscillation = Math.sin(oscillationPhase.value) * CD_ROTATION.bufferingAmplitude;
+      rotation.value = rotation.value + oscillation * 0.08;
       return; // Don't apply normal rotation during buffering
     }
 
@@ -315,7 +316,7 @@ const CDProgressBar: React.FC<ProgressBarProps> = ({ progress, onSeek, chapterMa
   React.useEffect(() => {
     if (!isDragging.value) {
       // Use very short timing for responsive feel during seeking
-      thumbPosition.value = withTiming(progress, { duration: 100 });
+      thumbPosition.value = withTiming(progress, { duration: DURATION.press });
     }
   }, [progress]);
 
@@ -345,7 +346,7 @@ const CDProgressBar: React.FC<ProgressBarProps> = ({ progress, onSeek, chapterMa
       left: `${thumbPosition.value}%`,
       transform: [
         { translateX: THUMB_TRANSLATE_X },
-        { scale: withSpring(isDragging.value ? 1.2 : 1) },
+        { scale: withTiming(isDragging.value ? 1.1 : 1, { duration: DURATION.press }) },
       ],
     };
   });
@@ -437,9 +438,13 @@ export function CDPlayerScreen() {
   const bookProgress = useBookProgress();
   const coverUrl = useCoverUrl(currentBook?.id || '');
   const { isAvailable: isDownloaded } = useIsOfflineAvailable(currentBook?.id || '');
+  const queueCount = useQueueCount();
 
   // Accessibility: respect reduced motion preference
   const reducedMotion = useReducedMotion();
+
+  // Joystick seek settings
+  const joystickSettings = useJoystickSeekSettings();
 
   // Disc rotation control
   // scrubSpeed: degrees per second when joystick is being dragged (negative = backward)
@@ -474,13 +479,18 @@ export function CDPlayerScreen() {
   const chapterDuration = chapterEnd - chapterStart;
   const chapterPosition = position - chapterStart;
 
-  // Progress percentage based on mode
+  // Progress percentage based on mode (includes scrubOffset during joystick seeking)
   const progressPercent = useMemo(() => {
+    const effectivePosition = scrubOffset !== null ? position + scrubOffset : position;
+    const effectiveChapterPosition = scrubOffset !== null ? chapterPosition + scrubOffset : chapterPosition;
+
     if (progressMode === 'chapter') {
-      return chapterDuration > 0 ? (chapterPosition / chapterDuration) * 100 : 0;
+      const percent = chapterDuration > 0 ? (effectiveChapterPosition / chapterDuration) * 100 : 0;
+      return Math.max(0, Math.min(100, percent));
     }
-    return duration > 0 ? (position / duration) * 100 : 0;
-  }, [progressMode, chapterPosition, chapterDuration, position, duration]);
+    const percent = duration > 0 ? (effectivePosition / duration) * 100 : 0;
+    return Math.max(0, Math.min(100, percent));
+  }, [progressMode, chapterPosition, chapterDuration, position, duration, scrubOffset]);
 
   // Chapter markers as percentages for book mode
   const chapterMarkers = useMemo(() => {
@@ -517,8 +527,11 @@ export function CDPlayerScreen() {
         if (gestureState.dy > 100 || gestureState.vy > 0.5) {
           handleClose();
         } else {
-          Animated.spring(slideAnim, {
+          // Snap back with quick timing
+          Animated.timing(slideAnim, {
             toValue: 0,
+            duration: 150,
+            easing: Easing.out(Easing.ease),
             useNativeDriver: true,
           }).start();
         }
@@ -547,7 +560,8 @@ export function CDPlayerScreen() {
     setActiveSheet('none');
     Animated.timing(slideAnim, {
       toValue: SCREEN_HEIGHT,
-      duration: 200,
+      duration: 150,
+      easing: Easing.in(Easing.ease),
       useNativeDriver: true,
     }).start(() => closePlayer());
   }, [closePlayer, slideAnim]);
@@ -770,17 +784,9 @@ export function CDPlayerScreen() {
       />
 
       {/* Blur overlay - starts from center of disc, extends to bottom */}
+      {/* BlurView blurs content behind it, so the spinning disc shows through frosted glass */}
       <View style={[styles.discBlurOverlay, { top: discCenterY }]}>
-        {/* Blurred cover image for Android (BlurView doesn't blur content behind it on Android) */}
-        {coverUrl && (
-          <Image
-            source={coverUrl}
-            style={styles.discBlurImage}
-            blurRadius={Platform.OS === 'android' ? 25 : 80}
-            contentFit="cover"
-          />
-        )}
-        <BlurView intensity={Platform.OS === 'android' ? 100 : 50} tint="dark" style={StyleSheet.absoluteFill} />
+        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
         {/* Semi-transparent overlay to darken */}
         <View style={styles.discBlurDarkOverlay} />
         {/* Subtle white line at top of blur */}
@@ -843,28 +849,47 @@ export function CDPlayerScreen() {
       <View style={[styles.contentArea, { marginTop: -(DISC_SIZE * 0.45) }]}>
         {/* Pills Row - Above Overview */}
         <View style={styles.pillsRow}>
-          <TouchableOpacity
-            onPress={() => setShowSleepSheet(true)}
-            style={styles.pillButton}
-            activeOpacity={0.7}
-            accessibilityLabel={sleepTimer && sleepTimer > 0
-              ? `Sleep timer active, ${formatSleepTimer(sleepTimer)} remaining`
-              : 'Set sleep timer'}
-            accessibilityRole="button"
-          >
-            <View style={styles.pillBorder} />
-            <MoonIcon />
-            {sleepTimer !== null && sleepTimer > 0 ? (
-              <View style={styles.timerCountdownContainer}>
-                <Text style={[styles.pillText, styles.pillTextActive]}>
-                  {formatSleepTimer(sleepTimer)}
-                </Text>
-                <View style={styles.timerActiveDot} />
-              </View>
-            ) : (
-              <Text style={styles.pillText}>Off</Text>
-            )}
-          </TouchableOpacity>
+          {/* Left column: Sleep + Queue stacked */}
+          <View style={styles.pillsColumn}>
+            <TouchableOpacity
+              onPress={() => setShowSleepSheet(true)}
+              style={styles.pillButton}
+              activeOpacity={0.7}
+              accessibilityLabel={sleepTimer && sleepTimer > 0
+                ? `Sleep timer active, ${formatSleepTimer(sleepTimer)} remaining`
+                : 'Set sleep timer'}
+              accessibilityRole="button"
+            >
+              <View style={styles.pillBorder} />
+              <MoonIcon />
+              {sleepTimer !== null && sleepTimer > 0 ? (
+                <View style={styles.timerCountdownContainer}>
+                  <Text style={[styles.pillText, styles.pillTextActive]}>
+                    {formatSleepTimer(sleepTimer)}
+                  </Text>
+                  <View style={styles.timerActiveDot} />
+                </View>
+              ) : (
+                <Text style={styles.pillText}>Off</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveSheet('queue')}
+              style={[styles.pillButton, styles.queuePill]}
+              activeOpacity={0.7}
+              accessibilityLabel={queueCount > 0 ? `Queue with ${queueCount} items` : 'Queue empty'}
+              accessibilityRole="button"
+            >
+              <View style={styles.pillBorder} />
+              <Ionicons name="albums-outline" size={scale(14)} color={queueCount > 0 ? colors.accent : '#fff'} />
+              {queueCount > 0 && (
+                <View style={styles.queueBadge}>
+                  <Text style={styles.queueBadgeText}>{queueCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+          {/* Right: Speed */}
           <TouchableOpacity
             onPress={() => setShowSpeedSheet(true)}
             style={[styles.pillButton, styles.speedPill]}
@@ -896,7 +921,9 @@ export function CDPlayerScreen() {
         {/* Progress Bar with time labels */}
         <View style={styles.progressWrapper}>
           <View style={styles.progressTimeRow}>
-            <Text style={styles.progressTimeText}>{formatTime(position)}</Text>
+            <Text style={[styles.progressTimeText, scrubOffset !== null && styles.scrubTimeText]}>
+              {formatTime(scrubOffset !== null ? Math.max(0, position + scrubOffset) : position)}
+            </Text>
             <Text style={styles.progressTimeText}>{formatTime(duration)}</Text>
           </View>
           <CDProgressBar progress={progressPercent} onSeek={handleSeek} chapterMarkers={chapterMarkers} />
@@ -963,6 +990,7 @@ export function CDPlayerScreen() {
                   setScrubOffset(isScrubbing ? offset : null);
                 }}
                 onJogStateChange={setJogState}
+                joystickSettings={joystickSettings}
               />
             </View>
           </View>
@@ -1003,7 +1031,7 @@ export function CDPlayerScreen() {
         <View style={{ height: insets.bottom + scale(100) }} />
       </View>
 
-      {/* Inline Bottom Sheets (chapters, settings) */}
+      {/* Inline Bottom Sheets (chapters, settings, queue) */}
       {activeSheet !== 'none' && (
         <TouchableOpacity
           style={styles.sheetOverlay}
@@ -1013,6 +1041,12 @@ export function CDPlayerScreen() {
           <View style={[styles.sheetContainer, { marginBottom: insets.bottom + scale(90) }]}>
             {activeSheet === 'chapters' && renderChaptersSheet()}
             {activeSheet === 'settings' && renderSettingsSheet()}
+            {activeSheet === 'queue' && (
+              <QueuePanel
+                onClose={() => setActiveSheet('none')}
+                maxHeight={SCREEN_HEIGHT * 0.6}
+              />
+            )}
           </View>
         </TouchableOpacity>
       )}
@@ -1146,10 +1180,6 @@ const styles = StyleSheet.create({
     zIndex: 5, // Above disc cover, below gray ring
     overflow: 'hidden',
   },
-  discBlurImage: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.6,
-  },
   discBlurDarkOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
@@ -1259,6 +1289,10 @@ const styles = StyleSheet.create({
     fontSize: scale(16),
     fontWeight: '600',
   },
+  scrubTimeText: {
+    color: colors.accent,
+    fontWeight: '600',
+  },
   progressTimeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1328,8 +1362,13 @@ const styles = StyleSheet.create({
   pillsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: scale(22),
     marginBottom: scale(10),
+  },
+  pillsColumn: {
+    flexDirection: 'column',
+    gap: scale(8),
   },
   pillButton: {
     flexDirection: 'row',
@@ -1364,6 +1403,22 @@ const styles = StyleSheet.create({
   speedPill: {
     minWidth: scale(40),
     paddingHorizontal: scale(12),
+  },
+  queuePill: {
+    minWidth: scale(40),
+    paddingHorizontal: scale(12),
+  },
+  queueBadge: {
+    backgroundColor: colors.accent,
+    borderRadius: scale(8),
+    paddingHorizontal: scale(5),
+    paddingVertical: scale(1),
+    marginLeft: scale(2),
+  },
+  queueBadgeText: {
+    fontSize: scale(10),
+    fontWeight: '700',
+    color: colors.backgroundPrimary,
   },
   scrubButtonContainer: {
     alignItems: 'center',

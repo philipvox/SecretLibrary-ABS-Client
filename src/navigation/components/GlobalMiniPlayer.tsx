@@ -43,15 +43,16 @@ import {
 import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { useCoverUrl } from '@/core/cache';
 import { getTitle, getAuthorName } from '@/shared/utils/metadata';
+import { useQueue } from '@/features/queue/stores/queueStore';
 
 // Mini disc size
 const MINI_DISC_SIZE = sizes.coverMini;
-const MINI_HOLE_SIZE = MINI_DISC_SIZE * 0.12;
-const MINI_SPINDLE_SIZE = MINI_DISC_SIZE * 0.22;
+const MINI_HOLE_SIZE = MINI_DISC_SIZE * 0.22;
+const MINI_SPINDLE_SIZE = MINI_DISC_SIZE * 0.32;
 
 // Layout constants
 const MINI_PLAYER_HEIGHT = layout.miniPlayerHeight;
-const NAV_BAR_HEIGHT = hp(13.5);
+const NAV_BAR_HEIGHT = hp(14);
 const SWIPE_THRESHOLD = -50;
 
 const TOUCH_TARGET = layout.minTouchTarget;
@@ -202,6 +203,11 @@ export function GlobalMiniPlayer() {
   // Cover URL
   const coverUrl = useCoverUrl(currentBook?.id || '');
 
+  // Queue
+  const queue = useQueue();
+  const nextBook = queue.length > 0 ? queue[0].book : null;
+  const nextBookTitle = nextBook ? getTitle(nextBook) : null;
+
   // Swipe gesture state
   const translateY = useSharedValue(0);
 
@@ -238,8 +244,8 @@ export function GlobalMiniPlayer() {
         // Swipe up detected - open player
         runOnJS(handleOpenPlayer)();
       }
-      // Reset position
-      translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+      // Reset position with subtle timing
+      translateY.value = withTiming(0, { duration: 150 });
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -285,11 +291,16 @@ export function GlobalMiniPlayer() {
             {/* Mini CD Disc */}
             <MiniCDDisc coverUrl={coverUrl} isPlaying={isPlaying} />
 
-            {/* Title */}
+            {/* Title and Up Next */}
             <View style={styles.textContainer}>
               <Text style={styles.title} numberOfLines={1}>
                 {title}
               </Text>
+              {nextBookTitle && (
+                <Text style={styles.upNext} numberOfLines={1}>
+                  Up next: {nextBookTitle}
+                </Text>
+              )}
             </View>
 
             {/* Controls */}
@@ -336,7 +347,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom:0,
     backgroundColor: colors.backgroundPrimary,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -370,6 +381,11 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     fontWeight: '500',
     color: colors.textPrimary,
+  },
+  upNext: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    marginTop: 2,
   },
   controls: {
     flexDirection: 'row',

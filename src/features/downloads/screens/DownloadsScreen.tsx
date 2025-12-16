@@ -1,670 +1,837 @@
 /**
  * src/features/downloads/screens/DownloadsScreen.tsx
  *
- * Downloads/Your Library screen - shows downloaded books organized by series.
- * - Top icons for search/settings
- * - "Your Library" highlighted header
- * - Books grouped by series (downloaded books first within each series)
- * - Browse CTA at bottom
+ * Manage Downloads Screen - UX Research-backed implementation
+ *
+ * Features:
+ * - Storage card with visual bar showing used/available space
+ * - Downloading section with progress bars
+ * - Queued section with cancel option
+ * - Downloaded section with swipe-to-delete
+ * - Clear cache functionality
+ * - Empty state with CTA
+ *
+ * Based on NNGroup research and competitor patterns (Audible, Spotify, Netflix)
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
   Alert,
-  Image,
+  StatusBar,
 } from 'react-native';
+import { Image } from 'expo-image';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Swipeable } from 'react-native-gesture-handler';
+import * as FileSystem from 'expo-file-system';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { DownloadTask, downloadManager } from '@/core/services/downloadManager';
-import { useLibraryCache } from '@/core/cache/libraryCache';
-import { DownloadItem } from '../components/DownloadItem';
 import { useCoverUrl } from '@/core/cache';
-import { formatBytes } from '@/shared/utils/format';
+import { sqliteCache } from '@/core/services/sqliteCache';
 import { LibraryItem } from '@/core/types';
-import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, scale, spacing, radius } from '@/shared/theme';
+import { haptics } from '@/core/native/haptics';
+import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { colors, scale, wp } from '@/shared/theme';
+
+// ============================================================================
+// DESIGN TOKENS (from spec)
+// ============================================================================
 
 const COLORS = {
+  accent: colors.accent,
   background: colors.backgroundPrimary,
+  storageUsed: colors.accent,
+  storageFree: 'rgba(255, 255, 255, 0.1)',
+  progressFill: colors.accent,
+  progressTrack: 'rgba(255, 255, 255, 0.1)',
   textPrimary: colors.textPrimary,
-  textSecondary: colors.textSecondary,
-  accent: colors.success,
-  danger: colors.error,
-  cardBg: colors.cardBackground,
+  textSecondary: 'rgba(255, 255, 255, 0.6)',
+  textTertiary: 'rgba(255, 255, 255, 0.5)',
+  cardBackground: 'rgba(255, 255, 255, 0.05)',
+  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  destructive: '#FF453A',
+  success: '#30D158',
 };
 
-// Helper to extract metadata safely
-function getMetadata(item: LibraryItem): any {
-  return (item.media?.metadata as any) || {};
+const SPACING = {
+  pageHorizontal: wp(4),
+  sectionGap: wp(6),
+  cardPadding: wp(4),
+  itemGap: wp(3),
+  coverSize: wp(15),
+};
+
+// ============================================================================
+// ICONS
+// ============================================================================
+
+const BackIcon = ({ size = 24, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M15 18l-6-6 6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const DownloadIcon = ({ size = 64, color = COLORS.textTertiary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const PauseIcon = ({ size = 24, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M10 4H6v16h4V4zM18 4h-4v16h4V4z" fill={color} />
+  </Svg>
+);
+
+const PlayIcon = ({ size = 24, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M5 4l15 8-15 8V4z" fill={color} />
+  </Svg>
+);
+
+const CloseIcon = ({ size = 24, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M18 6L6 18M6 6l12 12" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const TrashIcon = ({ size = 24, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const ChevronIcon = ({ size = 20, color = COLORS.textTertiary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M9 18l6-6-6-6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const SettingsIcon = ({ size = 24, color = '#fff' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx={12} cy={12} r={3} stroke={color} strokeWidth={1.5} />
+  </Svg>
+);
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-// Extract series name and sequence from metadata
-function parseSeriesInfo(seriesName: string): { name: string; sequence?: number } {
-  const match = seriesName.match(/^(.+?)\s*#([\d.]+)$/);
-  if (match) {
-    return { name: match[1].trim(), sequence: parseFloat(match[2]) };
-  }
-  return { name: seriesName, sequence: undefined };
+function formatDate(date: Date): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
-// Search icon
-const SearchIcon = ({ size = 24, color = '#B3B3B3' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
+function formatTimeRemaining(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s left`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min left`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.round((seconds % 3600) / 60);
+  return `${hours}h ${mins}m left`;
+}
 
-// Settings/gear icon
-const SettingsIcon = ({ size = 24, color = '#B3B3B3' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <Circle cx={12} cy={12} r={3} stroke={color} strokeWidth={2} />
-  </Svg>
-);
+// ============================================================================
+// STORAGE CARD COMPONENT
+// ============================================================================
 
-// Compass/browse icon
-const BrowseIcon = ({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx={12} cy={12} r={10} stroke={color} strokeWidth={2} />
-    <Path
-      d="M14.31 8l-5.31 2.16L12 15.31l5.31-2.16L14.31 8z"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
+interface StorageCardProps {
+  usedBytes: number;
+  onClearCache?: () => void;
+  cacheSize?: number;
+}
 
-// Download icon for empty state
-const DownloadIcon = ({ size = 48, color = 'rgba(255,255,255,0.3)' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
+function StorageCard({ usedBytes, onClearCache, cacheSize = 0 }: StorageCardProps) {
+  const [freeBytes, setFreeBytes] = useState<number | null>(null);
 
-// Checkmark for downloaded indicator
-const CheckIcon = ({ size = 12, color = '#4ADE80' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M5 12l5 5L20 7"
-      stroke={color}
-      strokeWidth={3}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
+  useEffect(() => {
+    FileSystem.getFreeDiskStorageAsync()
+      .then(setFreeBytes)
+      .catch(() => setFreeBytes(null));
+  }, [usedBytes]);
 
-// Book cover thumbnail with downloaded badge
-function BookCover({ itemId, title, isDownloaded }: { itemId: string; title: string; isDownloaded: boolean }) {
-  const coverUrl = useCoverUrl(itemId);
+  const totalBytes = freeBytes ? freeBytes + usedBytes : null;
+  const usagePercent = totalBytes ? Math.min((usedBytes / totalBytes) * 100, 100) : 1;
 
   return (
-    <View style={styles.bookCoverContainer}>
-      {coverUrl ? (
-        <Image source={{ uri: coverUrl }} style={styles.bookCover} />
-      ) : (
-        <View style={[styles.bookCover, styles.bookCoverPlaceholder]}>
-          <Text style={styles.bookCoverText}>{title.charAt(0)}</Text>
-        </View>
-      )}
-      {isDownloaded && (
-        <View style={styles.downloadedBadge}>
-          <CheckIcon size={10} color="#FFFFFF" />
-        </View>
+    <View style={styles.storageCard}>
+      <Text style={styles.storageTitle}>Storage</Text>
+
+      {/* Storage bar */}
+      <View style={styles.storageBar}>
+        <View style={[styles.storageBarFill, { width: `${usagePercent}%` }]} />
+      </View>
+
+      {/* Labels */}
+      <View style={styles.storageLabels}>
+        <Text style={styles.storageUsedLabel}>{formatBytes(usedBytes)} used</Text>
+        <Text style={styles.storageFreeLabel}>
+          {freeBytes ? `${formatBytes(freeBytes)} free` : 'Calculating...'}
+        </Text>
+      </View>
+
+      {/* Clear cache button */}
+      {cacheSize > 0 && onClearCache && (
+        <TouchableOpacity style={styles.clearCacheButton} onPress={onClearCache} activeOpacity={0.7}>
+          <Text style={styles.clearCacheText}>Clear Cache</Text>
+          <Text style={styles.clearCacheSize}>{formatBytes(cacheSize)}</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
 }
 
-interface BookInfo {
-  id: string;
-  title: string;
-  author: string;
-  sequence?: number;
-  totalBytes: number;
+// ============================================================================
+// ACTIVE DOWNLOAD ROW COMPONENT
+// ============================================================================
+
+interface ActiveDownloadRowProps {
+  download: DownloadTask;
+  onPause: () => void;
+  onResume: () => void;
+  onCancel: () => void;
 }
 
-// Series section with horizontal scroll of books
-function SeriesSection({
-  seriesName,
-  books,
-  downloadedIds,
-  onBookPress
-}: {
-  seriesName: string;
-  books: BookInfo[];
-  downloadedIds: Set<string>;
-  onBookPress: (id: string) => void;
-}) {
-  // Sort books: downloaded first, then by sequence
-  const sortedBooks = useMemo(() => {
-    return [...books].sort((a, b) => {
-      const aDownloaded = downloadedIds.has(a.id);
-      const bDownloaded = downloadedIds.has(b.id);
+function ActiveDownloadRow({ download, onPause, onResume, onCancel }: ActiveDownloadRowProps) {
+  const [book, setBook] = useState<LibraryItem | null>(null);
+  const coverUrl = useCoverUrl(download.itemId);
 
-      // Downloaded books first
-      if (aDownloaded && !bDownloaded) return -1;
-      if (!aDownloaded && bDownloaded) return 1;
+  useEffect(() => {
+    sqliteCache.getLibraryItem(download.itemId).then(setBook);
+  }, [download.itemId]);
 
-      // Then by sequence
-      const aSeq = a.sequence ?? 999;
-      const bSeq = b.sequence ?? 999;
-      return aSeq - bSeq;
-    });
-  }, [books, downloadedIds]);
+  const metadata = book?.media?.metadata as any;
+  const title = metadata?.title || 'Loading...';
+  const author = metadata?.authorName || '';
 
-  const downloadedCount = books.filter(b => downloadedIds.has(b.id)).length;
+  const progress = Math.round(download.progress * 100);
+  const isPaused = download.status === 'paused';
+  const isQueued = download.status === 'pending';
+
+  // Estimate time remaining (rough calculation)
+  const bytesRemaining = (download.totalBytes || 0) - (download.bytesDownloaded || 0);
+  const estimatedSeconds = download.totalBytes > 0 ? (bytesRemaining / (download.totalBytes / 300)) : 0; // Assume ~300s for full download
 
   return (
-    <View style={styles.seriesSection}>
-      <View style={styles.seriesTitleRow}>
-        <Text style={styles.seriesTitle}>{seriesName}</Text>
-        <Text style={styles.seriesCount}>{downloadedCount}/{books.length} downloaded</Text>
+    <View style={styles.downloadRow}>
+      <Image source={coverUrl} style={styles.downloadCover} contentFit="cover" />
+
+      <View style={styles.downloadInfo}>
+        <Text style={styles.downloadTitle} numberOfLines={1}>{title}</Text>
+        <Text style={styles.downloadAuthor} numberOfLines={1}>{author}</Text>
+
+        {/* Progress bar */}
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progress}%` }]} />
+        </View>
+
+        {/* Progress text */}
+        <Text style={styles.progressText}>
+          {isQueued ? 'Waiting...' : (
+            <>
+              {formatBytes(download.bytesDownloaded || 0)} / {formatBytes(download.totalBytes || 0)}
+              {!isPaused && estimatedSeconds > 0 && ` · ${formatTimeRemaining(estimatedSeconds)}`}
+              {isPaused && ' · Paused'}
+            </>
+          )}
+        </Text>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.seriesBooksScroll}
-      >
-        {sortedBooks.map((book) => (
+
+      {/* Action buttons */}
+      <View style={styles.downloadActions}>
+        {!isQueued && (
           <TouchableOpacity
-            key={book.id}
-            style={styles.seriesBookItem}
-            onPress={() => onBookPress(book.id)}
+            style={styles.actionButton}
+            onPress={isPaused ? onResume : onPause}
             activeOpacity={0.7}
           >
-            <BookCover
-              itemId={book.id}
-              title={book.title}
-              isDownloaded={downloadedIds.has(book.id)}
-            />
-            <Text style={styles.seriesBookTitle} numberOfLines={2}>{book.title}</Text>
-            {book.sequence && (
-              <Text style={styles.seriesBookSequence}>Book {book.sequence}</Text>
+            {isPaused ? (
+              <PlayIcon size={scale(18)} color={COLORS.accent} />
+            ) : (
+              <PauseIcon size={scale(18)} color={COLORS.textSecondary} />
             )}
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        )}
+        <TouchableOpacity style={styles.actionButton} onPress={onCancel} activeOpacity={0.7}>
+          <CloseIcon size={scale(18)} color={COLORS.destructive} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
+
+// ============================================================================
+// DOWNLOADED ROW COMPONENT (with swipe-to-delete)
+// ============================================================================
+
+interface DownloadedRowProps {
+  download: DownloadTask;
+  onPress: () => void;
+  onDelete: () => void;
+}
+
+function DownloadedRow({ download, onPress, onDelete }: DownloadedRowProps) {
+  const [book, setBook] = useState<LibraryItem | null>(null);
+  const coverUrl = useCoverUrl(download.itemId);
+  const swipeableRef = React.useRef<Swipeable>(null);
+
+  useEffect(() => {
+    sqliteCache.getLibraryItem(download.itemId).then(setBook);
+  }, [download.itemId]);
+
+  const metadata = book?.media?.metadata as any;
+  const title = metadata?.title || 'Unknown';
+  const author = metadata?.authorName || '';
+  const downloadDate = download.completedAt ? new Date(download.completedAt) : new Date();
+
+  const handleDelete = useCallback(() => {
+    haptics.warning();
+    swipeableRef.current?.close();
+    onDelete();
+  }, [onDelete]);
+
+  const renderRightActions = () => (
+    <TouchableOpacity style={styles.swipeDeleteButton} onPress={handleDelete} activeOpacity={0.8}>
+      <TrashIcon size={scale(22)} color="#fff" />
+      <Text style={styles.swipeDeleteText}>Delete</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      rightThreshold={40}
+      friction={2}
+    >
+      <TouchableOpacity style={styles.downloadedRow} onPress={onPress} activeOpacity={0.7}>
+        <Image source={coverUrl} style={styles.downloadCover} contentFit="cover" />
+
+        <View style={styles.downloadInfo}>
+          <Text style={styles.downloadTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.downloadAuthor} numberOfLines={1}>
+            {author} · {formatDate(downloadDate)}
+          </Text>
+        </View>
+
+        <Text style={styles.downloadSize}>{formatBytes(download.totalBytes || 0)}</Text>
+        <ChevronIcon size={scale(18)} />
+      </TouchableOpacity>
+    </Swipeable>
+  );
+}
+
+// ============================================================================
+// SECTION HEADER COMPONENT
+// ============================================================================
+
+interface SectionHeaderProps {
+  title: string;
+  count?: number;
+  actionLabel?: string;
+  onAction?: () => void;
+  actionColor?: string;
+}
+
+function SectionHeader({ title, count, actionLabel, onAction, actionColor = COLORS.accent }: SectionHeaderProps) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>
+        {title}{count !== undefined && ` (${count})`}
+      </Text>
+      {actionLabel && onAction && (
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
+          <Text style={[styles.sectionAction, { color: actionColor }]}>{actionLabel}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
+// EMPTY STATE COMPONENT
+// ============================================================================
+
+function EmptyState({ onBrowse }: { onBrowse: () => void }) {
+  return (
+    <View style={styles.emptyState}>
+      <DownloadIcon size={scale(64)} />
+      <Text style={styles.emptyTitle}>No Downloads Yet</Text>
+      <Text style={styles.emptyDescription}>
+        Download audiobooks to listen offline.{'\n'}They'll appear here.
+      </Text>
+      <TouchableOpacity style={styles.browseButton} onPress={onBrowse} activeOpacity={0.7}>
+        <Text style={styles.browseButtonText}>Browse Library</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ============================================================================
+// MAIN SCREEN COMPONENT
+// ============================================================================
 
 export function DownloadsScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { downloads, isLoading, deleteDownload, pauseDownload, resumeDownload } = useDownloads();
-  const { getItem, getSeries } = useLibraryCache();
+  const { downloads, deleteDownload, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
 
-  // Separate active downloads from completed
-  const activeDownloads = useMemo(
-    () => downloads.filter((d) => d.status === 'downloading' || d.status === 'pending' || d.status === 'paused'),
-    [downloads]
-  );
+  // Categorize downloads
+  const { downloading, queued, completed } = useMemo(() => {
+    const downloading: DownloadTask[] = [];
+    const queued: DownloadTask[] = [];
+    const completed: DownloadTask[] = [];
 
-  const completedDownloads = useMemo(
-    () => downloads.filter((d) => d.status === 'complete'),
-    [downloads]
-  );
-
-  // Get total size of completed downloads
-  const totalSize = useMemo(() => {
-    return completedDownloads.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
-  }, [completedDownloads]);
-
-  // Enrich downloads with book metadata from library cache
-  const enrichedBooks = useMemo(() => {
-    return completedDownloads.map((download) => {
-      const item = getItem(download.itemId);
-      const metadata = item ? getMetadata(item) : {};
-      const seriesName = metadata.seriesName || '';
-      const { name: cleanSeriesName, sequence } = seriesName ? parseSeriesInfo(seriesName) : { name: '', sequence: undefined };
-
-      return {
-        id: download.itemId,
-        title: metadata.title || 'Unknown Title',
-        author: metadata.authorName || 'Unknown Author',
-        seriesName: cleanSeriesName,
-        sequence,
-        totalBytes: download.totalBytes || 0,
-      };
-    });
-  }, [completedDownloads, getItem]);
-
-  // Group books by series and get full series from library cache
-  const { seriesGroups, standaloneBooks } = useMemo(() => {
-    const seriesMap = new Map<string, BookInfo[]>();
-    const standalone: BookInfo[] = [];
-    const processedSeries = new Set<string>();
-
-    for (const book of enrichedBooks) {
-      if (book.seriesName) {
-        if (!processedSeries.has(book.seriesName)) {
-          processedSeries.add(book.seriesName);
-
-          // Get the full series from library cache
-          const seriesInfo = getSeries(book.seriesName);
-          if (seriesInfo && seriesInfo.books.length > 0) {
-            // Use all books from the series, not just downloaded ones
-            const allBooksInSeries: BookInfo[] = seriesInfo.books.map((item) => {
-              const meta = getMetadata(item);
-              const { sequence } = meta.seriesName ? parseSeriesInfo(meta.seriesName) : { sequence: undefined };
-              const downloadInfo = completedDownloads.find(d => d.itemId === item.id);
-              return {
-                id: item.id,
-                title: meta.title || 'Unknown Title',
-                author: meta.authorName || 'Unknown Author',
-                sequence,
-                totalBytes: downloadInfo?.totalBytes || 0,
-              };
-            });
-            seriesMap.set(book.seriesName, allBooksInSeries);
-          } else {
-            // Series not in cache, just show the downloaded book
-            seriesMap.set(book.seriesName, [book]);
-          }
-        }
-      } else {
-        standalone.push(book);
+    for (const d of downloads) {
+      if (d.status === 'downloading' || d.status === 'paused') {
+        downloading.push(d);
+      } else if (d.status === 'pending') {
+        queued.push(d);
+      } else if (d.status === 'complete') {
+        completed.push(d);
       }
     }
 
-    return {
-      seriesGroups: Array.from(seriesMap.entries()).map(([name, books]) => ({ name, books })),
-      standaloneBooks: standalone,
-    };
-  }, [enrichedBooks, getSeries, completedDownloads]);
+    // Sort completed by size (largest first per spec)
+    completed.sort((a, b) => (b.totalBytes || 0) - (a.totalBytes || 0));
 
-  // Set of downloaded item IDs for quick lookup
-  const downloadedIds = useMemo(() => {
-    return new Set(completedDownloads.map(d => d.itemId));
-  }, [completedDownloads]);
+    return { downloading, queued, completed };
+  }, [downloads]);
 
-  const handleSearch = useCallback(() => {
-    navigation.navigate('Search');
-  }, [navigation]);
+  const totalUsedBytes = useMemo(() => {
+    return completed.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
+  }, [completed]);
 
-  const handleSettings = useCallback(() => {
-    navigation.navigate('Main', { screen: 'ProfileTab' });
-  }, [navigation]);
+  const hasDownloads = downloads.length > 0;
+  const hasActiveDownloads = downloading.length > 0 || queued.length > 0;
 
-  const handleBrowse = useCallback(() => {
-    navigation.navigate('Main', { screen: 'DiscoverTab' });
-  }, [navigation]);
+  // Handlers
+  const handleBack = useCallback(() => navigation.goBack(), [navigation]);
 
   const handleBookPress = useCallback((itemId: string) => {
     navigation.navigate('BookDetail', { id: itemId });
   }, [navigation]);
 
-  const handlePause = useCallback(
-    (itemId: string) => {
-      pauseDownload(itemId);
-    },
-    [pauseDownload]
-  );
-
-  const handleResume = useCallback(
-    (itemId: string) => {
-      resumeDownload(itemId);
-    },
-    [resumeDownload]
-  );
-
-  const handleDelete = useCallback(
-    (itemId: string) => {
-      Alert.alert('Remove Download', 'Remove this book from offline storage?', [
+  const handleDeleteDownload = useCallback((itemId: string, title: string) => {
+    Alert.alert(
+      'Delete Download',
+      `Remove "${title}" from downloads? You can re-download it anytime.`,
+      [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Remove',
+          text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteDownload(itemId),
-        },
-      ]);
-    },
-    [deleteDownload]
-  );
-
-  const handleCancelAll = useCallback(() => {
-    Alert.alert(
-      'Cancel All Downloads',
-      'This will cancel all active and pending downloads. Are you sure?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Yes, Cancel All',
-          style: 'destructive',
-          onPress: async () => {
-            await downloadManager.cancelAllDownloads();
+          onPress: () => {
+            haptics.warning();
+            deleteDownload(itemId);
           },
         },
       ]
     );
-  }, []);
+  }, [deleteDownload]);
+
+  const handleCancelDownload = useCallback((itemId: string) => {
+    haptics.warning();
+    cancelDownload(itemId);
+  }, [cancelDownload]);
+
+  const handlePauseAll = useCallback(() => {
+    downloading.forEach(d => pauseDownload(d.itemId));
+  }, [downloading, pauseDownload]);
+
+  const handleDeleteAll = useCallback(() => {
+    if (completed.length === 0) return;
+
+    const totalSize = completed.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
+
+    Alert.alert(
+      'Delete All Downloads?',
+      `This will remove ${completed.length} audiobook${completed.length !== 1 ? 's' : ''} (${formatBytes(totalSize)}). You can re-download them anytime.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            haptics.warning();
+            await downloadManager.clearAllDownloads();
+          },
+        },
+      ]
+    );
+  }, [completed]);
+
+  const handleBrowse = useCallback(() => {
+    navigation.navigate('Main', { screen: 'DiscoverTab' });
+  }, [navigation]);
+
+  const handleSettings = useCallback(() => {
+    navigation.navigate('StorageSettings');
+  }, [navigation]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-      {/* Top bar with icons */}
-      <View style={[styles.topBar, { paddingTop: insets.top + TOP_NAV_HEIGHT + scale(8) }]}>
-        <TouchableOpacity style={styles.iconButton} onPress={handleSearch}>
-          <SearchIcon size={scale(22)} />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <BackIcon size={scale(24)} />
         </TouchableOpacity>
-        <View style={styles.topBarSpacer} />
-        <TouchableOpacity style={styles.iconButton} onPress={handleSettings}>
-          <SettingsIcon size={scale(22)} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Downloads</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      {/* Your Library header */}
-      <View style={styles.headerSection}>
-        <Text style={styles.headerTitle}>Your Library</Text>
-        <Text style={styles.headerSubtitle}>
-          {completedDownloads.length} {completedDownloads.length === 1 ? 'book' : 'books'} • {formatBytes(totalSize)}
-        </Text>
-      </View>
-
-      {/* Content */}
-      {downloads.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <DownloadIcon size={scale(64)} />
-          <Text style={styles.emptyTitle}>No Downloads</Text>
-          <Text style={styles.emptySubtitle}>
-            Download audiobooks for offline listening. Browse the library to find something to download.
-          </Text>
-          <TouchableOpacity style={styles.browseButton} onPress={handleBrowse}>
-            <BrowseIcon size={20} color="#000" />
-            <Text style={styles.browseButtonText}>Browse Library</Text>
-          </TouchableOpacity>
-        </View>
+      {!hasDownloads ? (
+        <EmptyState onBrowse={handleBrowse} />
       ) : (
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Active downloads section */}
-          {activeDownloads.length > 0 && (
+          {/* Storage Card */}
+          <StorageCard usedBytes={totalUsedBytes} />
+
+          {/* Downloading Section */}
+          {downloading.length > 0 && (
             <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Downloading</Text>
-                <TouchableOpacity style={styles.cancelAllButton} onPress={handleCancelAll}>
-                  <Text style={styles.cancelAllText}>Cancel All</Text>
-                </TouchableOpacity>
-              </View>
-              {activeDownloads.map((download) => (
-                <DownloadItem
-                  key={download.itemId}
-                  download={download}
-                  onPause={() => handlePause(download.itemId)}
-                  onResume={() => handleResume(download.itemId)}
-                  onDelete={() => handleDelete(download.itemId)}
+              <SectionHeader
+                title="Downloading"
+                count={downloading.length}
+                actionLabel="Pause All"
+                onAction={handlePauseAll}
+              />
+              {downloading.map((d) => (
+                <ActiveDownloadRow
+                  key={d.itemId}
+                  download={d}
+                  onPause={() => pauseDownload(d.itemId)}
+                  onResume={() => resumeDownload(d.itemId)}
+                  onCancel={() => handleCancelDownload(d.itemId)}
                 />
               ))}
             </View>
           )}
 
-          {/* Series sections */}
-          {seriesGroups.length > 0 && (
+          {/* Queued Section */}
+          {queued.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your Series</Text>
-              {seriesGroups.map((series) => (
-                <SeriesSection
-                  key={series.name}
-                  seriesName={series.name}
-                  books={series.books}
-                  downloadedIds={downloadedIds}
-                  onBookPress={handleBookPress}
+              <SectionHeader title="Queued" count={queued.length} />
+              {queued.map((d, index) => (
+                <ActiveDownloadRow
+                  key={d.itemId}
+                  download={d}
+                  onPause={() => {}}
+                  onResume={() => {}}
+                  onCancel={() => handleCancelDownload(d.itemId)}
                 />
               ))}
             </View>
           )}
 
-          {/* Standalone books */}
-          {standaloneBooks.length > 0 && (
+          {/* Downloaded Section */}
+          {completed.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Books</Text>
-              {standaloneBooks.map((book) => (
-                <TouchableOpacity
-                  key={book.id}
-                  style={styles.bookRow}
-                  onPress={() => handleBookPress(book.id)}
-                  activeOpacity={0.7}
-                >
-                  <BookCover
-                    itemId={book.id}
-                    title={book.title}
-                    isDownloaded={true}
-                  />
-                  <View style={styles.bookInfo}>
-                    <Text style={styles.bookTitle} numberOfLines={1}>{book.title}</Text>
-                    <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
-                    <Text style={styles.bookSize}>{formatBytes(book.totalBytes)}</Text>
-                  </View>
-                </TouchableOpacity>
+              <SectionHeader
+                title="Downloaded"
+                count={completed.length}
+                actionLabel="Delete All"
+                onAction={handleDeleteAll}
+                actionColor={COLORS.destructive}
+              />
+              {completed.map((d) => (
+                <DownloadedRow
+                  key={d.itemId}
+                  download={d}
+                  onPress={() => handleBookPress(d.itemId)}
+                  onDelete={() => deleteDownload(d.itemId)}
+                />
               ))}
             </View>
           )}
 
-          {/* Browse CTA at bottom */}
-          <View style={styles.bottomCta}>
-            <Text style={styles.bottomCtaText}>Looking for more?</Text>
-            <TouchableOpacity style={styles.browseButtonOutline} onPress={handleBrowse}>
-              <BrowseIcon size={18} color={COLORS.accent} />
-              <Text style={styles.browseButtonOutlineText}>Browse Library</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Download Settings Link */}
+          <TouchableOpacity style={styles.settingsLink} onPress={handleSettings} activeOpacity={0.7}>
+            <SettingsIcon size={scale(20)} color={COLORS.textSecondary} />
+            <View style={styles.settingsLinkContent}>
+              <Text style={styles.settingsLinkTitle}>Download Settings</Text>
+              <Text style={styles.settingsLinkSubtitle}>Quality, WiFi-only, storage location</Text>
+            </View>
+            <ChevronIcon />
+          </TouchableOpacity>
         </ScrollView>
       )}
     </View>
   );
 }
 
+// ============================================================================
+// STYLES
+// ============================================================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  topBar: {
+
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingVertical: scale(12),
   },
-  iconButton: {
-    padding: scale(8),
-  },
-  topBarSpacer: {
-    flex: 1,
-  },
-  headerSection: {
-    paddingHorizontal: scale(20),
-    paddingTop: scale(8),
-    paddingBottom: scale(20),
+  backButton: {
+    width: scale(40),
+    height: scale(40),
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   headerTitle: {
-    fontSize: scale(32),
-    fontWeight: '700',
+    fontSize: scale(17),
+    fontWeight: '600',
     color: COLORS.textPrimary,
-    marginBottom: scale(4),
   },
-  headerSubtitle: {
-    fontSize: scale(14),
-    color: COLORS.textSecondary,
+  headerSpacer: {
+    width: scale(40),
   },
+
+  // Scroll
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: SCREEN_BOTTOM_PADDING,
+    paddingHorizontal: SPACING.pageHorizontal,
   },
+
+  // Storage Card
+  storageCard: {
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: scale(12),
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    padding: SPACING.cardPadding,
+    marginBottom: SPACING.sectionGap,
+  },
+  storageTitle: {
+    fontSize: scale(14),
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: scale(12),
+  },
+  storageBar: {
+    height: 8,
+    backgroundColor: COLORS.storageFree,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: scale(8),
+  },
+  storageBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.storageUsed,
+    borderRadius: 4,
+  },
+  storageLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  storageUsedLabel: {
+    fontSize: scale(13),
+    color: COLORS.textPrimary,
+  },
+  storageFreeLabel: {
+    fontSize: scale(13),
+    color: COLORS.textSecondary,
+  },
+  clearCacheButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: scale(12),
+    paddingTop: scale(12),
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+  },
+  clearCacheText: {
+    fontSize: scale(14),
+    color: COLORS.textPrimary,
+  },
+  clearCacheSize: {
+    fontSize: scale(14),
+    color: COLORS.textSecondary,
+  },
+
+  // Section
   section: {
-    marginBottom: scale(24),
+    marginBottom: SPACING.sectionGap,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(20),
-    marginBottom: scale(12),
+    paddingVertical: SPACING.itemGap,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+    marginBottom: scale(8),
   },
   sectionTitle: {
-    fontSize: scale(18),
+    fontSize: scale(14),
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
-  cancelAllButton: {
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    backgroundColor: 'rgba(220, 38, 38, 0.2)',
-    borderRadius: scale(8),
-  },
-  cancelAllText: {
+  sectionAction: {
     fontSize: scale(13),
-    fontWeight: '600',
-    color: COLORS.danger,
+    fontWeight: '500',
   },
-  // Series section styles
-  seriesSection: {
-    marginBottom: scale(20),
-  },
-  seriesTitleRow: {
+
+  // Download rows
+  downloadRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: scale(20),
-    marginBottom: scale(12),
-  },
-  seriesTitle: {
-    fontSize: scale(16),
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  seriesCount: {
-    fontSize: scale(12),
-    color: COLORS.textSecondary,
-  },
-  seriesBooksScroll: {
-    paddingHorizontal: scale(20),
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: scale(12),
+    padding: SPACING.itemGap,
+    marginBottom: scale(8),
     gap: scale(12),
   },
-  seriesBookItem: {
-    width: scale(100),
+  downloadedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: scale(12),
+    padding: SPACING.itemGap,
+    marginBottom: scale(8),
+    gap: scale(12),
   },
-  seriesBookTitle: {
-    fontSize: scale(12),
+  downloadCover: {
+    width: SPACING.coverSize,
+    height: SPACING.coverSize,
+    borderRadius: 6,
+    backgroundColor: '#262626',
+  },
+  downloadInfo: {
+    flex: 1,
+  },
+  downloadTitle: {
+    fontSize: scale(15),
+    fontWeight: '600',
     color: COLORS.textPrimary,
-    marginTop: scale(6),
+    marginBottom: 2,
   },
-  seriesBookSequence: {
-    fontSize: scale(10),
+  downloadAuthor: {
+    fontSize: scale(13),
     color: COLORS.textSecondary,
-    marginTop: scale(2),
+    marginBottom: scale(6),
   },
-  // Book cover styles
-  bookCoverContainer: {
-    position: 'relative',
-    width: scale(100),
-    height: scale(100),
-    borderRadius: scale(8),
+  downloadSize: {
+    fontSize: scale(13),
+    color: COLORS.textSecondary,
+    marginRight: scale(4),
+  },
+
+  // Progress
+  progressBar: {
+    height: 4,
+    backgroundColor: COLORS.progressTrack,
+    borderRadius: 2,
     overflow: 'hidden',
+    marginBottom: scale(4),
   },
-  bookCover: {
-    width: '100%',
+  progressFill: {
     height: '100%',
-    borderRadius: scale(8),
+    backgroundColor: COLORS.progressFill,
+    borderRadius: 2,
   },
-  bookCoverPlaceholder: {
-    backgroundColor: COLORS.cardBg,
+  progressText: {
+    fontSize: scale(12),
+    color: COLORS.textTertiary,
+  },
+
+  // Actions
+  downloadActions: {
+    flexDirection: 'row',
+    gap: scale(4),
+  },
+  actionButton: {
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bookCoverText: {
-    fontSize: scale(28),
+
+  // Swipe delete
+  swipeDeleteButton: {
+    backgroundColor: COLORS.destructive,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginBottom: scale(8),
+    borderRadius: scale(12),
+    marginLeft: scale(8),
+  },
+  swipeDeleteText: {
+    color: '#fff',
+    fontSize: scale(12),
     fontWeight: '600',
-    color: COLORS.textSecondary,
+    marginTop: scale(4),
   },
-  downloadedBadge: {
-    position: 'absolute',
-    bottom: scale(4),
-    right: scale(4),
-    width: scale(18),
-    height: scale(18),
-    borderRadius: scale(9),
-    backgroundColor: COLORS.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Standalone book row
-  bookRow: {
+
+  // Settings link
+  settingsLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(8),
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: scale(12),
+    padding: SPACING.cardPadding,
+    marginTop: scale(8),
     gap: scale(12),
   },
-  bookInfo: {
+  settingsLinkContent: {
     flex: 1,
   },
-  bookTitle: {
+  settingsLinkTitle: {
     fontSize: scale(15),
     fontWeight: '500',
     color: COLORS.textPrimary,
   },
-  bookAuthor: {
+  settingsLinkSubtitle: {
     fontSize: scale(13),
     color: COLORS.textSecondary,
-    marginTop: scale(2),
+    marginTop: 2,
   },
-  bookSize: {
-    fontSize: scale(12),
-    color: COLORS.textSecondary,
-    marginTop: scale(4),
-  },
+
   // Empty state
-  emptyContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: scale(40),
   },
   emptyTitle: {
-    fontSize: scale(18),
+    fontSize: scale(17),
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginTop: scale(16),
     marginBottom: scale(8),
   },
-  emptySubtitle: {
+  emptyDescription: {
     fontSize: scale(14),
     color: COLORS.textSecondary,
     textAlign: 'center',
@@ -672,43 +839,15 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   browseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
     paddingHorizontal: scale(24),
     paddingVertical: scale(12),
+    borderWidth: 1,
+    borderColor: COLORS.accent,
     borderRadius: scale(24),
-    gap: scale(8),
   },
   browseButtonText: {
     fontSize: scale(15),
     fontWeight: '600',
-    color: '#000000',
-  },
-  // Bottom CTA
-  bottomCta: {
-    alignItems: 'center',
-    paddingVertical: scale(32),
-    paddingHorizontal: scale(20),
-  },
-  bottomCtaText: {
-    fontSize: scale(14),
-    color: COLORS.textSecondary,
-    marginBottom: scale(12),
-  },
-  browseButtonOutline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(10),
-    borderRadius: scale(20),
-    gap: scale(8),
-  },
-  browseButtonOutlineText: {
-    fontSize: scale(14),
-    fontWeight: '500',
     color: COLORS.accent,
   },
 });

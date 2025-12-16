@@ -29,8 +29,9 @@ import { AuthorDetailScreen } from '@/features/author';
 import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { BookDetailScreen } from '@/features/book-detail';
-import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen } from '@/features/profile';
+import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, JoystickSeekSettingsScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
+import { MoodDiscoveryScreen, MoodResultsScreen } from '@/features/mood-discovery';
 import { CDPlayerScreen } from '@/features/player';
 import { QueueScreen, useQueueStore } from '@/features/queue';
 import { DownloadsScreen } from '@/features/downloads/screens/DownloadsScreen';
@@ -138,10 +139,21 @@ function AuthenticatedApp() {
         <Stack.Screen name="Stats" component={StatsScreen} />
         <Stack.Screen name="PlaybackSettings" component={PlaybackSettingsScreen} />
         <Stack.Screen name="StorageSettings" component={StorageSettingsScreen} />
+        <Stack.Screen name="JoystickSeekSettings" component={JoystickSeekSettingsScreen} />
         <Stack.Screen name="CassetteTest" component={CassetteTestScreen} />
         <Stack.Screen
           name="PreferencesOnboarding"
           component={PreferencesOnboardingScreen}
+          options={{ presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="MoodDiscovery"
+          component={MoodDiscoveryScreen}
+          options={{ presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="MoodResults"
+          component={MoodResultsScreen}
           options={{ presentation: 'modal' }}
         />
       </Stack.Navigator>

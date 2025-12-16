@@ -27,6 +27,8 @@ import { useCoverUrl } from '@/core/cache';
 import { haptics } from '@/core/native/haptics';
 import { audioService } from '@/features/player/services/audioService';
 import { colors, wp } from '@/shared/theme';
+import type { JoystickSeekSettings } from '@/features/player/stores/joystickSeekStore';
+import { calculateSeekSpeed, applyDeadzone } from '@/features/player/stores/joystickSeekStore';
 
 const SCREEN_WIDTH = wp(100);
 
@@ -63,10 +65,10 @@ const SCRUB_CONFIG = {
   RAMP_DURATION_MS: 1000,
   RAMP_MAX_SPEED: 20,  // 20x realtime at max ramp
 
-  // Spring animation for snap back
+  // Timing animation for snap back (more subtle than spring)
   SPRING_CONFIG: {
-    damping: 20,
-    stiffness: 300,
+    damping: 25,
+    stiffness: 200,
     mass: 1,
   },
 };
@@ -189,6 +191,8 @@ interface CoverPlayButtonProps {
   onScrubOffsetChange?: (offset: number, isScrubbing: boolean) => void;
   /** Called with full jog state for parent to render overlay */
   onJogStateChange?: (state: JogState) => void;
+  /** Optional joystick seek settings from the store - if not provided, uses default zone-based scrubbing */
+  joystickSettings?: JoystickSeekSettings;
 }
 
 export function CoverPlayButton({
@@ -197,6 +201,7 @@ export function CoverPlayButton({
   onScrubSpeedChange,
   onScrubOffsetChange,
   onJogStateChange,
+  joystickSettings,
 }: CoverPlayButtonProps) {
   const currentBook = usePlayerStore((s) => s.currentBook);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -320,24 +325,80 @@ export function CoverPlayButton({
       const deltaTime = (now - lastTime) / 1000;
       lastTime = now;
 
-      const baseSpeed = calculateScrubSpeed(translateX.value);
       const absDisplacement = Math.abs(translateX.value);
+      const directionSign = translateX.value >= 0 ? 1 : -1;
+
+      // Calculate scrub speed based on whether joystickSettings is provided
+      let baseSpeed: number;
+      let effectiveDeadzone: number;
+      let hapticEnabled = true;
+
+      if (joystickSettings && joystickSettings.enabled) {
+        // Use curve-based calculation from joystick seek settings
+        effectiveDeadzone = joystickSettings.deadzone;
+        hapticEnabled = joystickSettings.hapticEnabled;
+
+        // Apply deadzone and normalize to 0-1
+        const normalizedDistance = applyDeadzone(
+          absDisplacement,
+          SCRUB_CONFIG.MAX_DISPLACEMENT,
+          joystickSettings.deadzone
+        );
+
+        if (normalizedDistance > 0) {
+          // Calculate speed using curve-based approach
+          baseSpeed = calculateSeekSpeed(normalizedDistance, joystickSettings) * directionSign;
+        } else {
+          baseSpeed = 0;
+        }
+      } else {
+        // Use default zone-based calculation
+        effectiveDeadzone = SCRUB_CONFIG.DEAD_ZONE;
+        baseSpeed = calculateScrubSpeed(translateX.value);
+      }
 
       // Determine direction
       const direction: 'forward' | 'backward' | null = baseSpeed > 0 ? 'forward' : baseSpeed < 0 ? 'backward' : null;
 
-      // Speed zone haptic and label update
-      const newZone = getSpeedZoneIndex(translateX.value);
-      if (newZone !== currentSpeedZoneRef.current && newZone > 0) {
-        if (newZone > currentSpeedZoneRef.current) {
-          haptics.impact('medium');
-        } else {
-          haptics.impact('light');
+      // Speed zone haptic and label update (only for zone-based mode)
+      if (!joystickSettings || !joystickSettings.enabled) {
+        const newZone = getSpeedZoneIndex(translateX.value);
+        if (newZone !== currentSpeedZoneRef.current && newZone > 0) {
+          if (hapticEnabled) {
+            if (newZone > currentSpeedZoneRef.current) {
+              haptics.impact('medium');
+            } else {
+              haptics.impact('light');
+            }
+          }
+          currentSpeedZoneRef.current = newZone;
+          const label = SCRUB_CONFIG.SPEED_ZONES[newZone].label;
+          setSpeedLabel(label);
+          setCurrentSpeedMultiplier(SCRUB_CONFIG.SPEED_ZONES[newZone].speed);
         }
-        currentSpeedZoneRef.current = newZone;
-        const label = SCRUB_CONFIG.SPEED_ZONES[newZone].label;
-        setSpeedLabel(label);
-        setCurrentSpeedMultiplier(SCRUB_CONFIG.SPEED_ZONES[newZone].speed);
+      } else {
+        // For curve-based mode, update speed label based on actual speed
+        const speedMultiplier = Math.abs(baseSpeed);
+        if (speedMultiplier !== currentSpeedZoneRef.current && speedMultiplier > 0) {
+          // Haptic feedback at speed thresholds (every 60× = 1 minute/second)
+          const oldThreshold = Math.floor(currentSpeedZoneRef.current / 60);
+          const newThreshold = Math.floor(speedMultiplier / 60);
+          if (newThreshold !== oldThreshold && hapticEnabled) {
+            if (newThreshold > oldThreshold) {
+              haptics.impact('medium');
+            } else {
+              haptics.impact('light');
+            }
+          }
+          currentSpeedZoneRef.current = speedMultiplier;
+          // Format speed as human-readable
+          if (speedMultiplier >= 60) {
+            setSpeedLabel(`${Math.round(speedMultiplier / 60)}m/s`);
+          } else {
+            setSpeedLabel(`${Math.round(speedMultiplier)}×`);
+          }
+          setCurrentSpeedMultiplier(speedMultiplier);
+        }
       }
 
       // Update direction state
@@ -351,28 +412,30 @@ export function CoverPlayButton({
       }
 
       if (baseSpeed !== 0) {
-        // Time ramp at max displacement
-        if (absDisplacement >= SCRUB_CONFIG.RAMP_THRESHOLD) {
-          timeAtMaxRef.current += deltaTime * 1000;
-        } else {
-          timeAtMaxRef.current = 0;
-          hasTriggeredRampHapticRef.current = false;
-        }
-
+        // Time ramp at max displacement (only for zone-based mode)
         let speed = baseSpeed;
-        if (timeAtMaxRef.current > SCRUB_CONFIG.RAMP_DELAY_MS) {
-          const rampProgress = Math.min(
-            (timeAtMaxRef.current - SCRUB_CONFIG.RAMP_DELAY_MS) / SCRUB_CONFIG.RAMP_DURATION_MS,
-            1
-          );
-          const direction = baseSpeed >= 0 ? 1 : -1;
-          const absBase = Math.abs(baseSpeed);
-          speed = direction * (absBase + (SCRUB_CONFIG.RAMP_MAX_SPEED - absBase) * rampProgress);
+        if (!joystickSettings || !joystickSettings.enabled) {
+          if (absDisplacement >= SCRUB_CONFIG.RAMP_THRESHOLD) {
+            timeAtMaxRef.current += deltaTime * 1000;
+          } else {
+            timeAtMaxRef.current = 0;
+            hasTriggeredRampHapticRef.current = false;
+          }
 
-          if (!hasTriggeredRampHapticRef.current && rampProgress > 0) {
-            haptics.impact('heavy');
-            hasTriggeredRampHapticRef.current = true;
-            setSpeedLabel('5m');
+          if (timeAtMaxRef.current > SCRUB_CONFIG.RAMP_DELAY_MS) {
+            const rampProgress = Math.min(
+              (timeAtMaxRef.current - SCRUB_CONFIG.RAMP_DELAY_MS) / SCRUB_CONFIG.RAMP_DURATION_MS,
+              1
+            );
+            const direction = baseSpeed >= 0 ? 1 : -1;
+            const absBase = Math.abs(baseSpeed);
+            speed = direction * (absBase + (SCRUB_CONFIG.RAMP_MAX_SPEED - absBase) * rampProgress);
+
+            if (!hasTriggeredRampHapticRef.current && rampProgress > 0 && hapticEnabled) {
+              haptics.impact('heavy');
+              hasTriggeredRampHapticRef.current = true;
+              setSpeedLabel('5m');
+            }
           }
         }
 
@@ -419,7 +482,7 @@ export function CoverPlayButton({
         if (atBoundary) {
           onScrubSpeedChange?.(0);
           // Haptic feedback for hitting boundary (only once)
-          if (Math.abs(newPosition - lastHapticPositionRef.current) > 0.5) {
+          if (Math.abs(newPosition - lastHapticPositionRef.current) > 0.5 && hapticEnabled) {
             haptics.error();
             lastHapticPositionRef.current = newPosition;
           }
@@ -431,13 +494,13 @@ export function CoverPlayButton({
 
         // Haptic tick every 30s
         const scrubbed = Math.abs(newPosition - lastHapticPositionRef.current);
-        if (scrubbed >= SCRUB_CONFIG.HAPTIC_INTERVAL_MS / 1000) {
+        if (scrubbed >= SCRUB_CONFIG.HAPTIC_INTERVAL_MS / 1000 && hapticEnabled) {
           haptics.seek();
           lastHapticPositionRef.current = newPosition;
         }
       }
     }, 1); // Ultra-fast for aggressive tape sound effect
-  }, [isPlaying, pause, duration, findChapterAtPosition, onScrubOffsetChange]);
+  }, [isPlaying, pause, duration, findChapterAtPosition, onScrubOffsetChange, joystickSettings]);
 
   const endScrub = useCallback(() => {
     if (scrubIntervalRef.current) {

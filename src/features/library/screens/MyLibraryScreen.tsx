@@ -43,8 +43,6 @@ import { SeriesProgressBadge, StackedCovers } from '@/shared/components';
 import { SortPicker, SortOption } from '../components/SortPicker';
 import { StorageSummary } from '../components/StorageSummary';
 import { ContinueListeningHero } from '../components/ContinueListeningHero';
-import { FilterChips, FilterOption } from '../components/FilterChips';
-import { AppliedFilters } from '../components/AppliedFilters';
 import { LibraryEmptyState } from '../components/LibraryEmptyState';
 import { useMyLibraryStore } from '../stores/myLibraryStore';
 import { usePreferencesStore } from '@/features/recommendations/stores/preferencesStore';
@@ -246,10 +244,9 @@ export function MyLibraryScreen() {
   // Continue listening data
   const { items: continueListeningItems } = useContinueListening();
 
-  // Tab, sort, filter, and search state
+  // Tab, sort, and search state
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortOption>('recently-played');
-  const [listenFilter, setListenFilter] = useState<FilterOption>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Separate active downloads from completed
@@ -422,65 +419,19 @@ export function MyLibraryScreen() {
     }
   }, [currentTabBooks, sort]);
 
-  // Calculate filter counts for FilterChips
-  const filterCounts = useMemo(() => ({
-    all: sortedBooks.length,
-    inProgress: sortedBooks.filter(b => b.progress > 0 && b.progress < 0.95).length,
-    notStarted: sortedBooks.filter(b => b.progress === 0 || b.progress === undefined).length,
-    completed: sortedBooks.filter(b => b.progress >= 0.95).length,
-  }), [sortedBooks]);
-
-  // Apply listen filter and search filter
+  // Apply search filter
   const filteredBooks = useMemo(() => {
-    let result = sortedBooks;
-
-    // Apply listen filter
-    switch (listenFilter) {
-      case 'in-progress':
-        result = result.filter(b => b.progress > 0 && b.progress < 0.95);
-        break;
-      case 'not-started':
-        result = result.filter(b => b.progress === 0 || b.progress === undefined);
-        break;
-      case 'completed':
-        result = result.filter(b => b.progress >= 0.95);
-        break;
+    if (!searchQuery.trim()) {
+      return sortedBooks;
     }
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      result = result.filter(b =>
-        b.title.toLowerCase().includes(query) ||
-        b.author.toLowerCase().includes(query) ||
-        b.seriesName?.toLowerCase().includes(query)
-      );
-    }
-
-    return result;
-  }, [sortedBooks, listenFilter, searchQuery]);
-
-  // Get applied filters for display
-  const appliedFilters = useMemo(() => {
-    const filters: { key: string; label: string }[] = [];
-    if (listenFilter !== 'all') {
-      const labelMap: Record<FilterOption, string> = {
-        'all': 'All',
-        'in-progress': 'In Progress',
-        'not-started': 'Not Started',
-        'completed': 'Completed',
-      };
-      filters.push({ key: 'listen', label: labelMap[listenFilter] });
-    }
-    return filters;
-  }, [listenFilter]);
-
-  // Handle filter removal
-  const handleRemoveFilter = useCallback((filterKey: string) => {
-    if (filterKey === 'listen') {
-      setListenFilter('all');
-    }
-  }, []);
+    const query = searchQuery.toLowerCase().trim();
+    return sortedBooks.filter(b =>
+      b.title.toLowerCase().includes(query) ||
+      b.author.toLowerCase().includes(query) ||
+      b.seriesName?.toLowerCase().includes(query)
+    );
+  }, [sortedBooks, searchQuery]);
 
   // In-progress books for Continue Listening section
   const inProgressBooks = useMemo(() => {
@@ -1029,24 +980,6 @@ export function MyLibraryScreen() {
             />
           )}
 
-          {/* Filter Chips (All and Downloaded tabs only) */}
-          {(activeTab === 'all' || activeTab === 'downloaded') && (
-            <FilterChips
-              selected={listenFilter}
-              onSelect={setListenFilter}
-              counts={filterCounts}
-            />
-          )}
-
-          {/* Applied Filters */}
-          {appliedFilters.length > 0 && (activeTab === 'all' || activeTab === 'downloaded') && (
-            <AppliedFilters
-              filters={appliedFilters}
-              onRemove={handleRemoveFilter}
-              resultCount={filteredBooks.length}
-            />
-          )}
-
           {/* =============== TAB CONTENT =============== */}
           {activeTab === 'favorites' ? (
             renderFavoritesContent()
@@ -1316,12 +1249,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(14),
     paddingVertical: scale(10),
     gap: scale(10),
+    minHeight: scale(44),
   },
   searchInput: {
     flex: 1,
     fontSize: scale(15),
     color: COLORS.textPrimary,
-    paddingVertical: 0,
+    paddingVertical: scale(4),
   },
 
   // Tab bar
