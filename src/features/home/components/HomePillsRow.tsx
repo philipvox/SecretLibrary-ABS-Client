@@ -156,8 +156,8 @@ const styles = StyleSheet.create({
   },
   queuePillWrapper: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: -wp(4),  // Counteract container padding to center on full screen
+    right: -wp(4),
     top: 0,
     bottom: 0,
     alignItems: 'center',
