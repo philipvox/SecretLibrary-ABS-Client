@@ -41,8 +41,10 @@ import {
   useActiveSession,
 } from '@/features/mood-discovery';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
 export function BrowseScreen() {
+  useScreenLoadTime('BrowseScreen');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 

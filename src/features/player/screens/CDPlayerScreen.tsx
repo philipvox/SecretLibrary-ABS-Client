@@ -52,6 +52,7 @@ import { useIsOfflineAvailable } from '@/core/hooks/useDownloads';
 import { CoverPlayButton, JogState } from '@/shared/components/CoverPlayButton';
 import { haptics } from '@/core/native/haptics';
 import { colors, spacing, radius, scale, wp, hp, layout } from '@/shared/theme';
+import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
 // Check if MaskedView native module is available (not just JS module)
 const isMaskedViewAvailable =
@@ -405,6 +406,7 @@ const CDProgressBar: React.FC<ProgressBarProps> = ({ progress, onSeek, chapterMa
 // =============================================================================
 
 export function CDPlayerScreen() {
+  useScreenLoadTime('CDPlayerScreen');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;

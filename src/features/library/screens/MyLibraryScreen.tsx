@@ -48,6 +48,7 @@ import { useMyLibraryStore } from '../stores/myLibraryStore';
 import { usePreferencesStore } from '@/features/recommendations/stores/preferencesStore';
 import { useContinueListening } from '@/features/home/hooks/useContinueListening';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 import { colors, scale, spacing, radius } from '@/shared/theme';
 
 const COLORS = {
@@ -229,6 +230,7 @@ const TabBar = React.memo(function TabBar({
 });
 
 export function MyLibraryScreen() {
+  useScreenLoadTime('MyLibraryScreen');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { items: cachedItems, isLoaded, getSeries, getItem } = useLibraryCache();

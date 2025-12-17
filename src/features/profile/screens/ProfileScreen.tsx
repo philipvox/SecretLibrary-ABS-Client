@@ -22,6 +22,7 @@ import { useDownloads } from '@/core/hooks/useDownloads';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { APP_VERSION, BUILD_NUMBER, VERSION_DATE } from '@/constants/version';
 import { colors, scale } from '@/shared/theme';
+import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
 const ACCENT = colors.accent;
 
@@ -127,6 +128,7 @@ function SectionGroup({ title, children }: SectionGroupProps) {
 }
 
 export function ProfileScreen() {
+  useScreenLoadTime('ProfileScreen');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { user, serverUrl, logout, isLoading } = useAuth();

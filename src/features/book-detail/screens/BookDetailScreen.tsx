@@ -40,6 +40,7 @@ import { downloadManager } from '@/core/services/downloadManager';
 import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { colors, scale, wp, hp, spacing, radius, layout } from '@/shared/theme';
+import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
 // Design constants
 const ACCENT = colors.accent;
@@ -64,6 +65,7 @@ function formatBytes(bytes: number): string {
 
 
 export function BookDetailScreen() {
+  useScreenLoadTime('BookDetailScreen');
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<BookDetailRouteParams, 'BookDetail'>>();
   const navigation = useNavigation<any>();

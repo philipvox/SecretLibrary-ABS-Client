@@ -40,6 +40,7 @@ import { useCoverUrl } from '@/core/cache';
 import { colors, wp, hp } from '@/shared/theme';
 import { useImageColors } from '@/shared/hooks/useImageColors';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
 // Components
 import { HomeHeader } from '../components/HomeHeader';
@@ -61,6 +62,7 @@ import { useHomeData } from '../hooks/useHomeData';
 const ACCENT = colors.accent;
 
 export function HomeScreen() {
+  useScreenLoadTime('HomeScreen');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const scrollY = useSharedValue(0);
