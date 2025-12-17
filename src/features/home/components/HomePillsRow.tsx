@@ -95,13 +95,10 @@ export function HomePillsRow({
         </Text>
       </TouchableOpacity>
 
-      {/* Spacer */}
-      <View style={{ flex: 1 }} />
-
-      {/* Queue Pill - Center */}
+      {/* Queue Pill - Absolutely centered on screen */}
       <TouchableOpacity
         onPress={onQueuePress}
-        style={styles.pill}
+        style={styles.queuePill}
         activeOpacity={0.7}
         accessibilityLabel={hasQueueItems
           ? `Queue with ${queueCount} items`
@@ -119,9 +116,6 @@ export function HomePillsRow({
           </Text>
         )}
       </TouchableOpacity>
-
-      {/* Spacer */}
-      <View style={{ flex: 1 }} />
 
       {/* Playback Speed Pill - Far Right */}
       <TouchableOpacity
@@ -143,11 +137,25 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: wp(4),
     marginTop: -wp(2),
     marginBottom: wp(4),
   },
   pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radius.lg,
+    paddingVertical: wp(2),
+    paddingHorizontal: wp(3),
+    gap: wp(1.5),
+  },
+  queuePill: {
+    position: 'absolute',
+    left: '50%',
+    transform: [{ translateX: -wp(5) }],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
