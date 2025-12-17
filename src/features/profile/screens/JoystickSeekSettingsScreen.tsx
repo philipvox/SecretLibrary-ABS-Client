@@ -52,14 +52,43 @@ interface CurvePreviewProps {
   maxSpeed: number;
   exponent: number;
   testPosition?: number;
+  /** Callback when user drags to adjust exponent (makes curve interactive) */
+  onExponentChange?: (exponent: number) => void;
 }
 
-function CurvePreview({ minSpeed, maxSpeed, exponent, testPosition }: CurvePreviewProps) {
+function CurvePreview({ minSpeed, maxSpeed, exponent, testPosition, onExponentChange }: CurvePreviewProps) {
   const width = wp(92);
-  const height = wp(40);
-  const padding = { top: 20, right: 45, bottom: 25, left: 45 };
+  const height = wp(50); // Taller for better dragging
+  const padding = { top: 20, right: 45, bottom: 35, left: 45 };
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
+
+  // Drag state for interactive curve editing
+  const isDragging = useSharedValue(false);
+  const startExponent = useSharedValue(exponent);
+
+  // Handle drag gesture on curve
+  const panGesture = useMemo(() => {
+    if (!onExponentChange) return null;
+
+    return Gesture.Pan()
+      .onStart(() => {
+        isDragging.value = true;
+        startExponent.value = exponent;
+        runOnJS(haptics.selection)();
+      })
+      .onUpdate((e) => {
+        // Dragging up = lower exponent (more linear), down = higher exponent (more curved)
+        // Map vertical movement to exponent change
+        const deltaY = -e.translationY / graphHeight;
+        const newExponent = Math.max(0.2, Math.min(2.0, startExponent.value + deltaY * 1.5));
+        runOnJS(onExponentChange)(newExponent);
+      })
+      .onEnd(() => {
+        isDragging.value = false;
+        runOnJS(haptics.selection)();
+      });
+  }, [onExponentChange, exponent, graphHeight]);
 
   // Generate curve path
   const curvePath = useMemo(() => {
@@ -89,7 +118,7 @@ function CurvePreview({ minSpeed, maxSpeed, exponent, testPosition }: CurvePrevi
     return { x, y };
   }, [testPosition, exponent, graphWidth, graphHeight]);
 
-  return (
+  const content = (
     <View style={styles.curvePreviewContainer}>
       <Svg width={width} height={height}>
         <Defs>
@@ -200,9 +229,42 @@ function CurvePreview({ minSpeed, maxSpeed, exponent, testPosition }: CurvePrevi
         >
           Drag Distance
         </SvgText>
+
+        {/* Exponent value display (when interactive) */}
+        {onExponentChange && (
+          <SvgText
+            x={padding.left + graphWidth - 5}
+            y={padding.top + 15}
+            fill="rgba(255,255,255,0.6)"
+            fontSize="11"
+            fontWeight="600"
+            textAnchor="end"
+          >
+            {exponent.toFixed(2)}
+          </SvgText>
+        )}
       </Svg>
+
+      {/* Drag hint (when interactive) */}
+      {onExponentChange && (
+        <View style={styles.dragHint}>
+          <Ionicons name="swap-vertical" size={12} color="rgba(255,255,255,0.4)" />
+          <Text style={styles.dragHintText}>Drag to adjust curve</Text>
+        </View>
+      )}
     </View>
   );
+
+  // Wrap with gesture detector if interactive
+  if (panGesture) {
+    return (
+      <GestureDetector gesture={panGesture}>
+        {content}
+      </GestureDetector>
+    );
+  }
+
+  return content;
 }
 
 // ============================================================================
@@ -582,12 +644,13 @@ export function JoystickSeekSettingsScreen() {
 
         {enabled && (
           <>
-            {/* Curve Preview */}
+            {/* Curve Preview - Interactive: drag to adjust exponent */}
             <CurvePreview
               minSpeed={minSpeed}
               maxSpeed={maxSpeed}
               exponent={curveExponent}
               testPosition={testPosition}
+              onExponentChange={setCurveExponent}
             />
 
             {/* Preset Pills */}
@@ -622,32 +685,62 @@ export function JoystickSeekSettingsScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionHeader}>Advanced</Text>
               <View style={styles.sectionCard}>
-                {/* Deadzone */}
-                <View style={styles.settingsRow}>
-                  <View style={styles.rowLeft}>
-                    <View style={styles.iconContainer}>
-                      <Ionicons name="resize-outline" size={scale(18)} color="rgba(255,255,255,0.8)" />
+                {/* Deadzone Slider */}
+                <View style={styles.sliderRow}>
+                  <View style={styles.sliderHeader}>
+                    <View style={styles.rowLeft}>
+                      <View style={styles.iconContainer}>
+                        <Ionicons name="resize-outline" size={scale(18)} color="rgba(255,255,255,0.8)" />
+                      </View>
+                      <View style={styles.rowContent}>
+                        <Text style={styles.rowLabel}>Deadzone</Text>
+                        <Text style={styles.rowNote}>Distance before seeking starts</Text>
+                      </View>
                     </View>
-                    <View style={styles.rowContent}>
-                      <Text style={styles.rowLabel}>Deadzone</Text>
-                      <Text style={styles.rowNote}>Distance before seeking starts</Text>
-                    </View>
+                    <Text style={styles.rowValue}>{deadzone}pt</Text>
                   </View>
-                  <Text style={styles.rowValue}>{deadzone}pt</Text>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={0}
+                    maximumValue={30}
+                    step={1}
+                    value={deadzone}
+                    onValueChange={(value) => {
+                      setDeadzone(value);
+                    }}
+                    minimumTrackTintColor={ACCENT}
+                    maximumTrackTintColor="rgba(255,255,255,0.2)"
+                    thumbTintColor="#fff"
+                  />
                 </View>
 
-                {/* Curve Exponent */}
-                <View style={styles.settingsRow}>
-                  <View style={styles.rowLeft}>
-                    <View style={styles.iconContainer}>
-                      <Ionicons name="trending-up-outline" size={scale(18)} color="rgba(255,255,255,0.8)" />
+                {/* Curve Exponent Slider */}
+                <View style={styles.sliderRow}>
+                  <View style={styles.sliderHeader}>
+                    <View style={styles.rowLeft}>
+                      <View style={styles.iconContainer}>
+                        <Ionicons name="trending-up-outline" size={scale(18)} color="rgba(255,255,255,0.8)" />
+                      </View>
+                      <View style={styles.rowContent}>
+                        <Text style={styles.rowLabel}>Curve Exponent</Text>
+                        <Text style={styles.rowNote}>Fine-tune response curve</Text>
+                      </View>
                     </View>
-                    <View style={styles.rowContent}>
-                      <Text style={styles.rowLabel}>Curve Exponent</Text>
-                      <Text style={styles.rowNote}>Fine-tune response curve</Text>
-                    </View>
+                    <Text style={styles.rowValue}>{curveExponent.toFixed(2)}</Text>
                   </View>
-                  <Text style={styles.rowValue}>{curveExponent.toFixed(2)}</Text>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={0.2}
+                    maximumValue={2.0}
+                    step={0.05}
+                    value={curveExponent}
+                    onValueChange={(value) => {
+                      setCurveExponent(value);
+                    }}
+                    minimumTrackTintColor={ACCENT}
+                    maximumTrackTintColor="rgba(255,255,255,0.2)"
+                    thumbTintColor="#fff"
+                  />
                 </View>
 
                 {/* Haptic Feedback */}
@@ -805,6 +898,16 @@ const styles = StyleSheet.create({
     padding: scale(12),
     alignItems: 'center',
   },
+  dragHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(4),
+    marginTop: scale(4),
+  },
+  dragHintText: {
+    fontSize: scale(10),
+    color: 'rgba(255,255,255,0.4)',
+  },
 
   // Preset Pills
   presetContainer: {
@@ -874,6 +977,17 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
     color: 'rgba(255,255,255,0.5)',
     marginBottom: scale(12),
+  },
+  sliderRow: {
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   slider: {
     width: '100%',
