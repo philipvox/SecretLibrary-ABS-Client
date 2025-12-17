@@ -3,9 +3,8 @@
  *
  * Organization:
  * - buttons/  → Button, IconButton
- * - cards/    → Card, GlassCard
  * - inputs/   → TextInput, SearchInput
- * - feedback/ → LoadingSpinner, ErrorView, EmptyState, TabBar
+ * - feedback/ → LoadingSpinner, ErrorView, EmptyState
  */
 
 // =============================================================================
@@ -13,12 +12,6 @@
 // =============================================================================
 export { Button } from './Button';
 export { IconButton } from './buttons/IconButton';
-
-// =============================================================================
-// CARDS
-// =============================================================================
-export { Card } from './Card';
-export { GlassCard } from './cards/GlassCard';
 
 // =============================================================================
 // INPUTS
@@ -34,7 +27,6 @@ export { ErrorView } from './ErrorView';
 export type { ErrorType } from './ErrorView';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateIcon } from './EmptyState';
-export { TabBar } from './feedback/TabBar';
 
 // =============================================================================
 // UTILITY COMPONENTS
@@ -57,7 +49,6 @@ export { Swipeable } from './GestureComponents';
 // OFFLINE-FIRST
 // =============================================================================
 export { SyncStatusBadge } from './SyncStatusBadge';
-export { DownloadButton } from './DownloadButton';
 export { CircularDownloadButton } from './CircularDownloadButton';
 
 // =============================================================================
@@ -73,19 +64,11 @@ export type { SeriesHeartButtonProps } from './SeriesHeartButton';
 // =============================================================================
 export { BookCard, BookCardWithState } from './BookCard';
 export type { BookCardProps, BookCardActionType, BookCardContext } from './BookCard';
-export { SwipeableBookCard } from './SwipeableBookCard';
-export type { SwipeableBookCardProps } from './SwipeableBookCard';
 
 // =============================================================================
 // PLAYER CONTROLS
 // =============================================================================
 export { CoverPlayButton } from './CoverPlayButton';
-
-// =============================================================================
-// PULL-TO-REFRESH
-// =============================================================================
-export { CassetteRefreshControl, useCassetteRefresh } from './CassetteRefreshControl';
-export { CassetteRefreshView } from './CassetteRefreshView';
 
 // =============================================================================
 // NAVIGATION

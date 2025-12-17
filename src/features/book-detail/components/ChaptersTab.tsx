@@ -132,6 +132,9 @@ export function ChaptersTab({ chapters, currentPosition = 0, bookId, book }: Cha
         {chapters.map((chapter, index) => {
           const state = chapterStates[index];
 
+          const chapterTitle = chapter.title || `Chapter ${index + 1}`;
+          const statusLabel = state.isCompleted ? 'completed' : state.isCurrent ? 'currently playing' : '';
+
           return (
             <TouchableOpacity
               key={chapter.id}
@@ -141,6 +144,9 @@ export function ChaptersTab({ chapters, currentPosition = 0, bookId, book }: Cha
               ]}
               onPress={() => handleChapterPress(chapter)}
               activeOpacity={0.7}
+              accessibilityLabel={`${chapterTitle}, ${formatShortDuration(state.duration)}${statusLabel ? `, ${statusLabel}` : ''}`}
+              accessibilityRole="button"
+              accessibilityHint="Double tap to play this chapter"
             >
               {/* Status indicator */}
               <View style={[
@@ -167,7 +173,7 @@ export function ChaptersTab({ chapters, currentPosition = 0, bookId, book }: Cha
                   ]}
                   numberOfLines={1}
                 >
-                  {chapter.title || `Chapter ${index + 1}`}
+                  {chapterTitle}
                 </Text>
 
                 {/* Progress bar for current chapter */}

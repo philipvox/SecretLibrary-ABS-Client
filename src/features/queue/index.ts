@@ -16,7 +16,6 @@ export {
 export type { QueueBook } from './stores/queueStore';
 
 // Components
-export { QueuePreview } from './components/QueuePreview';
 export { QueueItem } from './components/QueueItem';
 
 // Screens

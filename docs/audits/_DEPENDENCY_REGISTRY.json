@@ -1,0 +1,346 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-12-16",
+  "totalScreens": 30,
+  "screens": {
+    "HomeScreen": {
+      "path": "src/features/home/screens/HomeScreen.tsx",
+      "size": "13KB",
+      "loc": 403,
+      "complexity": "medium-high",
+      "priority": "P0",
+      "auditStatus": "complete",
+      "accessibilityScore": 95,
+      "dependencies": {
+        "features": ["player", "queue"],
+        "stores": ["playerStore"],
+        "core": ["apiClient", "useCoverUrl", "useScreenLoadTime"],
+        "shared": ["colors", "useImageColors"]
+      },
+      "localComponents": [
+        "HomeHeader",
+        "HomeDiscSection",
+        "HomePillsRow",
+        "ContinueListeningSection",
+        "RecentlyAddedSection",
+        "YourSeriesSection",
+        "SectionHeader",
+        "EmptySection"
+      ]
+    },
+    "MyLibraryScreen": {
+      "path": "src/features/library/screens/MyLibraryScreen.tsx",
+      "size": "56KB",
+      "loc": 1751,
+      "complexity": "high",
+      "priority": "P0",
+      "auditStatus": "complete",
+      "accessibilityScore": 85,
+      "dependencies": {
+        "features": ["player", "downloads", "home", "recommendations"],
+        "stores": ["playerStore", "myLibraryStore", "preferencesStore"],
+        "core": ["apiClient", "useDownloads", "useLibraryCache", "useScreenLoadTime"],
+        "shared": ["colors", "formatBytes", "SeriesProgressBadge", "StackedCovers"]
+      },
+      "localComponents": [
+        "SortPicker",
+        "StorageSummary",
+        "ContinueListeningHero",
+        "LibraryEmptyState"
+      ]
+    },
+    "CDPlayerScreen": {
+      "path": "src/features/player/screens/CDPlayerScreen.tsx",
+      "size": "59KB",
+      "loc": 1811,
+      "complexity": "very-high",
+      "priority": "P0",
+      "auditStatus": "complete",
+      "accessibilityScore": 90,
+      "dependencies": {
+        "features": ["queue"],
+        "stores": ["playerStore", "joystickSeekStore", "queueStore"],
+        "core": ["useCoverUrl", "useIsOfflineAvailable", "haptics", "useScreenLoadTime"],
+        "shared": ["CoverPlayButton", "colors", "DURATION", "CD_ROTATION"]
+      },
+      "localComponents": [
+        "CDDisc",
+        "CDProgressBar",
+        "SleepTimerSheet",
+        "SpeedSheet"
+      ]
+    },
+    "SearchScreen": {
+      "path": "src/features/search/screens/SearchScreen.tsx",
+      "size": "51KB",
+      "loc": 1630,
+      "complexity": "high",
+      "priority": "P1",
+      "auditStatus": "complete",
+      "accessibilityScore": 85,
+      "dependencies": {
+        "features": ["player"],
+        "stores": ["playerStore"],
+        "core": ["useLibraryCache", "apiClient", "downloadManager"],
+        "shared": ["Icon", "HeartButton", "BookCard", "colors"]
+      },
+      "localComponents": [
+        "SeriesCard"
+      ]
+    },
+    "BookDetailScreen": {
+      "path": "src/features/book-detail/screens/BookDetailScreen.tsx",
+      "size": "31KB",
+      "loc": 867,
+      "complexity": "high",
+      "priority": "P1",
+      "auditStatus": "complete",
+      "accessibilityScore": 95,
+      "dependencies": {
+        "features": ["player", "queue"],
+        "stores": ["playerStore", "queueStore"],
+        "core": ["useCoverUrl", "useDownloads", "downloadManager", "useScreenLoadTime"],
+        "shared": ["colors", "scale", "ErrorView"]
+      },
+      "localComponents": [
+        "OverviewTab",
+        "ChaptersTab",
+        "SeriesNavigator"
+      ]
+    },
+    "BrowseScreen": {
+      "path": "src/features/browse/screens/BrowseScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P1",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "DiscoverScreen": {
+      "path": "src/features/discover/screens/DiscoverScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P1",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "SeriesDetailScreen": {
+      "path": "src/features/series/screens/SeriesDetailScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P2",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "AuthorDetailScreen": {
+      "path": "src/features/author/screens/AuthorDetailScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P2",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "NarratorDetailScreen": {
+      "path": "src/features/narrator/screens/NarratorDetailScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P2",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "CollectionDetailScreen": {
+      "path": "src/features/collections/screens/CollectionDetailScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P2",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "ProfileScreen": {
+      "path": "src/features/profile/screens/ProfileScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P3",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "SettingsScreen": {
+      "path": "src/features/settings/screens/SettingsScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P3",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "QueueScreen": {
+      "path": "src/features/queue/screens/QueueScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P3",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    },
+    "MoodResultsScreen": {
+      "path": "src/features/mood-discovery/screens/MoodResultsScreen.tsx",
+      "size": null,
+      "loc": null,
+      "complexity": null,
+      "priority": "P3",
+      "auditStatus": "pending",
+      "accessibilityScore": null,
+      "dependencies": {
+        "features": [],
+        "stores": [],
+        "core": [],
+        "shared": []
+      }
+    }
+  },
+  "sharedComponents": {
+    "CoverPlayButton": {
+      "path": "src/shared/components/CoverPlayButton.tsx",
+      "usedBy": ["CDPlayerScreen"]
+    },
+    "SeriesProgressBadge": {
+      "path": "src/shared/components/SeriesProgressBadge.tsx",
+      "usedBy": ["MyLibraryScreen"]
+    },
+    "StackedCovers": {
+      "path": "src/shared/components/StackedCovers.tsx",
+      "usedBy": ["MyLibraryScreen"]
+    },
+    "EmptyState": {
+      "path": "src/shared/components/EmptyState.tsx",
+      "usedBy": []
+    },
+    "ErrorView": {
+      "path": "src/shared/components/ErrorView.tsx",
+      "usedBy": []
+    }
+  },
+  "stores": {
+    "playerStore": {
+      "path": "src/features/player/stores/playerStore.ts",
+      "usedBy": ["HomeScreen", "MyLibraryScreen", "CDPlayerScreen"]
+    },
+    "queueStore": {
+      "path": "src/features/queue/stores/queueStore.ts",
+      "usedBy": ["CDPlayerScreen"]
+    },
+    "myLibraryStore": {
+      "path": "src/features/library/stores/myLibraryStore.ts",
+      "usedBy": ["MyLibraryScreen"]
+    },
+    "preferencesStore": {
+      "path": "src/features/recommendations/stores/preferencesStore.ts",
+      "usedBy": ["MyLibraryScreen"]
+    },
+    "joystickSeekStore": {
+      "path": "src/features/player/stores/joystickSeekStore.ts",
+      "usedBy": ["CDPlayerScreen"]
+    }
+  },
+  "crossFeatureDependencies": {
+    "player": {
+      "dependedOnBy": ["home", "library"],
+      "exports": ["usePlayerStore", "SleepTimerSheet", "SpeedSheet"]
+    },
+    "queue": {
+      "dependedOnBy": ["home", "player"],
+      "exports": ["QueuePanel", "useQueueCount", "useQueueStore"]
+    },
+    "home": {
+      "dependedOnBy": ["library"],
+      "exports": ["SectionHeader", "useContinueListening"]
+    },
+    "downloads": {
+      "dependedOnBy": ["library"],
+      "exports": ["DownloadItem"]
+    }
+  },
+  "summary": {
+    "byPriority": {
+      "P0": 3,
+      "P1": 4,
+      "P2": 4,
+      "P3": 4
+    },
+    "byAuditStatus": {
+      "complete": 5,
+      "pending": 10
+    },
+    "averageAccessibilityScore": 90.0,
+    "highComplexityScreens": ["CDPlayerScreen", "MyLibraryScreen", "SearchScreen", "BookDetailScreen"],
+    "lastFixDate": "2025-12-16",
+    "recentFixes": [
+      "HomeScreen accessibility (0% -> 95%)",
+      "MyLibraryScreen accessibility (25% -> 85%)",
+      "CDPlayerScreen accessibility (75% -> 90%)",
+      "BookDetailScreen accessibility (0% -> 95%)",
+      "SearchScreen accessibility (0% -> 85%)"
+    ]
+  }
+}

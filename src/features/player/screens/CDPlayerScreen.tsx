@@ -375,7 +375,18 @@ const CDProgressBar: React.FC<ProgressBarProps> = ({ progress, onSeek, chapterMa
 
   return (
     <GestureDetector gesture={panGesture}>
-      <View style={styles.progressContainer}>
+      <View
+        style={styles.progressContainer}
+        accessible={true}
+        accessibilityRole="adjustable"
+        accessibilityLabel={`Playback progress ${Math.round(progress)}%`}
+        accessibilityHint="Drag left or right to seek"
+        accessibilityValue={{
+          min: 0,
+          max: 100,
+          now: Math.round(progress),
+        }}
+      >
         {/* Track background with fill inside */}
         <View style={styles.progressTrack}>
           <View style={styles.progressBorder} />
@@ -641,40 +652,54 @@ export function CDPlayerScreen() {
     <View style={[styles.sheet, styles.chaptersSheet]}>
       <View style={styles.sheetHeader}>
         <Text style={styles.sheetTitle}>Chapters</Text>
-        <TouchableOpacity onPress={() => setActiveSheet('none')} style={styles.sheetClose}>
+        <TouchableOpacity
+          onPress={() => setActiveSheet('none')}
+          style={styles.sheetClose}
+          accessibilityLabel="Close chapters"
+          accessibilityRole="button"
+        >
           <Ionicons name="close" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.chaptersList} showsVerticalScrollIndicator={false}>
-        {chapters.map((chapter: any, index: number) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.chapterItem,
-              index === chapterIndex && styles.chapterItemActive,
-            ]}
-            onPress={() => handleChapterSelect(chapter.start)}
-          >
-            <Text style={styles.chapterNumber}>{index + 1}</Text>
-            <View style={styles.chapterInfo}>
-              <Text
-                style={[
-                  styles.chapterTitle,
-                  index === chapterIndex && styles.chapterTitleActive,
-                ]}
-                numberOfLines={1}
-              >
-                {chapter.title || `Chapter ${index + 1}`}
-              </Text>
-              <Text style={styles.chapterDuration}>
-                {formatTime(chapter.end - chapter.start)}
-              </Text>
-            </View>
-            {index === chapterIndex && (
-              <Ionicons name="volume-high" size={16} color={ACCENT_COLOR} />
-            )}
-          </TouchableOpacity>
-        ))}
+        {chapters.map((chapter: any, index: number) => {
+          const isCurrentChapter = index === chapterIndex;
+          const chapterTitle = chapter.title || `Chapter ${index + 1}`;
+          const chapterDuration = formatTime(chapter.end - chapter.start);
+
+          return (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.chapterItem,
+                isCurrentChapter && styles.chapterItemActive,
+              ]}
+              onPress={() => handleChapterSelect(chapter.start)}
+              accessibilityLabel={`${chapterTitle}, ${chapterDuration}${isCurrentChapter ? ', currently playing' : ''}`}
+              accessibilityRole="button"
+              accessibilityHint="Double tap to jump to this chapter"
+            >
+              <Text style={styles.chapterNumber}>{index + 1}</Text>
+              <View style={styles.chapterInfo}>
+                <Text
+                  style={[
+                    styles.chapterTitle,
+                    isCurrentChapter && styles.chapterTitleActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {chapterTitle}
+                </Text>
+                <Text style={styles.chapterDuration}>
+                  {chapterDuration}
+                </Text>
+              </View>
+              {isCurrentChapter && (
+                <Ionicons name="volume-high" size={16} color={ACCENT_COLOR} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );

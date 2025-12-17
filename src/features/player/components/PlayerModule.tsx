@@ -177,7 +177,12 @@ export function PlayerModule({
       {/* Panel OR Cover+Controls */}
       {panelMode && panelMode !== 'none' && panelContent ? (
         <View style={styles.panelContainer}>
-          <TouchableOpacity style={styles.panelCloseButton} onPress={onClosePanel}>
+          <TouchableOpacity
+            style={styles.panelCloseButton}
+            onPress={onClosePanel}
+            accessibilityLabel="Close panel"
+            accessibilityRole="button"
+          >
             <Text style={styles.panelCloseText}>✕</Text>
           </TouchableOpacity>
           {panelContent}
@@ -190,6 +195,9 @@ export function PlayerModule({
             onPress={onCoverPress}
             onLongPress={onCoverLongPress}
             delayLongPress={400}
+            accessibilityLabel={`${title} cover`}
+            accessibilityRole="button"
+            accessibilityHint="Tap for details. Long press for full player."
           >
             <CoverArtwork
               coverUrl={coverUrl}

@@ -26,6 +26,4 @@ export {
   useUpdateCollection,
 } from './hooks/useCollectionMutations';
 
-// Components
-export { FavoriteButton } from './components/FavoriteButton';
-export { AddToCollectionButton } from './components/AddToCollectionButton';
+// Note: FavoriteButton and AddToCollectionButton removed - use HeartButton from shared/components

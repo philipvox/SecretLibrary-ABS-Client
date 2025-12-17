@@ -1,0 +1,2117 @@
+{
+  "totalFiles": 296,
+  "unusedFiles": [
+    {
+      "file": "features/player/components/PlayerScrubButton.tsx",
+      "exports": [
+        "PlayerScrubButton",
+        "PlayerScrubButton"
+      ],
+      "size": 24953,
+      "lines": 753
+    },
+    {
+      "file": "features/book-detail/components/ActionButtonsRow.tsx",
+      "exports": [
+        "ActionButtonsRow"
+      ],
+      "size": 19423,
+      "lines": 689
+    },
+    {
+      "file": "features/completion/components/CompletionCelebration.tsx",
+      "exports": [
+        "CompletionCelebration"
+      ],
+      "size": 17386,
+      "lines": 682
+    },
+    {
+      "file": "features/player/hooks/useRobustSeekControl.ts",
+      "exports": [
+        "useRobustSeekControl"
+      ],
+      "size": 17696,
+      "lines": 619
+    },
+    {
+      "file": "features/discover/hooks/useDiscoverData.ts",
+      "exports": [
+        "useDiscoverData"
+      ],
+      "size": 19310,
+      "lines": 561
+    },
+    {
+      "file": "features/discover/components/HeroSection.tsx",
+      "exports": [
+        "HeroSection"
+      ],
+      "size": 13562,
+      "lines": 471
+    },
+    {
+      "file": "features/discover/components/MoodFilterPills.tsx",
+      "exports": [
+        "MoodFilterPills"
+      ],
+      "size": 13040,
+      "lines": 471
+    },
+    {
+      "file": "core/native/performanceMonitor.ts",
+      "exports": [
+        "frameRateMonitor",
+        "memoryMonitor",
+        "renderTracker",
+        "interactionTracker",
+        "useRenderTracking",
+        "analyzePerformance"
+      ],
+      "size": 11813,
+      "lines": 445
+    },
+    {
+      "file": "core/native/storageOptimizer.ts",
+      "exports": [
+        "storageOptimizer",
+        "DIRECTORIES"
+      ],
+      "size": 12117,
+      "lines": 440
+    },
+    {
+      "file": "features/home/components/CompactNowPlaying.tsx",
+      "exports": [
+        "CompactNowPlaying",
+        "NothingPlayingCard"
+      ],
+      "size": 11124,
+      "lines": 430
+    },
+    {
+      "file": "shared/components/SwipeableBookCard.tsx",
+      "exports": [
+        "SwipeableBookCardProps",
+        "SwipeableBookCard",
+        "SwipeableBookCard"
+      ],
+      "size": 12141,
+      "lines": 422
+    },
+    {
+      "file": "features/player/sheets/SleepTimerSheet.tsx",
+      "exports": [
+        "SleepTimerSheet",
+        "SleepTimerSheet"
+      ],
+      "size": 11659,
+      "lines": 395
+    },
+    {
+      "file": "features/book-detail/components/BookActions.tsx",
+      "exports": [
+        "BookActions"
+      ],
+      "size": 10051,
+      "lines": 355
+    },
+    {
+      "file": "core/native/threadUtils.ts",
+      "exports": [
+        "taskScheduler",
+        "processInChunks",
+        "processSequentially",
+        "debounce",
+        "throttle",
+        "createBatchCollector",
+        "requestIdleCallback",
+        "cancelIdleCallback"
+      ],
+      "size": 8482,
+      "lines": 340
+    },
+    {
+      "file": "features/home/components/HomeMiniPlayer.tsx",
+      "exports": [
+        "MINI_PLAYER_SCROLL_THRESHOLD",
+        "HomeMiniPlayer",
+        "HomeMiniPlayer"
+      ],
+      "size": 8808,
+      "lines": 333
+    },
+    {
+      "file": "features/player/panels/SpeedPanel.tsx",
+      "exports": [
+        "SpeedPanel",
+        "SpeedPanel"
+      ],
+      "size": 9362,
+      "lines": 324
+    },
+    {
+      "file": "shared/components/CircularDownloadButton.tsx",
+      "exports": [
+        "CircularDownloadButton"
+      ],
+      "size": 9875,
+      "lines": 320
+    },
+    {
+      "file": "core/errors/playbackErrorHandler.ts",
+      "exports": [
+        "PlaybackFailureType",
+        "classifyPlaybackError",
+        "getPlaybackFailureType",
+        "getPlaybackRecoveryAction",
+        "canAutoRecoverPlayback",
+        "formatPlaybackError"
+      ],
+      "size": 8092,
+      "lines": 308
+    },
+    {
+      "file": "core/api/middleware.ts",
+      "exports": [
+        "RequestContext",
+        "ResponseContext",
+        "ErrorContext",
+        "RequestMiddleware",
+        "ResponseMiddleware",
+        "ErrorMiddleware",
+        "middlewareManager",
+        "loggingMiddleware",
+        "performanceTracker",
+        "createAuthRefreshMiddleware",
+        "offlineMiddleware"
+      ],
+      "size": 7454,
+      "lines": 306
+    },
+    {
+      "file": "shared/assets/svg/controls.tsx",
+      "exports": [
+        "PlayButton",
+        "RewindButton",
+        "FastForwardButton",
+        "ChapterBackButton",
+        "ChapterForwardButton",
+        "SmallPlayButton",
+        "SmallPauseButton",
+        "HomeLargePlayButton",
+        "PauseButton"
+      ],
+      "size": 34142,
+      "lines": 299
+    },
+    {
+      "file": "core/errors/databaseErrorHandler.ts",
+      "exports": [
+        "DatabaseFailureType",
+        "classifyDatabaseError",
+        "getDatabaseFailureType",
+        "isDatabaseCritical",
+        "getDatabaseRecoveryAction",
+        "formatDatabaseError"
+      ],
+      "size": 7192,
+      "lines": 292
+    },
+    {
+      "file": "shared/components/ErrorView.tsx",
+      "exports": [
+        "ErrorType",
+        "ErrorView"
+      ],
+      "size": 7776,
+      "lines": 286
+    },
+    {
+      "file": "features/mood-discovery/components/MoodDiscoveryCard.tsx",
+      "exports": [
+        "MoodDiscoveryCard"
+      ],
+      "size": 7455,
+      "lines": 274
+    },
+    {
+      "file": "features/player/panels/ProgressPanel.tsx",
+      "exports": [
+        "ProgressPanel",
+        "ProgressPanel"
+      ],
+      "size": 8354,
+      "lines": 274
+    },
+    {
+      "file": "core/errors/downloadErrorHandler.ts",
+      "exports": [
+        "DownloadFailureType",
+        "classifyDownloadError",
+        "getDownloadFailureType",
+        "shouldRetryDownload",
+        "getDownloadErrorAction",
+        "formatDownloadError"
+      ],
+      "size": 7132,
+      "lines": 266
+    },
+    {
+      "file": "features/player/panels/SleepPanel.tsx",
+      "exports": [
+        "SleepPanel",
+        "SleepPanel"
+      ],
+      "size": 7663,
+      "lines": 262
+    },
+    {
+      "file": "features/player/panels/DetailsPanel.tsx",
+      "exports": [
+        "DetailsPanel"
+      ],
+      "size": 7243,
+      "lines": 255
+    },
+    {
+      "file": "features/player/panels/SettingsPanel.tsx",
+      "exports": [
+        "SettingsPanel",
+        "SettingsPanel"
+      ],
+      "size": 7738,
+      "lines": 254
+    },
+    {
+      "file": "core/errors/authErrorHandler.ts",
+      "exports": [
+        "AuthFailureType",
+        "classifyAuthError",
+        "getAuthFailureType",
+        "requiresReauth",
+        "isLoginFailure",
+        "getAuthErrorAction",
+        "formatAuthError",
+        "createAuthErrorHandler",
+        "validateServerUrl"
+      ],
+      "size": 6169,
+      "lines": 252
+    },
+    {
+      "file": "features/player/panels/ChaptersPanel.tsx",
+      "exports": [
+        "ChaptersPanel",
+        "ChaptersPanel"
+      ],
+      "size": 7325,
+      "lines": 248
+    },
+    {
+      "file": "features/queue/components/QueuePreview.tsx",
+      "exports": [
+        "QueuePreview"
+      ],
+      "size": 6567,
+      "lines": 244
+    },
+    {
+      "file": "features/discover/components/TopAuthorsSection.tsx",
+      "exports": [
+        "TopAuthorsSection"
+      ],
+      "size": 6677,
+      "lines": 243
+    },
+    {
+      "file": "core/errors/ErrorBoundary.tsx",
+      "exports": [
+        "ErrorBoundary",
+        "withErrorBoundary"
+      ],
+      "size": 6218,
+      "lines": 242
+    },
+    {
+      "file": "features/discover/components/ContentRowCarousel.tsx",
+      "exports": [
+        "ContentRowCarousel"
+      ],
+      "size": 6407,
+      "lines": 238
+    },
+    {
+      "file": "features/user/components/FavoriteButton.tsx",
+      "exports": [
+        "FavoriteButton"
+      ],
+      "size": 5612,
+      "lines": 236
+    },
+    {
+      "file": "core/errors/components/ErrorProvider.tsx",
+      "exports": [
+        "ErrorProvider",
+        "useErrorDisplay",
+        "useShowError"
+      ],
+      "size": 5778,
+      "lines": 236
+    },
+    {
+      "file": "features/player/components/ChapterProgressBar.tsx",
+      "exports": [
+        "ChapterProgressBar",
+        "ChapterProgressBar"
+      ],
+      "size": 6054,
+      "lines": 234
+    },
+    {
+      "file": "features/user/components/AddToCollectionButton.tsx",
+      "exports": [
+        "AddToCollectionButton"
+      ],
+      "size": 6485,
+      "lines": 234
+    },
+    {
+      "file": "features/player/sheets/SpeedSheet.tsx",
+      "exports": [
+        "SpeedSheet",
+        "SpeedSheet"
+      ],
+      "size": 6659,
+      "lines": 233
+    },
+    {
+      "file": "core/errors/networkErrorHandler.ts",
+      "exports": [
+        "classifyNetworkError",
+        "shouldUseOfflineFallback",
+        "getNetworkStatusMessage"
+      ],
+      "size": 5725,
+      "lines": 233
+    },
+    {
+      "file": "features/discover/components/PopularSeriesSection.tsx",
+      "exports": [
+        "PopularSeriesSection"
+      ],
+      "size": 6380,
+      "lines": 230
+    },
+    {
+      "file": "core/hooks/useOptimisticMutation.ts",
+      "exports": [
+        "useOptimisticMutation",
+        "useOptimisticProgress",
+        "useOptimisticCollection"
+      ],
+      "size": 8152,
+      "lines": 227
+    },
+    {
+      "file": "features/player/utils/colorUtils.ts",
+      "exports": [
+        "hexToRgb",
+        "rgbToHex",
+        "rgbToHsl",
+        "hslToRgb",
+        "darkenColor",
+        "lightenColor",
+        "isLightColor",
+        "getHighContrastAccent",
+        "getAccentColor",
+        "pickGradientColors",
+        "getFallbackColors"
+      ],
+      "size": 6391,
+      "lines": 225
+    },
+    {
+      "file": "shared/utils/colorPalette.ts",
+      "exports": [
+        "COLOR_PALETTE",
+        "PaletteColor",
+        "hexToRgb",
+        "findClosestColor",
+        "findClosestColorRgb",
+        "matchToPalette",
+        "matchToPaletteWithName"
+      ],
+      "size": 9465,
+      "lines": 225
+    },
+    {
+      "file": "core/api/offlineApi.ts",
+      "exports": [],
+      "size": 5382,
+      "lines": 220
+    },
+    {
+      "file": "shared/components/EmptyState.tsx",
+      "exports": [
+        "EmptyStateIcon",
+        "EmptyState"
+      ],
+      "size": 6413,
+      "lines": 215
+    },
+    {
+      "file": "core/api/playbackApi.ts",
+      "exports": [
+        "AudioTrack",
+        "PlaybackChapter",
+        "PlaybackSession",
+        "buildStreamUrl"
+      ],
+      "size": 5063,
+      "lines": 213
+    },
+    {
+      "file": "features/player/components/SleepTimer.tsx",
+      "exports": [
+        "SleepTimer"
+      ],
+      "size": 5905,
+      "lines": 212
+    },
+    {
+      "file": "shared/animation/AnimatedPressable.tsx",
+      "exports": [
+        "AnimatedPressable",
+        "AnimatedIconPressable",
+        "AnimatedCardPressable",
+        "AnimatedPressable"
+      ],
+      "size": 5142,
+      "lines": 209
+    },
+    {
+      "file": "core/errors/syncErrorHandler.ts",
+      "exports": [
+        "SyncFailureReason",
+        "SyncItemStatus",
+        "SyncStatus",
+        "classifySyncError",
+        "getSyncFailureReason",
+        "shouldRetrySyncError",
+        "getSyncRetryDelay",
+        "getSyncStatusMessage",
+        "resolveProgressConflict"
+      ],
+      "size": 5589,
+      "lines": 208
+    },
+    {
+      "file": "shared/components/DownloadButton.tsx",
+      "exports": [
+        "DownloadButton"
+      ],
+      "size": 5089,
+      "lines": 205
+    },
+    {
+      "file": "core/hooks/useNetworkStatus.ts",
+      "exports": [
+        "useNetworkStatus",
+        "useIsOffline",
+        "useIsOnWifi",
+        "useCanDownload",
+        "useOfflineAware",
+        "useOfflineAction"
+      ],
+      "size": 5240,
+      "lines": 202
+    },
+    {
+      "file": "features/book-detail/components/BookInfo.tsx",
+      "exports": [
+        "BookInfo"
+      ],
+      "size": 5239,
+      "lines": 198
+    },
+    {
+      "file": "shared/components/feedback/TabBar.tsx",
+      "exports": [
+        "TabBar"
+      ],
+      "size": 4803,
+      "lines": 195
+    },
+    {
+      "file": "features/home/components/SeriesCard.tsx",
+      "exports": [
+        "SeriesCard"
+      ],
+      "size": 5412,
+      "lines": 192
+    },
+    {
+      "file": "shared/components/CassetteRefreshView.tsx",
+      "exports": [
+        "CassetteRefreshView"
+      ],
+      "size": 4653,
+      "lines": 188
+    },
+    {
+      "file": "features/mood-discovery/components/WorldSelector.tsx",
+      "exports": [
+        "WorldSelector"
+      ],
+      "size": 4550,
+      "lines": 187
+    },
+    {
+      "file": "features/home/components/CoverGrid.tsx",
+      "exports": [
+        "CoverGrid"
+      ],
+      "size": 5392,
+      "lines": 184
+    },
+    {
+      "file": "features/mood-discovery/components/VibeSelector.tsx",
+      "exports": [
+        "VibeSelector"
+      ],
+      "size": 4392,
+      "lines": 184
+    },
+    {
+      "file": "shared/components/Button.tsx",
+      "exports": [
+        "Button"
+      ],
+      "size": 3474,
+      "lines": 184
+    },
+    {
+      "file": "shared/components/inputs/TextInput.tsx",
+      "exports": [
+        "TextInput"
+      ],
+      "size": 4020,
+      "lines": 182
+    },
+    {
+      "file": "core/auth/authContext.tsx",
+      "exports": [
+        "AuthProvider",
+        "useAuth"
+      ],
+      "size": 4538,
+      "lines": 179
+    },
+    {
+      "file": "features/completion/components/CompleteBadge.tsx",
+      "exports": [
+        "CompleteBadge",
+        "CompleteBadgeOverlay",
+        "CompleteBanner"
+      ],
+      "size": 3893,
+      "lines": 178
+    },
+    {
+      "file": "features/search/hooks/useServerSearch.ts",
+      "exports": [
+        "SearchResults",
+        "SeriesResult",
+        "AuthorResult",
+        "NarratorResult",
+        "useServerSearch"
+      ],
+      "size": 4930,
+      "lines": 175
+    },
+    {
+      "file": "shared/components/AnimatedSplash.tsx",
+      "exports": [
+        "AnimatedSplash"
+      ],
+      "size": 4221,
+      "lines": 167
+    },
+    {
+      "file": "shared/theme/sizes.ts",
+      "exports": [
+        "coverSizes",
+        "iconSizes",
+        "buttonSizes",
+        "progressSizes",
+        "sizes",
+        "cardTokens",
+        "Sizes",
+        "SizeKey",
+        "CoverSizeKey",
+        "IconSizeKey",
+        "CardTokens"
+      ],
+      "size": 4289,
+      "lines": 160
+    },
+    {
+      "file": "shared/components/HeartButton.tsx",
+      "exports": [
+        "HeartButtonProps",
+        "HeartButton",
+        "DefaultHeartIcon"
+      ],
+      "size": 4825,
+      "lines": 158
+    },
+    {
+      "file": "features/mood-discovery/components/LengthSlider.tsx",
+      "exports": [
+        "LengthSlider"
+      ],
+      "size": 3555,
+      "lines": 155
+    },
+    {
+      "file": "core/hooks/useAppBootstrap.ts",
+      "exports": [
+        "useAppBootstrap"
+      ],
+      "size": 5569,
+      "lines": 152
+    },
+    {
+      "file": "features/queue/components/QueueItem.tsx",
+      "exports": [
+        "QueueItem"
+      ],
+      "size": 3937,
+      "lines": 151
+    },
+    {
+      "file": "features/discover/components/CategoryGrid.tsx",
+      "exports": [
+        "CategoryGrid"
+      ],
+      "size": 4717,
+      "lines": 150
+    },
+    {
+      "file": "shared/theme/formatting.ts",
+      "exports": [
+        "formatDuration",
+        "formatProgress",
+        "separators"
+      ],
+      "size": 4312,
+      "lines": 149
+    },
+    {
+      "file": "core/services/appInitializer.ts",
+      "exports": [
+        "InitResult",
+        "appInitializer"
+      ],
+      "size": 4236,
+      "lines": 149
+    },
+    {
+      "file": "features/search/hooks/useSearch.ts",
+      "exports": [
+        "SearchResults",
+        "SeriesResult",
+        "AuthorResult",
+        "NarratorResult",
+        "useSearch"
+      ],
+      "size": 4066,
+      "lines": 148
+    },
+    {
+      "file": "features/discover/components/BrowsePills.tsx",
+      "exports": [
+        "BrowsePills"
+      ],
+      "size": 4272,
+      "lines": 147
+    },
+    {
+      "file": "shared/theme/typography.ts",
+      "exports": [
+        "typography",
+        "fontSize",
+        "fontWeight",
+        "lineHeight",
+        "Typography",
+        "TypographyKey",
+        "FontSizeKey",
+        "FontWeightKey"
+      ],
+      "size": 3896,
+      "lines": 145
+    },
+    {
+      "file": "features/book-detail/components/ChapterList.tsx",
+      "exports": [
+        "ChapterList"
+      ],
+      "size": 3935,
+      "lines": 143
+    },
+    {
+      "file": "shared/components/SyncStatusBadge.tsx",
+      "exports": [
+        "SyncStatusBadge"
+      ],
+      "size": 3599,
+      "lines": 143
+    },
+    {
+      "file": "shared/components/SeriesProgressBadge.tsx",
+      "exports": [
+        "SeriesProgressBadge",
+        "SeriesProgressBadge"
+      ],
+      "size": 3404,
+      "lines": 135
+    },
+    {
+      "file": "features/narrator/hooks/useNarrators.ts",
+      "exports": [
+        "NarratorInfo",
+        "useNarrators"
+      ],
+      "size": 3728,
+      "lines": 134
+    },
+    {
+      "file": "features/author/components/AuthorCard.tsx",
+      "exports": [
+        "AuthorCard"
+      ],
+      "size": 3163,
+      "lines": 132
+    },
+    {
+      "file": "features/library/components/AppliedFilters.tsx",
+      "exports": [
+        "AppliedFilter",
+        "AppliedFilters",
+        "AppliedFilters"
+      ],
+      "size": 3326,
+      "lines": 132
+    },
+    {
+      "file": "features/player/panels/PanelContainer.tsx",
+      "exports": [
+        "PANEL_CONFIG",
+        "PANEL_WIDTH",
+        "PANEL_MAX_HEIGHT",
+        "PanelContainer",
+        "PanelContainer"
+      ],
+      "size": 3219,
+      "lines": 131
+    },
+    {
+      "file": "shared/assets/svg/backgrounds.tsx",
+      "exports": [
+        "HomeCardBackground",
+        "PlayerCardBackground"
+      ],
+      "size": 8928,
+      "lines": 131
+    },
+    {
+      "file": "shared/components/StackedCovers.tsx",
+      "exports": [
+        "StackedCovers",
+        "StackedCovers"
+      ],
+      "size": 3747,
+      "lines": 131
+    },
+    {
+      "file": "shared/components/inputs/SearchInput.tsx",
+      "exports": [
+        "SearchInput"
+      ],
+      "size": 2942,
+      "lines": 131
+    },
+    {
+      "file": "features/library/components/HorizontalBookItem.tsx",
+      "exports": [
+        "HorizontalBookItem"
+      ],
+      "size": 3296,
+      "lines": 124
+    },
+    {
+      "file": "features/automotive/useAutomotive.ts",
+      "exports": [
+        "useAutomotiveConnection",
+        "useAutomotiveActions",
+        "useAutomotive"
+      ],
+      "size": 3219,
+      "lines": 122
+    },
+    {
+      "file": "features/collections/components/CollectionCard.tsx",
+      "exports": [
+        "CollectionCard"
+      ],
+      "size": 3337,
+      "lines": 122
+    },
+    {
+      "file": "shared/components/SeriesHeartButton.tsx",
+      "exports": [
+        "SeriesHeartButtonProps",
+        "SeriesHeartButton"
+      ],
+      "size": 3721,
+      "lines": 122
+    },
+    {
+      "file": "shared/assets/svg/loading.tsx",
+      "exports": [
+        "LoadingDots",
+        "LoadingDotsStatic"
+      ],
+      "size": 6537,
+      "lines": 120
+    },
+    {
+      "file": "features/home/components/PlaylistCard.tsx",
+      "exports": [
+        "PlaylistCard"
+      ],
+      "size": 2886,
+      "lines": 118
+    },
+    {
+      "file": "features/library/components/FilterChips.tsx",
+      "exports": [
+        "FilterOption",
+        "FilterChips"
+      ],
+      "size": 3204,
+      "lines": 117
+    },
+    {
+      "file": "features/book-detail/components/PlayButtonWithProgress.tsx",
+      "exports": [
+        "PlayButtonWithProgress"
+      ],
+      "size": 3025,
+      "lines": 116
+    },
+    {
+      "file": "shared/components/buttons/IconButton.tsx",
+      "exports": [
+        "IconButton"
+      ],
+      "size": 2367,
+      "lines": 114
+    },
+    {
+      "file": "shared/hooks/useBookCardState.ts",
+      "exports": [
+        "BookCardDisplayState",
+        "DownloadState",
+        "BookCardState",
+        "useBookCardState",
+        "resolveDisplayState"
+      ],
+      "size": 3283,
+      "lines": 114
+    },
+    {
+      "file": "features/library/components/AddToLibraryButton.tsx",
+      "exports": [
+        "AddToLibraryButton"
+      ],
+      "size": 2748,
+      "lines": 111
+    },
+    {
+      "file": "features/home/components/CoverStack.tsx",
+      "exports": [
+        "CoverStack"
+      ],
+      "size": 3010,
+      "lines": 108
+    },
+    {
+      "file": "features/mood-discovery/hooks/useMoodFilteredBooks.ts",
+      "exports": [
+        "useMoodFilteredBooks",
+        "useAllFilteredBooks"
+      ],
+      "size": 2886,
+      "lines": 108
+    },
+    {
+      "file": "features/discover/components/QuickFilterChips.tsx",
+      "exports": [
+        "QuickFilterChips"
+      ],
+      "size": 2402,
+      "lines": 107
+    },
+    {
+      "file": "features/home/components/NowPlayingCard.tsx",
+      "exports": [
+        "NowPlayingCard"
+      ],
+      "size": 2669,
+      "lines": 106
+    },
+    {
+      "file": "core/api/endpoints/libraries.ts",
+      "exports": [
+        "librariesApi"
+      ],
+      "size": 2304,
+      "lines": 104
+    },
+    {
+      "file": "shared/components/cards/GlassCard.tsx",
+      "exports": [
+        "GlassCard"
+      ],
+      "size": 2151,
+      "lines": 103
+    },
+    {
+      "file": "features/browse/components/CollectionsListContent.tsx",
+      "exports": [
+        "CollectionsListContent"
+      ],
+      "size": 2755,
+      "lines": 98
+    },
+    {
+      "file": "features/browse/components/AuthorsListContent.tsx",
+      "exports": [
+        "AuthorsListContent"
+      ],
+      "size": 2775,
+      "lines": 97
+    },
+    {
+      "file": "features/browse/components/SeriesListContent.tsx",
+      "exports": [
+        "SeriesListContent"
+      ],
+      "size": 2723,
+      "lines": 97
+    },
+    {
+      "file": "features/browse/components/NarratorsListContent.tsx",
+      "exports": [
+        "NarratorsListContent"
+      ],
+      "size": 2731,
+      "lines": 96
+    },
+    {
+      "file": "features/narrator/components/NarratorCard.tsx",
+      "exports": [
+        "NarratorCard"
+      ],
+      "size": 2188,
+      "lines": 91
+    },
+    {
+      "file": "shared/components/Skeleton.tsx",
+      "exports": [
+        "Shimmer"
+      ],
+      "size": 2050,
+      "lines": 88
+    },
+    {
+      "file": "features/home/components/MiniControls.tsx",
+      "exports": [
+        "MiniControls"
+      ],
+      "size": 2285,
+      "lines": 83
+    },
+    {
+      "file": "shared/theme/animation.ts",
+      "exports": [
+        "duration",
+        "spring",
+        "easing",
+        "animation",
+        "Duration",
+        "DurationKey",
+        "Spring",
+        "SpringKey"
+      ],
+      "size": 2120,
+      "lines": 82
+    },
+    {
+      "file": "features/book-detail/components/BookHeader.tsx",
+      "exports": [
+        "BookHeader"
+      ],
+      "size": 2058,
+      "lines": 77
+    },
+    {
+      "file": "features/home/components/HorizontalCarousel.tsx",
+      "exports": [
+        "HorizontalCarousel"
+      ],
+      "size": 2096,
+      "lines": 77
+    },
+    {
+      "file": "features/search/services/searchService.ts",
+      "exports": [
+        "searchService"
+      ],
+      "size": 1936,
+      "lines": 77
+    },
+    {
+      "file": "shared/components/GestureComponents.tsx",
+      "exports": [
+        "Swipeable"
+      ],
+      "size": 1979,
+      "lines": 77
+    },
+    {
+      "file": "shared/components/Card.tsx",
+      "exports": [
+        "Card"
+      ],
+      "size": 1310,
+      "lines": 75
+    },
+    {
+      "file": "features/library/hooks/useLibraryItems.ts",
+      "exports": [
+        "useLibraryItems"
+      ],
+      "size": 1790,
+      "lines": 74
+    },
+    {
+      "file": "shared/theme/colors.ts",
+      "exports": [
+        "colors",
+        "Colors",
+        "ColorKey"
+      ],
+      "size": 1756,
+      "lines": 70
+    },
+    {
+      "file": "features/home/components/Greeting.tsx",
+      "exports": [
+        "Greeting"
+      ],
+      "size": 1574,
+      "lines": 69
+    },
+    {
+      "file": "core/api/endpoints/playlists.ts",
+      "exports": [
+        "playlistsApi"
+      ],
+      "size": 1271,
+      "lines": 67
+    },
+    {
+      "file": "core/api/endpoints/authors.ts",
+      "exports": [
+        "authorsApi"
+      ],
+      "size": 1317,
+      "lines": 60
+    },
+    {
+      "file": "features/home/components/HeartBadge.tsx",
+      "exports": [
+        "HeartBadge"
+      ],
+      "size": 1351,
+      "lines": 59
+    },
+    {
+      "file": "core/api/endpoints/items.ts",
+      "exports": [
+        "itemsApi"
+      ],
+      "size": 1212,
+      "lines": 58
+    },
+    {
+      "file": "core/hooks/useLibraryPrefetch.ts",
+      "exports": [
+        "useLibraryPrefetch"
+      ],
+      "size": 1781,
+      "lines": 58
+    },
+    {
+      "file": "shared/assets/svg/navigation.tsx",
+      "exports": [
+        "HomeButton",
+        "HomeButtonActive",
+        "SearchButton"
+      ],
+      "size": 2552,
+      "lines": 57
+    },
+    {
+      "file": "shared/assets/svg/overlays.tsx",
+      "exports": [
+        "PlayerCoverOverlay"
+      ],
+      "size": 4252,
+      "lines": 47
+    },
+    {
+      "file": "core/cache/useCoverUrl.ts",
+      "exports": [
+        "useCoverUrl",
+        "getCoverUrl"
+      ],
+      "size": 1373,
+      "lines": 43
+    },
+    {
+      "file": "core/api/endpoints/auth.ts",
+      "exports": [
+        "authApi"
+      ],
+      "size": 745,
+      "lines": 40
+    },
+    {
+      "file": "core/api/endpoints/series.ts",
+      "exports": [
+        "seriesApi"
+      ],
+      "size": 525,
+      "lines": 28
+    },
+    {
+      "file": "shared/utils/navigation.ts",
+      "exports": [
+        "safeGoBack"
+      ],
+      "size": 237,
+      "lines": 9
+    },
+    {
+      "file": "core/storage/cache.ts",
+      "exports": [],
+      "size": 0,
+      "lines": 1
+    },
+    {
+      "file": "core/storage/database.ts",
+      "exports": [],
+      "size": 0,
+      "lines": 1
+    },
+    {
+      "file": "core/sync/syncService.ts",
+      "exports": [],
+      "size": 0,
+      "lines": 1
+    }
+  ],
+  "singleUseFiles": [
+    {
+      "file": "shared/utils/genreUtils.ts",
+      "usedBy": "features/recommendations/screens/PreferencesOnboardingScreen.tsx",
+      "exports": [
+        "extractGenres"
+      ],
+      "lines": 12
+    },
+    {
+      "file": "features/collections/hooks/useCollectionDetails.ts",
+      "usedBy": "features/collections/screens/CollectionDetailScreen.tsx",
+      "exports": [
+        "useCollectionDetails"
+      ],
+      "lines": 27
+    },
+    {
+      "file": "shared/components/LoadingSpinner.tsx",
+      "usedBy": "features/mood-discovery/screens/MoodResultsScreen.tsx",
+      "exports": [
+        "LoadingSpinner"
+      ],
+      "lines": 45
+    },
+    {
+      "file": "features/book-detail/hooks/useBookDetails.ts",
+      "usedBy": "features/book-detail/screens/BookDetailScreen.tsx",
+      "exports": [
+        "useBookDetails"
+      ],
+      "lines": 51
+    },
+    {
+      "file": "features/author/hooks/useAuthors.ts",
+      "usedBy": "features/browse/components/AuthorsListContent.tsx",
+      "exports": [
+        "useAuthors"
+      ],
+      "lines": 58
+    },
+    {
+      "file": "features/series/hooks/useSeries.ts",
+      "usedBy": "features/series/screens/SeriesListScreen.tsx",
+      "exports": [
+        "useSeries"
+      ],
+      "lines": 61
+    },
+    {
+      "file": "shared/components/ThumbnailProgressBar.tsx",
+      "usedBy": "shared/components/BookCard.tsx",
+      "exports": [
+        "ThumbnailProgressBar",
+        "ThumbnailProgressBar"
+      ],
+      "lines": 64
+    },
+    {
+      "file": "core/constants/performanceBudgets.ts",
+      "usedBy": "core/hooks/useScreenLoadTime.ts",
+      "exports": [
+        "PERFORMANCE_BUDGETS",
+        "PerformanceBudgets"
+      ],
+      "lines": 71
+    },
+    {
+      "file": "features/narrator/services/narratorAdapter.ts",
+      "usedBy": "features/narrator/components/NarratorCard.tsx",
+      "exports": [
+        "NarratorInfo",
+        "extractNarrators",
+        "sortNarrators",
+        "filterNarrators"
+      ],
+      "lines": 75
+    },
+    {
+      "file": "features/home/components/EmptySection.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "EmptySection"
+      ],
+      "lines": 76
+    },
+    {
+      "file": "features/user/types.ts",
+      "usedBy": "features/user/hooks/useFavorites.ts",
+      "exports": [
+        "FavoriteItem",
+        "Collection",
+        "CollectionWithItems",
+        "CollectionItem",
+        "ListeningHistory",
+        "ItemProgress",
+        "ContinueListeningItem"
+      ],
+      "lines": 77
+    },
+    {
+      "file": "core/api/endpoints/user.ts",
+      "usedBy": "core/api/offlineApi.ts",
+      "exports": [
+        "userApi"
+      ],
+      "lines": 79
+    },
+    {
+      "file": "features/player/utils.ts",
+      "usedBy": "features/player/panels/ChaptersPanel.tsx",
+      "exports": [
+        "formatTime",
+        "formatDelta",
+        "formatSleepTimer",
+        "isColorLight",
+        "hexToRgb",
+        "getColorSaturation",
+        "pickMostSaturated",
+        "getTitleFontSize"
+      ],
+      "lines": 82
+    },
+    {
+      "file": "features/search/hooks/useAllLibraryItems.ts",
+      "usedBy": "features/recommendations/screens/PreferencesOnboardingScreen.tsx",
+      "exports": [
+        "useAllLibraryItems"
+      ],
+      "lines": 83
+    },
+    {
+      "file": "features/automotive/androidAutoBridge.ts",
+      "usedBy": "features/automotive/automotiveService.ts",
+      "exports": [],
+      "lines": 93
+    },
+    {
+      "file": "features/home/components/CoverArtwork.tsx",
+      "usedBy": "features/player/components/PlayerModule.tsx",
+      "exports": [
+        "CoverArtwork"
+      ],
+      "lines": 93
+    },
+    {
+      "file": "core/api/endpoints/collections.ts",
+      "usedBy": "core/api/offlineApi.ts",
+      "exports": [
+        "collectionsApi"
+      ],
+      "lines": 95
+    },
+    {
+      "file": "shared/hooks/useImageColors.ts",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "ImageColors",
+        "useImageColors",
+        "useImageColors"
+      ],
+      "lines": 101
+    },
+    {
+      "file": "core/errors/errorMessages.ts",
+      "usedBy": "core/errors/errorService.ts",
+      "exports": [
+        "errorMessages",
+        "getUserMessage",
+        "recoveryMessages",
+        "getRecoveryMessage",
+        "categoryMessages",
+        "getCategoryMessage"
+      ],
+      "lines": 109
+    },
+    {
+      "file": "features/home/components/HomeHeader.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "HomeHeader",
+        "HomeHeader"
+      ],
+      "lines": 118
+    },
+    {
+      "file": "core/hooks/useSyncStatus.ts",
+      "usedBy": "shared/components/SyncStatusBadge.tsx",
+      "exports": [
+        "SyncStatus",
+        "useSyncStatus"
+      ],
+      "lines": 123
+    },
+    {
+      "file": "shared/components/ProgressDots.tsx",
+      "usedBy": "shared/components/SeriesProgressBadge.tsx",
+      "exports": [
+        "ProgressDots",
+        "ProgressDots"
+      ],
+      "lines": 139
+    },
+    {
+      "file": "core/api/endpoints.ts",
+      "usedBy": "core/api/apiClient.ts",
+      "exports": [
+        "endpoints",
+        "buildQueryString"
+      ],
+      "lines": 142
+    },
+    {
+      "file": "features/player/services/shakeDetector.ts",
+      "usedBy": "features/player/stores/playerStore.ts",
+      "exports": [
+        "shakeDetector"
+      ],
+      "lines": 144
+    },
+    {
+      "file": "features/player/services/progressService.ts",
+      "usedBy": "features/player/stores/playerStore.ts",
+      "exports": [
+        "progressService"
+      ],
+      "lines": 153
+    },
+    {
+      "file": "core/utils/seriesUtils.ts",
+      "usedBy": "features/player/stores/playerStore.ts",
+      "exports": [
+        "SeriesInfo",
+        "getSeriesInfo",
+        "findNextInSeries",
+        "getSeriesBooks"
+      ],
+      "lines": 158
+    },
+    {
+      "file": "features/user/hooks/useFavorites.ts",
+      "usedBy": "features/user/components/FavoriteButton.tsx",
+      "exports": [
+        "useFavorites",
+        "useIsFavorite",
+        "useToggleFavorite",
+        "useAddFavorite",
+        "useRemoveFavorite",
+        "useFavoritesCount"
+      ],
+      "lines": 160
+    },
+    {
+      "file": "features/home/components/PlaybackControls.tsx",
+      "usedBy": "features/player/components/PlayerModule.tsx",
+      "exports": [
+        "PlaybackControls"
+      ],
+      "lines": 162
+    },
+    {
+      "file": "features/library/components/StorageSummary.tsx",
+      "usedBy": "features/library/screens/MyLibraryScreen.tsx",
+      "exports": [
+        "StorageSummary"
+      ],
+      "lines": 163
+    },
+    {
+      "file": "features/library/components/LibraryEmptyState.tsx",
+      "usedBy": "features/library/screens/MyLibraryScreen.tsx",
+      "exports": [
+        "LibraryEmptyState",
+        "LibraryEmptyState"
+      ],
+      "lines": 166
+    },
+    {
+      "file": "features/search/utils/fuzzySearch.ts",
+      "usedBy": "features/search/screens/SearchScreen.tsx",
+      "exports": [
+        "levenshteinDistance",
+        "similarityScore",
+        "fuzzyMatch",
+        "findSuggestions",
+        "phoneticKey",
+        "phoneticMatch",
+        "expandAbbreviations"
+      ],
+      "lines": 168
+    },
+    {
+      "file": "features/home/components/HomePillsRow.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "HomePillsRow",
+        "HomePillsRow"
+      ],
+      "lines": 171
+    },
+    {
+      "file": "features/completion/stores/completionStore.ts",
+      "usedBy": "features/completion/components/CompleteBadge.tsx",
+      "exports": [
+        "useCompletionStore",
+        "useIsComplete",
+        "useMarkComplete",
+        "useMarkIncomplete",
+        "useToggleComplete"
+      ],
+      "lines": 173
+    },
+    {
+      "file": "features/mood-discovery/components/MoodBookCard.tsx",
+      "usedBy": "features/mood-discovery/screens/MoodResultsScreen.tsx",
+      "exports": [
+        "MoodBookCard"
+      ],
+      "lines": 174
+    },
+    {
+      "file": "shared/hooks/useResponsive.ts",
+      "usedBy": "features/home/components/HomeMiniPlayer.tsx",
+      "exports": [
+        "LAYOUT",
+        "DIMENSIONS",
+        "TYPOGRAPHY",
+        "SPACING",
+        "COLORS",
+        "useResponsive",
+        "scale",
+        "wp",
+        "hp",
+        "verticalScale",
+        "moderateScale",
+        "DESIGN_WIDTH",
+        "DESIGN_HEIGHT",
+        "spacing",
+        "layout",
+        "radius",
+        "elevation",
+        "colors",
+        "typography",
+        "fontSize",
+        "sizes",
+        "coverSizes",
+        "iconSizes",
+        "formatDuration",
+        "formatProgress",
+        "useResponsive"
+      ],
+      "lines": 175
+    },
+    {
+      "file": "features/library/components/SortPicker.tsx",
+      "usedBy": "features/library/screens/MyLibraryScreen.tsx",
+      "exports": [
+        "SortOption",
+        "SortPicker"
+      ],
+      "lines": 187
+    },
+    {
+      "file": "core/errors/components/ErrorToast.tsx",
+      "usedBy": "core/errors/components/ErrorProvider.tsx",
+      "exports": [
+        "ErrorToast"
+      ],
+      "lines": 187
+    },
+    {
+      "file": "features/home/components/ContinueListeningSection.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "ContinueListeningSection",
+        "ContinueListeningSection"
+      ],
+      "lines": 204
+    },
+    {
+      "file": "core/api/errors.ts",
+      "usedBy": "core/api/offlineApi.ts",
+      "exports": [
+        "ApiError",
+        "NetworkError",
+        "AuthenticationError",
+        "AuthorizationError",
+        "NotFoundError",
+        "ValidationError",
+        "ServerError",
+        "TimeoutError",
+        "CancelledError",
+        "OfflineError",
+        "isApiError",
+        "isNetworkError",
+        "isAuthError",
+        "isTimeoutError",
+        "isOfflineError",
+        "ErrorCodes",
+        "ErrorCode"
+      ],
+      "lines": 205
+    },
+    {
+      "file": "features/queue/components/SwipeableQueueItem.tsx",
+      "usedBy": "features/queue/screens/QueueScreen.tsx",
+      "exports": [
+        "SwipeableQueueItem",
+        "SwipeableQueueItem"
+      ],
+      "lines": 222
+    },
+    {
+      "file": "features/book-detail/components/SeriesNavigator.tsx",
+      "usedBy": "features/book-detail/screens/BookDetailScreen.tsx",
+      "exports": [
+        "SeriesNavigator"
+      ],
+      "lines": 227
+    },
+    {
+      "file": "features/player/utils/chapterUtils.ts",
+      "usedBy": "features/player/hooks/useRobustSeekControl.ts",
+      "exports": [
+        "findChapterIndex",
+        "detectChapterCrossing",
+        "detectAllChapterCrossings",
+        "calculatePrevChapterPosition",
+        "calculateNextChapterPosition",
+        "clampPosition",
+        "isAtStart",
+        "isAtEnd",
+        "calculateSeekPosition",
+        "getChapterProgress"
+      ],
+      "lines": 242
+    },
+    {
+      "file": "features/home/homeDesign.ts",
+      "usedBy": "features/home/homeDesign.ts",
+      "exports": [
+        "COLORS",
+        "PROPORTIONS",
+        "DIMENSIONS",
+        "TYPOGRAPHY",
+        "SHADOWS",
+        "GLASS_LAYERS",
+        "ICON_PATHS",
+        "ANIMATION",
+        "LAYOUT"
+      ],
+      "lines": 244
+    },
+    {
+      "file": "features/recommendations/hooks/useRecommendations.ts",
+      "usedBy": "features/discover/hooks/useDiscoverData.ts",
+      "exports": [
+        "useRecommendations"
+      ],
+      "lines": 245
+    },
+    {
+      "file": "features/mood-discovery/components/QuickTuneBar.tsx",
+      "usedBy": "features/mood-discovery/screens/MoodResultsScreen.tsx",
+      "exports": [
+        "QuickTuneBar"
+      ],
+      "lines": 264
+    },
+    {
+      "file": "features/home/components/RecentlyAddedSection.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "RecentlyAddedSection",
+        "RecentlyAddedSection"
+      ],
+      "lines": 269
+    },
+    {
+      "file": "shared/components/CassetteRefreshControl.tsx",
+      "usedBy": "shared/components/CassetteRefreshView.tsx",
+      "exports": [
+        "CassetteRefreshControl",
+        "useCassetteRefresh"
+      ],
+      "lines": 272
+    },
+    {
+      "file": "core/api/baseClient.ts",
+      "usedBy": "core/api/apiClient.ts",
+      "exports": [
+        "BaseApiClient"
+      ],
+      "lines": 277
+    },
+    {
+      "file": "features/user/hooks/useCollectionMutations.ts",
+      "usedBy": "features/user/components/AddToCollectionButton.tsx",
+      "exports": [
+        "useCreateCollection",
+        "useAddToCollection",
+        "useRemoveFromCollection",
+        "useDeleteCollection",
+        "useUpdateCollection"
+      ],
+      "lines": 279
+    },
+    {
+      "file": "core/errors/components/ErrorSheet.tsx",
+      "usedBy": "core/errors/components/ErrorProvider.tsx",
+      "exports": [
+        "ErrorSheet"
+      ],
+      "lines": 292
+    },
+    {
+      "file": "features/book-detail/components/OverviewTab.tsx",
+      "usedBy": "features/book-detail/screens/BookDetailScreen.tsx",
+      "exports": [
+        "OverviewTab"
+      ],
+      "lines": 295
+    },
+    {
+      "file": "features/home/components/HomeDiscSection.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "HomeDiscSection",
+        "HomeDiscSection"
+      ],
+      "lines": 298
+    },
+    {
+      "file": "features/stats/components/ShareStatsCard.tsx",
+      "usedBy": "features/stats/screens/StatsScreen.tsx",
+      "exports": [
+        "ShareStatsCard"
+      ],
+      "lines": 299
+    },
+    {
+      "file": "features/home/components/YourSeriesSection.tsx",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "YourSeriesSection",
+        "YourSeriesSection"
+      ],
+      "lines": 301
+    },
+    {
+      "file": "features/stats/services/shareService.ts",
+      "usedBy": "features/stats/components/ShareStatsCard.tsx",
+      "exports": [
+        "BookProgress",
+        "ShareableStats",
+        "generateProgressShareText",
+        "generateCompletedShareText",
+        "generateStreakShareText",
+        "generateMilestoneShareText"
+      ],
+      "lines": 306
+    },
+    {
+      "file": "features/library/components/ContinueListeningHero.tsx",
+      "usedBy": "features/library/screens/MyLibraryScreen.tsx",
+      "exports": [
+        "ContinueListeningHero",
+        "ContinueListeningHero"
+      ],
+      "lines": 319
+    },
+    {
+      "file": "features/player/components/PlayerModule.tsx",
+      "usedBy": "features/home/components/NowPlayingCard.tsx",
+      "exports": [
+        "PlayerModuleProgress",
+        "PlayerModuleProps",
+        "PlayerModule"
+      ],
+      "lines": 319
+    },
+    {
+      "file": "features/home/components/InfoTiles.tsx",
+      "usedBy": "features/player/components/PlayerModule.tsx",
+      "exports": [
+        "InfoTiles"
+      ],
+      "lines": 325
+    },
+    {
+      "file": "features/downloads/components/DownloadItem.tsx",
+      "usedBy": "features/library/screens/MyLibraryScreen.tsx",
+      "exports": [
+        "DownloadItem"
+      ],
+      "lines": 331
+    },
+    {
+      "file": "features/book-detail/components/ChaptersTab.tsx",
+      "usedBy": "features/book-detail/screens/BookDetailScreen.tsx",
+      "exports": [
+        "ChaptersTab"
+      ],
+      "lines": 362
+    },
+    {
+      "file": "features/series/components/SeriesCard.tsx",
+      "usedBy": "features/series/screens/SeriesListScreen.tsx",
+      "exports": [
+        "SeriesCard"
+      ],
+      "lines": 368
+    },
+    {
+      "file": "features/series/components/BatchActionButtons.tsx",
+      "usedBy": "features/series/screens/SeriesDetailScreen.tsx",
+      "exports": [
+        "BatchActionButtons"
+      ],
+      "lines": 371
+    },
+    {
+      "file": "core/services/waveformService.ts",
+      "usedBy": "core/services/downloadManager.ts",
+      "exports": [
+        "WaveformData",
+        "ChapterWaveform",
+        "waveformService"
+      ],
+      "lines": 371
+    },
+    {
+      "file": "features/library/components/GenreSections.tsx",
+      "usedBy": "features/library/screens/GenresListScreen.tsx",
+      "exports": [
+        "MetaCategorySection",
+        "YourGenresSection",
+        "PopularGenresSection",
+        "AlphabetIndex",
+        "SectionStickyHeader"
+      ],
+      "lines": 389
+    },
+    {
+      "file": "features/home/hooks/useHomeData.ts",
+      "usedBy": "features/home/screens/HomeScreen.tsx",
+      "exports": [
+        "useHomeData"
+      ],
+      "lines": 412
+    },
+    {
+      "file": "core/api/networkOptimizer.ts",
+      "usedBy": "core/api/baseClient.ts",
+      "exports": [
+        "networkOptimizer",
+        "withRetry",
+        "ResponseCache",
+        "RequestDeduplicator",
+        "RequestQueue"
+      ],
+      "lines": 417
+    },
+    {
+      "file": "shared/animation/hooks.ts",
+      "usedBy": "shared/animation/AnimatedPressable.tsx",
+      "exports": [
+        "useReduceMotion",
+        "useAccessibleAnimation",
+        "usePressAnimation",
+        "useBounceAnimation",
+        "useFadeAnimation",
+        "useSlideAnimation"
+      ],
+      "lines": 425
+    },
+    {
+      "file": "features/series/components/SeriesBookRow.tsx",
+      "usedBy": "features/series/screens/SeriesDetailScreen.tsx",
+      "exports": [
+        "SeriesBookRow"
+      ],
+      "lines": 442
+    },
+    {
+      "file": "features/automotive/automotiveService.ts",
+      "usedBy": "features/automotive/useAutomotive.ts",
+      "exports": [
+        "automotiveService"
+      ],
+      "lines": 553
+    },
+    {
+      "file": "features/series/components/SeriesProgressHeader.tsx",
+      "usedBy": "features/series/screens/SeriesDetailScreen.tsx",
+      "exports": [
+        "SeriesProgressHeader"
+      ],
+      "lines": 591
+    },
+    {
+      "file": "features/home/components/CassettePlayer.tsx",
+      "usedBy": "features/home/screens/CassetteTestScreen.tsx",
+      "exports": [
+        "CassettePlayer"
+      ],
+      "lines": 691
+    },
+    {
+      "file": "shared/components/CoverPlayButton.tsx",
+      "usedBy": "features/player/screens/CDPlayerScreen.tsx",
+      "exports": [
+        "JogState",
+        "CoverPlayButton",
+        "CoverPlayButton"
+      ],
+      "lines": 840
+    }
+  ],
+  "orphanedFeatures": [
+    {
+      "feature": "auth",
+      "fileCount": 1,
+      "hasScreens": true,
+      "files": [
+        "features/auth/screens/LoginScreen.tsx"
+      ]
+    },
+    {
+      "feature": "automotive",
+      "fileCount": 4,
+      "hasScreens": false,
+      "files": [
+        "features/automotive/androidAutoBridge.ts",
+        "features/automotive/automotiveService.ts",
+        "features/automotive/types.ts",
+        "features/automotive/useAutomotive.ts"
+      ]
+    },
+    {
+      "feature": "browse",
+      "fileCount": 5,
+      "hasScreens": true,
+      "files": [
+        "features/browse/components/AuthorsListContent.tsx",
+        "features/browse/components/CollectionsListContent.tsx",
+        "features/browse/components/NarratorsListContent.tsx",
+        "features/browse/components/SeriesListContent.tsx",
+        "features/browse/screens/BrowseScreen.tsx"
+      ]
+    },
+    {
+      "feature": "completion",
+      "fileCount": 3,
+      "hasScreens": false,
+      "files": [
+        "features/completion/components/CompleteBadge.tsx",
+        "features/completion/components/CompletionCelebration.tsx",
+        "features/completion/stores/completionStore.ts"
+      ]
+    },
+    {
+      "feature": "discover",
+      "fileCount": 10,
+      "hasScreens": false,
+      "files": [
+        "features/discover/components/BrowsePills.tsx",
+        "features/discover/components/CategoryGrid.tsx",
+        "features/discover/components/ContentRowCarousel.tsx",
+        "features/discover/components/HeroSection.tsx",
+        "features/discover/components/MoodFilterPills.tsx",
+        "features/discover/components/PopularSeriesSection.tsx",
+        "features/discover/components/QuickFilterChips.tsx",
+        "features/discover/components/TopAuthorsSection.tsx",
+        "features/discover/hooks/useDiscoverData.ts",
+        "features/discover/types.ts"
+      ]
+    },
+    {
+      "feature": "narrator",
+      "fileCount": 4,
+      "hasScreens": true,
+      "files": [
+        "features/narrator/components/NarratorCard.tsx",
+        "features/narrator/hooks/useNarrators.ts",
+        "features/narrator/screens/NarratorDetailScreen.tsx",
+        "features/narrator/services/narratorAdapter.ts"
+      ]
+    },
+    {
+      "feature": "series",
+      "fileCount": 8,
+      "hasScreens": true,
+      "files": [
+        "features/series/components/BatchActionButtons.tsx",
+        "features/series/components/SeriesBookRow.tsx",
+        "features/series/components/SeriesCard.tsx",
+        "features/series/components/SeriesProgressHeader.tsx",
+        "features/series/hooks/useSeries.ts",
+        "features/series/screens/SeriesDetailScreen.tsx",
+        "features/series/screens/SeriesListScreen.tsx",
+        "features/series/services/seriesAdapter.ts"
+      ]
+    },
+    {
+      "feature": "stats",
+      "fileCount": 4,
+      "hasScreens": true,
+      "files": [
+        "features/stats/components/ShareStatsCard.tsx",
+        "features/stats/hooks/useListeningStats.ts",
+        "features/stats/screens/StatsScreen.tsx",
+        "features/stats/services/shareService.ts"
+      ]
+    },
+    {
+      "feature": "user",
+      "fileCount": 5,
+      "hasScreens": false,
+      "files": [
+        "features/user/components/AddToCollectionButton.tsx",
+        "features/user/components/FavoriteButton.tsx",
+        "features/user/hooks/useCollectionMutations.ts",
+        "features/user/hooks/useFavorites.ts",
+        "features/user/types.ts"
+      ]
+    }
+  ],
+  "orphanedTests": [],
+  "duplicateNames": [
+    {
+      "name": "types.ts",
+      "paths": [
+        "features/automotive/types.ts",
+        "features/discover/types.ts",
+        "features/home/types.ts",
+        "features/mood-discovery/types.ts",
+        "features/user/types.ts",
+        "shared/assets/svg/types.ts",
+        "core/errors/types.ts"
+      ]
+    },
+    {
+      "name": "SeriesCard.tsx",
+      "paths": [
+        "features/home/components/SeriesCard.tsx",
+        "features/series/components/SeriesCard.tsx"
+      ]
+    },
+    {
+      "name": "constants.ts",
+      "paths": [
+        "features/home/constants.ts",
+        "features/player/constants.ts"
+      ]
+    },
+    {
+      "name": "SeriesListScreen.tsx",
+      "paths": [
+        "features/library/screens/SeriesListScreen.tsx",
+        "features/series/screens/SeriesListScreen.tsx"
+      ]
+    },
+    {
+      "name": "metadata.ts",
+      "paths": [
+        "shared/utils/metadata.ts",
+        "core/types/metadata.ts"
+      ]
+    },
+    {
+      "name": "user.ts",
+      "paths": [
+        "core/api/endpoints/user.ts",
+        "core/types/user.ts"
+      ]
+    }
+  ],
+  "timestamp": "2025-12-17T07:41:25.759Z"
+}

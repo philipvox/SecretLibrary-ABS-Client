@@ -58,14 +58,8 @@ export type { RetryConfig, Priority } from './networkOptimizer';
 
 // Domain-specific APIs
 export {
-  authApi,
   userApi,
-  librariesApi,
-  itemsApi,
   collectionsApi,
-  seriesApi,
-  authorsApi,
-  playlistsApi,
 } from './endpoints';
 
 // Offline-aware API functions

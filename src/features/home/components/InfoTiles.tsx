@@ -151,6 +151,9 @@ export function InfoTiles({
           onPress={onChapterPress}
           disabled={!onChapterPress}
           activeOpacity={0.7}
+          accessibilityLabel={`Chapter ${chapterLine2}`}
+          accessibilityRole="button"
+          accessibilityHint="Double tap to view chapters"
         >
           <Text style={styles.chapterText}>{chapterLine1}</Text>
           <Text style={styles.chapterText}>{chapterLine2}</Text>
@@ -165,6 +168,10 @@ export function InfoTiles({
           onPress={onTimePress}
           disabled={!onTimePress}
           activeOpacity={0.7}
+          accessibilityLabel={isSeeking && seekDelta !== undefined && seekDelta !== 0
+            ? `Seeking ${formatSeekDelta(seekDelta)}`
+            : `Elapsed time ${timeRemaining || '00:00:00'}`}
+          accessibilityRole="button"
         >
           {isSeeking && seekDelta !== undefined && seekDelta !== 0 ? (
             <Text style={[styles.timeText, styles.seekDeltaText]}>
@@ -176,10 +183,22 @@ export function InfoTiles({
           {isPlaying && !isSeeking && <PixelPlayIcon />}
         </TouchableOpacity>
         <View style={styles.bottomRow}>
-          <TouchableOpacity onPress={onSpeedPress} disabled={!onSpeedPress}>
+          <TouchableOpacity
+            onPress={onSpeedPress}
+            disabled={!onSpeedPress}
+            accessibilityLabel={`Playback speed ${speedText}`}
+            accessibilityRole="button"
+            accessibilityHint="Double tap to change playback speed"
+          >
             <Text style={styles.speedText}>{speedText}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={onSleepPress} disabled={!onSleepPress}>
+          <TouchableOpacity
+            onPress={onSleepPress}
+            disabled={!onSleepPress}
+            accessibilityLabel={sleepTimerMinutes ? `Sleep timer ${sleepTimerText}` : 'Sleep timer off'}
+            accessibilityRole="button"
+            accessibilityHint="Double tap to set sleep timer"
+          >
             <Text style={styles.sleepTimerText}>{sleepTimerText}</Text>
           </TouchableOpacity>
         </View>

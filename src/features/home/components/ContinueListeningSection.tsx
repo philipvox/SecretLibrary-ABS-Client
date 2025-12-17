@@ -81,7 +81,9 @@ const ContinueListeningCard = ({
   onLongPress?: () => void;
 }) => {
   const coverUrl = apiClient.getItemCoverUrl(book.id);
-  const title = book.media?.metadata?.title || 'Unknown';
+  const metadata = book.media?.metadata as any;
+  const title = metadata?.title || 'Unknown';
+  const author = metadata?.authorName || metadata?.authors?.[0]?.name || '';
 
   return (
     <TouchableOpacity
@@ -89,6 +91,9 @@ const ContinueListeningCard = ({
       onPress={onPress}
       onLongPress={onLongPress}
       activeOpacity={0.9}
+      accessibilityLabel={author ? `${title} by ${author}` : title}
+      accessibilityRole="button"
+      accessibilityHint="Double tap to resume. Long press for details."
     >
       {/* Cover with play overlay */}
       <View style={styles.coverWrapper}>

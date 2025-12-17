@@ -206,6 +206,9 @@ const TabBar = React.memo(function TabBar({
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onTabChange(tab.id);
             }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={`${tab.label}${count > 0 ? `, ${count} items` : ''}`}
           >
             <Ionicons
               name={isActive ? (tab.icon.replace('-outline', '') as any) : (tab.icon as any)}
@@ -614,12 +617,20 @@ export function MyLibraryScreen() {
     const isCompleted = book.progress >= 0.95;
     const isDownloaded = book.isDownloaded || book.totalBytes > 0;
 
+    const progressText = book.progress > 0 && book.progress < 0.95
+      ? `, ${Math.round(book.progress * 100)}% complete`
+      : isCompleted ? ', completed' : '';
+    const downloadText = isDownloaded ? ', downloaded' : '';
+
     return (
       <TouchableOpacity
         key={book.id}
         style={styles.bookRow}
         onPress={() => handleBookPress(book.id)}
         activeOpacity={0.7}
+        accessibilityLabel={`${book.title} by ${book.author}${progressText}${downloadText}`}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to view book details"
       >
         <View style={styles.bookCoverContainer}>
           <Image source={coverUrl} style={styles.bookCover} contentFit="cover" />
@@ -655,6 +666,8 @@ export function MyLibraryScreen() {
           style={styles.playButton}
           onPress={() => handlePlayBook(book)}
           activeOpacity={0.7}
+          accessibilityLabel={`Play ${book.title}`}
+          accessibilityRole="button"
         >
           <Ionicons name="play" size={18} color="#000" />
         </TouchableOpacity>
@@ -673,6 +686,9 @@ export function MyLibraryScreen() {
         style={styles.personCard}
         onPress={() => navigation.navigate('AuthorDetail', { name: author.name })}
         activeOpacity={0.7}
+        accessibilityLabel={`${author.name}, ${bookCount} book${bookCount !== 1 ? 's' : ''}`}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to view author"
       >
         <View style={styles.personAvatar}>
           {author.imageUrl ? (
@@ -698,6 +714,9 @@ export function MyLibraryScreen() {
         style={styles.personCard}
         onPress={() => navigation.navigate('NarratorDetail', { name: narrator.name })}
         activeOpacity={0.7}
+        accessibilityLabel={`${narrator.name}, narrator, ${bookCount} book${bookCount !== 1 ? 's' : ''}`}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to view narrator"
       >
         <View style={styles.personAvatar}>
           <Ionicons name="mic" size={scale(24)} color={COLORS.textSecondary} />
@@ -723,6 +742,9 @@ export function MyLibraryScreen() {
         style={styles.favoriteSeriesCard}
         onPress={() => handleSeriesPress(series.name)}
         activeOpacity={0.7}
+        accessibilityLabel={`${series.name} series, ${bookCount} book${bookCount !== 1 ? 's' : ''}`}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to view series"
       >
         <View style={styles.seriesCoversContainer}>
           <StackedCovers
@@ -754,12 +776,19 @@ export function MyLibraryScreen() {
     // Get cover URLs for stacked display
     const coverUrls = series.books.slice(0, 3).map(book => apiClient.getItemCoverUrl(book.id));
 
+    const progressText = series.completedCount > 0
+      ? `${series.completedCount} of ${series.totalBooks} complete`
+      : `${series.downloadedCount} of ${series.totalBooks} downloaded`;
+
     return (
       <TouchableOpacity
         key={series.name}
         style={styles.seriesCard}
         onPress={() => handleSeriesPress(series.name)}
         activeOpacity={0.8}
+        accessibilityLabel={`${series.name} series, ${progressText}`}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to view series"
       >
         <View style={styles.seriesCoversContainer}>
           <StackedCovers
@@ -958,11 +987,15 @@ export function MyLibraryScreen() {
                 returnKeyType="search"
                 autoCapitalize="none"
                 autoCorrect={false}
+                accessibilityLabel="Search your library"
+                accessibilityHint="Enter book title, author, or series name"
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity
                   onPress={() => setSearchQuery('')}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityLabel="Clear search"
+                  accessibilityRole="button"
                 >
                   <Ionicons name="close-circle" size={scale(18)} color={COLORS.textSecondary} />
                 </TouchableOpacity>

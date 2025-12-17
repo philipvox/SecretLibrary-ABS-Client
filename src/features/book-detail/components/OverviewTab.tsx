@@ -90,7 +90,11 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
         <View style={styles.descriptionSection}>
           <Text style={styles.description}>{displayDescription}</Text>
           {needsExpansion && (
-            <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)}>
+            <TouchableOpacity
+              onPress={() => setIsExpanded(!isExpanded)}
+              accessibilityLabel={isExpanded ? 'Read less' : 'Read more'}
+              accessibilityRole="button"
+            >
               <Text style={styles.readMore}>{isExpanded ? 'Read Less' : 'Read More'}</Text>
             </TouchableOpacity>
           )}
@@ -114,6 +118,9 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
                   style={styles.chip}
                   onPress={() => handleAuthorPress(author)}
                   activeOpacity={0.7}
+                  accessibilityLabel={`Author: ${author}`}
+                  accessibilityRole="button"
+                  accessibilityHint="Double tap to view author details"
                 >
                   <Text style={styles.chipText}>{author}</Text>
                 </TouchableOpacity>
@@ -133,6 +140,9 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
                   style={styles.chip}
                   onPress={() => handleNarratorPress(narrator)}
                   activeOpacity={0.7}
+                  accessibilityLabel={`Narrator: ${narrator}`}
+                  accessibilityRole="button"
+                  accessibilityHint="Double tap to view narrator details"
                 >
                   <Text style={styles.chipText}>{narrator}</Text>
                 </TouchableOpacity>
@@ -149,6 +159,9 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
               style={styles.chip}
               onPress={handleSeriesPress}
               activeOpacity={0.7}
+              accessibilityLabel={`Series: ${seriesName}`}
+              accessibilityRole="button"
+              accessibilityHint="Double tap to view series details"
             >
               <Text style={styles.chipText}>{seriesName}</Text>
             </TouchableOpacity>
@@ -166,6 +179,9 @@ export function OverviewTab({ book, showFullDetails = false }: OverviewTabProps)
                   style={[styles.chip, styles.genreChip]}
                   onPress={() => handleGenrePress(genre)}
                   activeOpacity={0.7}
+                  accessibilityLabel={`Genre: ${genre}`}
+                  accessibilityRole="button"
+                  accessibilityHint="Double tap to view books in this genre"
                 >
                   <Text style={styles.genreChipText}>#{genre.toLowerCase()}</Text>
                 </TouchableOpacity>

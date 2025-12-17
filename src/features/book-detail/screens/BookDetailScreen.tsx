@@ -337,7 +337,12 @@ export function BookDetailScreen() {
 
       {/* Back button - minimal header */}
       <View style={[styles.header, { paddingTop: insets.top + TOP_NAV_HEIGHT + 8 }]}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerSpacer} />
@@ -356,6 +361,9 @@ export function BookDetailScreen() {
                 key={idx}
                 onPress={() => (navigation as any).navigate('GenreDetail', { genreName: genre })}
                 activeOpacity={0.7}
+                accessibilityLabel={`Genre: ${genre}`}
+                accessibilityRole="button"
+                accessibilityHint="Double tap to view books in this genre"
               >
                 <Text style={styles.genreTag}>{genre}</Text>
               </TouchableOpacity>
@@ -377,6 +385,9 @@ export function BookDetailScreen() {
                 (navigation as any).navigate('AuthorDetail', { authorName: firstAuthor });
               }}
               activeOpacity={0.7}
+              accessibilityLabel={`Author: ${author}`}
+              accessibilityRole="button"
+              accessibilityHint="Double tap to view author details"
             >
               <Text style={styles.creditName} numberOfLines={1}>{author}</Text>
             </TouchableOpacity>
@@ -392,6 +403,9 @@ export function BookDetailScreen() {
                   (navigation as any).navigate('NarratorDetail', { narratorName: firstNarrator });
                 }}
                 activeOpacity={0.7}
+                accessibilityLabel={`Narrator: ${narrator}`}
+                accessibilityRole="button"
+                accessibilityHint="Double tap to view narrator details"
               >
                 <Text style={styles.creditName} numberOfLines={1}>{narrator}</Text>
               </TouchableOpacity>
@@ -414,6 +428,9 @@ export function BookDetailScreen() {
               style={styles.pillButton}
               onPress={handleDownloadPress}
               activeOpacity={0.7}
+              accessibilityLabel={isPending ? 'Download preparing' : isPaused ? `Download paused at ${Math.round(downloadProgress * 100)}%` : `Downloading ${Math.round(downloadProgress * 100)}%`}
+              accessibilityRole="button"
+              accessibilityHint={isPaused ? 'Double tap to resume download' : 'Double tap to pause download'}
             >
               <View style={styles.downloadProgressContainer}>
                 <View style={styles.downloadProgressRow}>
@@ -438,6 +455,9 @@ export function BookDetailScreen() {
               style={[styles.pillButton, isDownloaded && styles.pillButtonDownloaded]}
               onPress={handleDownloadPress}
               activeOpacity={0.7}
+              accessibilityLabel={isDownloaded ? 'Downloaded' : 'Download'}
+              accessibilityRole="button"
+              accessibilityHint={isDownloaded ? 'Double tap to delete download' : 'Double tap to download for offline listening'}
             >
               <Ionicons
                 name={isDownloaded ? 'checkmark-circle' : 'arrow-down-outline'}
@@ -455,6 +475,9 @@ export function BookDetailScreen() {
             style={[styles.pillButton, styles.pillButtonPrimary]}
             onPress={handlePlayPress}
             activeOpacity={0.7}
+            accessibilityLabel={playContent.text}
+            accessibilityRole="button"
+            accessibilityHint={isThisBookPlaying ? 'Double tap to pause' : 'Double tap to play'}
           >
             <Ionicons name={playContent.icon} size={scale(18)} color="#000" />
             <Text style={styles.pillButtonTextDark}>{playContent.text}</Text>
@@ -472,6 +495,9 @@ export function BookDetailScreen() {
             style={styles.infoItem}
             onPress={() => setActiveTab('chapters')}
             activeOpacity={0.7}
+            accessibilityLabel={`${chapters.length} chapters`}
+            accessibilityRole="button"
+            accessibilityHint="Double tap to view chapters"
           >
             <Ionicons name="list-outline" size={scale(16)} color="rgba(255,255,255,0.5)" />
             <Text style={styles.infoText}>{chapters.length} Chapters</Text>
@@ -497,6 +523,9 @@ export function BookDetailScreen() {
             <TouchableOpacity
               style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
               onPress={() => setActiveTab('overview')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'overview' }}
+              accessibilityLabel="Overview"
             >
               <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>
                 Overview
@@ -505,6 +534,9 @@ export function BookDetailScreen() {
             <TouchableOpacity
               style={[styles.tab, activeTab === 'chapters' && styles.tabActive]}
               onPress={() => setActiveTab('chapters')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'chapters' }}
+              accessibilityLabel="Chapters"
             >
               <Text style={[styles.tabText, activeTab === 'chapters' && styles.tabTextActive]}>
                 Chapters
@@ -524,6 +556,9 @@ export function BookDetailScreen() {
               }
             }}
             activeOpacity={0.7}
+            accessibilityLabel={isInQueue ? `In queue at position ${queuePosition}` : 'Add to queue'}
+            accessibilityRole="button"
+            accessibilityHint={isInQueue ? 'Double tap to remove from queue' : 'Double tap to add to queue'}
           >
             <Text style={[styles.addToQueueText, isInQueue && styles.addToQueueTextActive]}>
               {isInQueue ? `In Queue #${queuePosition}` : 'Add to Queue'}

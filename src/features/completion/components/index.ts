@@ -3,4 +3,3 @@
  */
 
 export { CompleteBadge, CompleteBadgeOverlay, CompleteBanner } from './CompleteBadge';
-export { CompletionCelebration } from './CompletionCelebration';

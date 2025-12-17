@@ -42,6 +42,10 @@ interface HomeDiscSectionProps {
   playbackRate?: number;
   /** Callback when disc is pressed */
   onPress: () => void;
+  /** Book title for accessibility */
+  bookTitle?: string;
+  /** Author name for accessibility */
+  authorName?: string;
 }
 
 /**
@@ -115,6 +119,8 @@ export function HomeDiscSection({
   isPlaying,
   playbackRate = 1,
   onPress,
+  bookTitle,
+  authorName,
 }: HomeDiscSectionProps) {
   const scaleAnim = useSharedValue(1);
 
@@ -150,6 +156,11 @@ export function HomeDiscSection({
             easing: EASING.decelerate,
           });
         }}
+        accessibilityLabel={bookTitle && authorName
+          ? `${bookTitle} by ${authorName}${isPlaying ? ', currently playing' : ''}`
+          : isPlaying ? 'Now playing' : 'Open player'}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to open full player"
       >
         <Animated.View style={animatedStyle}>
           <CDDisc

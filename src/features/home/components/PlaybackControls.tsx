@@ -89,6 +89,9 @@ export function PlaybackControls({
         disabled={controlsDisabled}
         activeOpacity={0.7}
         style={[styles.button, controlsDisabled && styles.disabled]}
+        accessibilityLabel="Skip backward"
+        accessibilityRole="button"
+        accessibilityHint="Double tap to skip back. Long press for continuous rewind."
       >
         <Ionicons name="play-back" size={iconSize} color={controlsDisabled ? colors.textMuted : colors.textPrimary} />
       </TouchableOpacity>
@@ -101,6 +104,9 @@ export function PlaybackControls({
         disabled={controlsDisabled}
         activeOpacity={0.7}
         style={[styles.button, controlsDisabled && styles.disabled]}
+        accessibilityLabel="Skip forward"
+        accessibilityRole="button"
+        accessibilityHint="Double tap to skip forward. Long press for continuous fast forward."
       >
         <Ionicons name="play-forward" size={iconSize} color={controlsDisabled ? colors.textMuted : colors.textPrimary} />
       </TouchableOpacity>
@@ -111,6 +117,9 @@ export function PlaybackControls({
         disabled={controlsDisabled}
         activeOpacity={0.7}
         style={styles.playButton}
+        accessibilityLabel={isLoading ? 'Loading' : isPlaying ? 'Pause' : 'Play'}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: controlsDisabled }}
       >
         {isLoading ? (
           <ActivityIndicator size={playIconSize} color={colors.accent} />

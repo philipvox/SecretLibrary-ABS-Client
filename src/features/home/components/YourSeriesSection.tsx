@@ -121,11 +121,18 @@ const SeriesRow = ({
   const hasProgress = series.booksCompleted > 0 || series.booksInProgress > 0;
   const isComplete = series.booksCompleted === series.totalBooks && series.totalBooks > 0;
 
+  const progressText = hasProgress
+    ? `${series.booksCompleted} of ${series.totalBooks} books complete${timeText ? `, ${timeText}` : ''}`
+    : `${series.totalBooks} ${series.totalBooks === 1 ? 'book' : 'books'}`;
+
   return (
     <TouchableOpacity
       style={[styles.row, !isFirst && styles.rowWithGap]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityLabel={`${series.name}${author ? ` by ${author}` : ''}, ${progressText}`}
+      accessibilityRole="button"
+      accessibilityHint="Double tap to view series"
     >
       {/* Stacked covers */}
       <View style={styles.coverContainer}>

@@ -100,7 +100,14 @@ const SeriesCard = React.memo(function SeriesCard({
     : 0;
 
   return (
-    <TouchableOpacity style={styles.seriesCard} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={styles.seriesCard}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityLabel={`${title}, ${series.bookCount} books`}
+      accessibilityRole="button"
+      accessibilityHint="Double tap to view series"
+    >
       <View style={styles.seriesStackContainer}>
         {/* Render stacked covers - back to front horizontally */}
         {bookCovers.map((coverUrl, idx) => (
@@ -543,7 +550,12 @@ export function SearchScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + TOP_NAV_HEIGHT + 10 }]}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBack}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Icon name="chevron-back" size={24} color="#FFFFFF" set="ionicons" />
         </TouchableOpacity>
 
@@ -566,9 +578,16 @@ export function SearchScreen() {
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
+            accessibilityLabel="Search"
+            accessibilityHint="Search books, authors, series, or narrators"
           />
           {(query.length > 0 || activeFilterCount > 0) && (
-            <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
+            <TouchableOpacity
+              onPress={handleClear}
+              style={styles.clearButton}
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
               <Icon name="close-circle" size={18} color="rgba(255,255,255,0.5)" set="ionicons" />
             </TouchableOpacity>
           )}
@@ -577,6 +596,9 @@ export function SearchScreen() {
         <TouchableOpacity
           style={[styles.filterButton, showFilters && styles.filterButtonActive]}
           onPress={() => setShowFilters(!showFilters)}
+          accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showFilters }}
         >
           <Icon name="options" size={20} color={showFilters ? '#000' : '#FFF'} set="ionicons" />
           {activeFilterCount > 0 && (
@@ -596,6 +618,9 @@ export function SearchScreen() {
                 key={tab}
                 style={[styles.filterTab, activeFilterTab === tab && styles.filterTabActive]}
                 onPress={() => setActiveFilterTab(tab)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: activeFilterTab === tab }}
+                accessibilityLabel={tab.charAt(0).toUpperCase() + tab.slice(1)}
               >
                 <Text style={[styles.filterTabText, activeFilterTab === tab && styles.filterTabTextActive]}>
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -717,6 +742,9 @@ export function SearchScreen() {
                     key={book.id}
                     style={styles.autocompleteItem}
                     onPress={() => handleAutocompleteBook(book.id)}
+                    accessibilityLabel={`${book.title} by ${book.author}, ${book.duration}`}
+                    accessibilityRole="button"
+                    accessibilityHint="Double tap to view book"
                   >
                     <View style={styles.autocompleteItemContent}>
                       <Text style={styles.autocompleteTitle} numberOfLines={1}>{book.title}</Text>
@@ -737,6 +765,9 @@ export function SearchScreen() {
                     key={author.name}
                     style={styles.autocompleteItem}
                     onPress={() => handleAutocompleteAuthor(author.name)}
+                    accessibilityLabel={`Author: ${author.name}, ${author.bookCount} books`}
+                    accessibilityRole="button"
+                    accessibilityHint="Double tap to view author"
                   >
                     <View style={styles.autocompleteItemContent}>
                       <Text style={styles.autocompleteTitle}>{author.name}</Text>
@@ -757,6 +788,9 @@ export function SearchScreen() {
                     key={series.name}
                     style={styles.autocompleteItem}
                     onPress={() => handleAutocompleteSeries(series.name)}
+                    accessibilityLabel={`Series: ${series.name}, ${series.bookCount} books`}
+                    accessibilityRole="button"
+                    accessibilityHint="Double tap to view series"
                   >
                     <View style={styles.autocompleteItemContent}>
                       <Text style={styles.autocompleteTitle}>{series.name}</Text>
@@ -777,6 +811,9 @@ export function SearchScreen() {
                     key={narrator.name}
                     style={styles.autocompleteItem}
                     onPress={() => handleAutocompleteNarrator(narrator.name)}
+                    accessibilityLabel={`Narrator: ${narrator.name}, ${narrator.bookCount} books`}
+                    accessibilityRole="button"
+                    accessibilityHint="Double tap to view narrator"
                   >
                     <View style={styles.autocompleteItemContent}>
                       <Text style={styles.autocompleteTitle}>{narrator.name}</Text>
@@ -996,6 +1033,9 @@ export function SearchScreen() {
                   key={author.name}
                   style={styles.entityItem}
                   onPress={() => handleAuthorPress(author.name)}
+                  accessibilityLabel={`${author.name}, ${author.bookCount} books`}
+                  accessibilityRole="button"
+                  accessibilityHint="Double tap to view author"
                 >
                   <View style={[styles.entityAvatar, { backgroundColor: ACCENT }]}>
                     <Text style={styles.entityAvatarText}>{getInitials(author.name)}</Text>
@@ -1028,6 +1068,9 @@ export function SearchScreen() {
                   key={narrator.name}
                   style={styles.entityItem}
                   onPress={() => handleNarratorPress(narrator.name)}
+                  accessibilityLabel={`${narrator.name}, ${narrator.bookCount} books narrated`}
+                  accessibilityRole="button"
+                  accessibilityHint="Double tap to view narrator"
                 >
                   <View style={[styles.entityAvatar, { backgroundColor: '#4A90D9' }]}>
                     <Text style={styles.entityAvatarText}>{getInitials(narrator.name)}</Text>

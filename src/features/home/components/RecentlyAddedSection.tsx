@@ -103,6 +103,9 @@ const BookRow = ({
       style={[styles.row, !isFirst && styles.rowWithGap]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityLabel={`${title}${author ? ` by ${author}` : ''}${duration ? `, ${duration}` : ''}`}
+      accessibilityRole="button"
+      accessibilityHint="Double tap to view book details"
     >
       {/* Cover thumbnail */}
       <Image
@@ -133,6 +136,8 @@ const BookRow = ({
           onPlayPress();
         }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityLabel={`Play ${title}`}
+        accessibilityRole="button"
       >
         <View style={styles.playCircle}>
           <Ionicons name="play" size={wp(3)} color="#fff" style={{ marginLeft: 2 }} />
@@ -147,6 +152,8 @@ const BookRow = ({
           onMorePress?.();
         }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityLabel={`More options for ${title}`}
+        accessibilityRole="button"
       >
         <Ionicons name="ellipsis-vertical" size={wp(5)} color="rgba(255,255,255,0.7)" />
       </TouchableOpacity>

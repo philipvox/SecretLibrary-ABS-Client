@@ -24,9 +24,6 @@ export {
 } from './stores/moodSessionStore';
 
 // Components
-export { VibeSelector } from './components/VibeSelector';
-export { LengthSlider } from './components/LengthSlider';
-export { WorldSelector } from './components/WorldSelector';
 export { QuickTuneBar } from './components/QuickTuneBar';
 export { MoodBookCard } from './components/MoodBookCard';
 export { MoodDiscoveryCard } from './components/MoodDiscoveryCard';

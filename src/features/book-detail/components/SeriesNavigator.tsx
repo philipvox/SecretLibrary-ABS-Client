@@ -123,6 +123,10 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
         onPress={handlePreviousPress}
         disabled={!previousBook}
         activeOpacity={0.7}
+        accessibilityLabel={previousBook ? `Previous book in series` : undefined}
+        accessibilityRole={previousBook ? 'button' : undefined}
+        accessibilityHint={previousBook ? 'Double tap to go to previous book' : undefined}
+        accessible={!!previousBook}
       >
         {previousBook ? (
           <>
@@ -139,6 +143,9 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
         style={styles.seriesInfo}
         onPress={handleSeriesPress}
         activeOpacity={0.7}
+        accessibilityLabel={`${seriesName}, book ${Math.floor(currentSequence)}${totalBooks > 0 ? ` of ${totalBooks}` : ''}`}
+        accessibilityRole="button"
+        accessibilityHint="Double tap to view series details"
       >
         <Text style={styles.seriesName} numberOfLines={1}>
           {seriesName}
@@ -154,6 +161,10 @@ export function SeriesNavigator({ book }: SeriesNavigatorProps) {
         onPress={handleNextPress}
         disabled={!nextBook}
         activeOpacity={0.7}
+        accessibilityLabel={nextBook ? `Next book in series` : undefined}
+        accessibilityRole={nextBook ? 'button' : undefined}
+        accessibilityHint={nextBook ? 'Double tap to go to next book' : undefined}
+        accessible={!!nextBook}
       >
         {nextBook ? (
           <>

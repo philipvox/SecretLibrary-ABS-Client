@@ -18,5 +18,4 @@ export {
   CompleteBadge,
   CompleteBadgeOverlay,
   CompleteBanner,
-  CompletionCelebration,
 } from './components';

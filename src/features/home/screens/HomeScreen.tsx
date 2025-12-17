@@ -285,6 +285,8 @@ export function HomeScreen() {
           isPlaying={isPlaying}
           playbackRate={playbackRate}
           onPress={handleDiscPress}
+          bookTitle={title || undefined}
+          authorName={author || undefined}
         />
 
         {/* Pills Row: Sleep / Queue / Speed */}
@@ -353,6 +355,8 @@ export function HomeScreen() {
             style={styles.queueBackdrop}
             activeOpacity={1}
             onPress={() => setShowQueuePanel(false)}
+            accessibilityLabel="Close queue"
+            accessibilityRole="button"
           />
           <View style={styles.queueContainer}>
             <QueuePanel
