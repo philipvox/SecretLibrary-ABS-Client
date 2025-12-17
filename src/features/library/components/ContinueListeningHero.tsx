@@ -114,6 +114,7 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
         activeOpacity={0.9}
         accessibilityRole="button"
         accessibilityLabel={`Continue listening to ${title} by ${author}${narrator ? `, narrated by ${narrator}` : ''}${currentChapter ? `, ${currentChapter.title}` : ''}, ${progressPercent}% complete, ${formatTimeRemaining(remainingSeconds)}`}
+        accessibilityHint="Double tap to view book details"
       >
         {/* Cover Image */}
         <Image
@@ -177,6 +178,7 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel={`Resume playing ${title}`}
+          accessibilityHint="Double tap to resume playback"
         >
           <Ionicons name="play" size={scale(28)} color="#000" />
         </TouchableOpacity>

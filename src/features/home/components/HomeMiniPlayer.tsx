@@ -248,6 +248,8 @@ export function HomeMiniPlayer({
               style={styles.controlButton}
               onPress={onSkipBack}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Skip back 30 seconds"
             >
               <RewindIcon size={MINI_PLAYER.skipIconSize} color="white" />
             </TouchableOpacity>
@@ -256,6 +258,8 @@ export function HomeMiniPlayer({
               style={[styles.controlButton, { marginLeft: MINI_PLAYER.buttonGap }]}
               onPress={onPlayPause}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
                 <Ionicons name="pause" size={MINI_PLAYER.playIconSize} color={ACCENT} />

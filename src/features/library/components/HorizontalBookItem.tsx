@@ -35,7 +35,14 @@ export function HorizontalBookItem({ book }: HorizontalBookItemProps) {
     : description;
 
   return (
-    <TouchableOpacity style={styles.container} onPress={handlePress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={handlePress}
+      activeOpacity={0.7}
+      accessibilityLabel={`${title} by ${author}`}
+      accessibilityRole="button"
+      accessibilityHint="Double tap to view book details"
+    >
       {/* Cover */}
       <View style={styles.coverContainer}>
         {coverUrl ? (

@@ -12,6 +12,7 @@ import { networkMonitor, NetworkState } from './networkMonitor';
 import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 import { formatBytes } from '@/shared/utils/format';
+import { haptics } from '@/core/native/haptics';
 
 // =============================================================================
 // LOGGING
@@ -860,6 +861,9 @@ class DownloadManager {
       log(`Total time: ${elapsed}s`);
       log(`═══════════════════════════════════════════════════════`);
 
+      // Haptic feedback for download complete
+      haptics.downloadComplete();
+
       // Process next item in queue
       this.processQueue();
     } catch (error) {
@@ -878,6 +882,9 @@ class DownloadManager {
         logError(`Stack trace:`, error.stack);
       }
       logError(`═══════════════════════════════════════════════════════`);
+
+      // Haptic feedback for download failed
+      haptics.downloadFailed();
 
       // Process next item in queue
       this.processQueue();

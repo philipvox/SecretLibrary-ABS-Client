@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, StyleSheet, RefreshControl } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { NarratorCard } from '@/features/narrator';
 import { useNarrators, NarratorInfo } from '@/features/narrator';
 import { useDefaultLibrary } from '@/features/library/hooks/useDefaultLibrary';
@@ -44,12 +45,16 @@ export function NarratorsListContent() {
         />
       </View>
 
-      <FlatList
+      <FlashList
         data={narrators}
-        renderItem={({ item }) => <NarratorCard narrator={item} />}
+        renderItem={({ item }) => (
+          <View style={styles.itemWrapper}>
+            <NarratorCard narrator={item} />
+          </View>
+        )}
         keyExtractor={(item: NarratorInfo) => item.id}
         numColumns={2}
-        columnWrapperStyle={styles.row}
+        estimatedItemSize={200}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -84,7 +89,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: 188,
   },
-  row: {
-    justifyContent: 'space-between',
+  itemWrapper: {
+    flex: 1,
+    paddingHorizontal: 4,
   },
 });

@@ -25,8 +25,16 @@ const TYPOGRAPHY = { sectionTitle: { fontSize: scale(13), fontWeight: '600' as c
 const LAYOUT = { carouselPaddingHorizontal: layout.screenPaddingH, sectionHeaderMarginBottom: spacing.md };
 
 const CARD_WIDTH = scale(160);
+const CARD_GAP = scale(14);
 const COVER_SIZE = scale(100);
 const STACK_OFFSET = scale(8);
+
+// getItemLayout for horizontal scroll optimization
+const getItemLayout = (_data: any, index: number) => ({
+  length: CARD_WIDTH,
+  offset: (CARD_WIDTH + CARD_GAP) * index,
+  index,
+});
 
 interface SeriesCardProps {
   series: {
@@ -149,6 +157,7 @@ export function PopularSeriesSection({ limit = 10 }: PopularSeriesSectionProps) 
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        getItemLayout={getItemLayout}
       />
     </View>
   );
@@ -182,7 +191,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: LAYOUT.carouselPaddingHorizontal,
-    gap: scale(14),
+    gap: CARD_GAP,
   },
   card: {
     width: CARD_WIDTH,

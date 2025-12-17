@@ -303,7 +303,7 @@ const CDDisc: React.FC<CDDiscProps> = ({
           style={[styles.discCover, { borderRadius: size / 2 }]}
           contentFit="cover"
           contentPosition="top"
-          blurRadius={isBlurred ? 25 : 0}
+          blurRadius={isBlurred ? 10 : 0}
         />
       ) : (
         <View style={[styles.discCover, { backgroundColor: '#333', borderRadius: size / 2 }]} />
@@ -753,8 +753,8 @@ export function CDPlayerScreen() {
         {/* BlurView overlay for Android (blurRadius only works on iOS) */}
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
-          locations={[0, 0.1, 0.54]}
+          colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,1)']}
+          locations={[0, 0.35, 0.6]}
           style={StyleSheet.absoluteFill}
         />
       </View>
@@ -793,49 +793,20 @@ export function CDPlayerScreen() {
         <Text style={styles.author} numberOfLines={1}>{author}</Text>
       </View>
 
-      {/* Sharp CD Disc - top half visible with radial edge fade */}
-      <View style={[styles.discContainer, { height: DISC_SIZE / 2, overflow: 'hidden' }]}>
-        {MaskedView ? (
-          <MaskedView
-            style={{ width: DISC_SIZE, height: DISC_SIZE / 2 }}
-            maskElement={
-              <Svg width={DISC_SIZE} height={DISC_SIZE}>
-                <Defs>
-                  <RadialGradient id="topEdgeFade" cx="50%" cy="50%" r="50%">
-                    <Stop offset="0" stopColor="white" stopOpacity="1" />
-                    <Stop offset="0.75" stopColor="white" stopOpacity="1" />
-                    <Stop offset="1" stopColor="white" stopOpacity="0" />
-                  </RadialGradient>
-                </Defs>
-                <Circle cx={DISC_SIZE / 2} cy={DISC_SIZE / 2} r={DISC_SIZE / 2} fill="url(#topEdgeFade)" />
-              </Svg>
-            }
-          >
-            <CDDisc
-              coverUrl={coverUrl}
-              rotation={discRotation}
-              isPrimary={true}
-              isPlaying={isPlaying}
-              isBuffering={isBuffering && !isDownloaded}
-              playbackRate={playbackRate}
-              reducedMotion={reducedMotion ?? false}
-              scrubSpeed={discScrubSpeed}
-              spinBurst={discSpinBurst}
-            />
-          </MaskedView>
-        ) : (
-          <CDDisc
-            coverUrl={coverUrl}
-            rotation={discRotation}
-            isPrimary={true}
-            isPlaying={isPlaying}
-            isBuffering={isBuffering && !isDownloaded}
-            playbackRate={playbackRate}
-            reducedMotion={reducedMotion ?? false}
-            scrubSpeed={discScrubSpeed}
-            spinBurst={discSpinBurst}
-          />
-        )}
+      {/* Sharp CD Disc - top portion, hard clip (no radial fade) */}
+      {/* Height is DISC_SIZE/2 + 20px to lower the glass line and hide any seam */}
+      <View style={[styles.discContainer, { height: DISC_SIZE / 2 + scale(20), overflow: 'hidden' }]}>
+        <CDDisc
+          coverUrl={coverUrl}
+          rotation={discRotation}
+          isPrimary={true}
+          isPlaying={isPlaying}
+          isBuffering={isBuffering && !isDownloaded}
+          playbackRate={playbackRate}
+          reducedMotion={reducedMotion ?? false}
+          scrubSpeed={discScrubSpeed}
+          spinBurst={discSpinBurst}
+        />
         {/* Playing indicator for reduced motion mode */}
         {reducedMotion && isPlaying && (
           <View style={styles.playingBadge}>
@@ -858,7 +829,8 @@ export function CDPlayerScreen() {
       />
 
       {/* Blurred CD Disc - clipped to bottom half, with radial edge fade */}
-      <View style={[styles.blurredDiscContainer, { top: discCenterY, height: DISC_SIZE / 2, overflow: 'hidden' }]}>
+      {/* Note: top is discCenterY - 2 to create overlap and hide seam between sharp/blurred halves */}
+      <View style={[styles.blurredDiscContainer, { top: discCenterY - 2, height: DISC_SIZE / 2 + 2, overflow: 'hidden' }]}>
         {MaskedView ? (
           <MaskedView
             style={{ width: DISC_SIZE, height: DISC_SIZE / 2 }}
@@ -867,17 +839,18 @@ export function CDPlayerScreen() {
                 <Defs>
                   <RadialGradient id="edgeFade" cx="50%" cy="50%" r="50%">
                     <Stop offset="0" stopColor="white" stopOpacity="1" />
-                    <Stop offset="0.75" stopColor="white" stopOpacity="1" />
+                    <Stop offset="0.9" stopColor="white" stopOpacity="1" />
                     <Stop offset="1" stopColor="white" stopOpacity="0" />
                   </RadialGradient>
                 </Defs>
-                <Circle cx={DISC_SIZE / 2} cy={DISC_SIZE / 2} r={DISC_SIZE / 2} fill="url(#edgeFade)" />
+                <Circle cx={DISC_SIZE / 2} cy={DISC_SIZE / 2} r={DISC_SIZE / 2 + scale(5)} fill="url(#edgeFade)" />
               </Svg>
             }
           >
             <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
               <CDDisc
                 coverUrl={coverUrl}
+                size={DISC_SIZE + scale(5)}
                 rotation={discRotation}
                 isPrimary={false}
                 isBlurred={true}
@@ -890,6 +863,7 @@ export function CDPlayerScreen() {
           <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
             <CDDisc
               coverUrl={coverUrl}
+              size={DISC_SIZE + scale(5)}
               rotation={discRotation}
               isPrimary={false}
               isBlurred={true}
@@ -903,35 +877,8 @@ export function CDPlayerScreen() {
         <View style={styles.blurTopLine} />
       </View>
 
-      {/* Center gray ring and black hole - above blur */}
-      <View style={[styles.discCenterOverlay, { top: discCenterY }]}>
-        <View style={styles.discGrayRingStatic}>
-          <View style={styles.discHoleStatic} />
-        </View>
-      </View>
-
-      {/* Chrome spindle - above blur */}
-      <View style={[styles.discSpindleOverlay, { top: discCenterY }]}>
-        <Image
-          source={require('@/assets/svg/player/chrome-spindle.svg')}
-          style={styles.chromeSpindleImage}
-          contentFit="contain"
-        />
-      </View>
-
-      {/* Buffering indicator - only show when streaming (not for downloaded files) */}
-      {isBuffering && !isDownloaded && (
-        <View style={[styles.bufferingBadgeContainer, { top: discCenterY + scale(60) }]}>
-          <View style={styles.bufferingBadge}>
-            <Ionicons name="hourglass-outline" size={scale(10)} color="#FFF" />
-            <Text style={styles.bufferingBadgeText}>Buffering...</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Content area - positioned to appear in blurred zone */}
-      <View style={[styles.contentArea, { marginTop: -(DISC_SIZE * 0.45) }]}>
-        {/* Pills Row - Above Overview */}
+      {/* Pills positioned at glass line */}
+      <View style={[styles.pillsOverlay, { top: discCenterY + scale(12) }]}>
         <View style={styles.pillsRow}>
           {/* Left column: Sleep + Queue stacked */}
           <View style={styles.pillsColumn}>
@@ -987,7 +934,36 @@ export function CDPlayerScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
 
+      {/* Center gray ring and black hole - above blur */}
+      <View style={[styles.discCenterOverlay, { top: discCenterY }]}>
+        <View style={styles.discGrayRingStatic}>
+          <View style={styles.discHoleStatic} />
+        </View>
+      </View>
+
+      {/* Chrome spindle - above blur */}
+      <View style={[styles.discSpindleOverlay, { top: discCenterY }]}>
+        <Image
+          source={require('@/assets/svg/player/chrome-spindle.svg')}
+          style={styles.chromeSpindleImage}
+          contentFit="contain"
+        />
+      </View>
+
+      {/* Buffering indicator - only show when streaming (not for downloaded files) */}
+      {isBuffering && !isDownloaded && (
+        <View style={[styles.bufferingBadgeContainer, { top: discCenterY + scale(60) }]}>
+          <View style={styles.bufferingBadge}>
+            <Ionicons name="hourglass-outline" size={scale(10)} color="#FFF" />
+            <Text style={styles.bufferingBadgeText}>Buffering...</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Content area - positioned to appear in blurred zone */}
+      <View style={[styles.contentArea, { marginTop: -(DISC_SIZE * 0.45) }]}>
         {/* Overview Section - hidden for now */}
         {false && description ? (
           <View style={styles.overviewSection}>
@@ -1445,12 +1421,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+  pillsOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 15,
+  },
   pillsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: scale(22),
-    marginBottom: scale(10),
   },
   pillsColumn: {
     flexDirection: 'column',

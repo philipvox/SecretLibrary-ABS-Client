@@ -29,7 +29,7 @@ import { AuthorDetailScreen } from '@/features/author';
 import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { BookDetailScreen } from '@/features/book-detail';
-import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, JoystickSeekSettingsScreen } from '@/features/profile';
+import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
 import { MoodDiscoveryScreen, MoodResultsScreen } from '@/features/mood-discovery';
 import { CDPlayerScreen } from '@/features/player';
@@ -140,6 +140,7 @@ function AuthenticatedApp() {
         <Stack.Screen name="PlaybackSettings" component={PlaybackSettingsScreen} />
         <Stack.Screen name="StorageSettings" component={StorageSettingsScreen} />
         <Stack.Screen name="JoystickSeekSettings" component={JoystickSeekSettingsScreen} />
+        <Stack.Screen name="HapticSettings" component={HapticSettingsScreen} />
         <Stack.Screen name="CassetteTest" component={CassetteTestScreen} />
         <Stack.Screen
           name="PreferencesOnboarding"

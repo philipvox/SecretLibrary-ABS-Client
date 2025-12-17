@@ -287,6 +287,7 @@ export function GlobalMiniPlayer() {
             onPress={handleOpenPlayer}
             accessibilityRole="button"
             accessibilityLabel={`Now playing: ${title} by ${author}. Tap or swipe up to open player.`}
+            accessibilityHint="Swipe up to expand full player"
           >
             {/* Mini CD Disc */}
             <MiniCDDisc coverUrl={coverUrl} isPlaying={isPlaying} />

@@ -25,6 +25,15 @@ const TYPOGRAPHY = { sectionTitle: { fontSize: scale(13), fontWeight: '600' as c
 const LAYOUT = { carouselPaddingHorizontal: layout.screenPaddingH, sectionHeaderMarginBottom: spacing.md };
 
 const AVATAR_SIZE = scale(80);
+const CARD_WIDTH = AVATAR_SIZE + scale(20);
+const CARD_GAP = scale(16);
+
+// getItemLayout for horizontal scroll optimization
+const getItemLayout = (_data: any, index: number) => ({
+  length: CARD_WIDTH,
+  offset: (CARD_WIDTH + CARD_GAP) * index,
+  index,
+});
 
 // Generate consistent color from name
 function getAvatarColor(name: string): string {
@@ -157,6 +166,7 @@ export function TopAuthorsSection({ limit = 10 }: TopAuthorsSectionProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        getItemLayout={getItemLayout}
       />
     </View>
   );
@@ -190,11 +200,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: LAYOUT.carouselPaddingHorizontal,
-    gap: scale(16),
+    gap: CARD_GAP,
   },
   card: {
     alignItems: 'center',
-    width: AVATAR_SIZE + scale(20),
+    width: CARD_WIDTH,
   },
   avatarContainer: {
     width: AVATAR_SIZE,

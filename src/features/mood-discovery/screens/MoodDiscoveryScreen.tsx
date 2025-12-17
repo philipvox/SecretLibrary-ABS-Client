@@ -371,7 +371,7 @@ export function MoodDiscoveryScreen() {
         style={styles.content}
         contentContainerStyle={[
           styles.contentContainer,
-          { paddingBottom: insets.bottom + 100 },
+          { paddingBottom: insets.bottom + spacing.xl },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -386,50 +386,50 @@ export function MoodDiscoveryScreen() {
 
         {/* Options */}
         {renderOptions()}
-      </ScrollView>
 
-      {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <View style={styles.footerButtons}>
-          {draft.currentStep > 1 && (
-            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-              <Icon name="arrow-back" size={20} color={colors.textSecondary} set="ionicons" />
-              <Text style={styles.backText}>Back</Text>
-            </TouchableOpacity>
+        {/* Footer - inside scroll */}
+        <View style={styles.footer}>
+          <View style={styles.footerButtons}>
+            {draft.currentStep > 1 && (
+              <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                <Icon name="arrow-back" size={20} color={colors.textSecondary} set="ionicons" />
+                <Text style={styles.backText}>Back</Text>
+              </TouchableOpacity>
+            )}
+
+            <AnimatedPressable
+              onPress={handleNext}
+              onPressIn={() => {
+                buttonScale.value = withSpring(0.97, { damping: 55 });
+              }}
+              onPressOut={() => {
+                buttonScale.value = withSpring(1, { damping: 55 });
+              }}
+              disabled={!canProceed}
+              style={[
+                styles.nextButton,
+                !canProceed && styles.nextButtonDisabled,
+                draft.currentStep === 1 && styles.nextButtonFull,
+                buttonAnimatedStyle,
+              ]}
+            >
+              <Text style={[styles.nextText, !canProceed && styles.nextTextDisabled]}>
+                {draft.currentStep === 4 ? 'Find Books' : 'Next'}
+              </Text>
+              <Icon
+                name={draft.currentStep === 4 ? 'sparkles' : 'arrow-forward'}
+                size={20}
+                color={canProceed ? '#000' : colors.textTertiary}
+                set="ionicons"
+              />
+            </AnimatedPressable>
+          </View>
+
+          {!canProceed && draft.currentStep === 1 && (
+            <Text style={styles.hint}>Select a mood to continue</Text>
           )}
-
-          <AnimatedPressable
-            onPress={handleNext}
-            onPressIn={() => {
-              buttonScale.value = withSpring(0.97, { damping: 55 });
-            }}
-            onPressOut={() => {
-              buttonScale.value = withSpring(1, { damping: 55 });
-            }}
-            disabled={!canProceed}
-            style={[
-              styles.nextButton,
-              !canProceed && styles.nextButtonDisabled,
-              draft.currentStep === 1 && styles.nextButtonFull,
-              buttonAnimatedStyle,
-            ]}
-          >
-            <Text style={[styles.nextText, !canProceed && styles.nextTextDisabled]}>
-              {draft.currentStep === 4 ? 'Find Books' : 'Next'}
-            </Text>
-            <Icon
-              name={draft.currentStep === 4 ? 'sparkles' : 'arrow-forward'}
-              size={20}
-              color={canProceed ? '#000' : colors.textTertiary}
-              set="ionicons"
-            />
-          </AnimatedPressable>
         </View>
-
-        {!canProceed && draft.currentStep === 1 && (
-          <Text style={styles.hint}>Select a mood to continue</Text>
-        )}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   closeButton: {
     width: 44,
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xs,
   },
 
   // Step
@@ -520,22 +520,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   question: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
 
   // Options Grid (2 columns for Mood and World)
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
 
   // Options List (full width for Pace and Weight)
@@ -547,29 +547,28 @@ const styles = StyleSheet.create({
   compactCard: {
     width: '47%',
     backgroundColor: colors.backgroundSecondary,
-    borderRadius: radius.lg,
-    padding: spacing.md,
+    borderRadius: radius.md,
+    padding: spacing.sm,
     borderWidth: 2,
     borderColor: 'transparent',
-    minHeight: 120,
   },
   compactCardSelected: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
   compactLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   compactLabelSelected: {
     color: '#000',
   },
   compactDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: spacing.xxs,
+    marginTop: 2,
   },
   compactDescSelected: {
     color: 'rgba(0, 0, 0, 0.7)',
@@ -637,11 +636,7 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    backgroundColor: colors.backgroundPrimary,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
+    marginTop: spacing.lg,
   },
   footerButtons: {
     flexDirection: 'row',

@@ -469,6 +469,7 @@ export function NarratorDetailScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalList}
+              removeClippedSubviews={true}
             />
           </View>
         )}

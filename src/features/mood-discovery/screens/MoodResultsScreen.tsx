@@ -262,6 +262,10 @@ export function MoodResultsScreen() {
           { paddingBottom: insets.bottom + spacing.xl },
         ]}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        windowSize={5}
+        maxToRenderPerBatch={5}
+        initialNumToRender={4}
         renderItem={({ item: section }) => (
           <Animated.View
             entering={FadeIn.duration(300)}

@@ -591,6 +591,10 @@ export function SeriesDetailScreen() {
         ListEmptyComponent={showDownloadedOnly ? ListEmpty : null}
         contentContainerStyle={{ paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        windowSize={5}
+        maxToRenderPerBatch={5}
+        initialNumToRender={10}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}

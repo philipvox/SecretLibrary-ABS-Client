@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, StyleSheet, RefreshControl } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { CollectionCard } from '@/features/collections';
 import { useCollections } from '@/features/collections/hooks/useCollections';
 import { SearchBar } from '@/features/search/components/SearchBar';
@@ -46,12 +47,16 @@ export function CollectionsListContent() {
         />
       </View>
 
-      <FlatList
+      <FlashList
         data={filteredCollections}
-        renderItem={({ item }) => <CollectionCard collection={item} />}
+        renderItem={({ item }) => (
+          <View style={styles.itemWrapper}>
+            <CollectionCard collection={item} />
+          </View>
+        )}
         keyExtractor={(item: Collection) => item.id}
         numColumns={2}
-        columnWrapperStyle={styles.row}
+        estimatedItemSize={200}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -86,7 +91,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: 188,
   },
-  row: {
-    justifyContent: 'space-between',
+  itemWrapper: {
+    flex: 1,
+    paddingHorizontal: 4,
   },
 });

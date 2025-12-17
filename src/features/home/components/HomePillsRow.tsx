@@ -1,8 +1,8 @@
 /**
  * src/features/home/components/HomePillsRow.tsx
  *
- * Sleep timer and playback speed pills for Home screen
- * Positioned at far left and right edges below the CD disc
+ * Sleep timer, queue, and playback speed pills for Home screen
+ * Positioned at far left, center, and right edges below the CD disc
  */
 
 import React from 'react';
@@ -13,7 +13,9 @@ import {
   StyleSheet,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, wp, moderateScale, radius } from '@/shared/theme';
+import { useQueueCount } from '@/features/queue/stores/queueStore';
 
 interface HomePillsRowProps {
   /** Current sleep timer remaining in seconds (null if off) */
@@ -24,6 +26,8 @@ interface HomePillsRowProps {
   onSleepPress: () => void;
   /** Callback when speed pill is pressed */
   onSpeedPress: () => void;
+  /** Callback when queue pill is pressed */
+  onQueuePress: () => void;
   /** Whether to show the pills (hidden when no book loaded) */
   visible: boolean;
 }
@@ -62,12 +66,16 @@ export function HomePillsRow({
   playbackSpeed,
   onSleepPress,
   onSpeedPress,
+  onQueuePress,
   visible,
 }: HomePillsRowProps) {
+  const queueCount = useQueueCount();
+
   if (!visible) return null;
 
   const isSleepActive = sleepTimer !== null && sleepTimer > 0;
   const isSpeedModified = playbackSpeed !== 1;
+  const hasQueueItems = queueCount > 0;
 
   return (
     <View style={styles.container}>
@@ -85,6 +93,31 @@ export function HomePillsRow({
         <Text style={[styles.pillText, isSleepActive && styles.pillTextActive]}>
           {formatSleepTimer(sleepTimer)}
         </Text>
+      </TouchableOpacity>
+
+      {/* Spacer */}
+      <View style={{ flex: 1 }} />
+
+      {/* Queue Pill - Center */}
+      <TouchableOpacity
+        onPress={onQueuePress}
+        style={styles.pill}
+        activeOpacity={0.7}
+        accessibilityLabel={hasQueueItems
+          ? `Queue with ${queueCount} items`
+          : 'Queue is empty'}
+        accessibilityRole="button"
+      >
+        <Ionicons
+          name="list"
+          size={ICON_SIZE}
+          color={hasQueueItems ? ACCENT : colors.textPrimary}
+        />
+        {hasQueueItems && (
+          <Text style={[styles.pillText, styles.pillTextActive]}>
+            {queueCount}
+          </Text>
+        )}
       </TouchableOpacity>
 
       {/* Spacer */}

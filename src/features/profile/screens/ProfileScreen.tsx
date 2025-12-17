@@ -221,6 +221,12 @@ export function ProfileScreen() {
             subtitle="Downloads, cache, WiFi-only"
             onPress={() => navigation.navigate('StorageSettings')}
           />
+          <ProfileLink
+            icon="radio-button-on-outline"
+            label="Haptic Feedback"
+            subtitle="Vibration and tactile feedback"
+            onPress={() => navigation.navigate('HapticSettings')}
+          />
         </SectionGroup>
 
         {/* Developer Section - keep for testing */}

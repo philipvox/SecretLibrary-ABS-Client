@@ -50,6 +50,7 @@ import { RecentlyAddedSection } from '../components/RecentlyAddedSection';
 import { YourSeriesSection } from '../components/YourSeriesSection';
 import { SectionHeader } from '../components/SectionHeader';
 import { EmptySection } from '../components/EmptySection';
+import { QueuePanel } from '@/features/queue/components/QueuePanel';
 
 // Types
 import { SeriesWithBooks } from '../types';
@@ -105,6 +106,7 @@ export function HomeScreen() {
   // Local state for sheet visibility
   const [showSleepSheet, setShowSleepSheet] = useState(false);
   const [showSpeedSheet, setShowSpeedSheet] = useState(false);
+  const [showQueuePanel, setShowQueuePanel] = useState(false);
 
   // Get book metadata
   const getMetadata = (book: LibraryItem | null) => {
@@ -206,6 +208,7 @@ export function HomeScreen() {
   // Pills handlers
   const handleSleepPress = () => setShowSleepSheet(true);
   const handleSpeedPress = () => setShowSpeedSheet(true);
+  const handleQueuePress = () => setShowQueuePanel(true);
 
   // Continue Listening - exclude current book
   const continueListeningBooks = useMemo(() => {
@@ -282,12 +285,13 @@ export function HomeScreen() {
           onPress={handleDiscPress}
         />
 
-        {/* Pills Row: Sleep / Speed */}
+        {/* Pills Row: Sleep / Queue / Speed */}
         <HomePillsRow
           sleepTimer={sleepTimer}
           playbackSpeed={playbackRate}
           onSleepPress={handleSleepPress}
           onSpeedPress={handleSpeedPress}
+          onQueuePress={handleQueuePress}
           visible={!!currentBook}
         />
 
@@ -339,6 +343,23 @@ export function HomeScreen() {
       {/* Shared Sheet Components */}
       <SleepTimerSheet visible={showSleepSheet} onClose={() => setShowSleepSheet(false)} />
       <SpeedSheet visible={showSpeedSheet} onClose={() => setShowSpeedSheet(false)} />
+
+      {/* Queue Panel */}
+      {showQueuePanel && (
+        <View style={styles.queueOverlay}>
+          <TouchableOpacity
+            style={styles.queueBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowQueuePanel(false)}
+          />
+          <View style={styles.queueContainer}>
+            <QueuePanel
+              onClose={() => setShowQueuePanel(false)}
+              maxHeight={hp(60)}
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -360,6 +381,20 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: wp(4),
+  },
+  queueOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  queueBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  queueContainer: {
+    backgroundColor: colors.backgroundSecondary,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
   },
 });
 

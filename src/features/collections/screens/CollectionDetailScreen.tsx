@@ -273,6 +273,10 @@ export function CollectionDetailScreen() {
           ListHeaderComponent={renderHeader}
           contentContainerStyle={[styles.listContent, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          windowSize={5}
+          maxToRenderPerBatch={5}
+          initialNumToRender={10}
           refreshControl={
             <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={ACCENT} />
           }

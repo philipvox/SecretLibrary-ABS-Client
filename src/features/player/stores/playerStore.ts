@@ -41,6 +41,9 @@ import {
 // Import constants
 import { REWIND_STEP, REWIND_INTERVAL, FF_STEP } from '../constants';
 
+// Import haptics for sleep timer feedback
+import { haptics } from '@/core/native/haptics';
+
 const DEBUG = __DEV__;
 const log = (msg: string, ...args: any[]) => audioLog.store(msg, ...args);
 const logError = (msg: string, ...args: any[]) => audioLog.error(msg, ...args);
@@ -390,12 +393,13 @@ async function setupDownloadCompletionListener(bookId: string): Promise<void> {
     const task = tasks.find((t) => t.itemId === currentStreamingBookId);
 
     if (task?.status === 'complete' && currentStreamingBookId) {
-      log(`Download completed for currently streaming book: ${currentStreamingBookId}`);
-      log('Switching to local playback...');
+      log(`[DOWNLOAD] Completed for streaming book: ${currentStreamingBookId}`);
+      log('[DOWNLOAD] Switching to local playback...');
 
       // Get current state
       const state = usePlayerStore.getState();
-      const { currentBook, position, isPlaying } = state;
+      const { currentBook, position, isPlaying, isLoading } = state;
+      log(`[DOWNLOAD] Current state: currentBook=${currentBook?.id}, isPlaying=${isPlaying}, isLoading=${isLoading}`);
 
       // Verify we're still playing the same book
       if (currentBook?.id === currentStreamingBookId) {
@@ -674,24 +678,35 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
     loadBook: async (book: LibraryItem, options?: { startPosition?: number; autoPlay?: boolean; showPlayer?: boolean }) => {
       const { startPosition, autoPlay = true, showPlayer = true } = options || {};
-      const { currentBook, position: prevPosition, isLoading } = get();
+      const { currentBook, position: prevPosition, isLoading, isPlaying } = get();
+
+      // DEBUG: Log entry point and call stack
+      const debugTs = Date.now();
+      log(`[LOAD ${debugTs}] Starting load for: ${book.media?.metadata?.title}`);
+      log(`[LOAD ${debugTs}] Previous book: ${currentBook?.media?.metadata?.title || 'none'}`);
+      log(`[LOAD ${debugTs}] State: isLoading=${isLoading}, isPlaying=${isPlaying}`);
+      if (__DEV__) {
+        console.log(`[LOAD ${debugTs}] Call stack:`, new Error().stack?.split('\n').slice(1, 6).join('\n'));
+      }
 
       // Debounce rapid load requests (prevent double-taps)
       const now = Date.now();
       if (now - lastLoadTime < LOAD_DEBOUNCE_MS && currentBook?.id !== book.id) {
-        log('Debouncing rapid load request, ignoring');
+        log(`[LOAD ${debugTs}] Debouncing rapid load request, ignoring`);
         return;
       }
       lastLoadTime = now;
 
-      // If already loading a different book, cancel the old load and stop any playback
-      if (isLoading) {
-        log('Cancelling previous load, unloading audio');
+      // CRITICAL FIX: Always stop existing audio before loading new audio
+      // Previously only called unloadAudio if isLoading was true, but this missed
+      // the case where audio was playing (isLoading=false, isPlaying=true)
+      if (isLoading || isPlaying || audioService.getIsLoaded()) {
+        log(`[LOAD] Stopping existing audio before new load`);
         await audioService.unloadAudio();
       }
 
       // Increment load ID to invalidate any in-progress loads
-      const thisLoadId = ++currentLoadId;
+      const loadId = ++currentLoadId;
       const timing = createTimer('loadBook');
 
       // Reset track finish guard for new book
@@ -752,7 +767,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           ).catch(() => {});
         }
 
-        if (thisLoadId !== currentLoadId) return;
+        if (loadId !== currentLoadId) return;
 
         // OPTIMIZATION: Run download check and session start in PARALLEL
         // This saves ~500ms by not waiting for download check before starting session
@@ -767,7 +782,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         ]);
         timing('After parallel fetch');
 
-        if (thisLoadId !== currentLoadId) return;
+        if (loadId !== currentLoadId) return;
 
         const isOffline = !!localPath;
         let streamUrl: string = '';
@@ -936,7 +951,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           isOffline,
         });
 
-        if (thisLoadId !== currentLoadId) return;
+        if (loadId !== currentLoadId) return;
 
         // Get metadata for lock screen
         const title = book.media?.metadata?.title || 'Audiobook';
@@ -983,7 +998,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         }
         timing('After loadAudio');
 
-        if (thisLoadId !== currentLoadId) {
+        if (loadId !== currentLoadId) {
           log('Load cancelled after audio load');
           return;
         }
@@ -1051,7 +1066,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         }
 
       } catch (error: any) {
-        if (thisLoadId === currentLoadId) {
+        if (loadId === currentLoadId) {
           logSection('LOAD BOOK FAILED');
           logError('Error:', error.message);
           logError('Stack:', error.stack);
@@ -1498,11 +1513,18 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       let endTime = Date.now() + minutes * 60 * 1000;
 
+      // Track last remaining for warning detection
+      let lastRemaining = minutes * 60;
+
       const interval = setInterval(async () => {
         const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
 
         if (remaining <= 0) {
           clearInterval(interval);
+
+          // Haptic feedback for timer expiration
+          haptics.sleepTimerExpired();
+
           get().pause();
 
           // Stop shake detection
@@ -1513,6 +1535,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
           set({ sleepTimer: null, sleepTimerInterval: null, isShakeDetectionActive: false });
         } else {
+          // Trigger warning haptic when crossing 60 second threshold
+          if (lastRemaining > 60 && remaining <= 60) {
+            haptics.sleepTimerWarning();
+          }
+          lastRemaining = remaining;
+
           set({ sleepTimer: remaining });
 
           // Start shake detection when timer is low and feature is enabled
@@ -1857,6 +1885,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       const updated = [...bookmarks, bookmark];
       set({ bookmarks: updated });
 
+      // Haptic feedback for bookmark created
+      haptics.bookmarkCreated();
+
       // Persist to SQLite
       try {
         await sqliteCache.addBookmark({
@@ -1900,6 +1931,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Update local state
       const updated = bookmarks.filter((b) => b.id !== bookmarkId);
       set({ bookmarks: updated });
+
+      // Haptic feedback for bookmark deleted
+      haptics.bookmarkDeleted();
 
       // Persist to SQLite
       try {

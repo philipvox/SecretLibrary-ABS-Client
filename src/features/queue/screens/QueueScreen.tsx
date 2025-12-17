@@ -171,6 +171,10 @@ export function QueueScreen() {
         data={queue}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        removeClippedSubviews={true}
+        windowSize={5}
+        maxToRenderPerBatch={5}
+        initialNumToRender={10}
         renderItem={({ item, index }) => (
           <SwipeableQueueItem
             book={item.book}

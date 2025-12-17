@@ -538,6 +538,7 @@ export function AuthorDetailScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalList}
+              removeClippedSubviews={true}
             />
           </View>
         )}

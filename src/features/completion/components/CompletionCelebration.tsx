@@ -21,7 +21,7 @@ import {
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '@/core/native/haptics';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
 import { colors, scale, wp, hp } from '@/shared/theme';
@@ -102,8 +102,14 @@ export function CompletionCelebration({
 
   useEffect(() => {
     if (visible) {
-      // Trigger haptic
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Trigger haptic based on celebration type
+      if (type === 'series_complete') {
+        haptics.seriesComplete();
+      } else if (type === 'milestone') {
+        haptics.progressMilestone();
+      } else {
+        haptics.bookComplete();
+      }
 
       // Animate in
       Animated.parallel([
@@ -123,32 +129,32 @@ export function CompletionCelebration({
       scaleAnim.setValue(0.8);
       opacityAnim.setValue(0);
     }
-  }, [visible, scaleAnim, opacityAnim]);
+  }, [visible, type, scaleAnim, opacityAnim]);
 
   const handleDismiss = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.buttonPress();
     onDismiss();
   }, [onDismiss]);
 
   const handleStartNext = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.impact('medium');
     onStartNext?.();
     onDismiss();
   }, [onStartNext, onDismiss]);
 
   const handleTakeBreak = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.buttonPress();
     onTakeBreak?.();
     onDismiss();
   }, [onTakeBreak, onDismiss]);
 
   const handleShare = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.buttonPress();
     onShare?.();
   }, [onShare]);
 
   const handleFindSimilar = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.impact('medium');
     onFindSimilar?.();
     onDismiss();
   }, [onFindSimilar, onDismiss]);

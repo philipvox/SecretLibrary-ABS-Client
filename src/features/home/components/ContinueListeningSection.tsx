@@ -39,6 +39,14 @@ const CARD = {
   titleWidth: wp(22),           // Width for title text
 };
 
+// getItemLayout for horizontal scroll optimization
+// Item width includes the cover size plus the gap (separator)
+const getItemLayout = (_data: any, index: number) => ({
+  length: CARD.coverSize + CARD.gap,
+  offset: (CARD.coverSize + CARD.gap) * index,
+  index,
+});
+
 // Play icon for overlay
 const PlayIcon = ({ size, color }: { size: number; color: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -137,6 +145,7 @@ export function ContinueListeningSection({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={{ width: CARD.gap }} />}
+        getItemLayout={getItemLayout}
       />
     </View>
   );
