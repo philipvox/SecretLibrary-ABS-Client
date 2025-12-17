@@ -96,26 +96,28 @@ export function HomePillsRow({
       </TouchableOpacity>
 
       {/* Queue Pill - Absolutely centered on screen */}
-      <TouchableOpacity
-        onPress={onQueuePress}
-        style={styles.queuePill}
-        activeOpacity={0.7}
-        accessibilityLabel={hasQueueItems
-          ? `Queue with ${queueCount} items`
-          : 'Queue is empty'}
-        accessibilityRole="button"
-      >
-        <Ionicons
-          name="list"
-          size={ICON_SIZE}
-          color={hasQueueItems ? ACCENT : colors.textPrimary}
-        />
-        {hasQueueItems && (
-          <Text style={[styles.pillText, styles.pillTextActive]}>
-            {queueCount}
-          </Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.queuePillWrapper}>
+        <TouchableOpacity
+          onPress={onQueuePress}
+          style={styles.queuePill}
+          activeOpacity={0.7}
+          accessibilityLabel={hasQueueItems
+            ? `Queue with ${queueCount} items`
+            : 'Queue is empty'}
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name="list"
+            size={ICON_SIZE}
+            color={hasQueueItems ? ACCENT : colors.textPrimary}
+          />
+          {hasQueueItems && (
+            <Text style={[styles.pillText, styles.pillTextActive]}>
+              {queueCount}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
 
       {/* Playback Speed Pill - Far Right */}
       <TouchableOpacity
@@ -152,10 +154,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     gap: wp(1.5),
   },
-  queuePill: {
+  queuePillWrapper: {
     position: 'absolute',
-    left: '50%',
-    transform: [{ translateX: -wp(5) }],
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  queuePill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
