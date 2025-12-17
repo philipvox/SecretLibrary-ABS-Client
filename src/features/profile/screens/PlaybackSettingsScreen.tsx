@@ -4,7 +4,7 @@
  * Dedicated screen for playback settings: speed, skip intervals, sleep timer.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useReducedMotion } from 'react-native-reanimated';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
+import { useJoystickSeekStore } from '@/features/player/stores/joystickSeekStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { colors, scale } from '@/shared/theme';
 
@@ -30,6 +32,7 @@ const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 // Skip interval options (in seconds)
 const SKIP_FORWARD_OPTIONS = [10, 15, 30, 45, 60];
 const SKIP_BACK_OPTIONS = [5, 10, 15, 30, 45];
+const SMART_REWIND_MAX_OPTIONS = [15, 30, 45, 60, 90];
 
 function formatSpeed(speed: number): string {
   return speed === 1.0 ? '1.0× (Normal)' : `${speed}×`;
@@ -44,38 +47,44 @@ interface SettingsRowProps {
   switchValue?: boolean;
   onSwitchChange?: (value: boolean) => void;
   note?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
-function SettingsRow({ icon, label, value, onPress, switchValue, onSwitchChange, note }: SettingsRowProps) {
+function SettingsRow({ icon, label, value, onPress, switchValue, onSwitchChange, note, disabled, disabledReason }: SettingsRowProps) {
+  // Show disabled reason instead of note when disabled
+  const displayNote = disabled && disabledReason ? disabledReason : note;
+
   const content = (
-    <View style={styles.settingsRow}>
+    <View style={[styles.settingsRow, disabled && styles.settingsRowDisabled]}>
       <View style={styles.rowLeft}>
         <View style={styles.iconContainer}>
-          <Ionicons name={icon} size={scale(18)} color="rgba(255,255,255,0.8)" />
+          <Ionicons name={icon} size={scale(18)} color={disabled ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'} />
         </View>
         <View style={styles.rowContent}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          {note ? <Text style={styles.rowNote}>{note}</Text> : null}
+          <Text style={[styles.rowLabel, disabled && styles.rowLabelDisabled]}>{label}</Text>
+          {displayNote ? <Text style={[styles.rowNote, disabled && styles.rowNoteDisabled]}>{displayNote}</Text> : null}
         </View>
       </View>
       <View style={styles.rowRight}>
-        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+        {value ? <Text style={[styles.rowValue, disabled && styles.rowValueDisabled]}>{value}</Text> : null}
         {onSwitchChange !== undefined ? (
           <Switch
             value={switchValue}
             onValueChange={onSwitchChange}
             trackColor={{ false: 'rgba(255,255,255,0.2)', true: ACCENT }}
             thumbColor="#fff"
+            disabled={disabled}
           />
         ) : null}
         {onPress ? (
-          <Ionicons name="chevron-forward" size={scale(18)} color="rgba(255,255,255,0.3)" />
+          <Ionicons name="chevron-forward" size={scale(18)} color={disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.3)'} />
         ) : null}
       </View>
     </View>
   );
 
-  if (onPress) {
+  if (onPress && !disabled) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
         {content}
@@ -174,6 +183,27 @@ export function PlaybackSettingsScreen() {
   const setSkipBackInterval = usePlayerStore((s) => s.setSkipBackInterval);
   const shakeToExtendEnabled = usePlayerStore((s) => s.shakeToExtendEnabled);
   const setShakeToExtendEnabled = usePlayerStore((s) => s.setShakeToExtendEnabled);
+  const discAnimationEnabled = usePlayerStore((s) => s.discAnimationEnabled ?? true);
+  const setDiscAnimationEnabled = usePlayerStore((s) => s.setDiscAnimationEnabled);
+  const useStandardPlayer = usePlayerStore((s) => s.useStandardPlayer ?? false);
+  const setUseStandardPlayer = usePlayerStore((s) => s.setUseStandardPlayer);
+  const joystickEnabled = useJoystickSeekStore((s) => s.enabled);
+  const setJoystickEnabled = useJoystickSeekStore((s) => s.setEnabled);
+  const smartRewindEnabled = usePlayerStore((s) => s.smartRewindEnabled ?? true);
+  const setSmartRewindEnabled = usePlayerStore((s) => s.setSmartRewindEnabled);
+  const smartRewindMaxSeconds = usePlayerStore((s) => s.smartRewindMaxSeconds ?? 30);
+  const setSmartRewindMaxSeconds = usePlayerStore((s) => s.setSmartRewindMaxSeconds);
+
+  // System accessibility preference
+  const systemReduceMotion = useReducedMotion();
+
+  // Computed disabled states per UX spec
+  const spinningDiscDisabled = useStandardPlayer || (systemReduceMotion ?? false);
+  const spinningDiscDisabledReason = useMemo(() => {
+    if (useStandardPlayer) return 'Standard Player is enabled';
+    if (systemReduceMotion) return 'Disabled by system settings';
+    return undefined;
+  }, [useStandardPlayer, systemReduceMotion]);
 
   // Modal states
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
@@ -261,15 +291,89 @@ export function PlaybackSettingsScreen() {
           </View>
         </View>
 
+        {/* Smart Rewind Section */}
+        <View style={styles.section}>
+          <SectionHeader title="Smart Rewind" />
+          <View style={styles.sectionCard}>
+            <SettingsRow
+              icon="refresh-outline"
+              label="Smart Rewind"
+              switchValue={smartRewindEnabled}
+              onSwitchChange={setSmartRewindEnabled}
+              note="Automatically rewind after pausing"
+            />
+            {smartRewindEnabled && (
+              <View style={styles.maxRewindContainer}>
+                <Text style={styles.maxRewindLabel}>Maximum Rewind</Text>
+                <View style={styles.maxRewindOptions}>
+                  {SMART_REWIND_MAX_OPTIONS.map((seconds) => (
+                    <TouchableOpacity
+                      key={seconds}
+                      style={[
+                        styles.maxRewindOption,
+                        smartRewindMaxSeconds === seconds && styles.maxRewindOptionSelected,
+                      ]}
+                      onPress={() => setSmartRewindMaxSeconds(seconds)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.maxRewindOptionText,
+                          smartRewindMaxSeconds === seconds && styles.maxRewindOptionTextSelected,
+                        ]}
+                      >
+                        {seconds}s
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.maxRewindNote}>
+                  Rewind amount increases with pause duration
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Joystick Seek Section */}
         <View style={styles.section}>
           <SectionHeader title="Seeking" />
           <View style={styles.sectionCard}>
             <SettingsRow
               icon="game-controller-outline"
-              label="Joystick Seek"
+              label="Joystick Seek Settings"
               onPress={() => (navigation as any).navigate('JoystickSeekSettings')}
               note="Customize drag-to-seek speed and curve"
+            />
+          </View>
+        </View>
+
+        {/* Player Appearance Section */}
+        <View style={styles.section}>
+          <SectionHeader title="Player Appearance" />
+          <View style={styles.sectionCard}>
+            <SettingsRow
+              icon="disc-outline"
+              label="Spinning Disc"
+              switchValue={discAnimationEnabled}
+              onSwitchChange={setDiscAnimationEnabled}
+              note="Animate the CD rotation while playing"
+              disabled={spinningDiscDisabled}
+              disabledReason={spinningDiscDisabledReason}
+            />
+            <SettingsRow
+              icon="game-controller-outline"
+              label="Joystick Seek"
+              switchValue={joystickEnabled}
+              onSwitchChange={setJoystickEnabled}
+              note="Drag on cover to scrub through audio"
+            />
+            <SettingsRow
+              icon="image-outline"
+              label="Standard Player"
+              switchValue={useStandardPlayer}
+              onSwitchChange={setUseStandardPlayer}
+              note="Show static album cover instead of disc"
             />
           </View>
         </View>
@@ -415,6 +519,20 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontWeight: '500',
   },
+  // Disabled states
+  settingsRowDisabled: {
+    opacity: 0.5,
+  },
+  rowLabelDisabled: {
+    color: 'rgba(255,255,255,0.5)',
+  },
+  rowNoteDisabled: {
+    color: 'rgba(255,255,255,0.3)',
+    fontStyle: 'italic',
+  },
+  rowValueDisabled: {
+    color: 'rgba(255,255,255,0.3)',
+  },
   infoSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -427,6 +545,49 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
     color: 'rgba(255,255,255,0.4)',
     lineHeight: scale(18),
+  },
+  // Smart Rewind max selector styles
+  maxRewindContainer: {
+    paddingHorizontal: scale(16),
+    paddingTop: scale(8),
+    paddingBottom: scale(16),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  maxRewindLabel: {
+    fontSize: scale(13),
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: scale(12),
+  },
+  maxRewindOptions: {
+    flexDirection: 'row',
+    gap: scale(8),
+  },
+  maxRewindOption: {
+    flex: 1,
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(8),
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: scale(8),
+    alignItems: 'center',
+  },
+  maxRewindOptionSelected: {
+    backgroundColor: ACCENT,
+  },
+  maxRewindOptionText: {
+    fontSize: scale(14),
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  maxRewindOptionTextSelected: {
+    color: '#000',
+  },
+  maxRewindNote: {
+    fontSize: scale(11),
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: scale(12),
+    textAlign: 'center',
   },
   // Modal styles
   modalOverlay: {

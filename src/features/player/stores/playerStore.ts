@@ -38,6 +38,9 @@ import {
   validateUrl,
 } from '@/shared/utils/audioDebug';
 
+// Import smart rewind utility
+import { calculateSmartRewindSeconds } from '../utils/smartRewindCalculator';
+
 // Import constants
 import { REWIND_STEP, REWIND_INTERVAL, FF_STEP } from '../constants';
 
@@ -138,6 +141,18 @@ interface PlayerState {
   // ---------------------------------------------------------------------------
   skipForwardInterval: number;            // Seconds to skip forward (default 30)
   skipBackInterval: number;               // Seconds to skip back (default 15)
+
+  // ---------------------------------------------------------------------------
+  // Player Appearance (persisted)
+  // ---------------------------------------------------------------------------
+  discAnimationEnabled: boolean;          // Whether CD spins during playback (default true)
+  useStandardPlayer: boolean;             // Show static cover instead of disc UI (default false)
+
+  // ---------------------------------------------------------------------------
+  // Smart Rewind (persisted)
+  // ---------------------------------------------------------------------------
+  smartRewindEnabled: boolean;            // Auto-rewind on resume based on pause duration (default true)
+  smartRewindMaxSeconds: number;          // Maximum rewind amount in seconds (default 30)
 }
 
 interface PlayerActions {
@@ -246,6 +261,10 @@ interface PlayerActions {
   setSkipBackInterval: (seconds: number) => Promise<void>;
   setControlMode: (mode: 'rewind' | 'chapter') => void;
   setProgressMode: (mode: 'bar' | 'chapters') => void;
+  setDiscAnimationEnabled: (enabled: boolean) => Promise<void>;
+  setUseStandardPlayer: (enabled: boolean) => Promise<void>;
+  setSmartRewindEnabled: (enabled: boolean) => Promise<void>;
+  setSmartRewindMaxSeconds: (seconds: number) => Promise<void>;
   loadPlayerSettings: () => Promise<void>;
 
   // ---------------------------------------------------------------------------
@@ -277,7 +296,15 @@ const GLOBAL_DEFAULT_RATE_KEY = 'playerGlobalDefaultRate';
 const SHAKE_TO_EXTEND_KEY = 'playerShakeToExtend';
 const SKIP_FORWARD_INTERVAL_KEY = 'playerSkipForwardInterval';
 const SKIP_BACK_INTERVAL_KEY = 'playerSkipBackInterval';
+const DISC_ANIMATION_KEY = 'playerDiscAnimation';
+const STANDARD_PLAYER_KEY = 'playerStandardMode';
+const SMART_REWIND_ENABLED_KEY = 'playerSmartRewindEnabled';
+const SMART_REWIND_MAX_SECONDS_KEY = 'playerSmartRewindMaxSeconds';
+const SMART_REWIND_PAUSE_TIMESTAMP_KEY = 'smartRewindPauseTimestamp';
+const SMART_REWIND_PAUSE_BOOK_ID_KEY = 'smartRewindPauseBookId';
+const SMART_REWIND_PAUSE_POSITION_KEY = 'smartRewindPausePosition';
 const PROGRESS_SAVE_INTERVAL = 30000; // Save progress every 30 seconds
+const MIN_PAUSE_FOR_REWIND_MS = 3000; // Minimum pause before smart rewind applies
 const PREV_CHAPTER_THRESHOLD = 3;     // Seconds before going to prev vs restart
 const SLEEP_TIMER_SHAKE_THRESHOLD = 60; // Start shake detection when < 60 seconds remaining
 const SLEEP_TIMER_EXTEND_MINUTES = 15;  // Add 15 minutes on shake
@@ -307,6 +334,103 @@ const autoDownloadCheckedBooks = new Set<string>();
 // Download completion listener - to switch from streaming to local when download completes
 let downloadListenerUnsubscribe: (() => void) | null = null;
 let currentStreamingBookId: string | null = null; // Track which book is currently streaming (not offline)
+
+// =============================================================================
+// SMART REWIND STATE
+// =============================================================================
+
+// In-memory tracking for smart rewind (also persisted for app restart)
+let smartRewindPauseTimestamp: number | null = null;
+let smartRewindPauseBookId: string | null = null;
+let smartRewindPausePosition: number | null = null;
+
+/**
+ * Get chapter start time for a position to prevent rewinding past chapter boundary
+ */
+function getChapterStartForPosition(chapters: Chapter[], position: number): number {
+  if (!chapters || chapters.length === 0) return 0;
+  for (let i = chapters.length - 1; i >= 0; i--) {
+    if (chapters[i].start <= position) {
+      return chapters[i].start;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Persist smart rewind state for app restart scenarios
+ */
+async function persistSmartRewindState(bookId: string, position: number): Promise<void> {
+  const now = Date.now();
+  smartRewindPauseTimestamp = now;
+  smartRewindPauseBookId = bookId;
+  smartRewindPausePosition = position;
+
+  try {
+    await Promise.all([
+      AsyncStorage.setItem(SMART_REWIND_PAUSE_TIMESTAMP_KEY, now.toString()),
+      AsyncStorage.setItem(SMART_REWIND_PAUSE_BOOK_ID_KEY, bookId),
+      AsyncStorage.setItem(SMART_REWIND_PAUSE_POSITION_KEY, position.toString()),
+    ]);
+  } catch (err) {
+    log('[SmartRewind] Failed to persist pause state');
+  }
+}
+
+/**
+ * Restore smart rewind state from storage (for app restart)
+ */
+async function restoreSmartRewindState(currentBookId: string): Promise<{
+  timestamp: number | null;
+  position: number | null;
+}> {
+  // First check in-memory state
+  if (smartRewindPauseTimestamp && smartRewindPauseBookId === currentBookId) {
+    return {
+      timestamp: smartRewindPauseTimestamp,
+      position: smartRewindPausePosition,
+    };
+  }
+
+  // Try to restore from storage
+  try {
+    const [storedTimestamp, storedBookId, storedPosition] = await Promise.all([
+      AsyncStorage.getItem(SMART_REWIND_PAUSE_TIMESTAMP_KEY),
+      AsyncStorage.getItem(SMART_REWIND_PAUSE_BOOK_ID_KEY),
+      AsyncStorage.getItem(SMART_REWIND_PAUSE_POSITION_KEY),
+    ]);
+
+    if (storedTimestamp && storedBookId === currentBookId) {
+      return {
+        timestamp: parseInt(storedTimestamp, 10),
+        position: storedPosition ? parseFloat(storedPosition) : null,
+      };
+    }
+  } catch (err) {
+    log('[SmartRewind] Failed to restore pause state');
+  }
+
+  return { timestamp: null, position: null };
+}
+
+/**
+ * Clear smart rewind state
+ */
+async function clearSmartRewindState(): Promise<void> {
+  smartRewindPauseTimestamp = null;
+  smartRewindPauseBookId = null;
+  smartRewindPausePosition = null;
+
+  try {
+    await Promise.all([
+      AsyncStorage.removeItem(SMART_REWIND_PAUSE_TIMESTAMP_KEY),
+      AsyncStorage.removeItem(SMART_REWIND_PAUSE_BOOK_ID_KEY),
+      AsyncStorage.removeItem(SMART_REWIND_PAUSE_POSITION_KEY),
+    ]);
+  } catch {
+    // Ignore cleanup errors
+  }
+}
 
 // =============================================================================
 // LISTENING SESSION TRACKING
@@ -671,6 +795,14 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     // Skip intervals
     skipForwardInterval: 30,
     skipBackInterval: 15,
+
+    // Player appearance
+    discAnimationEnabled: true,
+    useStandardPlayer: false,
+
+    // Smart rewind
+    smartRewindEnabled: true,
+    smartRewindMaxSeconds: 30,
 
     // =========================================================================
     // LIFECYCLE
@@ -1199,8 +1331,49 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         // tries to resume playback before audio is loaded
         return;
       }
+
+      const {
+        currentBook,
+        position,
+        chapters,
+        smartRewindEnabled,
+        smartRewindMaxSeconds,
+      } = get();
+
+      // Apply smart rewind if enabled and we have valid pause state
+      if (smartRewindEnabled && currentBook?.id) {
+        try {
+          const { timestamp, position: pausePosition } = await restoreSmartRewindState(currentBook.id);
+
+          if (timestamp) {
+            const pauseDuration = Date.now() - timestamp;
+
+            if (pauseDuration >= MIN_PAUSE_FOR_REWIND_MS) {
+              const rewindSeconds = calculateSmartRewindSeconds(pauseDuration, smartRewindMaxSeconds);
+
+              if (rewindSeconds > 0) {
+                const basePosition = pausePosition ?? position;
+                const chapterStart = getChapterStartForPosition(chapters, basePosition);
+                const newPosition = Math.max(chapterStart, basePosition - rewindSeconds);
+
+                // Only apply if meaningful change
+                if (basePosition - newPosition >= 0.5) {
+                  log(`[SmartRewind] Pause: ${Math.round(pauseDuration / 1000)}s → Rewind: ${rewindSeconds}s`);
+                  await audioService.seekTo(newPosition);
+                  set({ position: newPosition });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          log('[SmartRewind] Error applying smart rewind');
+        }
+
+        // Clear smart rewind state
+        clearSmartRewindState().catch(() => {});
+      }
+
       await audioService.play();
-      const { currentBook, position } = get();
       set({
         isPlaying: true,
         lastPlayedBookId: currentBook?.id || null,
@@ -1216,8 +1389,13 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       await audioService.pause();
       set({ isPlaying: false });
 
-      const { currentBook, position, duration } = get();
+      const { currentBook, position, duration, smartRewindEnabled } = get();
       if (!currentBook) return;
+
+      // Record pause state for smart rewind
+      if (smartRewindEnabled) {
+        persistSmartRewindState(currentBook.id, position).catch(() => {});
+      }
 
       // End listening session tracking
       await endListeningSession(position);
@@ -1641,6 +1819,34 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       AsyncStorage.setItem('playerProgressMode', mode).catch(() => {});
     },
 
+    setDiscAnimationEnabled: async (enabled: boolean) => {
+      set({ discAnimationEnabled: enabled });
+      try {
+        await AsyncStorage.setItem(DISC_ANIMATION_KEY, enabled.toString());
+      } catch {}
+    },
+
+    setUseStandardPlayer: async (enabled: boolean) => {
+      set({ useStandardPlayer: enabled });
+      try {
+        await AsyncStorage.setItem(STANDARD_PLAYER_KEY, enabled.toString());
+      } catch {}
+    },
+
+    setSmartRewindEnabled: async (enabled: boolean) => {
+      set({ smartRewindEnabled: enabled });
+      try {
+        await AsyncStorage.setItem(SMART_REWIND_ENABLED_KEY, enabled.toString());
+      } catch {}
+    },
+
+    setSmartRewindMaxSeconds: async (seconds: number) => {
+      set({ smartRewindMaxSeconds: seconds });
+      try {
+        await AsyncStorage.setItem(SMART_REWIND_MAX_SECONDS_KEY, seconds.toString());
+      } catch {}
+    },
+
     loadPlayerSettings: async () => {
       try {
         const [
@@ -1651,6 +1857,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           shakeToExtendStr,
           skipForwardStr,
           skipBackStr,
+          discAnimationStr,
+          standardPlayerStr,
+          smartRewindEnabledStr,
+          smartRewindMaxSecondsStr,
         ] = await Promise.all([
           AsyncStorage.getItem('playerControlMode'),
           AsyncStorage.getItem('playerProgressMode'),
@@ -1659,6 +1869,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           AsyncStorage.getItem(SHAKE_TO_EXTEND_KEY),
           AsyncStorage.getItem(SKIP_FORWARD_INTERVAL_KEY),
           AsyncStorage.getItem(SKIP_BACK_INTERVAL_KEY),
+          AsyncStorage.getItem(DISC_ANIMATION_KEY),
+          AsyncStorage.getItem(STANDARD_PLAYER_KEY),
+          AsyncStorage.getItem(SMART_REWIND_ENABLED_KEY),
+          AsyncStorage.getItem(SMART_REWIND_MAX_SECONDS_KEY),
         ]);
 
         const bookSpeedMap = bookSpeedMapStr ? JSON.parse(bookSpeedMapStr) : {};
@@ -1666,6 +1880,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         const shakeToExtendEnabled = shakeToExtendStr !== 'false'; // Default true
         const skipForwardInterval = skipForwardStr ? parseInt(skipForwardStr, 10) : 30;
         const skipBackInterval = skipBackStr ? parseInt(skipBackStr, 10) : 15;
+        const discAnimationEnabled = discAnimationStr !== 'false'; // Default true
+        const useStandardPlayer = standardPlayerStr === 'true'; // Default false
+        const smartRewindEnabled = smartRewindEnabledStr !== 'false'; // Default true
+        const smartRewindMaxSeconds = smartRewindMaxSecondsStr ? parseInt(smartRewindMaxSecondsStr, 10) : 30;
 
         set({
           controlMode: (controlMode as 'rewind' | 'chapter') || 'rewind',
@@ -1676,6 +1894,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           shakeToExtendEnabled,
           skipForwardInterval,
           skipBackInterval,
+          discAnimationEnabled,
+          useStandardPlayer,
+          smartRewindEnabled,
+          smartRewindMaxSeconds,
         });
       } catch {
         // Use defaults

@@ -106,9 +106,8 @@ export function HomeScreen() {
   const backgroundTint = imageColors?.darkMuted || colors.backgroundTertiary;
 
   // Local state for sheet visibility
-  const [showSleepSheet, setShowSleepSheet] = useState(false);
-  const [showSpeedSheet, setShowSpeedSheet] = useState(false);
-  const [showQueuePanel, setShowQueuePanel] = useState(false);
+  type SheetType = 'none' | 'sleep' | 'speed' | 'queue';
+  const [activeSheet, setActiveSheet] = useState<SheetType>('none');
 
   // Get book metadata
   const getMetadata = (book: LibraryItem | null) => {
@@ -208,9 +207,9 @@ export function HomeScreen() {
   }, [navigation]);
 
   // Pills handlers
-  const handleSleepPress = () => setShowSleepSheet(true);
-  const handleSpeedPress = () => setShowSpeedSheet(true);
-  const handleQueuePress = () => setShowQueuePanel(true);
+  const handleSleepPress = () => setActiveSheet('sleep');
+  const handleSpeedPress = () => setActiveSheet('speed');
+  const handleQueuePress = () => setActiveSheet('queue');
 
   // Continue Listening - exclude current book
   const continueListeningBooks = useMemo(() => {
@@ -344,25 +343,29 @@ export function HomeScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* Shared Sheet Components */}
-      <SleepTimerSheet visible={showSleepSheet} onClose={() => setShowSleepSheet(false)} />
-      <SpeedSheet visible={showSpeedSheet} onClose={() => setShowSpeedSheet(false)} />
-
-      {/* Queue Panel */}
-      {showQueuePanel && (
+      {/* Inline Bottom Sheets (sleep, speed, queue) */}
+      {activeSheet !== 'none' && (
         <View style={styles.queueOverlay}>
           <TouchableOpacity
             style={styles.queueBackdrop}
             activeOpacity={1}
-            onPress={() => setShowQueuePanel(false)}
-            accessibilityLabel="Close queue"
+            onPress={() => setActiveSheet('none')}
+            accessibilityLabel="Close sheet"
             accessibilityRole="button"
           />
           <View style={styles.queueContainer}>
-            <QueuePanel
-              onClose={() => setShowQueuePanel(false)}
-              maxHeight={hp(60)}
-            />
+            {activeSheet === 'sleep' && (
+              <SleepTimerSheet onClose={() => setActiveSheet('none')} />
+            )}
+            {activeSheet === 'speed' && (
+              <SpeedSheet onClose={() => setActiveSheet('none')} />
+            )}
+            {activeSheet === 'queue' && (
+              <QueuePanel
+                onClose={() => setActiveSheet('none')}
+                maxHeight={hp(60)}
+              />
+            )}
           </View>
         </View>
       )}

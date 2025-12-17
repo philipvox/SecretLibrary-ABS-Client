@@ -4,24 +4,12 @@
  * Native haptic feedback service for tactile interactions.
  * Provides consistent haptic patterns across iOS and Android.
  * Integrates with haptic settings store for user preferences.
+ *
+ * Uses static import like MoodDiscoveryScreen (which works) instead of
+ * dynamic import which can have timing/resolution issues in React Native.
  */
 
-import { Platform } from 'react-native';
-
-// Lazy import to avoid crashes if expo-haptics isn't installed
-let Haptics: typeof import('expo-haptics') | null = null;
-
-async function loadHaptics() {
-  if (Haptics === null) {
-    try {
-      Haptics = await import('expo-haptics');
-    } catch (e) {
-      console.warn('[Haptics] expo-haptics not available');
-      Haptics = null;
-    }
-  }
-  return Haptics;
-}
+import * as ExpoHaptics from 'expo-haptics';
 
 // Lazy import of settings store to avoid circular dependencies
 let getHapticSettings: (() => {
@@ -80,16 +68,6 @@ export type HapticCategory =
 // ============================================================================
 
 class HapticService {
-  private isLoaded = false;
-
-  /**
-   * Initialize haptics (call early in app lifecycle)
-   */
-  async init(): Promise<void> {
-    await loadHaptics();
-    this.isLoaded = true;
-  }
-
   /**
    * Check if haptics are globally enabled
    */
@@ -102,7 +80,9 @@ class HapticService {
    */
   isCategoryEnabled(category: HapticCategory): boolean {
     const settings = loadSettingsStore();
-    return settings.enabled && settings[category];
+    const result = settings.enabled && settings[category];
+    console.log('[Haptics] isCategoryEnabled:', { category, enabled: settings.enabled, categoryValue: settings[category], result });
+    return result;
   }
 
   /**
@@ -118,36 +98,37 @@ class HapticService {
 
   /**
    * Trigger impact feedback (for UI interactions)
-   * Uses same approach as mood-discovery which works on Android
+   * Uses static import like MoodDiscoveryScreen which works correctly
    */
-  async impact(style: ImpactStyle = 'medium'): Promise<void> {
-    if (!loadSettingsStore().enabled) return;
+  impact(style: ImpactStyle = 'medium'): void {
+    const settings = loadSettingsStore();
+    console.log('[Haptics] impact called:', { style, enabled: settings.enabled });
 
-    const haptics = await loadHaptics();
-    if (!haptics) return;
+    if (!settings.enabled) {
+      console.log('[Haptics] Blocked - haptics disabled in settings');
+      return;
+    }
 
     try {
-      // Use actual enum values like mood-discovery does
-      const impactStyle = this.getImpactStyle(haptics, style);
-      await haptics.impactAsync(impactStyle);
+      const impactStyle = this.getImpactStyle(style);
+      console.log('[Haptics] Firing impactAsync with style:', impactStyle);
+      ExpoHaptics.impactAsync(impactStyle).catch((e) => {
+        console.warn('[Haptics] impactAsync failed:', e);
+      });
     } catch (e) {
-      // Silently fail on unsupported devices
+      console.warn('[Haptics] impact error:', e);
     }
   }
 
   /**
    * Trigger notification feedback (for system events)
    */
-  async notification(type: NotificationType = 'success'): Promise<void> {
+  notification(type: NotificationType = 'success'): void {
     if (!loadSettingsStore().enabled) return;
 
-    const haptics = await loadHaptics();
-    if (!haptics) return;
-
     try {
-      // Use actual enum values
-      const notificationType = this.getNotificationType(haptics, type);
-      await haptics.notificationAsync(notificationType);
+      const notificationType = this.getNotificationType(type);
+      ExpoHaptics.notificationAsync(notificationType).catch(() => {});
     } catch (e) {
       // Silently fail on unsupported devices
     }
@@ -156,16 +137,22 @@ class HapticService {
   /**
    * Trigger selection feedback (for picker/selection changes)
    */
-  async selection(): Promise<void> {
-    if (!loadSettingsStore().enabled) return;
+  selection(): void {
+    const settings = loadSettingsStore();
+    console.log('[Haptics] selection called:', { enabled: settings.enabled });
 
-    const haptics = await loadHaptics();
-    if (!haptics) return;
+    if (!settings.enabled) {
+      console.log('[Haptics] Blocked - haptics disabled in settings');
+      return;
+    }
 
     try {
-      await haptics.selectionAsync();
+      console.log('[Haptics] Firing selectionAsync');
+      ExpoHaptics.selectionAsync().catch((e) => {
+        console.warn('[Haptics] selectionAsync failed:', e);
+      });
     } catch (e) {
-      // Silently fail on unsupported devices
+      console.warn('[Haptics] selection error:', e);
     }
   }
 
@@ -176,25 +163,25 @@ class HapticService {
   /**
    * Playback state change (play/pause)
    */
-  async playbackToggle(): Promise<void> {
+  playbackToggle(): void {
     if (!this.isCategoryEnabled('playbackControls')) return;
-    await this.impact('medium');
+    this.impact('medium');
   }
 
   /**
    * Skip forward/backward
    */
-  async skip(): Promise<void> {
+  skip(): void {
     if (!this.isCategoryEnabled('playbackControls')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   /**
    * Chapter change feedback
    */
-  async chapterChange(): Promise<void> {
+  chapterChange(): void {
     if (!this.isCategoryEnabled('playbackControls')) return;
-    await this.impact('soft');
+    this.impact('soft');
   }
 
   // ============================================================================
@@ -204,25 +191,25 @@ class HapticService {
   /**
    * Seek feedback (for audio scrubbing)
    */
-  async seek(): Promise<void> {
+  seek(): void {
     if (!this.isCategoryEnabled('scrubberFeedback')) return;
-    await this.selection();
+    this.selection();
   }
 
   /**
    * Chapter marker crossed during scrubbing
    */
-  async chapterMarker(): Promise<void> {
+  chapterMarker(): void {
     if (!this.isCategoryEnabled('scrubberFeedback')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   /**
    * Snapped to chapter during scrubbing
    */
-  async chapterSnap(): Promise<void> {
+  chapterSnap(): void {
     if (!this.isCategoryEnabled('scrubberFeedback')) return;
-    await this.impact('medium');
+    this.impact('medium');
   }
 
   // ============================================================================
@@ -232,27 +219,26 @@ class HapticService {
   /**
    * Speed value changed
    */
-  async speedChange(): Promise<void> {
+  speedChange(): void {
     if (!this.isCategoryEnabled('speedControl')) return;
-    await this.selection();
+    this.selection();
   }
 
   /**
    * Reached speed boundary (min or max)
    */
-  async speedBoundary(): Promise<void> {
+  speedBoundary(): void {
     if (!this.isCategoryEnabled('speedControl')) return;
-    await this.impact('medium');
-    await this.delay(50);
-    await this.impact('light');
+    this.impact('medium');
+    setTimeout(() => this.impact('light'), 50);
   }
 
   /**
    * Reached default speed (1.0x)
    */
-  async speedDefault(): Promise<void> {
+  speedDefault(): void {
     if (!this.isCategoryEnabled('speedControl')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   // ============================================================================
@@ -262,33 +248,33 @@ class HapticService {
   /**
    * Sleep timer set
    */
-  async sleepTimerSet(): Promise<void> {
+  sleepTimerSet(): void {
     if (!this.isCategoryEnabled('sleepTimer')) return;
-    await this.notification('success');
+    this.notification('success');
   }
 
   /**
    * Sleep timer cleared
    */
-  async sleepTimerClear(): Promise<void> {
+  sleepTimerClear(): void {
     if (!this.isCategoryEnabled('sleepTimer')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   /**
    * Sleep timer warning (1 minute remaining)
    */
-  async sleepTimerWarning(): Promise<void> {
+  sleepTimerWarning(): void {
     if (!this.isCategoryEnabled('sleepTimer')) return;
-    await this.notification('warning');
+    this.notification('warning');
   }
 
   /**
    * Sleep timer expired
    */
-  async sleepTimerExpired(): Promise<void> {
+  sleepTimerExpired(): void {
     if (!this.isCategoryEnabled('sleepTimer')) return;
-    await this.notification('warning');
+    this.notification('warning');
   }
 
   // ============================================================================
@@ -298,25 +284,25 @@ class HapticService {
   /**
    * Download started
    */
-  async downloadStart(): Promise<void> {
+  downloadStart(): void {
     if (!this.isCategoryEnabled('downloads')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   /**
    * Download complete
    */
-  async downloadComplete(): Promise<void> {
+  downloadComplete(): void {
     if (!this.isCategoryEnabled('downloads')) return;
-    await this.notification('success');
+    this.notification('success');
   }
 
   /**
    * Download failed
    */
-  async downloadFailed(): Promise<void> {
+  downloadFailed(): void {
     if (!this.isCategoryEnabled('downloads')) return;
-    await this.notification('error');
+    this.notification('error');
   }
 
   // ============================================================================
@@ -326,25 +312,25 @@ class HapticService {
   /**
    * Bookmark created
    */
-  async bookmarkCreated(): Promise<void> {
+  bookmarkCreated(): void {
     if (!this.isCategoryEnabled('bookmarks')) return;
-    await this.notification('success');
+    this.notification('success');
   }
 
   /**
    * Bookmark deleted
    */
-  async bookmarkDeleted(): Promise<void> {
+  bookmarkDeleted(): void {
     if (!this.isCategoryEnabled('bookmarks')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   /**
    * Jumped to bookmark
    */
-  async bookmarkJump(): Promise<void> {
+  bookmarkJump(): void {
     if (!this.isCategoryEnabled('bookmarks')) return;
-    await this.selection();
+    this.selection();
   }
 
   // ============================================================================
@@ -354,31 +340,30 @@ class HapticService {
   /**
    * Book completion celebration
    */
-  async bookComplete(): Promise<void> {
+  bookComplete(): void {
     if (!this.isCategoryEnabled('completions')) return;
-    await this.notification('success');
-    await this.delay(100);
-    await this.impact('light');
+    this.notification('success');
+    setTimeout(() => this.impact('light'), 100);
   }
 
   /**
    * Series completion celebration (stronger pattern)
    */
-  async seriesComplete(): Promise<void> {
+  seriesComplete(): void {
     if (!this.isCategoryEnabled('completions')) return;
-    await this.notification('success');
-    await this.delay(150);
-    await this.impact('medium');
-    await this.delay(100);
-    await this.impact('light');
+    this.notification('success');
+    setTimeout(() => {
+      this.impact('medium');
+      setTimeout(() => this.impact('light'), 100);
+    }, 150);
   }
 
   /**
    * Progress milestone (25%, 50%, 75%)
    */
-  async progressMilestone(): Promise<void> {
+  progressMilestone(): void {
     if (!this.isCategoryEnabled('completions')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   // ============================================================================
@@ -388,73 +373,74 @@ class HapticService {
   /**
    * Light tap for button press
    */
-  async buttonPress(): Promise<void> {
+  buttonPress(): void {
+    console.log('[Haptics] buttonPress called, uiInteractions enabled:', this.isCategoryEnabled('uiInteractions'));
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.impact('light');
+    this.impact('light');
   }
 
   /**
    * Medium tap for toggle/switch
    */
-  async toggle(): Promise<void> {
+  toggle(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.impact('medium');
+    this.impact('medium');
   }
 
   /**
    * Heavy tap for important actions
    */
-  async importantAction(): Promise<void> {
+  importantAction(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.impact('heavy');
+    this.impact('heavy');
   }
 
   /**
    * Long press feedback
    */
-  async longPress(): Promise<void> {
+  longPress(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.impact('heavy');
+    this.impact('heavy');
   }
 
   /**
    * Pull to refresh trigger
    */
-  async pullToRefresh(): Promise<void> {
+  pullToRefresh(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.impact('medium');
+    this.impact('medium');
   }
 
   /**
    * Swipe action complete
    */
-  async swipeComplete(): Promise<void> {
+  swipeComplete(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.impact('soft');
+    this.impact('soft');
   }
 
   /**
    * Success feedback (generic)
    */
-  async success(): Promise<void> {
+  success(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.notification('success');
+    this.notification('success');
   }
 
   /**
    * Warning feedback (generic)
    */
-  async warning(): Promise<void> {
+  warning(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.notification('warning');
+    this.notification('warning');
   }
 
   /**
    * Error feedback (generic)
    */
-  async error(): Promise<void> {
+  error(): void {
     if (!this.isCategoryEnabled('uiInteractions')) return;
-    await this.notification('error');
+    this.notification('error');
   }
 
   // ============================================================================
@@ -462,39 +448,38 @@ class HapticService {
   // ============================================================================
 
   /**
-   * Get the actual ImpactFeedbackStyle enum value from the haptics module
-   * This matches how mood-discovery does it: Haptics.ImpactFeedbackStyle.Light
+   * Get the ImpactFeedbackStyle enum value
    */
-  private getImpactStyle(haptics: typeof import('expo-haptics'), style: ImpactStyle): any {
+  private getImpactStyle(style: ImpactStyle): ExpoHaptics.ImpactFeedbackStyle {
     switch (style) {
       case 'light':
-        return haptics.ImpactFeedbackStyle.Light;
+        return ExpoHaptics.ImpactFeedbackStyle.Light;
       case 'medium':
-        return haptics.ImpactFeedbackStyle.Medium;
+        return ExpoHaptics.ImpactFeedbackStyle.Medium;
       case 'heavy':
-        return haptics.ImpactFeedbackStyle.Heavy;
+        return ExpoHaptics.ImpactFeedbackStyle.Heavy;
       case 'soft':
-        return haptics.ImpactFeedbackStyle.Soft;
+        return ExpoHaptics.ImpactFeedbackStyle.Soft;
       case 'rigid':
-        return haptics.ImpactFeedbackStyle.Rigid;
+        return ExpoHaptics.ImpactFeedbackStyle.Rigid;
       default:
-        return haptics.ImpactFeedbackStyle.Medium;
+        return ExpoHaptics.ImpactFeedbackStyle.Medium;
     }
   }
 
   /**
-   * Get the actual NotificationFeedbackType enum value from the haptics module
+   * Get the NotificationFeedbackType enum value
    */
-  private getNotificationType(haptics: typeof import('expo-haptics'), type: NotificationType): any {
+  private getNotificationType(type: NotificationType): ExpoHaptics.NotificationFeedbackType {
     switch (type) {
       case 'success':
-        return haptics.NotificationFeedbackType.Success;
+        return ExpoHaptics.NotificationFeedbackType.Success;
       case 'warning':
-        return haptics.NotificationFeedbackType.Warning;
+        return ExpoHaptics.NotificationFeedbackType.Warning;
       case 'error':
-        return haptics.NotificationFeedbackType.Error;
+        return ExpoHaptics.NotificationFeedbackType.Error;
       default:
-        return haptics.NotificationFeedbackType.Success;
+        return ExpoHaptics.NotificationFeedbackType.Success;
     }
   }
 }

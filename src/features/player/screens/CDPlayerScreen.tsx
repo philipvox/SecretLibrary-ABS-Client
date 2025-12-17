@@ -71,7 +71,7 @@ const GRAY_RING_COLOR = '#6B6B6B';
 // TYPES
 // =============================================================================
 
-type SheetType = 'none' | 'chapters' | 'settings' | 'queue';
+type SheetType = 'none' | 'chapters' | 'settings' | 'queue' | 'sleep' | 'speed';
 type ProgressMode = 'chapter' | 'book';
 
 // =============================================================================
@@ -458,6 +458,10 @@ export function CDPlayerScreen() {
   const clearSleepTimer = usePlayerStore((s) => s.clearSleepTimer);
   const seekTo = usePlayerStore((s) => s.seekTo);
 
+  // Skip interval settings
+  const skipForwardInterval = usePlayerStore((s) => s.skipForwardInterval ?? 30);
+  const skipBackInterval = usePlayerStore((s) => s.skipBackInterval ?? 15);
+
   // Sleep timer state
   const sleepTimerState = useSleepTimerState();
 
@@ -473,6 +477,12 @@ export function CDPlayerScreen() {
   // Joystick seek settings
   const joystickSettings = useJoystickSeekSettings();
 
+  // Player appearance settings
+  const discAnimationSetting = usePlayerStore((s) => s.discAnimationEnabled ?? true);
+  const useStandardPlayer = usePlayerStore((s) => s.useStandardPlayer ?? false);
+  // Combine user setting with system reduced motion - disable if either is true
+  const discAnimationEnabled = discAnimationSetting && !reducedMotion;
+
   // Disc rotation control
   // Shared rotation value - both sharp and blurred discs use this for sync
   const discRotation = useSharedValue(0);
@@ -485,8 +495,6 @@ export function CDPlayerScreen() {
   const [activeSheet, setActiveSheet] = useState<SheetType>('none');
   const [progressMode, setProgressMode] = useState<ProgressMode>('chapter');
   const [scrubOffset, setScrubOffset] = useState<number | null>(null);
-  const [showSleepSheet, setShowSleepSheet] = useState(false);
-  const [showSpeedSheet, setShowSpeedSheet] = useState(false);
   const [jogState, setJogState] = useState<JogState | null>(null);
 
   // Book metadata
@@ -626,23 +634,23 @@ export function CDPlayerScreen() {
     setActiveSheet('none');
   }, [seekTo]);
 
-  // Skip backward 30 seconds
+  // Skip backward using configured interval
   const handleSkipBack = useCallback(() => {
     haptics.impact('light');
-    const newPosition = Math.max(0, position - 30);
+    const newPosition = Math.max(0, position - skipBackInterval);
     seekTo?.(newPosition);
     // Spin disc backward for visual feedback (90 degrees)
     discSpinBurst.value = -90;
-  }, [position, seekTo, discSpinBurst]);
+  }, [position, skipBackInterval, seekTo, discSpinBurst]);
 
-  // Skip forward 30 seconds
+  // Skip forward using configured interval
   const handleSkipForward = useCallback(() => {
     haptics.impact('light');
-    const newPosition = Math.min(duration, position + 30);
+    const newPosition = Math.min(duration, position + skipForwardInterval);
     seekTo?.(newPosition);
     // Spin disc forward for visual feedback (90 degrees)
     discSpinBurst.value = 90;
-  }, [position, duration, seekTo, discSpinBurst]);
+  }, [position, duration, skipForwardInterval, seekTo, discSpinBurst]);
 
   // ==========================================================================
   // RENDER HELPERS
@@ -820,97 +828,127 @@ export function CDPlayerScreen() {
         <Text style={styles.author} numberOfLines={1}>{author}</Text>
       </View>
 
-      {/* Sharp CD Disc - top portion, hard clip (no radial fade) */}
-      {/* Height is DISC_SIZE/2 + 20px to lower the glass line and hide any seam */}
-      <View style={[styles.discContainer, { height: DISC_SIZE / 2 + scale(20), overflow: 'hidden' }]}>
-        <CDDisc
-          coverUrl={coverUrl}
-          rotation={discRotation}
-          isPrimary={true}
-          isPlaying={isPlaying}
-          isBuffering={isBuffering && !isDownloaded}
-          playbackRate={playbackRate}
-          reducedMotion={reducedMotion ?? false}
-          scrubSpeed={discScrubSpeed}
-          spinBurst={discSpinBurst}
-        />
-        {/* Playing indicator for reduced motion mode */}
-        {reducedMotion && isPlaying && (
-          <View style={styles.playingBadge}>
-            <Ionicons name="play" size={scale(10)} color="#000" />
-            <Text style={styles.playingBadgeText}>Playing</Text>
-          </View>
-        )}
-        {/* Speed badge when not 1.0x */}
-        {playbackRate !== 1 && (
-          <View style={styles.speedBadgeOnDisc}>
-            <Text style={styles.speedBadgeOnDiscText}>{playbackRate}x</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Shadow gradient above blur - simulates shadow under the holder */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.5)']}
-        style={[styles.holderShadow, { top: discCenterY - scale(30) }]}
-      />
-
-      {/* Blurred CD Disc - clipped to bottom half, with radial edge fade */}
-      {/* Note: top is discCenterY - 2 to create overlap and hide seam between sharp/blurred halves */}
-      <View style={[styles.blurredDiscContainer, { top: discCenterY - 2, height: DISC_SIZE / 2 + 2, overflow: 'hidden' }]}>
-        {MaskedView ? (
-          <MaskedView
-            style={{ width: DISC_SIZE, height: DISC_SIZE / 2 }}
-            maskElement={
-              <Svg width={DISC_SIZE} height={DISC_SIZE} style={{ marginTop: -(DISC_SIZE / 2) }}>
-                <Defs>
-                  <RadialGradient id="edgeFade" cx="50%" cy="50%" r="50%">
-                    <Stop offset="0" stopColor="white" stopOpacity="1" />
-                    <Stop offset="0.9" stopColor="white" stopOpacity="1" />
-                    <Stop offset="1" stopColor="white" stopOpacity="0" />
-                  </RadialGradient>
-                </Defs>
-                <Circle cx={DISC_SIZE / 2} cy={DISC_SIZE / 2} r={DISC_SIZE / 2 + scale(5)} fill="url(#edgeFade)" />
-              </Svg>
-            }
-          >
-            <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
-              <CDDisc
-                coverUrl={coverUrl}
-                size={DISC_SIZE + scale(5)}
-                rotation={discRotation}
-                isPrimary={false}
-                isBlurred={true}
-                reducedMotion={reducedMotion ?? false}
-              />
+      {/* Standard Player Mode - Static Album Cover */}
+      {useStandardPlayer ? (
+        <View style={styles.standardCoverContainer}>
+          {coverUrl ? (
+            <Image
+              source={coverUrl}
+              style={styles.standardCover}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={[styles.standardCover, { backgroundColor: '#333' }]} />
+          )}
+          {/* Speed badge when not 1.0x */}
+          {playbackRate !== 1 && (
+            <View style={styles.speedBadgeStandard}>
+              <Text style={styles.speedBadgeOnDiscText}>{playbackRate}x</Text>
             </View>
-          </MaskedView>
-        ) : (
-          /* Fallback when MaskedView native module not available */
-          <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
+          )}
+        </View>
+      ) : (
+        <>
+          {/* Sharp CD Disc - top portion, hard clip (no radial fade) */}
+          {/* Height is DISC_SIZE/2 + 20px to lower the glass line and hide any seam */}
+          <View style={[styles.discContainer, { height: DISC_SIZE / 2 + scale(20), overflow: 'hidden' }]}>
             <CDDisc
               coverUrl={coverUrl}
-              size={DISC_SIZE + scale(5)}
               rotation={discRotation}
-              isPrimary={false}
-              isBlurred={true}
+              isPrimary={true}
+              isPlaying={isPlaying && discAnimationEnabled}
+              isBuffering={isBuffering && !isDownloaded}
+              playbackRate={playbackRate}
               reducedMotion={reducedMotion ?? false}
+              scrubSpeed={discScrubSpeed}
+              spinBurst={discSpinBurst}
             />
+            {/* Playing indicator for reduced motion mode */}
+            {reducedMotion && isPlaying && (
+              <View style={styles.playingBadge}>
+                <Ionicons name="play" size={scale(10)} color="#000" />
+                <Text style={styles.playingBadgeText}>Playing</Text>
+              </View>
+            )}
+            {/* Speed badge when not 1.0x */}
+            {playbackRate !== 1 && (
+              <View style={styles.speedBadgeOnDisc}>
+                <Text style={styles.speedBadgeOnDiscText}>{playbackRate}x</Text>
+              </View>
+            )}
           </View>
-        )}
-        {/* Dark overlay on top of blurred disc */}
-        <View style={styles.blurDarkOverlay} />
-        {/* Glass line at top */}
-        <View style={styles.blurTopLine} />
-      </View>
 
-      {/* Pills positioned at glass line */}
-      <View style={[styles.pillsOverlay, { top: discCenterY + scale(12) }]}>
+          {/* Shadow gradient above blur - simulates shadow under the holder */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.5)']}
+            style={[styles.holderShadow, { top: discCenterY - scale(30) }]}
+          />
+
+          {/* Blurred CD Disc - clipped to bottom half, extends to bottom of screen */}
+          {/* Note: top is discCenterY - 2 to create overlap and hide seam between sharp/blurred halves */}
+          <View style={[styles.blurredDiscContainer, { top: discCenterY - 2, bottom: 0 }]}>
+            {MaskedView ? (
+              <MaskedView
+                style={{ width: DISC_SIZE, height: DISC_SIZE / 2 }}
+                maskElement={
+                  <Svg width={DISC_SIZE} height={DISC_SIZE} style={{ marginTop: -(DISC_SIZE / 2) }}>
+                    <Defs>
+                      <RadialGradient id="edgeFade" cx="50%" cy="50%" r="50%">
+                        <Stop offset="0" stopColor="white" stopOpacity="1" />
+                        <Stop offset="0.9" stopColor="white" stopOpacity="1" />
+                        <Stop offset="1" stopColor="white" stopOpacity="0" />
+                      </RadialGradient>
+                    </Defs>
+                    <Circle cx={DISC_SIZE / 2} cy={DISC_SIZE / 2} r={DISC_SIZE / 2 + scale(5)} fill="url(#edgeFade)" />
+                  </Svg>
+                }
+              >
+                <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
+                  <CDDisc
+                    coverUrl={coverUrl}
+                    size={DISC_SIZE + scale(5)}
+                    rotation={discRotation}
+                    isPrimary={false}
+                    isBlurred={true}
+                    reducedMotion={reducedMotion ?? false}
+                  />
+                </View>
+              </MaskedView>
+            ) : (
+              /* Fallback when MaskedView native module not available */
+              <View style={{ marginTop: -(DISC_SIZE / 2), alignItems: 'center' }}>
+                <CDDisc
+                  coverUrl={coverUrl}
+                  size={DISC_SIZE + scale(5)}
+                  rotation={discRotation}
+                  isPrimary={false}
+                  isBlurred={true}
+                  reducedMotion={reducedMotion ?? false}
+                />
+              </View>
+            )}
+            {/* Dark overlay on top of blurred disc */}
+            <View style={styles.blurDarkOverlay} />
+            {/* Bottom fade gradient - adds extra darkening below disc */}
+            {/* Combined with blurDarkOverlay, creates smooth fade to black */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', '#000']}
+              locations={[0, 0.3, 0.5, 0.8]}
+              style={styles.blurBottomGradient}
+            />
+            {/* Glass line at top */}
+            <View style={styles.blurTopLine} />
+          </View>
+        </>
+      )}
+
+      {/* Pills - positioned differently based on player mode */}
+      <View style={[styles.pillsOverlay, useStandardPlayer ? styles.standardPillsPosition : { top: discCenterY + scale(12) }]}>
         <View style={styles.pillsRow}>
           {/* Left column: Sleep + Queue stacked */}
           <View style={styles.pillsColumn}>
             <TouchableOpacity
-              onPress={() => setShowSleepSheet(true)}
+              onPress={() => setActiveSheet('sleep')}
               style={styles.pillButton}
               activeOpacity={0.7}
               accessibilityLabel={sleepTimer && sleepTimer > 0
@@ -949,7 +987,7 @@ export function CDPlayerScreen() {
           </View>
           {/* Right: Speed */}
           <TouchableOpacity
-            onPress={() => setShowSpeedSheet(true)}
+            onPress={() => setActiveSheet('speed')}
             style={[styles.pillButton, styles.speedPill]}
             activeOpacity={0.7}
             accessibilityLabel={`Playback speed ${playbackRate}x. Tap to change.`}
@@ -963,25 +1001,29 @@ export function CDPlayerScreen() {
         </View>
       </View>
 
-      {/* Center gray ring and black hole - above blur */}
-      <View style={[styles.discCenterOverlay, { top: discCenterY }]}>
-        <View style={styles.discGrayRingStatic}>
-          <View style={styles.discHoleStatic} />
+      {/* Center gray ring and black hole - above blur (disc mode only) */}
+      {!useStandardPlayer && (
+        <View style={[styles.discCenterOverlay, { top: discCenterY }]}>
+          <View style={styles.discGrayRingStatic}>
+            <View style={styles.discHoleStatic} />
+          </View>
         </View>
-      </View>
+      )}
 
-      {/* Chrome spindle - above blur */}
-      <View style={[styles.discSpindleOverlay, { top: discCenterY }]}>
-        <Image
-          source={require('@/assets/svg/player/chrome-spindle.svg')}
-          style={styles.chromeSpindleImage}
-          contentFit="contain"
-        />
-      </View>
+      {/* Chrome spindle - above blur (disc mode only) */}
+      {!useStandardPlayer && (
+        <View style={[styles.discSpindleOverlay, { top: discCenterY }]}>
+          <Image
+            source={require('@/assets/svg/player/chrome-spindle.svg')}
+            style={styles.chromeSpindleImage}
+            contentFit="contain"
+          />
+        </View>
+      )}
 
       {/* Buffering indicator - only show when streaming (not for downloaded files) */}
       {isBuffering && !isDownloaded && (
-        <View style={[styles.bufferingBadgeContainer, { top: discCenterY + scale(60) }]}>
+        <View style={[styles.bufferingBadgeContainer, { top: useStandardPlayer ? scale(200) : discCenterY + scale(60) }]}>
           <View style={styles.bufferingBadge}>
             <Ionicons name="hourglass-outline" size={scale(10)} color="#FFF" />
             <Text style={styles.bufferingBadgeText}>Buffering...</Text>
@@ -989,8 +1031,8 @@ export function CDPlayerScreen() {
         </View>
       )}
 
-      {/* Content area - positioned to appear in blurred zone */}
-      <View style={[styles.contentArea, { marginTop: -(DISC_SIZE * 0.45) }]}>
+      {/* Content area - positioned based on player mode */}
+      <View style={[styles.contentArea, { marginTop: useStandardPlayer ? scale(20) : -(DISC_SIZE * 0.45) }]}>
         {/* Overview Section - hidden for now */}
         {false && description ? (
           <View style={styles.overviewSection}>
@@ -1049,12 +1091,12 @@ export function CDPlayerScreen() {
 
         {/* Playback Controls - Skip at edges, Play in center */}
         <View style={styles.controlsRow}>
-          {/* Skip Back 30s - far left */}
+          {/* Skip Back - far left */}
           <TouchableOpacity
             style={styles.skipButton}
             onPress={handleSkipBack}
             activeOpacity={0.7}
-            accessibilityLabel="Skip back 30 seconds"
+            accessibilityLabel={`Skip back ${skipBackInterval} seconds`}
             accessibilityRole="button"
           >
             <RewindIcon />
@@ -1082,12 +1124,12 @@ export function CDPlayerScreen() {
             </View>
           </View>
 
-          {/* Skip Forward 30s - far right */}
+          {/* Skip Forward - far right */}
           <TouchableOpacity
             style={styles.skipButton}
             onPress={handleSkipForward}
             activeOpacity={0.7}
-            accessibilityLabel="Skip forward 30 seconds"
+            accessibilityLabel={`Skip forward ${skipForwardInterval} seconds`}
             accessibilityRole="button"
           >
             <FastForwardIcon />
@@ -1118,7 +1160,7 @@ export function CDPlayerScreen() {
         <View style={{ height: insets.bottom + scale(100) }} />
       </View>
 
-      {/* Inline Bottom Sheets (chapters, settings, queue) */}
+      {/* Inline Bottom Sheets (chapters, settings, queue, sleep, speed) */}
       {activeSheet !== 'none' && (
         <TouchableOpacity
           style={styles.sheetOverlay}
@@ -1134,13 +1176,15 @@ export function CDPlayerScreen() {
                 maxHeight={SCREEN_HEIGHT * 0.6}
               />
             )}
+            {activeSheet === 'sleep' && (
+              <SleepTimerSheet onClose={() => setActiveSheet('none')} />
+            )}
+            {activeSheet === 'speed' && (
+              <SpeedSheet onClose={() => setActiveSheet('none')} />
+            )}
           </View>
         </TouchableOpacity>
       )}
-
-      {/* Shared Sheet Components (sleep, speed) */}
-      <SleepTimerSheet visible={showSleepSheet} onClose={() => setShowSleepSheet(false)} />
-      <SpeedSheet visible={showSpeedSheet} onClose={() => setShowSpeedSheet(false)} />
     </Animated.View>
   );
 }
@@ -1270,8 +1314,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: DISC_SIZE / 2,
+    bottom: 0, // Extend to bottom of container
     backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  blurBottomGradient: {
+    position: 'absolute',
+    top: 0, // Start from the glass line at top
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   blurTopLine: {
     position: 'absolute',
@@ -1830,6 +1881,38 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
     fontVariant: ['tabular-nums'],
     marginTop: scale(6),
+  },
+
+  // Standard Player Mode styles
+  standardCoverContainer: {
+    alignItems: 'center',
+    marginTop: scale(8),
+    marginBottom: scale(12),
+  },
+  standardCover: {
+    width: DISC_SIZE * 0.52,
+    height: DISC_SIZE * 0.52,
+    borderRadius: scale(12),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 16,
+  },
+  speedBadgeStandard: {
+    position: 'absolute',
+    top: scale(12),
+    right: scale(12),
+    backgroundColor: colors.accent,
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(3),
+    borderRadius: scale(10),
+  },
+  standardPillsPosition: {
+    position: 'relative',
+    top: 0,
+    marginTop: scale(10),
+    marginBottom: scale(10),
   },
 });
 

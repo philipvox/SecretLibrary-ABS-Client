@@ -1,7 +1,7 @@
 /**
  * src/features/player/sheets/SleepTimerSheet.tsx
  *
- * Unified Sleep Timer bottom sheet component.
+ * Unified Sleep Timer panel component (inline overlay style).
  * Use this component from any screen to control sleep timer.
  * All state is managed via playerStore.
  */
@@ -12,14 +12,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore, useCurrentChapterIndex } from '../stores/playerStore';
 import { haptics } from '@/core/native/haptics';
-import { colors, spacing, radius, layout } from '@/shared/theme';
+import { colors, spacing, radius, scale, layout } from '@/shared/theme';
 
 // =============================================================================
 // CONSTANTS
@@ -32,7 +30,6 @@ const SLEEP_PRESETS = [15, 30, 45, 60, 90];
 // =============================================================================
 
 interface SleepTimerSheetProps {
-  visible: boolean;
   onClose: () => void;
 }
 
@@ -40,9 +37,7 @@ interface SleepTimerSheetProps {
 // COMPONENT
 // =============================================================================
 
-export function SleepTimerSheet({ visible, onClose }: SleepTimerSheetProps) {
-  const insets = useSafeAreaInsets();
-
+export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
   // Player store state
   const sleepTimer = usePlayerStore((s) => s.sleepTimer);
   const position = usePlayerStore((s) => s.position);
@@ -55,19 +50,17 @@ export function SleepTimerSheet({ visible, onClose }: SleepTimerSheetProps) {
   const [sliderValue, setSliderValue] = useState(15);
   const [endOfChapter, setEndOfChapter] = useState(false);
 
-  // Sync local state when sheet opens
+  // Sync local state when sheet mounts
   useEffect(() => {
-    if (visible) {
-      if (sleepTimer && sleepTimer > 0) {
-        const mins = Math.ceil(sleepTimer / 60);
-        setSliderValue(mins);
-        setEndOfChapter(false);
-      } else {
-        setSliderValue(15);
-        setEndOfChapter(false);
-      }
+    if (sleepTimer && sleepTimer > 0) {
+      const mins = Math.ceil(sleepTimer / 60);
+      setSliderValue(mins);
+      setEndOfChapter(false);
+    } else {
+      setSliderValue(15);
+      setEndOfChapter(false);
     }
-  }, [visible, sleepTimer]);
+  }, []);
 
   // ==========================================================================
   // HELPERS
@@ -138,130 +131,123 @@ export function SleepTimerSheet({ visible, onClose }: SleepTimerSheetProps) {
   const chapterRemaining = getChapterRemainingMins();
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View
-          style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}
-          onStartShouldSetResponder={() => true}
-        >
-          {/* Header */}
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Sleep Timer</Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Sleep Timer</Text>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Value Display */}
+      <Text style={styles.valueText}>{displayValue}</Text>
+
+      {/* Slider */}
+      <View style={styles.sliderContainer}>
+        <Slider
+          style={styles.slider}
+          minimumValue={0}
+          maximumValue={120}
+          step={5}
+          value={sliderValue}
+          onValueChange={(value) => {
+            setSliderValue(value);
+            setEndOfChapter(false);
+          }}
+          minimumTrackTintColor={colors.accent}
+          maximumTrackTintColor={colors.progressTrack}
+          thumbTintColor={colors.accent}
+        />
+        <View style={styles.sliderLabels}>
+          <Text style={styles.sliderLabel}>Off</Text>
+          <Text style={styles.sliderLabel}>30m</Text>
+          <Text style={styles.sliderLabel}>1h</Text>
+          <Text style={styles.sliderLabel}>1.5h</Text>
+          <Text style={styles.sliderLabel}>2h</Text>
+        </View>
+      </View>
+
+      {/* Preset Buttons */}
+      <View style={styles.presetRow}>
+        {SLEEP_PRESETS.map((preset) => {
+          const isActive = sliderValue === preset && !endOfChapter;
+          return (
             <TouchableOpacity
-              style={styles.headerAction}
-              onPress={sliderValue > 0 || endOfChapter ? handleApply : handleClear}
-            >
-              <Text style={styles.headerActionText}>
-                {sliderValue > 0 || endOfChapter ? 'Start' : 'Off'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Value Display */}
-          <Text style={styles.valueText}>{displayValue}</Text>
-
-          {/* Slider */}
-          <View style={styles.sliderContainer}>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={120}
-              step={5}
-              value={sliderValue}
-              onValueChange={(value) => {
-                setSliderValue(value);
-                setEndOfChapter(false);
-              }}
-              minimumTrackTintColor={colors.accent}
-              maximumTrackTintColor={colors.progressTrack}
-              thumbTintColor={colors.accent}
-            />
-            <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabel}>Off</Text>
-              <Text style={styles.sliderLabel}>30m</Text>
-              <Text style={styles.sliderLabel}>1h</Text>
-              <Text style={styles.sliderLabel}>1.5h</Text>
-              <Text style={styles.sliderLabel}>2h</Text>
-            </View>
-          </View>
-
-          {/* Preset Buttons */}
-          <View style={styles.presetRow}>
-            {SLEEP_PRESETS.map((preset) => {
-              const isActive = sliderValue === preset && !endOfChapter;
-              return (
-                <TouchableOpacity
-                  key={preset}
-                  style={[
-                    styles.presetButton,
-                    isActive && styles.presetButtonActive,
-                  ]}
-                  onPress={() => handlePresetPress(preset)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.presetText,
-                    isActive && styles.presetTextActive,
-                  ]}>
-                    {preset < 60 ? `${preset}m` : `${preset / 60}h`}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* End of Chapter Button */}
-          <TouchableOpacity
-            style={[
-              styles.endOfChapterButton,
-              endOfChapter && styles.endOfChapterButtonActive,
-            ]}
-            onPress={handleEndOfChapterPress}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="bookmark-outline"
-              size={20}
-              color={endOfChapter ? '#000' : '#FFF'}
-            />
-            <Text style={[
-              styles.endOfChapterText,
-              endOfChapter && styles.endOfChapterTextActive,
-            ]}>
-              End of Chapter
-            </Text>
-            {chapterRemaining > 0 && (
-              <Text style={[
-                styles.endOfChapterEstimate,
-                endOfChapter && styles.endOfChapterEstimateActive,
-              ]}>
-                (~{chapterRemaining}m)
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Cancel Timer (only if active) */}
-          {sleepTimer !== null && sleepTimer > 0 && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleClear}
+              key={preset}
+              style={[
+                styles.presetButton,
+                isActive && styles.presetButtonActive,
+              ]}
+              onPress={() => handlePresetPress(preset)}
               activeOpacity={0.7}
             >
-              <Text style={styles.cancelButtonText}>Cancel Timer</Text>
+              <Text style={[
+                styles.presetText,
+                isActive && styles.presetTextActive,
+              ]}>
+                {preset < 60 ? `${preset}m` : `${preset / 60}h`}
+              </Text>
             </TouchableOpacity>
-          )}
-        </View>
+          );
+        })}
+      </View>
+
+      {/* End of Chapter Button */}
+      <TouchableOpacity
+        style={[
+          styles.endOfChapterButton,
+          endOfChapter && styles.endOfChapterButtonActive,
+        ]}
+        onPress={handleEndOfChapterPress}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name="bookmark-outline"
+          size={20}
+          color={endOfChapter ? '#000' : '#FFF'}
+        />
+        <Text style={[
+          styles.endOfChapterText,
+          endOfChapter && styles.endOfChapterTextActive,
+        ]}>
+          End of Chapter
+        </Text>
+        {chapterRemaining > 0 && (
+          <Text style={[
+            styles.endOfChapterEstimate,
+            endOfChapter && styles.endOfChapterEstimateActive,
+          ]}>
+            (~{chapterRemaining}m)
+          </Text>
+        )}
       </TouchableOpacity>
-    </Modal>
+
+      {/* Action Row: Cancel or Start */}
+      <View style={styles.actionRow}>
+        {sleepTimer !== null && sleepTimer > 0 ? (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleClear}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.cancelButtonText}>Cancel Timer</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={[
+            styles.applyButton,
+            sleepTimer !== null && sleepTimer > 0 && styles.applyButtonSmall,
+          ]}
+          onPress={sliderValue > 0 || endOfChapter ? handleApply : handleClear}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.applyButtonText}>
+            {sliderValue > 0 || endOfChapter ? 'Start Timer' : 'Turn Off'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -270,41 +256,28 @@ export function SleepTimerSheet({ visible, onClose }: SleepTimerSheetProps) {
 // =============================================================================
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: colors.overlay.medium,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.backgroundTertiary,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+  container: {
     padding: spacing.lg,
   },
-  sheetHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  sheetTitle: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  headerAction: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radius.lg,
-  },
-  headerActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.backgroundPrimary,
+  closeButton: {
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   valueText: {
-    fontSize: 48,
+    fontSize: scale(42),
     fontWeight: '700',
     color: colors.textPrimary,
     textAlign: 'center',
@@ -358,7 +331,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.md,
     backgroundColor: colors.cardBackground,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   endOfChapterButtonActive: {
     backgroundColor: colors.accent,
@@ -378,16 +351,36 @@ const styles = StyleSheet.create({
   endOfChapterEstimateActive: {
     color: 'rgba(0,0,0,0.5)',
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   cancelButton: {
+    flex: 1,
     paddingVertical: 14,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(255,80,80,0.2)',
+    backgroundColor: 'rgba(255,80,80,0.15)',
     alignItems: 'center',
   },
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.error,
+  },
+  applyButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+  },
+  applyButtonSmall: {
+    flex: 1,
+  },
+  applyButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.backgroundPrimary,
   },
 });
 

@@ -27,9 +27,9 @@ import Animated, {
   FadeIn,
   FadeOut,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 
 import { Icon } from '@/shared/components/Icon';
+import { haptics } from '@/core/native/haptics';
 import { colors, spacing, radius, scale } from '@/shared/theme';
 import {
   MOODS,
@@ -103,7 +103,7 @@ function OptionCard<T>({ config, selected, onSelect, compact }: OptionCardProps<
   };
 
   const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact('light');
     onSelect();
   };
 
@@ -224,10 +224,10 @@ export function MoodDiscoveryScreen() {
   }, [navigation, resetDraft]);
 
   const handleNext = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact('light');
     if (draft.currentStep === 4) {
       // Final step - commit and go back
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      haptics.impact('medium');
       commitSession();
       navigation.goBack();
     } else {
@@ -236,14 +236,14 @@ export function MoodDiscoveryScreen() {
   }, [draft.currentStep, nextStep, commitSession, navigation]);
 
   const handleBack = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact('light');
     prevStep();
   }, [prevStep]);
 
   const handleSkip = useCallback(() => {
     // Skip remaining steps and commit with current selections
     if (draft.mood) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      haptics.impact('medium');
       commitSession();
       navigation.goBack();
     }

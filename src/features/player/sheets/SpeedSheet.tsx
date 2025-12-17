@@ -1,7 +1,7 @@
 /**
  * src/features/player/sheets/SpeedSheet.tsx
  *
- * Unified Playback Speed bottom sheet component.
+ * Unified Playback Speed panel component (inline overlay style).
  * Use this component from any screen to control playback speed.
  * All state is managed via playerStore.
  */
@@ -12,13 +12,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore } from '../stores/playerStore';
 import { haptics } from '@/core/native/haptics';
-import { colors, spacing, radius, wp, layout } from '@/shared/theme';
+import { colors, spacing, radius, wp, scale, layout } from '@/shared/theme';
 
 // =============================================================================
 // CONSTANTS
@@ -31,7 +29,6 @@ const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 // =============================================================================
 
 interface SpeedSheetProps {
-  visible: boolean;
   onClose: () => void;
 }
 
@@ -39,9 +36,7 @@ interface SpeedSheetProps {
 // COMPONENT
 // =============================================================================
 
-export function SpeedSheet({ visible, onClose }: SpeedSheetProps) {
-  const insets = useSafeAreaInsets();
-
+export function SpeedSheet({ onClose }: SpeedSheetProps) {
   // Player store state
   const playbackRate = usePlayerStore((s) => s.playbackRate);
   const setPlaybackRate = usePlayerStore((s) => s.setPlaybackRate);
@@ -61,83 +56,63 @@ export function SpeedSheet({ visible, onClose }: SpeedSheetProps) {
   // ==========================================================================
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View
-          style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}
-          onStartShouldSetResponder={() => true}
-        >
-          {/* Header */}
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Playback Speed</Text>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Playback Speed</Text>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Current Speed Display */}
+      <Text style={styles.currentSpeed}>{playbackRate}x</Text>
+
+      {/* Speed Options Grid */}
+      <View style={styles.optionsGrid}>
+        {SPEED_OPTIONS.map((speed) => {
+          const isActive = Math.abs(playbackRate - speed) < 0.01;
+          return (
             <TouchableOpacity
-              onPress={onClose}
-              style={styles.closeButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={24} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Current Speed Display */}
-          <Text style={styles.currentSpeed}>{playbackRate}x</Text>
-
-          {/* Speed Options Grid */}
-          <View style={styles.optionsGrid}>
-            {SPEED_OPTIONS.map((speed) => {
-              const isActive = Math.abs(playbackRate - speed) < 0.01;
-              return (
-                <TouchableOpacity
-                  key={speed}
-                  style={[
-                    styles.optionButton,
-                    isActive && styles.optionButtonActive,
-                  ]}
-                  onPress={() => handleSpeedSelect(speed)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.optionText,
-                    isActive && styles.optionTextActive,
-                  ]}>
-                    {speed}x
-                  </Text>
-                  {speed === 1 && (
-                    <Text style={[
-                      styles.optionLabel,
-                      isActive && styles.optionLabelActive,
-                    ]}>
-                      Normal
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Reset to 1x Button */}
-          {playbackRate !== 1 && (
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={() => handleSpeedSelect(1)}
+              key={speed}
+              style={[
+                styles.optionButton,
+                isActive && styles.optionButtonActive,
+              ]}
+              onPress={() => handleSpeedSelect(speed)}
               activeOpacity={0.7}
             >
-              <Ionicons name="refresh-outline" size={18} color="#FFF" />
-              <Text style={styles.resetButtonText}>Reset to Normal</Text>
+              <Text style={[
+                styles.optionText,
+                isActive && styles.optionTextActive,
+              ]}>
+                {speed}x
+              </Text>
+              {speed === 1 && (
+                <Text style={[
+                  styles.optionLabel,
+                  isActive && styles.optionLabelActive,
+                ]}>
+                  Normal
+                </Text>
+              )}
             </TouchableOpacity>
-          )}
-        </View>
-      </TouchableOpacity>
-    </Modal>
+          );
+        })}
+      </View>
+
+      {/* Reset to 1x Button */}
+      {playbackRate !== 1 && (
+        <TouchableOpacity
+          style={styles.resetButton}
+          onPress={() => handleSpeedSelect(1)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="refresh-outline" size={18} color={colors.textPrimary} />
+          <Text style={styles.resetButtonText}>Reset to Normal</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -146,24 +121,16 @@ export function SpeedSheet({ visible, onClose }: SpeedSheetProps) {
 // =============================================================================
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: colors.overlay.medium,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.backgroundTertiary,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+  container: {
     padding: spacing.lg,
   },
-  sheetHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  sheetTitle: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
@@ -171,11 +138,11 @@ const styles = StyleSheet.create({
   closeButton: {
     width: layout.minTouchTarget,
     height: layout.minTouchTarget,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   currentSpeed: {
-    fontSize: 48,
+    fontSize: scale(42),
     fontWeight: '700',
     color: colors.textPrimary,
     textAlign: 'center',
