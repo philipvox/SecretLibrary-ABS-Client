@@ -3,3 +3,4 @@
  */
 
 export { WishlistItemRow } from './WishlistItemRow';
+export { ManualAddSheet } from './ManualAddSheet';

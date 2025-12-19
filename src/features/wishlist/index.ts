@@ -8,7 +8,7 @@
 export { WishlistScreen } from './screens';
 
 // Components
-export { WishlistItemRow } from './components';
+export { WishlistItemRow, ManualAddSheet } from './components';
 
 // Store and hooks
 export {

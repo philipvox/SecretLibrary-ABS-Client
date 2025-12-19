@@ -35,6 +35,7 @@ import {
   useTrackedSeriesCount,
 } from '../stores/wishlistStore';
 import { WishlistItemRow } from '../components/WishlistItemRow';
+import { ManualAddSheet } from '../components/ManualAddSheet';
 import { colors, scale, spacing, radius, layout } from '@/shared/theme';
 
 const ACCENT = colors.accent;
@@ -78,6 +79,7 @@ export function WishlistScreen() {
   const [activeTab, setActiveTab] = useState<TabId>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [showSortPicker, setShowSortPicker] = useState(false);
+  const [showAddSheet, setShowAddSheet] = useState(false);
 
   // Counts for badges
   const wishlistCount = useWishlistCount();
@@ -119,7 +121,7 @@ export function WishlistScreen() {
 
   const handleAddPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // TODO: Show add sheet
+    setShowAddSheet(true);
   }, []);
 
   const handleSortPress = useCallback(() => {
@@ -354,6 +356,12 @@ export function WishlistScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
+
+      {/* Manual Add Sheet */}
+      <ManualAddSheet
+        visible={showAddSheet}
+        onClose={() => setShowAddSheet(false)}
+      />
     </View>
   );
 }

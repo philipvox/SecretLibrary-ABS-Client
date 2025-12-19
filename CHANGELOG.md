@@ -9,6 +9,32 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.4.51] - 2025-12-19
+
+### Added
+- **Manual Add Sheet**: Form for adding books not in library to wishlist:
+  - Title and Author fields (required with validation)
+  - Narrator field (optional)
+  - Series name and sequence number fields
+  - Notes field for personal comments
+  - Priority selector with three levels:
+    - **Must Read** (red highlight) - High priority
+    - **Want to Read** (gold accent) - Normal priority
+    - **Maybe** - Lower priority, might read someday
+  - Keyboard-aware modal with scroll support
+  - Form validation with error states
+  - Haptic feedback on submit
+
+### Files Added
+- `src/features/wishlist/components/ManualAddSheet.tsx` - Form sheet component
+
+### Files Modified
+- `src/features/wishlist/components/index.ts` - Export ManualAddSheet
+- `src/features/wishlist/screens/WishlistScreen.tsx` - Integrate add sheet
+- `src/features/wishlist/index.ts` - Export ManualAddSheet
+
+---
+
 ## [0.4.50] - 2025-12-19
 
 ### Added
