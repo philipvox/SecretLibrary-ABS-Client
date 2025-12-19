@@ -16,13 +16,29 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Server,
+  Download,
+  BarChart3,
+  CheckCheck,
+  Sparkles,
+  PlayCircle,
+  Folder,
+  CircleDot,
+  Type,
+  Music,
+  LogOut,
+  ChevronRight,
+  Bookmark,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useAuth } from '@/core/auth';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { APP_VERSION, BUILD_NUMBER, VERSION_DATE } from '@/constants/version';
 import { colors, scale } from '@/shared/theme';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
+import { useWishlistCount } from '@/features/wishlist';
 
 const ACCENT = colors.accent;
 
@@ -32,6 +48,14 @@ try {
   usePreferencesStore = require('@/features/recommendations').usePreferencesStore;
 } catch {
   usePreferencesStore = null;
+}
+
+// Safe import for wizard store
+let useWizardStore: any;
+try {
+  useWizardStore = require('@/features/reading-history-wizard').useWizardStore;
+} catch {
+  useWizardStore = null;
 }
 
 // Format bytes to human readable
@@ -72,7 +96,7 @@ function UserHeader({ username, role, serverUrl }: UserHeaderProps) {
         <Text style={styles.username}>{username}</Text>
         <Text style={styles.userRole}>{role}</Text>
         <View style={styles.serverRow}>
-          <Ionicons name="server-outline" size={scale(12)} color="rgba(255,255,255,0.4)" />
+          <Server size={scale(12)} color="rgba(255,255,255,0.4)" strokeWidth={2} />
           <Text style={styles.serverText} numberOfLines={1}>{displayServer}</Text>
         </View>
       </View>
@@ -82,7 +106,7 @@ function UserHeader({ username, role, serverUrl }: UserHeaderProps) {
 
 // Profile Link Component
 interface ProfileLinkProps {
-  icon: keyof typeof Ionicons.glyphMap;
+  Icon: LucideIcon;
   label: string;
   subtitle?: string;
   badge?: string;
@@ -90,11 +114,11 @@ interface ProfileLinkProps {
   onPress: () => void;
 }
 
-function ProfileLink({ icon, label, subtitle, badge, badgeColor, onPress }: ProfileLinkProps) {
+function ProfileLink({ Icon, label, subtitle, badge, badgeColor, onPress }: ProfileLinkProps) {
   return (
     <TouchableOpacity style={styles.profileLink} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.linkIconContainer}>
-        <Ionicons name={icon} size={scale(20)} color="rgba(255,255,255,0.8)" />
+        <Icon size={scale(20)} color="rgba(255,255,255,0.8)" strokeWidth={2} />
       </View>
       <View style={styles.linkContent}>
         <Text style={styles.linkLabel}>{label}</Text>
@@ -105,7 +129,7 @@ function ProfileLink({ icon, label, subtitle, badge, badgeColor, onPress }: Prof
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
       ) : null}
-      <Ionicons name="chevron-forward" size={scale(18)} color="rgba(255,255,255,0.3)" />
+      <ChevronRight size={scale(18)} color="rgba(255,255,255,0.3)" strokeWidth={2} />
     </TouchableOpacity>
   );
 }
@@ -139,8 +163,16 @@ export function ProfileScreen() {
   const downloadCount = completedDownloads.length;
   const totalStorage = completedDownloads.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
 
+  // Wishlist count
+  const wishlistCount = useWishlistCount();
+
   // Safe access to preferences store
   const hasCompletedOnboarding = usePreferencesStore?.()?.hasCompletedOnboarding ?? false;
+
+  // Safe access to wizard store
+  const wizardState = useWizardStore?.();
+  const wizardCompleted = wizardState?.isComplete ?? false;
+  const canResumeWizard = wizardState?.canResume && !wizardState?.isComplete;
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -188,19 +220,35 @@ export function ProfileScreen() {
         {/* My Stuff Section */}
         <SectionGroup title="My Stuff">
           <ProfileLink
-            icon="download-outline"
+            Icon={Download}
             label="Downloads"
             subtitle={`${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}`}
             onPress={() => navigation.navigate('Downloads')}
           />
           <ProfileLink
-            icon="stats-chart-outline"
+            Icon={Bookmark}
+            label="Wishlist"
+            subtitle={wishlistCount > 0 ? `${wishlistCount} book${wishlistCount !== 1 ? 's' : ''} saved` : 'Books you want to read'}
+            badge={wishlistCount > 0 ? String(wishlistCount) : undefined}
+            badgeColor={ACCENT}
+            onPress={() => navigation.navigate('Wishlist')}
+          />
+          <ProfileLink
+            Icon={BarChart3}
             label="Listening Stats"
             subtitle="Track your listening activity"
             onPress={() => navigation.navigate('Stats')}
           />
           <ProfileLink
-            icon="sparkles-outline"
+            Icon={CheckCheck}
+            label="Reading History"
+            subtitle="Mark books you've already read"
+            badge={wizardCompleted ? undefined : canResumeWizard ? 'Resume' : 'Set up'}
+            badgeColor={ACCENT}
+            onPress={() => navigation.navigate('ReadingHistoryWizard')}
+          />
+          <ProfileLink
+            Icon={Sparkles}
             label="Reading Preferences"
             subtitle="Personalize recommendations"
             badge={hasCompletedOnboarding ? undefined : 'Set up'}
@@ -212,29 +260,35 @@ export function ProfileScreen() {
         {/* Settings Section */}
         <SectionGroup title="Settings">
           <ProfileLink
-            icon="play-circle-outline"
+            Icon={PlayCircle}
             label="Playback"
             subtitle="Speed, skip intervals, sleep timer"
             onPress={() => navigation.navigate('PlaybackSettings')}
           />
           <ProfileLink
-            icon="folder-outline"
+            Icon={Folder}
             label="Storage"
             subtitle="Downloads, cache, WiFi-only"
             onPress={() => navigation.navigate('StorageSettings')}
           />
           <ProfileLink
-            icon="radio-button-on-outline"
+            Icon={CircleDot}
             label="Haptic Feedback"
             subtitle="Vibration and tactile feedback"
             onPress={() => navigation.navigate('HapticSettings')}
+          />
+          <ProfileLink
+            Icon={Type}
+            label="Chapter Names"
+            subtitle="Clean up messy chapter names"
+            onPress={() => navigation.navigate('ChapterCleaningSettings')}
           />
         </SectionGroup>
 
         {/* Developer Section - keep for testing */}
         <SectionGroup title="Developer">
           <ProfileLink
-            icon="musical-notes-outline"
+            Icon={Music}
             label="Cassette Player Test"
             subtitle="Test the retro cassette UI"
             onPress={() => navigation.navigate('CassetteTest')}
@@ -249,7 +303,7 @@ export function ProfileScreen() {
             disabled={isLoading}
             activeOpacity={0.8}
           >
-            <Ionicons name="log-out-outline" size={scale(20)} color="#fff" />
+            <LogOut size={scale(20)} color="#fff" strokeWidth={2} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>

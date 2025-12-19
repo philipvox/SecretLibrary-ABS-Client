@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, InteractionManager } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -29,17 +29,20 @@ import { AuthorDetailScreen } from '@/features/author';
 import { NarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { BookDetailScreen } from '@/features/book-detail';
-import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen } from '@/features/profile';
+import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen, ChapterCleaningSettingsScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
 import { MoodDiscoveryScreen, MoodResultsScreen } from '@/features/mood-discovery';
-import { CDPlayerScreen } from '@/features/player';
+import { CDPlayerScreen, BookCompletionSheet } from '@/features/player';
+import { MarkBooksScreen, ReadingHistoryScreen } from '@/features/reading-history-wizard';
 import { QueueScreen, useQueueStore } from '@/features/queue';
 import { DownloadsScreen } from '@/features/downloads/screens/DownloadsScreen';
 import { StatsScreen } from '@/features/stats';
+import { WishlistScreen } from '@/features/wishlist';
 import { downloadManager } from '@/core/services/downloadManager';
 import { networkMonitor } from '@/core/services/networkMonitor';
 import { NavigationBar } from './components/NavigationBar';
 import { GlobalMiniPlayer } from './components/GlobalMiniPlayer';
+import { NetworkStatusBar } from '@/shared/components';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -69,43 +72,56 @@ function AuthenticatedApp() {
   const initQueue = useQueueStore((state) => state.init);
 
   // Pre-initialize audio service at app startup for faster playback
+  // Use InteractionManager to defer until after initial render and animations
   useEffect(() => {
-    // Lazy import to avoid circular dependency
-    const { audioService } = require('@/features/player/services/audioService');
-    audioService?.ensureSetup?.().catch((err: any) => {
-      console.warn('[AppNavigator] Audio service pre-init failed:', err);
-    });
+    const task = InteractionManager.runAfterInteractions(() => {
+      // Lazy import to avoid circular dependency
+      const { audioService } = require('@/features/player/services/audioService');
+      audioService?.ensureSetup?.().catch((err: any) => {
+        console.warn('[AppNavigator] Audio service pre-init failed:', err);
+      });
 
-    // Load player settings (control mode, progress mode, playback rate)
-    const { usePlayerStore } = require('@/features/player/stores/playerStore');
-    usePlayerStore.getState().loadPlayerSettings?.().catch((err: any) => {
-      console.warn('[AppNavigator] Player settings load failed:', err);
+      // Load player settings (control mode, progress mode, playback rate)
+      const { usePlayerStore } = require('@/features/player/stores/playerStore');
+      usePlayerStore.getState().loadPlayerSettings?.().catch((err: any) => {
+        console.warn('[AppNavigator] Player settings load failed:', err);
+      });
     });
+    return () => task.cancel();
   }, []);
 
-  // Initialize queue store
+  // Initialize queue store - defer to prevent transition glitches
   useEffect(() => {
-    initQueue().catch((err: any) => {
-      console.warn('[AppNavigator] Queue init failed:', err);
+    const task = InteractionManager.runAfterInteractions(() => {
+      initQueue().catch((err: any) => {
+        console.warn('[AppNavigator] Queue init failed:', err);
+      });
     });
+    return () => task.cancel();
   }, [initQueue]);
 
   // Initialize network monitor first (download manager depends on it)
   useEffect(() => {
-    networkMonitor.init().catch((err: any) => {
-      console.warn('[AppNavigator] Network monitor init failed:', err);
+    const task = InteractionManager.runAfterInteractions(() => {
+      networkMonitor.init().catch((err: any) => {
+        console.warn('[AppNavigator] Network monitor init failed:', err);
+      });
     });
+    return () => task.cancel();
   }, []);
 
   // Initialize download manager (resumes paused downloads, starts queue processing)
   useEffect(() => {
-    // Small delay to ensure network monitor is ready
-    const timer = setTimeout(() => {
-      downloadManager.init().catch((err: any) => {
-        console.warn('[AppNavigator] Download manager init failed:', err);
-      });
-    }, 100);
-    return () => clearTimeout(timer);
+    // Use InteractionManager + small delay to ensure network monitor is ready
+    const task = InteractionManager.runAfterInteractions(() => {
+      const timer = setTimeout(() => {
+        downloadManager.init().catch((err: any) => {
+          console.warn('[AppNavigator] Download manager init failed:', err);
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    });
+    return () => task.cancel();
   }, []);
 
   // Load cache in background - don't block UI
@@ -137,10 +153,12 @@ function AuthenticatedApp() {
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
         <Stack.Screen name="Downloads" component={DownloadsScreen} />
         <Stack.Screen name="Stats" component={StatsScreen} />
+        <Stack.Screen name="Wishlist" component={WishlistScreen} />
         <Stack.Screen name="PlaybackSettings" component={PlaybackSettingsScreen} />
         <Stack.Screen name="StorageSettings" component={StorageSettingsScreen} />
         <Stack.Screen name="JoystickSeekSettings" component={JoystickSeekSettingsScreen} />
         <Stack.Screen name="HapticSettings" component={HapticSettingsScreen} />
+        <Stack.Screen name="ChapterCleaningSettings" component={ChapterCleaningSettingsScreen} />
         <Stack.Screen name="CassetteTest" component={CassetteTestScreen} />
         <Stack.Screen
           name="PreferencesOnboarding"
@@ -157,10 +175,22 @@ function AuthenticatedApp() {
           component={MoodResultsScreen}
           options={{ presentation: 'modal' }}
         />
+        <Stack.Screen
+          name="ReadingHistoryWizard"
+          component={MarkBooksScreen}
+          options={{ presentation: 'fullScreenModal' }}
+        />
+        <Stack.Screen
+          name="ReadingHistory"
+          component={ReadingHistoryScreen}
+          options={{ presentation: 'modal' }}
+        />
       </Stack.Navigator>
       <CDPlayerScreen />
       <GlobalMiniPlayer />
       <NavigationBar />
+      <NetworkStatusBar />
+      <BookCompletionSheet />
     </NavigationContainer>
   );
 }

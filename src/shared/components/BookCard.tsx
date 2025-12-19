@@ -25,6 +25,7 @@ import { useDownloads } from '@/core/hooks/useDownloads';
 import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
 import { usePlayerStore } from '@/features/player';
 import { useNetworkStatus } from './NetworkStatusBar';
+import { useWishlistStore, useIsOnWishlist } from '@/features/wishlist';
 import {
   colors,
   spacing,
@@ -111,6 +112,20 @@ const CloudOffIcon = ({ size = 14, color = '#fff' }: { size?: number; color?: st
   </Svg>
 );
 
+// Bookmark Icon for wishlist
+const BookmarkIcon = ({ size = 14, color = '#fff', fill = false }: { size?: number; color?: string; fill?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={fill ? color : 'none'}
+    />
+  </Svg>
+);
+
 // Progress Ring for downloading
 const ProgressRing = ({ progress, size = 28 }: { progress: number; size?: number }) => {
   const strokeWidth = 2.5;
@@ -177,6 +192,8 @@ export interface BookCardProps {
    * - Streaming: blue cloud ☁
    */
   showStatusBadge?: boolean;
+  /** Show wishlist bookmark button on cover top-right */
+  showWishlistButton?: boolean;
 }
 
 export function BookCard({
@@ -187,6 +204,7 @@ export function BookCard({
   onPlayPress,
   context = 'browse',
   showStatusBadge = false,
+  showWishlistButton = false,
 }: BookCardProps) {
   // State from hooks
   const { isDownloaded, isDownloading, progress } = useDownloadStatus(book.id);
@@ -194,6 +212,12 @@ export function BookCard({
   const currentBookId = usePlayerStore((s) => s.currentBook?.id);
   const isNowPlaying = currentBookId === book.id;
   const isOnline = useNetworkStatus();
+
+  // Wishlist state
+  const isOnWishlist = useIsOnWishlist(book.id);
+  const addFromLibraryItem = useWishlistStore((s) => s.addFromLibraryItem);
+  const removeItem = useWishlistStore((s) => s.removeItem);
+  const getWishlistItemByLibraryId = useWishlistStore((s) => s.getWishlistItemByLibraryId);
 
   // Determine if book is unavailable (offline + not downloaded)
   const isUnavailableOffline = !isOnline && !isDownloaded && !isDownloading;
@@ -205,6 +229,7 @@ export function BookCard({
 
   // Animation
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const wishlistScaleAnim = useRef(new Animated.Value(1)).current;
 
   // Get metadata
   const coverUrl = useCoverUrl(book.id);
@@ -272,6 +297,34 @@ export function BookCard({
     }
   }, [book, isInQueue, addToQueue, removeFromQueue, scaleAnim]);
 
+  // Handle wishlist toggle
+  const handleWishlistPress = useCallback(() => {
+    // Bounce animation
+    Animated.sequence([
+      Animated.timing(wishlistScaleAnim, {
+        toValue: 1.3,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(wishlistScaleAnim, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (isOnWishlist) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const wishlistItem = getWishlistItemByLibraryId(book.id);
+      if (wishlistItem) {
+        removeItem(wishlistItem.id);
+      }
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      addFromLibraryItem(book.id);
+    }
+  }, [book.id, isOnWishlist, addFromLibraryItem, removeItem, getWishlistItemByLibraryId, wishlistScaleAnim]);
+
   return (
     <View style={styles.container}>
       {/* Pressable card area - navigates to BookDetail */}
@@ -326,6 +379,23 @@ export function BookCard({
                 <CloudIcon size={10} color="#fff" />
               )}
             </View>
+          )}
+
+          {/* Wishlist bookmark button on cover */}
+          {showWishlistButton && (
+            <TouchableOpacity
+              style={[styles.wishlistButton, isOnWishlist && styles.wishlistButtonActive]}
+              onPress={handleWishlistPress}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Animated.View style={{ transform: [{ scale: wishlistScaleAnim }] }}>
+                <BookmarkIcon
+                  size={12}
+                  color={isOnWishlist ? '#000' : colors.textPrimary}
+                  fill={isOnWishlist}
+                />
+              </Animated.View>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -443,6 +513,23 @@ const styles = StyleSheet.create({
   },
   offlineBadge: {
     backgroundColor: colors.error,
+  },
+  wishlistButton: {
+    position: 'absolute',
+    top: spacing.xxs,
+    right: spacing.xxs,
+    width: scale(22),
+    height: scale(22),
+    borderRadius: scale(11),
+    backgroundColor: colors.overlay.medium,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  wishlistButtonActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   info: {
     flex: 1,
