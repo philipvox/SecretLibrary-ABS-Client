@@ -33,6 +33,7 @@ import Animated, {
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 
+import { Headphones, BookOpen } from 'lucide-react-native';
 import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 import { usePlayerStore, SleepTimerSheet, SpeedSheet } from '@/features/player';
@@ -220,6 +221,9 @@ export function HomeScreen() {
   // Progress value
   const progressValue = duration > 0 ? position / duration : 0;
 
+  // Check if home screen is completely empty (new user)
+  const isCompletelyEmpty = !currentBook && continueListeningBooks.length === 0 && recentBooks.length === 0;
+
   // ==========================================================================
   // RENDER
   // ==========================================================================
@@ -270,6 +274,27 @@ export function HomeScreen() {
 
         {/* Content overlaid on background - pulled up with negative margin */}
         <View style={[styles.contentOverlay, { paddingTop: insets.top + 8 }]}>
+          {/* Empty state for new users */}
+          {isCompletelyEmpty ? (
+            <View style={styles.emptyHomeContainer}>
+              <View style={styles.emptyHomeIcon}>
+                <Headphones size={48} color={colors.accent} strokeWidth={1.5} />
+              </View>
+              <Text style={styles.emptyHomeTitle}>Welcome to Secret Library</Text>
+              <Text style={styles.emptyHomeDescription}>
+                Your audiobook collection is waiting. Browse your library to start listening.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyHomeCTA}
+                onPress={handleLibraryPress}
+                activeOpacity={0.8}
+              >
+                <BookOpen size={18} color="#000" strokeWidth={2} />
+                <Text style={styles.emptyHomeCTAText}>Browse Library</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
           {/* Header: Title + Time / Author */}
           <HomeHeader
           title={title}
@@ -340,6 +365,8 @@ export function HomeScreen() {
             maxItems={5}
           />
         )}
+            </>
+          )}
         </View>
       </Animated.ScrollView>
 
@@ -405,6 +432,53 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     overflow: 'hidden',
     marginBottom: BOTTOM_NAV_HEIGHT + MINI_PLAYER_HEIGHT + 36,
+  },
+  // Empty home state for new users
+  emptyHomeContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: wp(10),
+    paddingTop: hp(15),
+    minHeight: hp(60),
+  },
+  emptyHomeIcon: {
+    width: wp(24),
+    height: wp(24),
+    borderRadius: wp(12),
+    backgroundColor: 'rgba(244,182,12,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(3),
+  },
+  emptyHomeTitle: {
+    fontSize: wp(5.5),
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: hp(1.5),
+  },
+  emptyHomeDescription: {
+    fontSize: wp(3.8),
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: wp(5.5),
+    maxWidth: wp(70),
+    marginBottom: hp(4),
+  },
+  emptyHomeCTA: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+    backgroundColor: colors.accent,
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(1.5),
+    borderRadius: wp(10),
+  },
+  emptyHomeCTAText: {
+    fontSize: wp(4),
+    fontWeight: '600',
+    color: '#000',
   },
 });
 

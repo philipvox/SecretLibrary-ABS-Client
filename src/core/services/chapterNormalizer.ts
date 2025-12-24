@@ -686,12 +686,41 @@ export function parseChapterTitle(
 // ============================================================
 
 /**
+ * Cache for normalized chapters to avoid re-parsing on every screen mount.
+ * Key format: `${bookTitle || ''}-${level}-${chaptersHash}`
+ * Limited to 50 entries to prevent memory bloat.
+ */
+const chapterCache = new Map<string, ParsedChapter[]>();
+const MAX_CACHE_SIZE = 50;
+
+/**
+ * Generate a simple hash from chapter titles for cache key
+ */
+function hashChapterTitles(chapters: string[]): string {
+  // Use first title + last title + count for a quick hash
+  // This covers most cases without expensive full-array hashing
+  if (chapters.length === 0) return '0';
+  const first = chapters[0].slice(0, 20);
+  const last = chapters[chapters.length - 1].slice(0, 20);
+  return `${chapters.length}-${first}-${last}`;
+}
+
+/**
  * Normalize an array of chapter titles with smart duplicate handling
  */
 export function normalizeChapters(
   chapters: string[],
   options: NormalizerOptions = { level: 'standard' }
 ): ParsedChapter[] {
+  // Generate cache key
+  const cacheKey = `${options.bookTitle || ''}-${options.level}-${hashChapterTitles(chapters)}`;
+
+  // Check cache
+  const cached = chapterCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const parsed = chapters.map((ch) => parseChapterTitle(ch, options));
 
   // Smart numbering: if all chapters parsed to same display name,
@@ -699,32 +728,44 @@ export function normalizeChapters(
   const displayNames = parsed.map((p) => p.displayName);
   const allSame = displayNames.every((n) => n === displayNames[0]);
 
+  let result: ParsedChapter[];
+
   if (allSame && chapters.length > 1) {
-    return parsed.map((p, i) => ({
+    result = parsed.map((p, i) => ({
       ...p,
       displayName: `${p.displayName} ${i + 1}`,
       chapterNumber: i + 1,
     }));
-  }
+  } else {
+    // Check for duplicate display names and disambiguate
+    const counts: Record<string, number> = {};
+    const seen: Record<string, number> = {};
 
-  // Check for duplicate display names and disambiguate
-  const counts: Record<string, number> = {};
-  const seen: Record<string, number> = {};
-
-  for (const p of parsed) {
-    counts[p.displayName] = (counts[p.displayName] || 0) + 1;
-  }
-
-  return parsed.map((p) => {
-    if (counts[p.displayName] > 1) {
-      seen[p.displayName] = (seen[p.displayName] || 0) + 1;
-      return {
-        ...p,
-        displayName: `${p.displayName} (${seen[p.displayName]})`,
-      };
+    for (const p of parsed) {
+      counts[p.displayName] = (counts[p.displayName] || 0) + 1;
     }
-    return p;
-  });
+
+    result = parsed.map((p) => {
+      if (counts[p.displayName] > 1) {
+        seen[p.displayName] = (seen[p.displayName] || 0) + 1;
+        return {
+          ...p,
+          displayName: `${p.displayName} (${seen[p.displayName]})`,
+        };
+      }
+      return p;
+    });
+  }
+
+  // Store in cache (with size limit)
+  if (chapterCache.size >= MAX_CACHE_SIZE) {
+    // Remove oldest entry (first key)
+    const firstKey = chapterCache.keys().next().value;
+    if (firstKey) chapterCache.delete(firstKey);
+  }
+  chapterCache.set(cacheKey, result);
+
+  return result;
 }
 
 /**

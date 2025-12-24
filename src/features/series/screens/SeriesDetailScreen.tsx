@@ -549,8 +549,14 @@ export function SeriesDetailScreen() {
     );
   }
 
-  const bookIds = sortedBooks.map(b => b.id);
-  const firstBookCoverUrl = bookIds[0] ? apiClient.getItemCoverUrl(bookIds[0]) : null;
+  // Memoize bookIds to prevent re-creating array on every render
+  const bookIds = useMemo(() => sortedBooks.map(b => b.id), [sortedBooks]);
+
+  // Memoize cover URL to prevent background image flickering
+  const firstBookCoverUrl = useMemo(
+    () => bookIds[0] ? apiClient.getItemCoverUrl(bookIds[0]) : null,
+    [bookIds]
+  );
 
   // Calculate total duration
   const totalDuration = sortedBooks.reduce((sum, book) => sum + ((book.media as any)?.duration || 0), 0);
@@ -559,7 +565,8 @@ export function SeriesDetailScreen() {
     return `${hours}h`;
   };
 
-  const renderBookItem = ({ item, index }: { item: LibraryItem; index: number }) => {
+  // Memoized render function for book items to prevent flickering
+  const renderBookItem = useCallback(({ item, index }: { item: LibraryItem; index: number }) => {
     const isNowPlaying = item.id === currentBookId;
     const isUpNext = item.id === upNextBook?.id && !isNowPlaying;
     // Use getSequenceForDisplay to hide sequence if all books have the same one
@@ -574,9 +581,10 @@ export function SeriesDetailScreen() {
         onPress={() => handleBookPress(item.id)}
       />
     );
-  };
+  }, [currentBookId, upNextBook?.id, sortedBooks, handleBookPress]);
 
-  const ListHeader = () => (
+  // Memoized header component to prevent flickering
+  const ListHeader = useMemo(() => (
     <>
       {/* Series Info with Stacked Covers */}
       <View style={styles.seriesHeader}>
@@ -683,7 +691,27 @@ export function SeriesDetailScreen() {
         </View>
       </View>
     </>
-  );
+  ), [
+    bookIds,
+    seriesInfo.name,
+    seriesInfo.bookCount,
+    isTracking,
+    handleTrackToggle,
+    sortedBooks,
+    progressStats,
+    nextBook,
+    handleBookPress,
+    loadBook,
+    booksToDownload,
+    nextBookDownloaded,
+    allDownloaded,
+    seriesComplete,
+    handleContinueSeries,
+    seriesHasRealSequences,
+    showDownloadedOnly,
+    displayedBooks.length,
+    sortOrder,
+  ]);
 
   const ListEmpty = () => (
     <View style={styles.emptyListContainer}>

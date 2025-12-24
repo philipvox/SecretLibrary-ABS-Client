@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Auto application descriptor.
+  Declares that this app supports media playback on Android Auto.
+-->
+<automotiveApp>
+    <uses name="media"/>
+</automotiveApp>

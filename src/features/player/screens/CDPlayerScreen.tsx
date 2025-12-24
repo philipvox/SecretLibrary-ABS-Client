@@ -19,6 +19,7 @@ import {
   Easing,
   UIManager,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -523,6 +524,16 @@ export function CDPlayerScreen() {
   const [scrubOffset, setScrubOffset] = useState<number | null>(null);
   const [jogState, setJogState] = useState<JogState | null>(null);
 
+  // Deferred initialization - wait for navigation animation to complete
+  // This improves perceived performance by not blocking the initial render
+  const [interactionsReady, setInteractionsReady] = useState(false);
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setInteractionsReady(true);
+    });
+    return () => handle.cancel();
+  }, []);
+
   // Book metadata
   const metadata = currentBook?.media?.metadata as any;
   const title = metadata?.title || 'Unknown Title';
@@ -946,8 +957,8 @@ export function CDPlayerScreen() {
               coverUrl={coverUrl}
               rotation={discRotation}
               isPrimary={true}
-              isPlaying={isPlaying && discAnimationEnabled}
-              isBuffering={isBuffering && !isDownloaded}
+              isPlaying={isPlaying && discAnimationEnabled && interactionsReady}
+              isBuffering={isBuffering && !isDownloaded && interactionsReady}
               playbackRate={playbackRate}
               reducedMotion={reducedMotion ?? false}
               scrubSpeed={discScrubSpeed}
@@ -1192,6 +1203,7 @@ export function CDPlayerScreen() {
             accessibilityRole="button"
           >
             <RewindIcon />
+            <Text style={styles.skipButtonLabel}>{skipBackInterval}s</Text>
           </TouchableOpacity>
 
           {/* Joystick Scrub Button with amber border - center */}
@@ -1202,17 +1214,35 @@ export function CDPlayerScreen() {
             accessibilityHint="Tap to play or pause. Drag left or right to scrub through the audio."
           >
             <View style={styles.playButtonBorder}>
-              <CoverPlayButton
-                size={70}
-                onScrubSpeedChange={(speed) => {
-                  discScrubSpeed.value = speed;
-                }}
-                onScrubOffsetChange={(offset, isScrubbing) => {
-                  setScrubOffset(isScrubbing ? offset : null);
-                }}
-                onJogStateChange={setJogState}
-                joystickSettings={joystickSettings}
-              />
+              {interactionsReady ? (
+                <CoverPlayButton
+                  size={70}
+                  onScrubSpeedChange={(speed) => {
+                    discScrubSpeed.value = speed;
+                  }}
+                  onScrubOffsetChange={(offset, isScrubbing) => {
+                    setScrubOffset(isScrubbing ? offset : null);
+                  }}
+                  onJogStateChange={setJogState}
+                  joystickSettings={joystickSettings}
+                />
+              ) : (
+                // Simple play button placeholder - no gesture handler overhead
+                <TouchableOpacity
+                  style={{
+                    width: scale(70),
+                    height: scale(70),
+                    borderRadius: scale(35),
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                  onPress={() => (isPlaying ? pause() : play())}
+                  activeOpacity={0.7}
+                >
+                  <Play size={scale(28)} color="white" fill="white" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -1227,6 +1257,7 @@ export function CDPlayerScreen() {
             accessibilityRole="button"
           >
             <FastForwardIcon />
+            <Text style={styles.skipButtonLabel}>{skipForwardInterval}s</Text>
           </TouchableOpacity>
         </View>
 
@@ -1864,12 +1895,19 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     width: scale(48),
-    height: scale(48),
+    height: scale(60),
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 44,
     minHeight: 44,
     opacity: 0.8,
+  },
+  skipButtonLabel: {
+    color: colors.textTertiary,
+    fontSize: scale(11),
+    fontWeight: '500',
+    marginTop: scale(2),
   },
   // Scrub Speed Scale
   scrubScaleContainer: {

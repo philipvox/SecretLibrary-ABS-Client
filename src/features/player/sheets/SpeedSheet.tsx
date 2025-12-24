@@ -45,9 +45,9 @@ export function SpeedSheet({ onClose }: SpeedSheetProps) {
   // HANDLERS
   // ==========================================================================
 
-  const handleSpeedSelect = useCallback((speed: number) => {
+  const handleSpeedSelect = useCallback(async (speed: number) => {
     haptics.speedChange();  // Category-specific haptic for speed control
-    setPlaybackRate(speed);
+    await setPlaybackRate(speed);  // Wait for speed to apply before closing
     onClose();
   }, [setPlaybackRate, onClose]);
 

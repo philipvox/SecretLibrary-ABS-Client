@@ -240,6 +240,7 @@ export function CoverPlayButton({
   const hasTriggeredRampHapticRef = useRef(false);
   const lastSeekTimeRef = useRef(0);  // Throttle seek calls
   const lastSeekPositionRef = useRef(0);  // Track last seeked position
+  const SEEK_THROTTLE_MS = 300;  // Only seek every 300ms during scrubbing
   // Chapter boundary refs - store bounds at scrub start to prevent scrubbing past chapter
   const chapterBoundsRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
@@ -489,8 +490,18 @@ export function CoverPlayButton({
           return; // Don't try to seek further
         }
 
-        // NOTE: Audio feedback during scrubbing disabled - caused duplicate audio bug
-        // when scrubbing for extended periods. The seek will be performed at endScrub.
+        // Throttled real-time seeking during scrub for responsive audio feedback
+        // Seek every SEEK_THROTTLE_MS to keep audio in sync with visual scrub position
+        const now = Date.now();
+        if (now - lastSeekTimeRef.current >= SEEK_THROTTLE_MS) {
+          // Only seek if position changed significantly (more than 0.5 seconds)
+          if (Math.abs(newPosition - lastSeekPositionRef.current) > 0.5) {
+            audioService.seekTo(newPosition);
+            usePlayerStore.setState({ position: newPosition });
+            lastSeekPositionRef.current = newPosition;
+            lastSeekTimeRef.current = now;
+          }
+        }
 
         // Haptic tick every 30s
         const scrubbed = Math.abs(newPosition - lastHapticPositionRef.current);
@@ -499,7 +510,7 @@ export function CoverPlayButton({
           lastHapticPositionRef.current = newPosition;
         }
       }
-    }, 1); // Ultra-fast for aggressive tape sound effect
+    }, 16); // 60fps update rate for smooth visual feedback
   }, [isPlaying, pause, duration, findChapterAtPosition, onScrubOffsetChange, joystickSettings]);
 
   const endScrub = useCallback(() => {

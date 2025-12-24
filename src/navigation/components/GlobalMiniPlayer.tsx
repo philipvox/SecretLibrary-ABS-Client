@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Pause } from 'lucide-react-native';
+import { Pause, Moon } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -45,6 +45,7 @@ import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { useCoverUrl } from '@/core/cache';
 import { getTitle, getAuthorName } from '@/shared/utils/metadata';
 import { useQueue } from '@/features/queue/stores/queueStore';
+import { formatSleepTimer } from '@/features/player/utils';
 
 // Mini disc size
 const MINI_DISC_SIZE = sizes.coverMini;
@@ -176,6 +177,20 @@ const RewindIcon = ({ size, color }: { size: number; color: string }) => (
   </Svg>
 );
 
+// Fast forward icon (mirrored rewind)
+const FastForwardIcon = ({ size, color }: { size: number; color: string }) => (
+  <Svg width={size} height={size * 0.7} viewBox="0 0 22 15" fill="none">
+    <Path
+      d="M12.3461 1.67933C12.3461 1.17875 12.9188 0.894224 13.3178 1.19641L21.6087 7.47742C21.9287 7.71984 21.9287 8.20081 21.6087 8.44323L13.3178 14.7242C12.9188 15.0265 12.3461 14.7419 12.3461 14.2413V1.67933Z"
+      fill={color}
+    />
+    <Path
+      d="M0.246094 1.67933C0.246094 1.17875 0.818755 0.894224 1.21776 1.19641L9.50866 7.47742C9.82866 7.71984 9.82866 8.20081 9.50866 8.44323L1.21777 14.7242C0.818756 15.0265 0.246094 14.7419 0.246094 14.2413V1.67933Z"
+      fill={color}
+    />
+  </Svg>
+);
+
 // Play icon
 const PlayIcon = ({ size, color }: { size: number; color: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -210,6 +225,7 @@ export function GlobalMiniPlayer() {
   const isPlayerVisible = usePlayerStore((s) => s.isPlayerVisible);
   const position = usePlayerStore((s) => s.position);
   const duration = usePlayerStore((s) => s.duration);
+  const sleepTimer = usePlayerStore((s) => s.sleepTimer);
   const play = usePlayerStore((s) => s.play);
   const pause = usePlayerStore((s) => s.pause);
   const seekTo = usePlayerStore((s) => s.seekTo);
@@ -239,6 +255,11 @@ export function GlobalMiniPlayer() {
     const newPosition = Math.max(0, position - 30);
     seekTo?.(newPosition);
   }, [position, seekTo]);
+
+  const handleSkipForward = useCallback(() => {
+    const newPosition = Math.min(duration, position + 30);
+    seekTo?.(newPosition);
+  }, [position, duration, seekTo]);
 
   const handleOpenPlayer = useCallback(() => {
     togglePlayer?.();
@@ -309,16 +330,23 @@ export function GlobalMiniPlayer() {
             {/* Mini CD Disc */}
             <MiniCDDisc coverUrl={coverUrl} isPlaying={isPlaying} />
 
-            {/* Title and Up Next */}
+            {/* Title and Status */}
             <View style={styles.textContainer}>
               <Text style={styles.title} numberOfLines={1}>
                 {title}
               </Text>
-              {nextBookTitle && (
+              {sleepTimer !== null && sleepTimer > 0 ? (
+                <View style={styles.sleepTimerRow}>
+                  <Moon size={10} color={colors.accent} />
+                  <Text style={styles.sleepTimerText}>
+                    {formatSleepTimer(sleepTimer)}
+                  </Text>
+                </View>
+              ) : nextBookTitle ? (
                 <Text style={styles.upNext} numberOfLines={1}>
                   Up next: {nextBookTitle}
                 </Text>
-              )}
+              ) : null}
             </View>
 
             {/* Controls */}
@@ -334,7 +362,7 @@ export function GlobalMiniPlayer() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.controlButton, { marginLeft: wp(1) }]}
+                style={styles.controlButton}
                 onPress={handlePlayPause}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
@@ -348,6 +376,16 @@ export function GlobalMiniPlayer() {
                 ) : (
                   <PlayIcon size={playIconSize} color={colors.accent} />
                 )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={handleSkipForward}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Skip forward 30 seconds"
+              >
+                <FastForwardIcon size={skipIconSize} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -404,6 +442,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textTertiary,
     marginTop: 2,
+  },
+  sleepTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  sleepTimerText: {
+    fontSize: 11,
+    color: colors.accent,
+    fontWeight: '500',
   },
   controls: {
     flexDirection: 'row',

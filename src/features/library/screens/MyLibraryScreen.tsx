@@ -770,6 +770,12 @@ export function MyLibraryScreen() {
               <Text style={styles.bookProgress}>{Math.round(book.progress * 100)}%</Text>
             )}
           </View>
+          {/* Progress bar for in-progress books */}
+          {book.progress > 0 && book.progress < 0.95 && (
+            <View style={styles.bookProgressBar}>
+              <View style={[styles.bookProgressFill, { width: `${book.progress * 100}%` }]} />
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
@@ -1558,6 +1564,18 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
     color: COLORS.accent,
     fontWeight: '500',
+  },
+  bookProgressBar: {
+    height: scale(3),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: scale(2),
+    marginTop: scale(6),
+    overflow: 'hidden',
+  },
+  bookProgressFill: {
+    height: '100%',
+    backgroundColor: COLORS.accent,
+    borderRadius: scale(2),
   },
   playButton: {
     width: scale(40),

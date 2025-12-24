@@ -9,7 +9,7 @@
  * - Clear state indicators
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -90,7 +90,7 @@ function ProgressRing({ progress, size = 24 }: { progress: number; size?: number
   );
 }
 
-export function SeriesBookRow({
+export const SeriesBookRow = memo(function SeriesBookRow({
   book,
   sequenceNumber,
   isNowPlaying,
@@ -258,7 +258,7 @@ export function SeriesBookRow({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

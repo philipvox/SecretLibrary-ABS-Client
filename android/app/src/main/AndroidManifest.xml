@@ -38,5 +38,20 @@
         <data android:scheme="exp+audiobookshelf-app"/>
       </intent-filter>
     </activity>
+
+    <!-- Android Auto Media Browse Service -->
+    <service
+        android:name=".AndroidAutoMediaService"
+        android:exported="true"
+        android:foregroundServiceType="mediaPlayback">
+      <intent-filter>
+        <action android:name="android.media.browse.MediaBrowserService"/>
+      </intent-filter>
+    </service>
+
+    <!-- Android Auto configuration -->
+    <meta-data
+        android:name="com.google.android.gms.car.application"
+        android:resource="@xml/automotive_app_desc"/>
   </application>
 </manifest>

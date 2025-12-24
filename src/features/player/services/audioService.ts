@@ -1011,18 +1011,14 @@ class AudioService {
     this.isScrubbing = scrubbing;
 
     if (!scrubbing) {
-      // Scrubbing ended - execute any pending track switch immediately
+      // Scrubbing ended - clear any pending track switch
+      // The final seekTo() call will handle the actual seek with the correct position
       if (this.trackSwitchTimeout) {
         clearTimeout(this.trackSwitchTimeout);
         this.trackSwitchTimeout = null;
       }
-      if (this.pendingTrackSwitch) {
-        this.executeTrackSwitch(
-          this.pendingTrackSwitch.trackIndex,
-          this.pendingTrackSwitch.positionInTrack
-        );
-        this.pendingTrackSwitch = null;
-      }
+      // Clear pending switch - let the subsequent seekTo handle it
+      this.pendingTrackSwitch = null;
     }
   }
 
@@ -1056,12 +1052,13 @@ class AudioService {
     if (!this.player) return;
 
     // Android needs pitch correction enabled separately
+    // IMPORTANT: Must await for immediate effect
     if (Platform.OS === 'android') {
       this.player.shouldCorrectPitch = true;
-      this.player.setPlaybackRate(rate);
+      await this.player.setPlaybackRate(rate);
     } else {
       // iOS supports pitch correction quality parameter
-      this.player.setPlaybackRate(rate, 'high');
+      await this.player.setPlaybackRate(rate, 'high');
     }
   }
 

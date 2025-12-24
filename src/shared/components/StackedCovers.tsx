@@ -9,7 +9,7 @@
  * - vertical: Covers stack vertically with offset
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { Library } from 'lucide-react-native';
@@ -18,6 +18,8 @@ import { colors, radius, cardTokens, scale } from '@/shared/theme';
 interface StackedCoversProps {
   /** Cover URLs (first 2-3 will be used) */
   coverUrls: (string | null | undefined)[];
+  /** Optional book IDs for stable keys (prevents flickering) */
+  bookIds?: string[];
   /** Size of covers (default from cardTokens) */
   size?: number;
   /** Offset between covers in pixels */
@@ -34,6 +36,7 @@ interface StackedCoversProps {
 
 export function StackedCovers({
   coverUrls,
+  bookIds,
   size = cardTokens.stackedCovers.size,
   offset = cardTokens.stackedCovers.offset,
   maxCovers = cardTokens.stackedCovers.count,
@@ -41,9 +44,22 @@ export function StackedCovers({
   borderRadius = radius.sm,
   style,
 }: StackedCoversProps) {
-  // Filter and limit cover URLs
-  const covers = coverUrls.filter(Boolean).slice(0, maxCovers);
-  const count = Math.min(covers.length, maxCovers);
+  // Memoize cover data with stable keys to prevent flickering
+  const coverData = useMemo(() => {
+    const result: Array<{ url: string; key: string }> = [];
+    for (let i = 0; i < Math.min(coverUrls.length, maxCovers); i++) {
+      const url = coverUrls[i];
+      if (url) {
+        // Use bookId if available, otherwise use index with URL hash for uniqueness
+        // Note: URL extraction like url.split('/').pop() can return "cover" for multiple items
+        const key = bookIds?.[i] || `cover-${i}-${url.length}`;
+        result.push({ url, key });
+      }
+    }
+    return result;
+  }, [coverUrls, bookIds, maxCovers]);
+
+  const count = coverData.length;
 
   // If no covers, show placeholder
   if (count === 0) {
@@ -62,7 +78,7 @@ export function StackedCovers({
 
   return (
     <View style={[{ width: containerWidth, height: containerHeight }, style]}>
-      {covers.map((url, index) => {
+      {coverData.map(({ url, key }, index) => {
         // Position: first cover in back, last in front
         const reverseIndex = count - 1 - index;
         const positionOffset = reverseIndex * offset;
@@ -73,7 +89,7 @@ export function StackedCovers({
 
         return (
           <View
-            key={index}
+            key={key}
             style={[
               styles.coverWrapper,
               {
@@ -85,16 +101,12 @@ export function StackedCovers({
               },
             ]}
           >
-            {url ? (
-              <Image
-                source={url}
-                style={styles.cover}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : (
-              <View style={[styles.cover, styles.placeholderCover]} />
-            )}
+            <Image
+              source={url}
+              style={styles.cover}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
           </View>
         );
       })}

@@ -629,7 +629,12 @@ export function BookDetailScreen() {
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
             </View>
-            <Text style={styles.progressText}>{progressPercent}% Complete</Text>
+            <View style={styles.progressTextRow}>
+              <Text style={styles.progressText}>{progressPercent}% Complete</Text>
+              <Text style={styles.progressTimeRemaining}>
+                {formatDuration(duration * (1 - progress))} remaining
+              </Text>
+            </View>
           </View>
         )}
 
@@ -971,10 +976,20 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
     borderRadius: scale(2),
   },
+  progressTextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '80%',
+    marginTop: scale(8),
+  },
   progressText: {
     fontSize: scale(11),
     color: 'rgba(255,255,255,0.5)',
-    marginTop: scale(8),
+  },
+  progressTimeRemaining: {
+    fontSize: scale(11),
+    color: ACCENT,
+    fontWeight: '500',
   },
 
   // Tabs Container with Add to Queue link

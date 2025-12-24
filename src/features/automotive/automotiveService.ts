@@ -46,6 +46,11 @@ class AutomotiveService {
   private downloadsTemplate: any = null;
   private libraryCacheUnsubscribe: (() => void) | null = null;
 
+  // Deduplication for playItem to prevent double playback
+  private lastPlayedItemId: string | null = null;
+  private lastPlayedTime: number = 0;
+  private static PLAY_DEBOUNCE_MS = 2000; // Ignore duplicate play requests within 2 seconds
+
   /**
    * Initialize the automotive service
    */
@@ -320,9 +325,24 @@ class AutomotiveService {
   }
 
   /**
-   * Play a library item
+   * Play a library item (with deduplication to prevent double playback)
    */
   private async playItem(itemId: string): Promise<void> {
+    const now = Date.now();
+
+    // Deduplication: Skip if same item requested within debounce window
+    if (
+      this.lastPlayedItemId === itemId &&
+      now - this.lastPlayedTime < AutomotiveService.PLAY_DEBOUNCE_MS
+    ) {
+      log('Ignoring duplicate play request for:', itemId, '(within debounce window)');
+      return;
+    }
+
+    // Update deduplication tracking
+    this.lastPlayedItemId = itemId;
+    this.lastPlayedTime = now;
+
     log('Playing item:', itemId);
 
     try {

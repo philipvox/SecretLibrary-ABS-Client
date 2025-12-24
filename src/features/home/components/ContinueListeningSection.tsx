@@ -84,6 +84,8 @@ const ContinueListeningCard = ({
   const metadata = book.media?.metadata as any;
   const title = metadata?.title || 'Unknown';
   const author = metadata?.authorName || metadata?.authors?.[0]?.name || '';
+  const progress = (book as any).userMediaProgress?.progress || 0;
+  const hasProgress = progress > 0 && progress < 1;
 
   return (
     <TouchableOpacity
@@ -91,7 +93,7 @@ const ContinueListeningCard = ({
       onPress={onPress}
       onLongPress={onLongPress}
       activeOpacity={0.9}
-      accessibilityLabel={author ? `${title} by ${author}` : title}
+      accessibilityLabel={author ? `${title} by ${author}, ${Math.round(progress * 100)}% complete` : `${title}, ${Math.round(progress * 100)}% complete`}
       accessibilityRole="button"
       accessibilityHint="Double tap to resume. Long press for details."
     >
@@ -107,6 +109,12 @@ const ContinueListeningCard = ({
         <View style={styles.playOverlay}>
           <PlayIcon size={wp(7)} color="white" />
         </View>
+        {/* Progress bar at bottom of cover */}
+        {hasProgress && (
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+          </View>
+        )}
       </View>
 
       {/* Title - left aligned */}
@@ -190,6 +198,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  progressBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: wp(1),
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
   },
   cardTitle: {
     width: CARD.titleWidth,

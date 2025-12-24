@@ -9,6 +9,142 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.4.92] - 2025-12-23
+
+### Added
+- **Android Auto native support** - Full Android Auto integration
+  - Created MediaPlaybackService for browse tree (Continue Listening, Downloads)
+  - Created AndroidAutoModule React Native bridge for event handling
+  - Added automotive_app_desc.xml for Android Auto compatibility
+  - Browse data synced via JSON file from React Native layer
+
+### Files Added
+- `android/app/src/main/java/com/secretlibrary/app/MediaPlaybackService.kt`
+- `android/app/src/main/java/com/secretlibrary/app/AndroidAutoModule.kt`
+- `android/app/src/main/java/com/secretlibrary/app/AndroidAutoPackage.kt`
+- `android/app/src/main/res/xml/automotive_app_desc.xml`
+
+### Files Modified
+- `android/app/src/main/AndroidManifest.xml` - Added MediaPlaybackService declaration
+- `android/app/src/main/java/com/secretlibrary/app/MainApplication.kt` - Registered AndroidAutoPackage
+
+---
+
+## [0.4.91] - 2025-12-23
+
+### Fixed
+- **Joystick scrub lag/sync** - Scrubbing now seeks audio in real-time
+  - Added throttled seeking every 300ms during scrub for responsive audio feedback
+  - Changed scrub interval from 1ms to 16ms (60fps) for better performance
+  - Audio now stays in sync with visual scrub position
+- **Android Auto double playback** - Fixed duplicate playback on Android Auto
+  - Added 2-second deduplication window to prevent rapid duplicate play requests
+  - Both MediaSession and JS layer events now properly deduplicated
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Added throttled real-time seeking during scrub
+- `src/features/automotive/automotiveService.ts` - Added playItem deduplication logic
+
+---
+
+## [0.4.90] - 2025-12-21
+
+### Fixed
+- **Immediate playback speed changes** - Speed changes now apply instantly
+  - Added `await` to `audioService.setPlaybackRate()` calls for immediate effect
+  - SpeedSheet now waits for speed change before closing
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Await setPlaybackRate calls
+- `src/features/player/sheets/SpeedSheet.tsx` - Await speed change before close
+
+---
+
+## [0.4.89] - 2025-12-21
+
+### Added
+- **UX Audit Phase 3 Implementation** - Implemented P3 nice-to-have improvements
+  - **Personalized greeting** - Home header shows time-based greeting (Good morning/afternoon/evening)
+
+### Already Implemented (Verified)
+- Disc spinning animation - CDPlayerScreen has rotation animation with settings toggle
+- Visual progress bar for onboarding - PreferencesOnboardingScreen has animated progress bar
+- Sort options on list screens - All list screens (Series, Authors, Narrators, Genres) have sort options
+
+### Files Modified
+- `src/features/home/components/HomeHeader.tsx` - Added getGreeting() for time-based greeting
+
+---
+
+## [0.4.88] - 2025-12-21
+
+### Added
+- **UX Audit Phase 2 Implementation** - Implemented P2 improvements from UX audit
+  - **Mini-player skip forward** - Added skip forward 30s button to match skip back
+  - **Home carousel progress bars** - Added visual progress bars on Continue Listening cards
+
+### Performance
+- **Series page image flickering fix** - Eliminated image flickering on the series detail screen
+  - Fixed StackedCovers using array index as key (now uses book ID or extracted URL ID)
+  - Added `React.memo` to SeriesBookRow to prevent unnecessary re-renders
+  - Memoized `bookIds` and `firstBookCoverUrl` to prevent reference instability
+  - Memoized `renderBookItem` callback with proper dependencies
+  - Memoized `ListHeader` component with `useMemo`
+  - Added `cachePolicy="memory-disk"` to cover images
+
+### Already Implemented (Verified)
+- Chapter completion indicators - ChaptersTab already has checkmarks and progress
+- Per-book status badges in Series - SeriesBookRow already has completion badges
+- Recent searches - SearchScreen already stores and displays search history
+- Login error messages - AuthService already has user-friendly error messages
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Added FastForwardIcon and skip forward button
+- `src/features/home/components/ContinueListeningSection.tsx` - Added progress bars to book cards
+- `src/shared/components/StackedCovers.tsx` - Use stable keys from bookIds prop, added caching
+- `src/features/series/screens/SeriesDetailScreen.tsx` - Memoized callbacks and header component
+- `src/features/series/components/SeriesBookRow.tsx` - Wrapped with React.memo
+
+---
+
+## [0.4.87] - 2025-12-21
+
+### Performance
+- **CDPlayerScreen open time optimization** - Reduced screen open time by 220-600ms
+  - Added chapter normalization cache (100-300ms saved) - Caches parsed chapter names by book to avoid re-parsing on every mount
+  - Deferred CoverPlayButton gesture initialization using InteractionManager (50-150ms saved)
+  - Deferred disc animation start until after first paint (50-100ms saved)
+  - Shows simple play button placeholder during initial render, swaps to full gesture handler after interactions complete
+
+### Files Modified
+- `src/core/services/chapterNormalizer.ts` - Added persistent Map cache with LRU eviction (50 entries max)
+- `src/features/player/screens/CDPlayerScreen.tsx` - Added InteractionManager deferral for gestures and animations
+
+---
+
+## [0.4.86] - 2025-12-21
+
+### Added
+- **UX Audit Phase 1 Implementation** - Implemented critical P1 fixes from comprehensive UX audit
+  - **Skip button labels** - Added visible time labels (15s/30s) to CD Player skip buttons
+  - **Sleep timer in mini-player** - Shows countdown when timer is active with moon icon
+  - **Book Detail progress bar** - Enhanced to show both percentage and time remaining
+  - **Library row progress bars** - Added thin visual progress bars to in-progress books
+  - **Home screen empty state** - Welcome screen for new users with CTA to browse library
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Skip button labels with dynamic intervals
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Sleep timer countdown display
+- `src/features/book-detail/screens/BookDetailScreen.tsx` - Enhanced progress bar with time remaining
+- `src/features/library/screens/MyLibraryScreen.tsx` - Progress bars in book rows
+- `src/features/home/screens/HomeScreen.tsx` - Comprehensive empty state for new users
+
+### Documentation
+- Created UX audit implementation plan at `~/.claude/plans/ux-audit-implementation.md`
+- 52 total issues identified (10 P1, 40 P2, ~12 P3)
+
+---
+
 ## [0.4.85] - 2025-12-21
 
 ### Fixed

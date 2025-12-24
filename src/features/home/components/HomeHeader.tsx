@@ -34,18 +34,29 @@ function formatTime(seconds: number): string {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Get time-based greeting
+ */
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  if (hour < 21) return 'Good evening';
+  return 'Good night';
+}
+
 export function HomeHeader({
   title,
   author,
   currentTime,
   isPlaying,
 }: HomeHeaderProps) {
-  // Empty state when no book is loaded
+  // Empty state when no book is loaded - show personalized greeting
   if (!title) {
     return (
       <View style={styles.headerEmpty}>
-        <Text style={styles.emptyTitle}>CassetteShelf</Text>
-        <Text style={styles.emptySubtitle}>Select a book to start listening</Text>
+        <Text style={styles.emptyTitle}>{getGreeting()}</Text>
+        <Text style={styles.emptySubtitle}>Ready to listen?</Text>
       </View>
     );
   }
