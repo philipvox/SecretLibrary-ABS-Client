@@ -18,6 +18,10 @@ const USER_KEY = 'user_data';
 
 /**
  * Cross-platform secure storage wrapper
+ *
+ * IMPORTANT: SecureStore has a 2048 byte limit on iOS.
+ * Only store sensitive credentials (tokens) in SecureStore.
+ * User data with large arrays should use AsyncStorage.
  */
 class Storage {
   /**
@@ -28,9 +32,10 @@ class Storage {
   }
 
   /**
-   * Save value
+   * Save value to SecureStore (for sensitive data like tokens)
+   * Note: Has 2048 byte limit on iOS
    */
-  async setItem(key: string, value: string): Promise<void> {
+  async setSecureItem(key: string, value: string): Promise<void> {
     if (this.canUseSecureStore()) {
       await SecureStore.setItemAsync(key, value);
     } else {
@@ -39,9 +44,9 @@ class Storage {
   }
 
   /**
-   * Get value
+   * Get value from SecureStore
    */
-  async getItem(key: string): Promise<string | null> {
+  async getSecureItem(key: string): Promise<string | null> {
     if (this.canUseSecureStore()) {
       return await SecureStore.getItemAsync(key);
     } else {
@@ -50,14 +55,35 @@ class Storage {
   }
 
   /**
-   * Delete value
+   * Delete value from SecureStore
    */
-  async deleteItem(key: string): Promise<void> {
+  async deleteSecureItem(key: string): Promise<void> {
     if (this.canUseSecureStore()) {
       await SecureStore.deleteItemAsync(key);
     } else {
       await AsyncStorage.removeItem(key);
     }
+  }
+
+  /**
+   * Save value to AsyncStorage (for larger, non-sensitive data)
+   */
+  async setItem(key: string, value: string): Promise<void> {
+    await AsyncStorage.setItem(key, value);
+  }
+
+  /**
+   * Get value from AsyncStorage
+   */
+  async getItem(key: string): Promise<string | null> {
+    return await AsyncStorage.getItem(key);
+  }
+
+  /**
+   * Delete value from AsyncStorage
+   */
+  async deleteItem(key: string): Promise<void> {
+    await AsyncStorage.removeItem(key);
   }
 }
 
@@ -71,11 +97,11 @@ export { User };
  */
 class AuthService {
   /**
-   * Store authentication token securely
+   * Store authentication token securely (in SecureStore)
    */
   async storeToken(token: string): Promise<void> {
     try {
-      await storage.setItem(TOKEN_KEY, token);
+      await storage.setSecureItem(TOKEN_KEY, token);
     } catch (error) {
       console.error('Failed to store token:', error);
       throw new Error('Failed to store authentication token');
@@ -83,11 +109,11 @@ class AuthService {
   }
 
   /**
-   * Get stored authentication token
+   * Get stored authentication token (from SecureStore)
    */
   async getStoredToken(): Promise<string | null> {
     try {
-      return await storage.getItem(TOKEN_KEY);
+      return await storage.getSecureItem(TOKEN_KEY);
     } catch (error) {
       console.error('Failed to get stored token:', error);
       return null;
@@ -95,11 +121,11 @@ class AuthService {
   }
 
   /**
-   * Store server URL
+   * Store server URL (in SecureStore - small and somewhat sensitive)
    */
   async storeServerUrl(url: string): Promise<void> {
     try {
-      await storage.setItem(SERVER_URL_KEY, url);
+      await storage.setSecureItem(SERVER_URL_KEY, url);
     } catch (error) {
       console.error('Failed to store server URL:', error);
       throw new Error('Failed to store server URL');
@@ -107,11 +133,11 @@ class AuthService {
   }
 
   /**
-   * Get stored server URL
+   * Get stored server URL (from SecureStore)
    */
   async getStoredServerUrl(): Promise<string | null> {
     try {
-      return await storage.getItem(SERVER_URL_KEY);
+      return await storage.getSecureItem(SERVER_URL_KEY);
     } catch (error) {
       console.error('Failed to get stored server URL:', error);
       return null;
@@ -119,7 +145,7 @@ class AuthService {
   }
 
   /**
-   * Store user data
+   * Store user data (in AsyncStorage - can be large due to mediaProgress/bookmarks)
    */
   async storeUser(user: User): Promise<void> {
     try {
@@ -131,7 +157,7 @@ class AuthService {
   }
 
   /**
-   * Get stored user data
+   * Get stored user data (from AsyncStorage)
    */
   async getStoredUser(): Promise<User | null> {
     try {
@@ -148,8 +174,10 @@ class AuthService {
    */
   async clearStorage(): Promise<void> {
     try {
-      await storage.deleteItem(TOKEN_KEY);
-      await storage.deleteItem(SERVER_URL_KEY);
+      // Clear SecureStore items
+      await storage.deleteSecureItem(TOKEN_KEY);
+      await storage.deleteSecureItem(SERVER_URL_KEY);
+      // Clear AsyncStorage items
       await storage.deleteItem(USER_KEY);
     } catch (error) {
       console.error('Failed to clear storage:', error);
@@ -221,12 +249,14 @@ class AuthService {
 
   /**
    * Restore session from stored credentials
+   * Token and server URL are in SecureStore, user data is in AsyncStorage.
    */
   async restoreSession(): Promise<{
     user: User | null;
     serverUrl: string | null;
   }> {
     try {
+      // Use the individual getter methods which use correct storage types
       const token = await this.getStoredToken();
       const serverUrl = await this.getStoredServerUrl();
       const user = await this.getStoredUser();
@@ -252,6 +282,8 @@ class AuthService {
    * Optimized session restore - reads all storage keys in parallel.
    * Reduces latency from ~150ms (3 sequential reads) to ~50ms (1 parallel read).
    * Includes retry logic for SecureStore reliability on Android.
+   *
+   * Token and server URL are in SecureStore, user data is in AsyncStorage.
    */
   async restoreSessionOptimized(): Promise<{
     user: User | null;
@@ -264,10 +296,10 @@ class AuthService {
       try {
         console.log(`[AuthService] Restoring session (attempt ${attempt}/${MAX_RETRIES})...`);
 
-        // Read all three values in parallel
+        // Read all three values in parallel (token/serverUrl from SecureStore, user from AsyncStorage)
         const [token, serverUrl, userJson] = await Promise.all([
-          storage.getItem(TOKEN_KEY),
-          storage.getItem(SERVER_URL_KEY),
+          storage.getSecureItem(TOKEN_KEY),
+          storage.getSecureItem(SERVER_URL_KEY),
           storage.getItem(USER_KEY),
         ]);
 

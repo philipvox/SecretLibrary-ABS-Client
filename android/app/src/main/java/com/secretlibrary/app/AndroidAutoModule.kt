@@ -162,6 +162,24 @@ class AndroidAutoModule(reactContext: ReactApplicationContext) :
         // No explicit action needed here as Android Auto requests data on demand
     }
 
+    /**
+     * Required by NativeEventEmitter - called when a listener is added
+     */
+    @ReactMethod
+    fun addListener(eventType: String) {
+        Log.d(TAG, "addListener: $eventType")
+        // No-op: required for NativeEventEmitter compatibility
+    }
+
+    /**
+     * Required by NativeEventEmitter - called when listeners are removed
+     */
+    @ReactMethod
+    fun removeListeners(count: Int) {
+        Log.d(TAG, "removeListeners: $count")
+        // No-op: required for NativeEventEmitter compatibility
+    }
+
     // Lifecycle callbacks
     override fun onHostResume() {
         Log.d(TAG, "onHostResume")
