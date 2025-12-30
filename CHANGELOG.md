@@ -9,6 +9,1520 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.6.8] - 2025-12-30
+
+### Changed
+- **Enhanced timeline scrubbing** - Replaced joystick scrub with long-press + pan gesture
+  - Long-press (300ms) on timeline activates direct scrub mode
+  - Tap-to-seek remains instant (<150ms)
+  - Fine-scrub mode: Pull finger down for precision control
+    - Normal: Full speed
+    - Half speed: Finger 40px below start
+    - Quarter speed: 80px below
+    - Fine: 120px below
+    - Fast (2x): Finger 40px above start
+  - Visual feedback: Timeline scale lift, speed mode indicator
+  - Haptic feedback: Chapter crossings (medium), minute markers (light), tap confirm, edge reached, mode changes
+  - Snap-to-chapter: Auto-snaps when releasing within threshold of chapter boundary
+  - New settings: `snapToChapterEnabled`, `snapToChapterThreshold` in settingsStore
+
+### Added
+- **useTimelineHaptics hook** - Centralized haptic feedback for timeline interactions
+  - Configurable feedback for: chapterBoundaries, minuteMarkers, tapConfirm, edgeReached, modeChanges
+  - Debounced triggers to prevent rapid-fire haptics
+  - Convenience check functions for use during scrub updates
+
+### Removed
+- Joystick scrub component from CD player screen (CoverPlayButton)
+- Joystick-related state and callbacks (jogState, scrubOffsetDisplay)
+- Unused jog overlay UI and related styles
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Long-press + pan gesture, removed joystick
+- `src/features/player/hooks/useTimelineHaptics.ts` - New haptic feedback hook
+- `src/features/player/stores/settingsStore.ts` - Added snap-to-chapter settings
+- `src/constants/version.ts` - Version bump
+
+---
+
+## [0.6.6] - 2025-12-29
+
+### Fixed
+- **Complete light mode theme support** - Converted all remaining screens to use centralized theme system
+  - All screens now properly support light and dark modes
+  - Fixed white text on white background issues in light mode
+  - Settings screens (Playback, Storage, Haptic, JoystickSeek, ChapterCleaning) converted
+  - Feature screens (Downloads, Stats, Queue, Wishlist, ManualAdd) confirmed converted
+  - All screens use `useThemeColors()` hook from `@/shared/theme/themeStore`
+
+### Technical Details
+- Pattern: `createColors(themeColors: ThemeColors)` helper creates theme-aware color objects
+- Theme tokens used: `text`, `textSecondary`, `textTertiary`, `background`, `backgroundSecondary`, `border`
+- `accentColors.gold` replaces legacy `colors.accent` for static accent color
+- Sub-components receive colors via props instead of accessing hardcoded values
+- StyleSheets cleaned up with comments indicating where colors are set in JSX
+- StatusBar dynamically uses `themeColors.statusBar` for proper bar style
+
+### Files Modified
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx`
+- `src/features/profile/screens/StorageSettingsScreen.tsx`
+- `src/features/profile/screens/HapticSettingsScreen.tsx`
+- `src/features/profile/screens/JoystickSeekSettingsScreen.tsx`
+- `src/features/profile/screens/ChapterCleaningSettingsScreen.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.6.5] - 2025-12-28
+
+### Changed
+- **Centralized theme conversion for detail screens** - Migrated key screens to use centralized theme system
+  - AuthorDetailScreen: Converted to use `useTheme` hook with `ThemeColorsConfig` interface
+  - NarratorDetailScreen: Converted with dynamic styles via `createStyles(COLORS)` pattern
+  - SeriesDetailScreen: Updated StackedCovers and SeriesBackground to accept theme color props
+  - BookDetailScreen: Converted to use `lightColors` from centralized theme
+  - QueuePanel: Updated to use `lightColors.queue.*` tokens for consistent styling
+  - All screens now use `useMemo` for styles to support dynamic theming
+
+### Technical Details
+- Pattern: `createStyles(COLORS: ThemeColorsConfig) => StyleSheet.create({...})`
+- Colors sourced from `@/shared/theme` via `useTheme()` hook or `lightColors`/`darkColors`
+- Convenience aliases (e.g., `BG_COLOR = COLORS.background`) for inline JSX color props
+- Sub-components receive color props instead of accessing global constants
+
+### Files Modified
+- `src/features/author/screens/AuthorDetailScreen.tsx`
+- `src/features/narrator/screens/NarratorDetailScreen.tsx`
+- `src/features/series/screens/SeriesDetailScreen.tsx`
+- `src/features/book-detail/screens/BookDetailScreen.tsx`
+- `src/features/queue/components/QueuePanel.tsx`
+
+---
+
+## [0.6.4] - 2025-12-28
+
+### Fixed
+- **Android crash on player screen** - Fixed "Canvas: trying to draw too large bitmap" crash
+  - SVG timeline for chapter view was rendering at full audiobook duration width (e.g., 40,000+ pixels for 10-hour books)
+  - Android has a canvas size limit (~100MB), causing crash when loading long audiobooks
+  - Implemented viewport-based rendering: SVG is now fixed at ~2100px width
+  - Tick positions are calculated relative to a sliding viewport window
+  - Ticks only render within ±15 minutes of current playback position (already existed)
+  - Now the SVG width matches the visible window instead of full duration
+
+- **Image blur crash on Android** - Made blur effects iOS-only
+  - expo-image `blurRadius` was causing massive bitmap allocation on Android
+  - Changed to `blurRadius={Platform.OS === 'ios' ? value : 0}` for cover images
+
+- **Performance warning red screens** - Changed console.error to console.warn in useScreenLoadTime
+  - Dev client was showing red error screens for slow screen mounts
+  - Now uses console.warn which shows yellow instead of blocking red
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Viewport-based timeline SVG rendering
+- `src/core/hooks/useScreenLoadTime.ts` - console.error → console.warn
+
+---
+
+## [0.6.2] - 2025-12-28
+
+### Added
+- **Navigation bar theme support** - Bottom tab bar respects app theme setting
+  - Light mode: White background, black icons and labels
+  - Dark mode: Black background, white icons and labels
+  - Active/inactive states properly themed
+
+### Files Modified
+- `src/navigation/components/FloatingTabBar.tsx` - Theme-aware navigation bar
+
+---
+
+## [0.6.1] - 2025-12-28
+
+### Added
+- **Full player (CDPlayerScreen) theme support** - Respects app theme setting
+  - Light mode: White backgrounds, black text/icons, light gray controls
+  - Dark mode: Black backgrounds, white text/icons, dark gray controls
+  - All sheets (chapters, settings, bookmarks) use theme colors
+  - Standard player controls bar, overlay buttons, and dividers themed
+  - Timeline progress bars (both book and chapter views) use theme-aware tick colors
+  - Header icons, source indicator, and close arrow respond to theme
+  - Control buttons (rewind, play/pause, fast-forward) match theme
+  - Red accent color (#E53935) preserved in both modes for play state and timestamps
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Comprehensive theme support
+- `src/constants/version.ts` - Version bump to 0.6.1
+
+---
+
+## [0.6.0] - 2025-12-28
+
+### Changed
+- **Mini player theme toggle support** - Now respects app theme setting
+  - Uses `useThemeStore` from profile settings dark mode toggle
+  - Light mode: White background, black text/icons
+  - Dark mode: Dark surface (`#1C1C1E`), white text/icons
+  - Colors dynamically switch when theme is toggled
+  - Red accent color preserved in both modes
+  - All elements (container, title, buttons, timeline ticks) respond to theme
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Theme-aware styling using themeStore
+
+---
+
+## [0.5.98] - 2025-12-28
+
+### Fixed
+- **Download count mismatch** - Home screen now shows all downloaded books
+  - Previously only showed downloads that were also in library cache
+  - Now fetches missing library item metadata from API when needed
+  - Fixes discrepancy between home (showed 1) and library/downloads screens (showed 4)
+
+### Files Modified
+- `src/core/services/downloadManager.ts` - Fetch missing library items from API
+
+---
+
+## [0.5.97] - 2025-12-28
+
+### Added
+- **Unified user_books table** - Single source of truth for user-book relationships
+  - Consolidates playback_progress, favorites, marked_complete, and read_history
+  - Schema includes progress, status flags, timestamps, sync state, cached metadata, per-book settings
+  - Partial indexes for efficient queries (favorites, finished, needs_sync)
+  - CRUD methods with upsert support for atomic updates
+
+- **Automatic migration on startup**
+  - One-time migration merges legacy tables into user_books
+  - Runs in parallel with other initialization tasks
+  - Preserves all existing data with timestamp-based conflict resolution
+
+- **Unified data access hooks** (`useUserBooks.ts`)
+  - `useUserBook` - Get full user book record
+  - `useBookProgress`, `useIsFavorite`, `useIsFinished`, `useBookPlaybackSpeed` - Specific data
+  - `useFavoriteBooks`, `useFinishedBooks`, `useInProgressBooks` - Collections
+  - `useUpdateProgress`, `useToggleFavorite`, `useMarkFinished` - Mutations
+  - `useBookStatus`, `useBookActions` - Combined convenience hooks
+  - React Query integration with automatic cache invalidation
+
+### Technical Details
+- Foundation for data storage consolidation (Phase 1 of architecture refactor)
+- Legacy tables remain for backward compatibility during transition
+- Stores can be migrated incrementally to use new unified hooks
+
+### Files Modified
+- `src/core/services/sqliteCache.ts` - Added user_books table, indexes, methods, migration
+- `src/core/services/appInitializer.ts` - Added migration trigger on startup
+- `src/core/hooks/useUserBooks.ts` - New unified data access hooks
+- `src/core/hooks/index.ts` - Export new hooks
+
+---
+
+## [0.5.96] - 2025-12-28
+
+### Changed
+- **QueuePanel modernist redesign** - Updated to match Settings sheet theme
+  - White background with black text
+  - Light gray item cards (#F5F5F5)
+  - Black badge and browse button
+  - Gray icons for drag handle, remove, autoplay
+  - Black/white toggle switch styling
+  - Consistent padding and typography
+
+### Files Modified
+- `src/features/queue/components/QueuePanel.tsx` - Complete style overhaul
+
+---
+
+## [0.5.95] - 2025-12-28
+
+### Fixed
+- **Sheet visibility** - Fixed invisible text on sheets by separating backgrounds
+  - Sheet container now transparent (individual sheets set their own background)
+  - Settings, Bookmarks, Chapters sheets use white background
+  - Queue panel keeps dark theme styling
+  - Updated Chapters sheet to modernist white/black theme
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Sheet background separation, chapter styles
+
+---
+
+## [0.5.94] - 2025-12-28
+
+### Changed
+- **Modernist Sheet Design** - Complete redesign of Settings and Bookmarks sheets
+  - White background (#FFFFFF) with black text
+  - Light gray option buttons (#F0F0F0) with black active state
+  - Section titles in gray uppercase with letter-spacing
+  - More spacious padding throughout (20-24px)
+  - Softer rounded corners (24px on container)
+  - Gray dividers between bookmark items
+  - Black icons for close, bookmark, play buttons
+  - Clean badge design with black background
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Sheet, settings, and bookmark styles
+
+---
+
+## [0.5.93] - 2025-12-28
+
+### Changed
+- **Modernist Popup Design** - Updated toast and modal to clean white/black theme
+  - White background with black text and icons
+  - Increased padding and font sizes for better readability
+  - Softer shadows for floating appearance
+  - Note modal has handle bar for modern bottom sheet look
+  - Underlined action text for clearer affordance
+  - Black save button with white text
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Toast and modal style updates
+
+---
+
+## [0.5.92] - 2025-12-28
+
+### Added
+- **Enhanced Bookmark System** - Comprehensive bookmark UX improvements
+  - Toast notification with "Add note" option after creating bookmark
+  - Note input modal with character counter (500 limit)
+  - Enhanced bookmark cards with cover thumbnail, chapter, timestamp, note preview
+  - Long-press to edit existing bookmark notes
+  - Delete with 5-second undo window
+  - Improved empty state with helpful messaging
+- **Inline Settings Controls** - Speed and sleep timer in settings panel
+  - Quick option buttons for common speeds (1x, 1.25x, 1.5x, 2x)
+  - Quick option buttons for sleep times (5min, 15min, 30min, 1h)
+  - Inline custom input fields for arbitrary values
+  - Live countdown display in sleep timer input
+- **Sleep Timer on Play Button** - Visual feedback when timer active
+  - Replaces play/pause button when sleep timer running
+  - Shows live mm:ss countdown in red bold
+  - Small play/pause icon above timer
+
+### Changed
+- **Settings Panel Layout** - Single column design
+  - Progress bar toggle at top
+  - Speed options with inline custom input
+  - Sleep timer with inline custom input
+  - View Bookmarks button
+  - Clear Queue button
+- Removed full-screen SpeedPanel and SleepTimerPanel pages
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Bookmark enhancements, inline settings, sleep timer display
+
+---
+
+## [0.5.82] - 2025-12-28
+
+### Added
+- **Full-Screen Speed Control Panel** - New immersive speed control experience
+  - Vertical fill-bar slider with 0.1x–4x range
+  - Logarithmic scale for natural drag feel
+  - Animal icons: turtle (slow), sitting rabbit (1x), running rabbit (1.5x+)
+  - Markers clip/reveal as fill rises
+  - Snap points with haptic feedback at common speeds
+  - Tappable display opens numeric keypad for manual entry
+  - Playback controls at bottom
+- **Full-Screen Sleep Timer Panel** - New circular pie selector for sleep timer
+  - Clock-style drag rotation (12 o'clock = 0)
+  - Full rotation = 60 minutes, multi-rotation for longer times
+  - Red fill arc showing selected duration
+  - Tick marks at 0, 15, 30, 45, END positions
+  - "End of Chapter" option
+  - Tappable display for manual time entry
+  - Presets: 15m, 30m, 1h, 2h
+  - OFF button in center
+- **NumericInputModal Component** - Reusable modal for manual entry
+  - Custom numeric keypad (no system keyboard)
+  - Supports speed mode (decimal) and time mode (hours/minutes)
+  - Preset quick-select buttons
+  - Range validation with error display
+
+### Changed
+- **Player Settings Sheet** - Added Controls section
+  - Speed Control option shows current speed, opens SpeedPanel
+  - Sleep Timer option shows remaining time, opens SleepTimerPanel
+
+### Files Added
+- `src/features/player/components/NumericInputModal.tsx` - Shared numeric input modal
+- `src/features/player/screens/SpeedPanel.tsx` - Full-screen speed control
+- `src/features/player/screens/SleepTimerPanel.tsx` - Full-screen sleep timer
+
+### Files Modified
+- `src/features/player/index.ts` - Export new panels and modal
+- `src/features/player/screens/CDPlayerScreen.tsx` - Integrate panels, add settings options
+
+---
+
+## [0.5.81] - 2025-12-28
+
+### Changed
+- **Minimal Search Bar** - Simplified Home page search bar design
+  - Changed from pill/bordered style to minimal underline style
+  - Smaller font size (13px) and icons (3.5%)
+  - Bottom border only instead of full border
+  - More compact height
+
+### Files Modified
+- `src/features/home/components/TextListSection.tsx` - Updated search bar styles
+
+---
+
+## [0.5.80] - 2025-12-28
+
+### Added
+- **Finished Tab on Home Page** - New tab showing completed books
+  - Shows books marked as finished or with 100% progress
+  - Matches Library page's Finished tab behavior
+- **Search Bar on Home Page** - Filter books by title or author
+  - Located under the tabs
+  - Includes clear button when text is entered
+  - Filters current tab's books in real-time
+
+### Files Modified
+- `src/features/home/components/TextListSection.tsx` - Added Finished tab, search bar, and filtering logic
+- `src/features/home/screens/HomeScreen.tsx` - Added finished books data and search state
+
+---
+
+## [0.5.79] - 2025-12-28
+
+### Changed
+- **Home Page Book Rows** - Added cover images with play overlay
+  - Small cover image (10% screen width) displayed for each book
+  - Dark overlay (35% opacity) on cover for visibility
+  - White play icon centered on cover (no circle stroke)
+- **Scrollable Tabs** - Made Home page tabs horizontally scrollable
+  - Matches Library page tab behavior
+  - Extends edge-to-edge with proper padding
+
+### Files Modified
+- `src/features/home/components/TextListSection.tsx` - Cover images, new play icon, scrollable tabs
+
+---
+
+## [0.5.78] - 2025-12-28
+
+### Changed
+- **Home Page Tabs** - Added Library-style tabs to Home page
+  - New tabs: In Progress, Downloaded, Favorites
+  - Tab styling matches Library page (26px text tabs)
+  - Favorites tab filters from available books
+- **Theme-Aware Section Headers** - Fixed SectionHeader component
+  - Now uses `useThemeColors()` for proper theming
+  - Titles display correctly in both light and dark modes
+
+### Files Modified
+- `src/features/home/components/TextListSection.tsx` - Added 3-tab system, new tab bar styles
+- `src/features/home/screens/HomeScreen.tsx` - Added favorite books data
+- `src/features/home/components/SectionHeader.tsx` - Fixed hardcoded colors
+
+---
+
+## [0.5.77] - 2025-12-28
+
+### Changed
+- **Library Screen Layout Update** - Improved header layout
+  - Removed "My Library" title - tabs now serve as the header
+  - Moved search bar below tabs
+  - Tightened spacing between elements
+  - Tabs slightly larger (26px) for better visibility
+
+### Files Modified
+- `src/features/library/screens/MyLibraryScreen.tsx` - Layout reorder and spacing fixes
+
+---
+
+## [0.5.76] - 2025-12-28
+
+### Changed
+- **Library Screen Redesign** - Updated to match Home page styling
+  - New Home-style text tabs: large 24px text labels instead of icon pills
+  - Simplified tabs: All, Downloaded, In Progress, Finished, Favorites
+  - Fixed all hardcoded colors to use `themeColors` for proper theme support
+  - Title/subtitle colors now dynamic for both light and dark themes
+  - Progress bar colors fixed on horizontal cards
+  - Badge icons use theme-aware colors
+  - Hero card play button uses theme colors
+  - Screen title style updated to match Home (32px, 400 weight)
+
+### Files Modified
+- `src/features/library/screens/MyLibraryScreen.tsx` - Complete styling overhaul
+
+---
+
+## [0.5.75] - 2025-12-28
+
+### Changed
+- **Improved Time Display in Player** - Shows current book position in verbose format
+  - Now displays: `19m 14s` (book position)
+  - New format: `5h 23m 10s` instead of `5:23:10`
+  - Updated both Standard Player and CD Player modes
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Updated time display format, added `formatTimeVerbose()` helper
+
+---
+
+## [0.5.74] - 2025-12-28
+
+### Changed
+- **Allow Scrubbing Across Chapter Boundaries** - Removed chapter bounds clamping from joystick scrubbing
+  - Previously: Scrubbing was clamped to current chapter bounds, preventing scrubbing past chapter start/end
+  - Now: Scrubbing is clamped only to book bounds (0 to duration), allowing free navigation across chapters
+  - User can now scrub from any position to any other position in the book
+  - Boundary haptics now trigger at book start/end instead of chapter boundaries
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Changed clamp bounds from chapter to book in scrub interval and endScrub
+
+---
+
+## [0.5.73] - 2025-12-28
+
+### Fixed
+- **Position Overwritten During endScrub Delay** - Fixed final position race condition in scrub seek
+  - Root cause: During 50ms delay after seek, audio callbacks overwrote store position with stale values
+  - Example: Store set to 1001s, then callback overwrote with 972s, causing wrong resume position
+  - Solution 1: Modified `updatePlaybackState()` to skip position updates when `isSeeking=true`
+  - Solution 2: Modified `endScrub()` to use `isSeeking` flag for entire operation including 50ms delay
+  - Flow: Set `isSeeking=true` → seek → delay → set `position` AND clear `isSeeking` together
+  - Position updates are now blocked during the entire endScrub operation
+
+### Files Modified
+- `src/features/player/stores/playerStore.ts` - Check `isSeeking` in `updatePlaybackState()` before updating position
+- `src/shared/components/CoverPlayButton.tsx` - Use `isSeeking` flag to block updates during endScrub
+
+---
+
+## [0.5.72] - 2025-12-28
+
+### Fixed
+- **Store Position Not Updated After Scrub** - Fixed position mismatch between store and audio
+  - Root cause: `audioService.seekTo()` updated `lastKnownGoodPosition` but not the store
+  - Store's `position` was stale from before scrubbing started
+  - Example: Audio at 971s but store reported 998s, causing wrong position on resume
+  - Solution: Added `usePlayerStore.setState({ position: finalPosition })` after seek
+  - Store position now matches actual audio position after scrubbing
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Update store position after final seek
+
+---
+
+## [0.5.71] - 2025-12-28
+
+### Fixed
+- **Track Switch Not Executing After Scrub** - Fixed position snap-back when scrubbing across track boundaries
+  - Root cause: `endScrub()` called `seekTo()` while `isScrubbing=true`, which queued track switches
+  - Then `setScrubbing(false)` cleared the pending switch without executing it
+  - Audio remained on old track at wrong position, causing snap-back on play
+  - Solution: Clear scrubbing flag BEFORE final seek, so track switches execute immediately
+  - Example: Scrub from 265s→117s now correctly switches tracks instead of snapping back to 265s
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Moved `setScrubbing(false)` before `seekTo()`
+
+---
+
+## [0.5.70] - 2025-12-28
+
+### Fixed
+- **SmartRewind Race Condition** - Fixed bug where SmartRewind could apply old position after scrubbing
+  - Root cause: `clearSmartRewind()` was fire-and-forget, AsyncStorage clear could be incomplete
+  - When `play()` was called after scrub, `restoreSmartRewindState()` would read stale AsyncStorage data
+  - Solution: Added `skipNextSmartRewind` flag in audioService, set when scrubbing starts
+  - `play()` now checks and consumes this flag before applying SmartRewind
+  - Added log message `[SmartRewind] Skipping - just finished scrubbing` for debugging
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Added `skipNextSmartRewind` flag and `consumeSkipSmartRewind()` method
+- `src/features/player/stores/playerStore.ts` - Check skip flag before applying SmartRewind
+
+---
+
+## [0.5.69] - 2025-12-28
+
+### Fixed
+- **Scrubbing Performance** - Fixed lag during joystick scrubbing
+  - Root cause: React state updating at ~40fps causing excessive re-renders
+  - Solution: Throttle scrub offset React state updates to 100ms intervals
+  - Added `scrubOffsetShared` (Reanimated shared value) for immediate updates
+  - Added `scrubOffsetDisplay` (throttled React state) for text displays
+  - CDPlayerScreen now re-renders at ~10fps max during scrubbing (was ~40fps)
+  - Timeline animations remain smooth using Reanimated shared values
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Added throttled scrub offset handling
+
+---
+
+## [0.5.68] - 2025-12-28
+
+### Added
+- **Timeline Gestures Restored** - Re-added seeking gestures to progress bars
+  - Tap gesture: Added to both TimelineProgressBar and ChapterTimelineProgressBar
+  - Pan gesture: Added only to TimelineProgressBar (book view)
+  - Chapter view has tap-to-seek only (no pan to avoid joystick conflicts)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Added gesture handling back
+
+---
+
+## [0.5.67] - 2025-12-28
+
+### Changed
+- **Bookmark Flag Design** - Updated flag appearance to match design spec
+  - Stem now reaches full height of timeline (like red center marker)
+  - Stem color: light blue (#64B5F6)
+  - Flag shape: notched pennant (based on Flag.svg design)
+  - Flag color: solid blue (#0146F5)
+  - Consistent design in both book view and chapter view
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Updated bookmark flag rendering
+
+---
+
+## [0.5.66] - 2025-12-28
+
+### Removed
+- **Progress Bar Gestures** - Removed click/drag seeking from timeline
+  - Removed pan gesture for scrubbing on TimelineProgressBar
+  - Removed tap gesture for seeking on TimelineProgressBar
+  - Removed pan/tap gestures from ChapterTimelineProgressBar
+  - Scrubbing now only via joystick (avoids gesture conflicts)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Removed gesture handlers from both timeline components
+
+---
+
+## [0.5.65] - 2025-12-28
+
+### Added
+- **Bookmark Flags on Timeline** - Visual bookmark indicators
+  - Bookmarks now display as blue flags on the progress bar
+  - Flag design: vertical pole with pennant shape at top
+  - Book view: smaller flags positioned below the marker
+  - Chapter view: larger flags that scroll with the timeline
+  - Bookmarks rounded to nearest second for precise positioning
+  - Flags only render within visible window for performance
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Added BookmarkFlagIcon, bookmark rendering in both timelines
+
+---
+
+## [0.5.64] - 2025-12-28
+
+### Changed
+- **Solid Red Joystick** - Simplified joystick appearance
+  - Removed cover image and blur overlay
+  - Removed play/pause icon from center
+  - Joystick is now a solid red circle (#E53935)
+  - Cleaned up unused imports (Image, BlurView, useCoverUrl)
+  - Removed unused PlayIcon and PauseIcon components
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Simplified to solid red circle
+
+---
+
+## [0.5.63] - 2025-12-28
+
+### Changed
+- **Joystick Scrub Only** - Removed play/pause from joystick
+  - Tap no longer toggles play/pause
+  - Joystick is now purely for scrubbing (drag left/right)
+  - Long press still opens full player (if applicable)
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Removed tap gesture, handlePlayPause
+
+---
+
+## [0.5.62] - 2025-12-28
+
+### Changed
+- **Standard Player Layout Cleanup** - Simplified layout
+  - Removed duplicate smaller joystick/play button from upper area
+  - Moved chapter title and time remaining to just under the header
+  - Joystick only appears on timeline (chapter mode)
+  - Book mode has no joystick (clean look)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Layout changes, new styles
+
+---
+
+## [0.5.61] - 2025-12-28
+
+### Changed
+- **Joystick on Chapter Timeline** - Replaced red marker with joystick
+  - Chapter view: Joystick (size 100) replaces the red dot at timeline center
+  - Book view: Joystick hidden entirely (per user request)
+  - Timeline still has vertical line marker below joystick
+  - ChapterTimelineProgressBar now accepts `joystickComponent` prop
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Move joystick to timeline
+
+---
+
+## [0.5.60] - 2025-12-28
+
+### Fixed
+- **Critical: SmartRewind triggering on scrub release** - Audio jumping back
+  - Root cause: SmartRewind detected "pause" during scrub and rewound on resume
+  - SmartRewind state now cleared when scrub starts
+  - Pause during scrub no longer records SmartRewind state
+  - Added `audioService.getIsScrubbing()` getter
+  - Added `playerStore.clearSmartRewind()` action
+
+  ```
+  BEFORE (audio jumped back 230s):
+    Scrub to 721s → Release → SmartRewind from old 465s pause → Audio at 460s!
+
+  AFTER (correct):
+    Scrub starts → clearSmartRewind() → No old state
+    Pause during scrub → Skip SmartRewind recording
+    Resume → No rewind applied → Audio at 721s ✓
+  ```
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Added `getIsScrubbing()` getter
+- `src/features/player/stores/playerStore.ts` - Added `clearSmartRewind()`, check scrubbing in pause
+- `src/shared/components/CoverPlayButton.tsx` - Call `clearSmartRewind()` on scrub start
+
+---
+
+## [0.5.59] - 2025-12-28
+
+### Changed
+- **Sub-second Position Accuracy** - Faster progress updates
+  - Progress callback: 250ms → 100ms (10 updates/second)
+  - Timeline now updates 2.5x more frequently for smoother scrolling
+  - Media control updates: every ~1 second (was ~2 seconds)
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Poll rate 250ms → 100ms
+
+---
+
+## [0.5.58] - 2025-12-28
+
+### Fixed
+- **Critical: Audio not seeking to scrub position** - Await seek completion
+  - `endScrub()` now async, awaits `seekTo()` before resuming playback
+  - Added 50ms settle delay after seek before clearing scrubbing flag
+  - Scrubbing flag stays ON during final seek (prevents callback overwrite)
+  - All `player.seekTo()` calls now properly awaited in audioService
+  - Removed setTimeout for trackSwitchInProgress clear (use await instead)
+
+  ```
+  BEFORE (race condition):
+    setScrubbing(false)  ← Protection removed
+    seekTo(500s)         ← Fire-and-forget
+    play()               ← Immediate, audio still at 464s!
+
+  AFTER (correct order):
+    await seekTo(500s)   ← Wait for seek
+    await delay(50ms)    ← Let audio settle
+    setScrubbing(false)  ← Safe to clear
+    play()               ← Audio at 500s ✓
+  ```
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Async endScrub, await seek
+- `src/features/player/services/audioService.ts` - Await all player.seekTo() calls
+
+---
+
+## [0.5.57] - 2025-12-28
+
+### Fixed
+- **Scrub Position Sync** - Fixed position lag during joystick scrubbing
+  - Added `audioService.setPosition()` - updates cached position without seeking
+  - Scrub interval now calls `setPosition()` on EVERY update (not throttled)
+  - `seekTo()` remains throttled for actual audio seeking
+  - `lastKnownGoodPosition` now always reflects current scrub position
+
+  ```
+  BEFORE (position could lag):
+    scrub interval → throttled seekTo() → lastKnownGoodPosition
+
+  AFTER (position always current):
+    scrub interval → setPosition() (immediate) + seekTo() (throttled)
+  ```
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Added `setPosition()` method
+- `src/shared/components/CoverPlayButton.tsx` - Call `setPosition()` on every scrub update
+
+---
+
+## [0.5.56] - 2025-12-28
+
+### Changed
+- **All Animations Now Instant** - Removed all animation durations
+  - Timeline position updates: instant (was 100-500ms)
+  - Timeline tap to seek: instant (was 100ms)
+  - Thumb position updates: instant (was 100ms)
+  - Thumb scale on drag: instant (was 100ms)
+  - CD rotation speed changes: instant (was 300ms)
+  - Player screen open/close: instant (was spring/150ms)
+  - Pan gesture snap back: instant (was 150ms)
+  - Title press navigation: instant (was 250ms delay)
+  - Removed unused imports: `withTiming`, `Easing`, `ReanimatedEasing`, `DURATION`
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - All animation removal
+
+---
+
+## [0.5.55] - 2025-12-28
+
+### Changed
+- **Single Source of Truth Architecture** - Eliminated position conflicts
+  - `audioService.lastKnownGoodPosition` is now THE authoritative position
+  - Removed direct position writes from CoverPlayButton (joystick scrubber)
+  - Simplified `playerStore.seekTo()` to only call `audioService.seekTo()`
+  - Simplified `playerStore.updatePlaybackState()` to always accept position from audioService
+  - Removed `lastSeekCommitTime` and `SEEK_SETTLING_MS` (no longer needed)
+  - Position flow: `audioService.lastKnownGoodPosition` → callback → `playerStore.position` → UI
+  - UI joystick preview uses `scrubOffset` (not position writes)
+
+### Fixed
+- **Cross-chapter scrubbing stability** - No more position flashing or multiple streams
+  - Race condition fixed: `trackSwitchInProgress` flag set BEFORE `currentTrackIndex` update
+  - audioService.seekTo() updates `lastKnownGoodPosition` immediately
+  - Progress callback returns cached position during track switches and scrubbing
+
+### Files Modified
+- `src/shared/components/CoverPlayButton.tsx` - Removed direct position writes
+- `src/features/player/stores/playerStore.ts` - Simplified seeking functions
+- `src/features/player/services/audioService.ts` - Single source of truth for position
+
+---
+
+## [0.5.54] - 2025-12-28
+
+### Fixed
+- **Position flash on backward scrub** - Race condition in track switch
+  - `trackSwitchInProgress` flag now set BEFORE updating `currentTrackIndex`
+  - Prevents stale position being read during track switch
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Flag ordering fix
+
+---
+
+## [0.5.53] - 2025-12-28
+
+### Fixed
+- **Multiple audio streams bug** - Old player not stopped when switching tracks
+  - Added `this.player.pause()` before swapping preloaded players in `executeTrackSwitch`
+  - Fixed same issue in auto-advance logic
+- **Position flash to chapter 1** - Added `lastKnownGoodPosition` cache
+  - Cache provides stable position during track switch operations
+  - `getGlobalPositionSync()` returns cached value during transitions
+
+### Files Modified
+- `src/features/player/services/audioService.ts` - Player cleanup, position cache
+
+---
+
+## [0.5.52] - 2025-12-28
+
+### Fixed
+- **First minute tick not marked** - Changed to 1-indexed minutes
+  - Minute labels now show as "1", "2", "3" instead of "0", "1", "2"
+  - First minute tick after chapter start now correctly labeled
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Minute indexing fix
+
+---
+
+## [0.5.51] - 2025-12-28
+
+### Changed
+- **Enhanced minute tick labels** - Better readability
+  - 10-minute ticks now also show minute labels
+  - Increased label font size for better visibility
+  - Moved labels up slightly for better spacing
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Tick label improvements
+
+---
+
+## [0.5.50] - 2025-12-28
+
+### Added
+- **Minute Tick Labels** - Chapter-relative minute markers
+  - 1-minute ticks now show small labels above them
+  - Labels show minutes within the chapter (not book time)
+  - Example: "1", "2", "3" for 1st, 2nd, 3rd minute of chapter
+  - Smaller font (8px) and lighter color (50% opacity) than chapter labels
+  - Labels positioned just above the tick mark
+  - Minute 0 (chapter start) has no label (chapter label shows instead)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Minute tick labels
+
+---
+
+## [0.5.49] - 2025-12-28
+
+### Changed
+- **Timeline Motion Spec Implementation** - Three motion types
+  - **Skip/Large Jump (>5s)**: 100ms ease-out animation
+  - **Playback (≤5s)**: 500ms linear animation for smooth scrolling
+  - **Tap on timeline**: 100ms ease-out to tapped position
+  - **Joystick scrub**: Direct update, no animation (0ms)
+    - Added `scrubOffset` prop to ChapterTimelineProgressBar
+    - Timeline follows joystick at 60fps with no animation wrapper
+    - Ticks stay in place on release (no settle animation)
+  - Visible tick window follows effective position during scrub
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Timeline motion implementation
+
+---
+
+## [0.5.48] - 2025-12-28
+
+### Fixed
+- **Chapter Label Smart Filtering** - Skip short chapter labels
+  - Added MIN_CHAPTER_DURATION = 60 seconds threshold
+  - Chapters shorter than 60s don't show labels (intros, transitions, credits)
+  - Tick marks still render for all chapters
+  - Combined with spacing check: must be long enough AND have space
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Chapter duration filtering
+
+---
+
+## [0.5.47] - 2025-12-28
+
+### Fixed
+- **Chapter Label Collision Detection** - No more overlapping labels
+  - Tracks last label position to detect potential overlaps
+  - Skips labels when chapters are too close (< 55px apart)
+  - Chapter ticks still render, only labels are hidden
+  - Prevents "CH 10CH 23" style collisions
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Label spacing logic
+
+---
+
+## [0.5.46] - 2025-12-28
+
+### Changed
+- **Smooth Chapter Timeline Animation** - Eliminated jitter
+  - Playback: smooth 150ms linear animation for small position updates
+  - Large jumps (seeks, chapter skips, rewind/ff): 300ms ease-out cubic animation
+  - Tap-to-seek: 250ms ease-out cubic animation
+  - Pan/scrub: direct (no animation) for responsive feel
+  - Tracks position delta to choose appropriate animation duration
+  - Uses Reanimated Easing for native-thread smoothness
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - ChapterTimelineProgressBar animation
+
+---
+
+## [0.5.45] - 2025-12-28
+
+### Changed
+- **Left Alignment Consistency** - Title aligns with chapter text
+  - Removed paddingHorizontal from header container
+  - Added paddingHorizontal: scale(22) to headerRow
+  - Title, chapter row, and header row all now left-align at scale(22)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Header/headerRow padding
+
+---
+
+## [0.5.44] - 2025-12-28
+
+### Changed
+- **Header Padding Alignment** - Match chapter row
+  - Header paddingHorizontal: scale(20) → scale(22)
+  - Now aligned with standardChapterRow padding
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Header padding
+
+---
+
+## [0.5.43] - 2025-12-28
+
+### Changed
+- **Standard Player Cover Height** - Taller cover image
+  - Increased flex from 1.5 to 2.0 (~150px taller)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Cover container flex increase
+
+---
+
+## [0.5.42] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Performance Optimization**
+  - Only render ticks within ±15 minutes of current position
+  - Previously rendered ALL ticks for entire book (thousands for long books)
+  - Now renders max ~120 ticks at any time (30 min window)
+  - Ticks regenerate as position changes
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Windowed tick rendering
+
+---
+
+## [0.5.41] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Refinements**
+  - Zoomed in to ~5 minutes visible per screen
+  - Changed 4th tier from 10-sec to 15-sec ticks
+  - Center-aligned chapter labels above their ticks
+  - Thicker chapter tick stroke (2.5px vs 1px for others)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Timeline zoom, tick intervals, label alignment
+
+---
+
+## [0.5.40] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Tick Heights** - Adjusted proportions
+  - Chapter: 80px (was 50px)
+  - 10-minute: 45px (was 24px)
+  - 1-minute: 24px (was 14px)
+  - 10-second: 11px (was 6px)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Tick height adjustments
+
+---
+
+## [0.5.39] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Zoom & 4th Tier** - More detail visible
+  - Zoomed in from ~25 min to ~10 min visible per screen
+  - Added 4th tier: 10-second tick marks (smallest)
+  - Four-tier system now:
+    - **Chapter** (50px) - at chapter boundaries with "CH X" labels
+    - **10-minute** (24px) - every 10 minutes
+    - **1-minute** (14px) - every minute
+    - **10-second** (6px) - every 10 seconds
+  - Smart collision avoidance for all tiers
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - 4-tier tick system, zoom adjustment
+
+---
+
+## [0.5.38] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Sizing Fixes** - Match design mockup
+  - Enlarged red marker circle from 60px to 100px
+  - Extended red stem line to reach bottom of component (to cover image)
+  - Increased chapter tick height from 28px to 50px
+  - Increased 10-minute tick height from 16px to 24px
+  - Increased 1-minute tick height from 8px to 10px
+  - Total component height now 220px to accommodate larger elements
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Chapter timeline sizing updates
+
+---
+
+## [0.5.37] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Time-Based Scale** - Three-tier tick system
+  - Removed horizontal baseline
+  - Now uses real time positioning (not normalized)
+  - ~25 minutes visible per screen (roughly one chapter)
+  - Three tick tiers:
+    - **Chapter** (tallest, 28px) - at chapter boundaries with "CH X" labels
+    - **10-minute** (medium, 16px) - every 10 minutes
+    - **1-minute** (shortest, 8px) - every minute
+  - Smart tick collision avoidance (skips overlapping ticks)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Time-based ChapterTimelineProgressBar
+
+---
+
+## [0.5.36] - 2025-12-28
+
+### Changed
+- **Chapter Timeline Lollipop Design** - Visual redesign
+  - Large red circle (60px) at top - lollipop style marker
+  - Red vertical line extending down to the timeline
+  - Chapter labels ("CH 1", "CH 2") above the major ticks
+  - Major ticks (24px) at chapter boundaries
+  - Minor ticks (12px) between chapters (10 per chapter)
+  - Horizontal baseline connecting all ticks
+  - Timeline scrolls beneath the fixed marker
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Redesigned ChapterTimelineProgressBar
+
+---
+
+## [0.5.35] - 2025-12-28
+
+### Added
+- **Chapter Timeline Progress Bar** - Scrolling chapter view
+  - New `ChapterTimelineProgressBar` component for chapter mode
+  - 5x wider than screen (scrolls horizontally)
+  - Fixed red marker at center of screen
+  - Timeline scrolls left as playback progresses
+  - Chapter ticks normalized (equal width per chapter)
+  - Chapter labels ("Ch 1", "Ch 2", etc.) below ticks
+  - Pan gesture to scrub through timeline
+  - Tap gesture to seek to position
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - New ChapterTimelineProgressBar component
+
+---
+
+## [0.5.34] - 2025-12-28
+
+### Changed
+- **Progress Bar Mode Structure** - Prepare for chapter view
+  - Associated TimelineProgressBar with 'book' progressMode
+  - Added placeholder for 'chapter' mode (uses book timeline temporarily)
+  - Ready for chapter-specific progress bar implementation
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Progress bar mode switching
+
+---
+
+## [0.5.33] - 2025-12-28
+
+### Changed
+- **Standard Player Controls** - White background
+  - Changed controls bar background from #F5F5F5 to #FFFFFF (pure white)
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Controls bar color
+
+---
+
+## [0.5.32] - 2025-12-28
+
+### Changed
+- **Standard Player Pills Hidden** - Cleaner interface
+  - Hidden sleep timer, queue, and speed pills for Standard Player
+  - Pills still visible in CD Player mode
+  - Speed control moved to Settings sheet (grid of speed options)
+  - Queue and Bookmark accessible via overlay buttons on cover
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Hide pills, add speed grid to settings
+
+---
+
+## [0.5.31] - 2025-12-28
+
+### Changed
+- **Standard Player Cover & Overlay Buttons**
+  - Cover is now 1.5x taller (flex: 1.5)
+  - Added white circular Queue button on left side of cover (above rewind)
+  - Added white circular Bookmark button on right side (above fast forward)
+  - Queue button shows count badge when items in queue
+  - Bookmark button creates bookmark at current position with haptic feedback
+  - Buttons have subtle shadow for visibility on any cover
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Cover height, overlay buttons, bookmark handler
+
+---
+
+## [0.5.30] - 2025-12-28
+
+### Changed
+- **Standard Player Title/Author/Narrator** - Complete Book Detail style
+  - Left edge aligned with pills, chapter row, and progress bar (scale(22) padding)
+  - Added narrator extraction from metadata
+  - Two-column layout: "WRITTEN BY" and "NARRATED BY" side by side
+  - Author clickable → navigates to AuthorDetail screen
+  - Narrator clickable → navigates to NarratorDetail screen
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Narrator support, clickable links, aligned layout
+
+---
+
+## [0.5.29] - 2025-12-28
+
+### Changed
+- **Standard Player Title/Author** - Book Detail page style
+  - Large bold title (22px, weight 700)
+  - "WRITTEN BY" label in small gray uppercase
+  - Author name below in medium weight
+  - Left-aligned layout matching Book Detail screen
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - New title section styles
+
+---
+
+## [0.5.28] - 2025-12-27
+
+### Changed
+- **Standard Player Overlap Layout** - Controls overlap cover artwork
+  - Controls bar now overlaps bottom of cover with negative margin
+  - Removed rounded corners on controls bar (borderRadius: 0)
+  - Made controls bar full width (no horizontal margins)
+  - Progress bar full width and aligned to top of cover (no padding/margin)
+  - Bottom padding reduced to just safe area inset
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Controls overlap, styles updated
+
+---
+
+## [0.5.27] - 2025-12-27
+
+### Changed
+- **Standard Player Bottom Alignment** - Controls at screen bottom
+  - Reduced bottom padding for Standard Player (nav is hidden)
+  - Bottom content now aligns where nav bar would be
+  - Just safe area inset + 16px padding
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Bottom padding adjustment
+
+---
+
+## [0.5.26] - 2025-12-27
+
+### Changed
+- **Standard Player Layout** - Independent scrub button positioning
+  - Scrub button now in upper area (after pills)
+  - Flex spacer moved after scrub button
+  - Bottom content (chapter, progress, cover, controls) pushed to bottom
+  - Scrub button position doesn't affect bottom content layout
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Layout reorganization
+
+---
+
+## [0.5.25] - 2025-12-27
+
+### Fixed
+- **Rect Import** - Added missing `Rect` import from react-native-svg for pause icon
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Added Rect import
+
+---
+
+## [0.5.24] - 2025-12-27
+
+### Changed
+- **Standard Player Layout Overhaul** - Matching design spec
+  - Chapter name + remaining time moved above progress bar
+  - Full-width cover image (fills available space)
+  - Controls bar moved to bottom of screen
+  - Layout order: Scrub button → Chapter/Time → Timeline → Cover → Controls
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Layout reorganization
+
+---
+
+## [0.5.23] - 2025-12-27
+
+### Changed
+- **Standard Player Controls Bar** - New 3-button control bar design
+  - Skip Back | Play/Pause | Skip Forward in a rounded bar
+  - Vertical dividers between buttons
+  - Red play/pause icon, black skip icons
+  - Light gray background (#F5F5F5)
+  - Scrub play button remains above for joystick scrubbing
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - New controls bar
+
+---
+
+## [0.5.22] - 2025-12-27
+
+### Changed
+- **Standard Player Cover Size** - Smaller centered cover
+  - Cover reduced to 120x120 (from ~180x180)
+  - Centered below progress bar
+  - Smaller border radius and shadow for compact look
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Cover size reduced
+
+---
+
+## [0.5.21] - 2025-12-27
+
+### Changed
+- **Standard Player Cover Position** - Cover moved below progress bar
+  - Album cover now appears under the timeline progress bar
+  - Provides more visual space for controls at top
+
+- **Hide Navigation Bar on Player** - Cleaner full-screen player
+  - Main tab bar hidden when full player is open
+  - More immersive player experience
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Cover repositioned
+- `src/navigation/components/FloatingTabBar.tsx` - Hide when player visible
+
+---
+
+## [0.5.20] - 2025-12-27
+
+### Changed
+- **Standard Player Jog Overlay** - Scrub indicator above play button
+  - Jog overlay (arrows + offset) now appears above scrub play button
+  - Replaces time indicator when scrubbing is active
+  - Dark styling for white background (light bg, dark text)
+  - Red accent for offset amount
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Jog overlay positioning
+
+---
+
+## [0.5.19] - 2025-12-27
+
+### Changed
+- **Standard Player Layout Reorganization** - Improved control layout
+  - Time indicator (position / duration) moved above scrub play button
+  - Scrub play button positioned above timeline progress bar
+  - Skip buttons centered below timeline (no play button in center)
+  - Scrub speed scale hidden for cleaner look
+  - Dark icons for skip buttons on white background
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Layout reorganization
+
+---
+
+## [0.5.18] - 2025-12-27
+
+### Changed
+- **Standard Player Timeline Progress Bar** - Ruler-style progress bar for standard player
+  - Red marker circle with shadow/glow effect
+  - Major tick marks at chapter boundaries
+  - Minor ticks at 25%, 50%, 75% within chapters (adaptive density)
+  - Equal width per chapter (normalized timeline)
+  - Tap to seek, drag to scrub
+  - Dark text for time labels and chapter info on white background
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - Added TimelineProgressBar component
+
+---
+
+## [0.5.17] - 2025-12-27
+
+### Changed
+- **Standard Player White Background** - Clean light theme for standard player mode
+  - White background replaces blurred cover background
+  - Dark text for title, author, and source indicator
+  - Dark icons for close arrow, settings, and cloud
+  - StatusBar changes to dark-content for proper contrast
+  - CD player mode retains original blur effect
+
+### Files Modified
+- `src/features/player/screens/CDPlayerScreen.tsx` - White background, dark text/icons
+
+---
+
+## [0.5.16] - 2025-12-27
+
+### Changed
+- **Standard Player Default** - Standard player (static cover) is now the default
+  - `useStandardPlayer` defaults to `true` instead of `false`
+  - Users can still toggle to CD player mode in settings
+
+### Files Modified
+- `src/features/player/stores/playerStore.ts` - Changed default
+
+---
+
+## [0.5.15] - 2025-12-27
+
+### Changed
+- **Timeline Progress Bar** - Adaptive density for many chapters
+  - ≥20px per chapter: full density (25%, 50%, 75% minor ticks)
+  - ≥12px per chapter: reduced density (50% only)
+  - <12px per chapter: no minor ticks, just chapter markers
+  - Prevents overcrowding on books with many chapters
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Adaptive tick density
+
+---
+
+## [0.5.14] - 2025-12-27
+
+### Changed
+- **Timeline Progress Bar** - Treat 0 chapters as 1 chapter
+  - Books with no chapters now show same layout as 1-chapter books
+  - 2 major ticks (start/end) + 3 minor ticks (25%, 50%, 75%)
+  - Consistent appearance regardless of chapter metadata
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - 0 chapters fallback
+
+---
+
+## [0.5.13] - 2025-12-27
+
+### Changed
+- **Timeline Progress Bar** - Chapter-based normalized timeline
+  - Major tick marks represent chapters (one per chapter)
+  - Minor tick marks at 25%, 50%, 75% within each chapter
+  - All chapters take equal width regardless of actual duration
+  - Seeking respects chapter boundaries and maps correctly
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Chapter-aware timeline
+
+---
+
+## [0.5.12] - 2025-12-27
+
+### Added
+- **Timeline Progress Bar** - Ruler-style progress bar for mini player
+  - Red floating marker indicates current position
+  - Major and minor tick marks like a ruler/timeline
+  - Tap anywhere to seek
+  - Drag marker to scrub through book
+  - Current tick highlights in red
+  - Marker has subtle shadow/glow effect
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Added TimelineProgressBar component
+
+---
+
+## [0.5.11] - 2025-12-27
+
+### Changed
+- **Mini Player Buttons** - Refined styling
+  - All circle buttons use 1pt stroke (was 1.5pt)
+  - Play/pause icon is red, border remains black
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Button stroke refinement
+
+---
+
+## [0.5.9] - 2025-12-27
+
+### Changed
+- **Navigation Bar Icons** - Updated all icons to match design spec
+  - New thinner, cleaner icon designs for Browse, Library, Search, Profile, Home
+  - Icons sourced from design SVG files
+
+- **Mini Player Buttons** - Reduced size for cleaner appearance
+  - Button size reduced from 44 to 32
+  - Icon size reduced from 18 to 14
+
+### Files Modified
+- `src/navigation/components/FloatingTabBar.tsx` - New icon paths
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Smaller buttons/icons
+
+---
+
+## [0.5.8] - 2025-12-27
+
+### Changed
+- **Mini Player Redesign** - Clean, minimal floating player
+  - Circular cover image instead of spinning CD animation
+  - Bold title display
+  - Three circular outline buttons: Skip Back, Skip Forward, Play/Pause
+  - Removed progress bar for cleaner look
+  - Swipe up gesture to open full player
+
+- **Navigation Bar Reorder** - Updated tab order for better UX
+  - New order: Browse | Library | Search | Profile | Home
+  - Thin outline icons with active state
+
+- **Library Screen Light Theme** - Unified with home screen styling
+  - White background with dark text
+  - Updated tab bar, search bar, and all cards to use theme colors
+  - Dynamic theme support via useThemeColors hook
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Complete redesign
+- `src/navigation/components/FloatingTabBar.tsx` - Tab order change
+- `src/features/library/screens/MyLibraryScreen.tsx` - Light theme conversion
+
+---
+
+## [0.5.7] - 2025-12-27
+
+### Changed
+- **BookDetailScreen Redesign** - Complete visual overhaul with light theme
+  - Full-width square cover image at top
+  - Overlay buttons on cover: back (top-left), queue/download/play (bottom row)
+  - Download button shows circular SVG progress indicator during download
+  - Two-column metadata layout: title & series (left), author & narrator (right)
+  - Clickable genre pills that navigate to genre filter
+  - Progress bar with completion % and time remaining
+  - Clean Overview/Chapters tabs with accent underline
+  - White background with dark text for readability
+
+- **Dark Mode Support** - Added theme store and toggle
+  - Created `themeStore.ts` with light/dark mode support
+  - Added dark mode toggle in Profile screen
+  - HomeScreen and TextListSection now respect theme colors
+
+- **Tab Transition Animations** - Polished animations for home screen tabs
+  - Subtle 12px slide with proper easing curves
+  - Easing.out(quad) for exit, Easing.out(cubic) for enter
+
+- **Long Press for Book Details** - Books now navigate to detail page on long press
+  - Added haptic feedback on long press
+  - Quick tap still plays the book
+
+### Files Modified
+- `src/features/book-detail/screens/BookDetailScreen.tsx` - Complete redesign
+- `src/shared/components/Skeleton.tsx` - Light theme skeleton colors
+- `src/shared/components/ErrorView.tsx` - Light theme error styling
+- `src/shared/theme/themeStore.ts` - New theme store
+- `src/features/home/screens/HomeScreen.tsx` - Theme colors, long press handler
+- `src/features/home/components/TextListSection.tsx` - Theme colors, polished animations
+- `src/features/profile/screens/ProfileScreen.tsx` - Dark mode toggle
+
+---
+
 ## [0.5.6] - 2025-12-27
 
 ### Fixed

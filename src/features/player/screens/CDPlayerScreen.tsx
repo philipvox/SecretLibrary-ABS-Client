@@ -34,6 +34,10 @@ import ReanimatedAnimated, {
   runOnJS,
   useFrameCallback,
   SharedValue,
+  withSpring,
+  withTiming,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { CD_ROTATION } from '@/shared/animation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,7 +61,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useNavigation } from '@react-navigation/native';
 
 import { usePlayerStore, useCurrentChapterIndex } from '../stores/playerStore';
-import { useJoystickSeekSettings } from '../stores/joystickSeekStore';
+import { useSnapToChapterSettings } from '../stores/settingsStore';
 import { SleepTimerSheet, SpeedSheet } from '../sheets';
 import { QueuePanel } from '@/features/queue/components/QueuePanel';
 import { useQueueCount, useQueueStore } from '@/features/queue/stores/queueStore';
@@ -65,9 +69,11 @@ import { useReducedMotion } from 'react-native-reanimated';
 import { useCoverUrl } from '@/core/cache';
 import { useIsOfflineAvailable } from '@/core/hooks/useDownloads';
 import { useRenderTracker, useLifecycleTracker } from '@/utils/perfDebug';
+import { useFpsMonitor, fpsMonitor } from '@/utils/runtimeMonitor';
 import { useNormalizedChapters } from '@/shared/hooks';
-import { CoverPlayButton, JogState } from '@/shared/components/CoverPlayButton';
+// CoverPlayButton removed - using long-press + pan on timeline instead
 import { haptics } from '@/core/native/haptics';
+import { useTimelineHaptics, Chapter as HapticChapter } from '../hooks/useTimelineHaptics';
 import { colors, spacing, radius, scale, wp, hp, layout } from '@/shared/theme';
 import { useThemeStore } from '@/shared/theme/themeStore';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
@@ -223,19 +229,6 @@ const formatTimeVerbose = (seconds: number): string => {
   parts.push(`${s}s`);
 
   return parts.join(' ');
-};
-
-const formatScrubOffset = (seconds: number): string => {
-  const sign = seconds >= 0 ? '+' : '-';
-  const absSeconds = Math.abs(seconds);
-  const m = Math.floor(absSeconds / 60);
-  const s = Math.floor(absSeconds % 60);
-
-  // Human-readable format: +20s, -1m 23s, +5m 0s
-  if (m === 0) {
-    return `${sign}${s}s`;
-  }
-  return `${sign}${m}m ${s}s`;
 };
 
 // =============================================================================
@@ -590,10 +583,6 @@ interface TimelineProgressBarProps {
   duration: number;
   chapters: TimelineChapter[];
   onSeek: (position: number) => void;
-  /** Scrub offset from joystick (null when not scrubbing) */
-  scrubOffset?: number | null;
-  /** Joystick component to render at center marker position (chapter mode only) */
-  joystickComponent?: React.ReactNode;
   /** Bookmarks to display as flags on the timeline */
   bookmarks?: TimelineBookmark[];
 }
@@ -904,7 +893,7 @@ const MINUTES_PER_SCREEN = 5; // ~5 minutes visible at once (zoomed in)
 const PIXELS_PER_SECOND = TIMELINE_WIDTH / (MINUTES_PER_SCREEN * 60);
 const CHAPTER_TIMELINE_TOTAL_HEIGHT = scale(220); // Total height from circle to bottom
 
-const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, onSeek, scrubOffset, joystickComponent, bookmarks = [] }: TimelineProgressBarProps) => {
+const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, onSeek, bookmarks = [] }: TimelineProgressBarProps) => {
   // Get theme colors
   const themeColors = usePlayerColors();
 
@@ -916,33 +905,10 @@ const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, o
   // Timeline offset to keep current position at center (time-based)
   const timelineOffset = useSharedValue(0);
   const lastPosition = useRef(position);
-  const isScrubbing = useRef(false);
 
-  // Track when joystick scrubbing starts/ends
+  // Position-based update (for playback - when NOT direct scrubbing)
+  // Direct scrubbing updates timelineOffset directly in the pan gesture
   useEffect(() => {
-    const wasScrubbingBefore = isScrubbing.current;
-    isScrubbing.current = scrubOffset !== null && scrubOffset !== undefined;
-
-    if (isScrubbing.current) {
-      // JOYSTICK SCRUB: Direct update, no animation
-      // Effective position = base position + scrub offset
-      const effectivePosition = position + (scrubOffset || 0);
-      const positionX = effectivePosition * PIXELS_PER_SECOND;
-      const newOffset = -positionX + CHAPTER_MARKER_X;
-      const minOffset = -timelineWidth + CHAPTER_MARKER_X;
-      const maxOffset = CHAPTER_MARKER_X;
-      // Direct assignment - no animation wrapper
-      timelineOffset.value = Math.max(minOffset, Math.min(maxOffset, newOffset));
-    } else if (wasScrubbingBefore && !isScrubbing.current) {
-      // Scrub just ended - ticks stay in place, don't animate
-      // Position will update from audio seek, handled below
-    }
-  }, [scrubOffset, position, timelineWidth]);
-
-  // Position-based update (for playback, skip - when NOT scrubbing)
-  useEffect(() => {
-    // Skip if joystick is actively scrubbing
-    if (isScrubbing.current) return;
 
     const positionX = position * PIXELS_PER_SECOND;
     const newOffset = -positionX + CHAPTER_MARKER_X;
@@ -957,14 +923,128 @@ const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, o
     }
   }, [position]);
 
-  // Handle seek from tap
+  // Handle seek from tap or scrub
   const handleSeek = useCallback((seconds: number) => {
     const clampedPosition = Math.max(0, Math.min(duration, seconds));
     onSeek(clampedPosition);
   }, [duration, onSeek]);
 
-  // Tap gesture for seeking (chapter view - tap only, no pan)
+  // ============================================================================
+  // DIRECT SCRUB MODE (Long-press + Pan)
+  // ============================================================================
+
+  // Haptic feedback
+  const timelineHaptics = useTimelineHaptics();
+
+  // Snap-to-chapter settings
+  const snapSettings = useSnapToChapterSettings();
+
+  // Convert chapters to haptic chapter format
+  const hapticChapters: HapticChapter[] = useMemo(() => {
+    return chapters.map((ch, index) => ({
+      index,
+      startTime: ch.start,
+      endTime: ch.end,
+      title: ch.title,
+    }));
+  }, [chapters]);
+
+  // Calculate snap position (finds nearest chapter boundary within threshold)
+  const calculateSnapPosition = useCallback((rawPosition: number): { position: number; didSnap: boolean } => {
+    if (!snapSettings.enabled) return { position: rawPosition, didSnap: false };
+
+    let nearestBoundary = rawPosition;
+    let nearestDistance = Infinity;
+
+    for (const chapter of chapters) {
+      const distance = Math.abs(rawPosition - chapter.start);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestBoundary = chapter.start;
+      }
+    }
+
+    // Snap if within threshold
+    if (nearestDistance <= snapSettings.threshold) {
+      return { position: nearestBoundary, didSnap: true };
+    }
+
+    return { position: rawPosition, didSnap: false };
+  }, [chapters, snapSettings.enabled, snapSettings.threshold]);
+
+  // Scrub state
+  const [isDirectScrubbing, setIsDirectScrubbing] = useState(false);
+  const [scrubSpeedMode, setScrubSpeedMode] = useState<'normal' | 'half' | 'quarter' | 'fine' | 'fast'>('normal');
+  const scrubStartOffset = useSharedValue(0);
+  const scrubStartX = useSharedValue(0);
+  const scrubStartY = useSharedValue(0);
+  const scrubCurrentPosition = useSharedValue(0);
+  const timelineScale = useSharedValue(1);
+  const lastScrubPosition = useRef(position);
+
+  // Speed mode labels
+  const SPEED_MODE_LABELS: Record<string, string> = {
+    normal: '',
+    half: 'HALF SPEED',
+    quarter: 'QUARTER SPEED',
+    fine: 'FINE',
+    fast: 'FAST (2×)',
+  };
+
+  // Calculate speed multiplier from vertical offset
+  const getSpeedMultiplier = useCallback((dy: number): { multiplier: number; mode: 'normal' | 'half' | 'quarter' | 'fine' | 'fast' } => {
+    if (dy > 120) return { multiplier: 0.1, mode: 'fine' };
+    if (dy > 80) return { multiplier: 0.25, mode: 'quarter' };
+    if (dy > 40) return { multiplier: 0.5, mode: 'half' };
+    if (dy < -40) return { multiplier: 2.0, mode: 'fast' };
+    return { multiplier: 1.0, mode: 'normal' };
+  }, []);
+
+  // Enter direct scrub mode
+  const enterDirectScrub = useCallback(() => {
+    setIsDirectScrubbing(true);
+    setScrubSpeedMode('normal');
+    timelineHaptics.triggerModeChange('enter');
+    timelineHaptics.resetTracking();
+    lastScrubPosition.current = position;
+  }, [position, timelineHaptics]);
+
+  // Exit direct scrub mode
+  const exitDirectScrub = useCallback((finalSeconds: number) => {
+    setIsDirectScrubbing(false);
+    setScrubSpeedMode('normal');
+
+    // Check for snap-to-chapter
+    const { position: snapPosition, didSnap } = calculateSnapPosition(finalSeconds);
+
+    if (didSnap) {
+      timelineHaptics.triggerSnap();
+    }
+
+    timelineHaptics.triggerModeChange('exit');
+    handleSeek(snapPosition);
+  }, [handleSeek, timelineHaptics, calculateSnapPosition]);
+
+  // Check haptics during scrub
+  const checkScrubHaptics = useCallback((newPositionSec: number) => {
+    timelineHaptics.checkChapterCrossing(lastScrubPosition.current, newPositionSec, hapticChapters);
+    timelineHaptics.checkMinuteCrossing(lastScrubPosition.current, newPositionSec);
+    timelineHaptics.checkEdgeReached(newPositionSec, duration);
+    lastScrubPosition.current = newPositionSec;
+  }, [hapticChapters, duration, timelineHaptics]);
+
+  // FPS monitoring during scrubbing
+  useEffect(() => {
+    if (isDirectScrubbing) {
+      fpsMonitor.start('scrubbing');
+    } else {
+      fpsMonitor.stop();
+    }
+  }, [isDirectScrubbing]);
+
+  // Tap gesture for instant seeking (<150ms)
   const tapGesture = Gesture.Tap()
+    .maxDuration(150)
     .onEnd((event) => {
       'worklet';
       // Convert tap position to timeline position
@@ -975,19 +1055,90 @@ const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, o
       const minOffset = -timelineWidth + CHAPTER_MARKER_X;
       const maxOffset = CHAPTER_MARKER_X;
       timelineOffset.value = Math.max(minOffset, Math.min(maxOffset, newOffset));
+
+      // Haptic feedback
+      runOnJS(timelineHaptics.triggerTapConfirm)();
       runOnJS(handleSeek)(seconds);
     });
 
-  // Animated style for scrolling timeline
+  // Long-press + Pan gesture for direct scrubbing
+  const longPressPanGesture = Gesture.Pan()
+    .activateAfterLongPress(300)
+    .onStart((event) => {
+      'worklet';
+      // Visual feedback: Timeline "lifts" slightly
+      timelineScale.value = withSpring(1.02, { damping: 20, stiffness: 300 });
+
+      // Store starting values
+      scrubStartOffset.value = timelineOffset.value;
+      scrubStartX.value = event.x;
+      scrubStartY.value = event.y;
+
+      // Calculate starting position in seconds
+      const startSeconds = (-timelineOffset.value + CHAPTER_MARKER_X) / PIXELS_PER_SECOND;
+      scrubCurrentPosition.value = startSeconds;
+
+      runOnJS(enterDirectScrub)();
+    })
+    .onUpdate((event) => {
+      'worklet';
+      const dx = event.x - scrubStartX.value;
+      const dy = event.y - scrubStartY.value;
+
+      // Calculate sensitivity based on vertical offset (fine-scrub)
+      const { multiplier, mode } = runOnJS(getSpeedMultiplier)(dy);
+
+      // Update speed mode display
+      runOnJS(setScrubSpeedMode)(mode);
+
+      // Direct 1:1 mapping with sensitivity adjustment
+      // Negative dx = moved finger left = want to see earlier content = offset increases
+      const adjustedDx = dx * multiplier;
+      const newOffset = scrubStartOffset.value - adjustedDx;
+
+      // Clamp to valid range
+      const minOffset = -timelineWidth + CHAPTER_MARKER_X;
+      const maxOffset = CHAPTER_MARKER_X;
+      timelineOffset.value = Math.max(minOffset, Math.min(maxOffset, newOffset));
+
+      // Calculate new position in seconds for haptics
+      const newSeconds = (-timelineOffset.value + CHAPTER_MARKER_X) / PIXELS_PER_SECOND;
+      scrubCurrentPosition.value = newSeconds;
+
+      // Check for haptic feedback (chapter/minute crossings)
+      runOnJS(checkScrubHaptics)(newSeconds);
+    })
+    .onEnd(() => {
+      'worklet';
+      // Visual feedback: Timeline settles
+      timelineScale.value = withSpring(1.0, { damping: 20, stiffness: 300 });
+
+      // Calculate final position
+      const finalSeconds = scrubCurrentPosition.value;
+      const clampedSeconds = Math.max(0, Math.min(duration, finalSeconds));
+
+      runOnJS(exitDirectScrub)(clampedSeconds);
+    });
+
+  // Combine gestures: Tap takes priority for quick taps, pan activates after long-press
+  const combinedGesture = Gesture.Exclusive(
+    longPressPanGesture,
+    tapGesture
+  );
+
+  // Animated style for scrolling timeline (with scale for scrub feedback)
   const timelineStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: timelineOffset.value }],
+    transform: [
+      { translateX: timelineOffset.value },
+      { scale: timelineScale.value },
+    ],
   }));
 
   // Visible window: 15 minutes in each direction from current position
   const VISIBLE_WINDOW_SECONDS = 15 * 60; // 15 minutes = 900 seconds
 
-  // Effective position includes scrub offset during joystick scrubbing
-  const effectivePosition = scrubOffset != null ? position + scrubOffset : position;
+  // Use position directly (scrubbing updates timelineOffset in real-time)
+  const effectivePosition = position;
 
   // Generate ticks only within visible window (±15 min from effective position)
   const ticks = useMemo(() => {
@@ -1149,13 +1300,17 @@ const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, o
       <View style={chapterTimelineStyles.markerLine} />
       <View style={chapterTimelineStyles.markerDot} />
 
-      {/* Fixed center marker - joystick hitbox (hidden for now) */}
-      {/* <View style={chapterTimelineStyles.markerContainer}>
-        {joystickComponent}
-      </View> */}
+      {/* Speed mode indicator (shown during direct scrub) */}
+      {isDirectScrubbing && scrubSpeedMode !== 'normal' && (
+        <View style={chapterTimelineStyles.speedIndicator}>
+          <Text style={chapterTimelineStyles.speedIndicatorText}>
+            {SPEED_MODE_LABELS[scrubSpeedMode]}
+          </Text>
+        </View>
+      )}
 
       {/* Scrolling timeline area */}
-      <GestureDetector gesture={tapGesture}>
+      <GestureDetector gesture={combinedGesture}>
         <View style={chapterTimelineStyles.container}>
           <ReanimatedAnimated.View style={[chapterTimelineStyles.timeline, { width: timelineWidth }, timelineStyle]}>
             <Svg width={timelineWidth} height={svgHeight}>
@@ -1284,6 +1439,22 @@ const chapterTimelineStyles = StyleSheet.create({
     left: 0,
     height: '100%',
   },
+  speedIndicator: {
+    position: 'absolute',
+    top: scale(40),
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(8),
+    borderRadius: scale(8),
+    zIndex: 20,
+  },
+  speedIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: scale(13),
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });
 
 // =============================================================================
@@ -1298,6 +1469,9 @@ export function CDPlayerScreen() {
     useRenderTracker('CDPlayerScreen');
     useLifecycleTracker('CDPlayerScreen');
   }
+
+  // FPS monitoring for the full player screen
+  useFpsMonitor('fullPlayer');
 
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -1366,9 +1540,6 @@ export function CDPlayerScreen() {
   // Accessibility: respect reduced motion preference
   const reducedMotion = useReducedMotion();
 
-  // Joystick seek settings
-  const joystickSettings = useJoystickSeekSettings();
-
   // Theme colors
   const themeColors = usePlayerColors();
   const isDarkMode = useThemeStore((s) => s.mode === 'dark');
@@ -1382,7 +1553,7 @@ export function CDPlayerScreen() {
   // Disc rotation control
   // Shared rotation value - both sharp and blurred discs use this for sync
   const discRotation = useSharedValue(0);
-  // scrubSpeed: degrees per second when joystick is being dragged (negative = backward)
+  // scrubSpeed: degrees per second when scrubbing (negative = backward)
   // spinBurst: instant rotation delta for skip button feedback
   const discScrubSpeed = useSharedValue(0);
   const discSpinBurst = useSharedValue(0);
@@ -1390,37 +1561,6 @@ export function CDPlayerScreen() {
   // Local state
   const [activeSheet, setActiveSheet] = useState<SheetType>('none');
   const [progressMode, setProgressMode] = useState<ProgressMode>('chapter');
-  const [jogState, setJogState] = useState<JogState | null>(null);
-
-  // Scrub offset: use shared value for smooth timeline animation, React state only for text display
-  const scrubOffsetShared = useSharedValue<number>(0);
-  const isScrubbing = useSharedValue<boolean>(false);
-  const [scrubOffsetDisplay, setScrubOffsetDisplay] = useState<number | null>(null);
-  const scrubDisplayThrottleRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Callback for scrub offset changes - updates shared value immediately, throttles React state
-  const handleScrubOffsetChange = useCallback((offset: number, scrubbing: boolean) => {
-    // Always update shared values immediately (no React re-render)
-    scrubOffsetShared.value = offset;
-    isScrubbing.value = scrubbing;
-
-    if (scrubbing) {
-      // Throttle React state updates to 100ms for text display
-      if (!scrubDisplayThrottleRef.current) {
-        setScrubOffsetDisplay(offset);
-        scrubDisplayThrottleRef.current = setTimeout(() => {
-          scrubDisplayThrottleRef.current = null;
-        }, 100);
-      }
-    } else {
-      // Scrub ended - clear display
-      if (scrubDisplayThrottleRef.current) {
-        clearTimeout(scrubDisplayThrottleRef.current);
-        scrubDisplayThrottleRef.current = null;
-      }
-      setScrubOffsetDisplay(null);
-    }
-  }, []);
 
   // Deferred initialization - wait for navigation animation to complete
   // This improves perceived performance by not blocking the initial render
@@ -1460,18 +1600,15 @@ export function CDPlayerScreen() {
   const chapterDuration = chapterEnd - chapterStart;
   const chapterPosition = position - chapterStart;
 
-  // Progress percentage based on mode (includes scrubOffsetDisplay during joystick seeking)
+  // Progress percentage based on mode
   const progressPercent = useMemo(() => {
-    const effectivePosition = scrubOffsetDisplay !== null ? position + scrubOffsetDisplay : position;
-    const effectiveChapterPosition = scrubOffsetDisplay !== null ? chapterPosition + scrubOffsetDisplay : chapterPosition;
-
     if (progressMode === 'chapter') {
-      const percent = chapterDuration > 0 ? (effectiveChapterPosition / chapterDuration) * 100 : 0;
+      const percent = chapterDuration > 0 ? (chapterPosition / chapterDuration) * 100 : 0;
       return Math.max(0, Math.min(100, percent));
     }
-    const percent = duration > 0 ? (effectivePosition / duration) * 100 : 0;
+    const percent = duration > 0 ? (position / duration) * 100 : 0;
     return Math.max(0, Math.min(100, percent));
-  }, [progressMode, chapterPosition, chapterDuration, position, duration, scrubOffsetDisplay]);
+  }, [progressMode, chapterPosition, chapterDuration, position, duration]);
 
   // Chapter markers as percentages for book mode
   const chapterMarkers = useMemo(() => {
@@ -2263,9 +2400,7 @@ export function CDPlayerScreen() {
               </Text>
             </TouchableOpacity>
             <Text style={styles.standardChapterTimeTop}>
-              {scrubOffsetDisplay !== null
-                ? formatScrubOffset(scrubOffsetDisplay)
-                : formatTimeVerbose(position)}
+              {formatTimeVerbose(position)}
             </Text>
           </View>
         )}
@@ -2471,8 +2606,6 @@ export function CDPlayerScreen() {
           </View>
         ) : null}
 
-        {/* Scrub Play Button - removed for Standard Player (joystick is on timeline in chapter mode) */}
-
         {/* Flex spacer - pushes bottom content to bottom (Standard Player) */}
         {useStandardPlayer && <View style={{ flex: 1 }} />}
 
@@ -2486,8 +2619,8 @@ export function CDPlayerScreen() {
           {/* Time row - CD mode only (Standard mode shows above scrub button) */}
           {!useStandardPlayer && (
             <View style={styles.progressTimeRow}>
-              <Text style={[styles.progressTimeText, scrubOffsetDisplay !== null && styles.scrubTimeText]}>
-                {formatTime(scrubOffsetDisplay !== null ? Math.max(0, position + scrubOffsetDisplay) : position)}
+              <Text style={styles.progressTimeText}>
+                {formatTime(position)}
               </Text>
               <Text style={styles.progressTimeText}>{formatTime(duration)}</Text>
             </View>
@@ -2505,32 +2638,14 @@ export function CDPlayerScreen() {
                 bookmarks={bookmarks}
               />
             ) : (
-              // Chapter mode: Scrolling timeline with joystick at center
+              // Chapter mode: Scrolling timeline with long-press + pan scrubbing
               <ChapterTimelineProgressBar
                 key={`timeline-chapter-${chapters.length}`}
                 position={position}
                 duration={duration}
                 chapters={chapters}
                 onSeek={seekTo}
-                scrubOffset={scrubOffsetDisplay}
                 bookmarks={bookmarks}
-                joystickComponent={
-                  interactionsReady ? (
-                    <CoverPlayButton
-                      size={100}
-                      onScrubSpeedChange={(speed) => {
-                        discScrubSpeed.value = speed;
-                      }}
-                      onScrubOffsetChange={(offset, scrubbing) => {
-                        handleScrubOffsetChange(offset, scrubbing);
-                      }}
-                      onJogStateChange={setJogState}
-                      joystickSettings={joystickSettings}
-                    />
-                  ) : (
-                    <View style={chapterTimelineStyles.markerCircle} />
-                  )
-                }
               />
             )
           ) : (
@@ -2674,27 +2789,8 @@ export function CDPlayerScreen() {
                 {currentNormalizedChapter?.displayTitle || `Chapter ${chapterIndex + 1}`}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.chapterRemaining, scrubOffsetDisplay !== null && styles.scrubOffsetText]}>
-              {scrubOffsetDisplay !== null
-                ? formatScrubOffset(scrubOffsetDisplay)
-                : formatTimeVerbose(position)}
-            </Text>
-          </View>
-        )}
-
-        {/* Jog Overlay - Direction arrows and offset when scrubbing (CD mode only) */}
-        {!useStandardPlayer && jogState?.isActive && jogState.direction && (
-          <View style={styles.jogOverlay}>
-            <View style={styles.jogIndicator}>
-              {jogState.direction === 'backward' ? (
-                <RewindIcon />
-              ) : (
-                <FastForwardIcon />
-              )}
-              <Text style={styles.jogSpeedText}>{formatScrubOffset(jogState.offset)}</Text>
-            </View>
-            <Text style={styles.jogTimePreview}>
-              {formatTime(jogState.currentPosition)} → {formatTime(jogState.targetPosition)}
+            <Text style={styles.chapterRemaining}>
+              {formatTimeVerbose(position)}
             </Text>
           </View>
         )}
@@ -2715,10 +2811,6 @@ export function CDPlayerScreen() {
               <RewindIcon />
               <Text style={styles.skipButtonLabel}>{skipBackInterval}s</Text>
             </TouchableOpacity>
-
-            {/* Joystick hidden in Standard Player mode:
-                - Chapter mode: Joystick is on the timeline
-                - Book mode: User requested to hide it */}
 
             {/* Skip Forward */}
             <TouchableOpacity
@@ -3169,14 +3261,6 @@ const styles = StyleSheet.create({
   },
   chapterRemainingStandard: {
     color: '#E53935', // Keep accent red for remaining time
-  },
-  scrubOffsetText: {
-    fontSize: scale(16),
-    fontWeight: '600',
-  },
-  scrubTimeText: {
-    color: colors.accent,
-    fontWeight: '600',
   },
   progressTimeRow: {
     flexDirection: 'row',
@@ -4255,63 +4339,6 @@ const styles = StyleSheet.create({
     height: scale(6),
     borderRadius: scale(3),
     backgroundColor: colors.accent,
-  },
-
-  // Jog overlay styles
-  jogOverlay: {
-    alignItems: 'center',
-    marginBottom: scale(8),
-  },
-  jogIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(8),
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(20),
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  jogSpeedText: {
-    color: colors.accent,
-    fontSize: scale(18),
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  jogTimePreview: {
-    color: colors.textSecondary,
-    fontSize: scale(12),
-    fontVariant: ['tabular-nums'],
-    marginTop: scale(6),
-  },
-  // Standard player jog overlay (dark on white)
-  jogOverlayStandard: {
-    alignItems: 'center',
-    marginBottom: scale(12),
-  },
-  jogIndicatorStandard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(8),
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(20),
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-  },
-  jogSpeedTextStandard: {
-    color: '#E53935',
-    fontSize: scale(18),
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  jogTimePreviewStandard: {
-    color: 'rgba(0,0,0,0.5)',
-    fontSize: scale(12),
-    fontVariant: ['tabular-nums'],
-    marginTop: scale(6),
   },
 
   // Standard Player Mode styles
