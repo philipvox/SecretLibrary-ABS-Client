@@ -1250,6 +1250,9 @@ const chapterTimelineStyles = StyleSheet.create({
     backgroundColor: '#F50101',
   },
   markerLine: {
+    position: 'absolute',
+    top: CHAPTER_MARKER_CIRCLE_SIZE, // Align to bottom of circle
+    left: (CHAPTER_MARKER_CIRCLE_SIZE - 2) / 2, // Center horizontally
     width: 2,
     height: CHAPTER_MARKER_LINE_HEIGHT,
     backgroundColor: '#F50101',
