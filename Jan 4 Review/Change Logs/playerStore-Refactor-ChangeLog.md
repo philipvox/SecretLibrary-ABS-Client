@@ -257,13 +257,61 @@
 - [ ] Finished book removed from queue
 
 ### Commit
-- [ ] Committed with message: `refactor(player): phase 6 - extract completion store`
+- [x] Committed: `45006bd` - `refactor(player): phase 6 - extract completion store`
 
 ---
 
-## Phase 7: Extract Seeking Store
+## Phase 7: Extract Seeking Store (HIGHEST RISK)
 
-**Status:** Pending
+**Status:** Complete ✓
+**Started:** January 5, 2026
+**Completed:** January 5, 2026
+
+### Files Created
+- [x] `src/features/player/stores/seekingStore.ts` - Seeking state and operations (~320 lines)
+
+### Features Extracted
+- `isSeeking` - Flag that blocks position updates from audioService
+- `seekPosition` - Position during seek (UI displays this)
+- `seekStartPosition` - Where seek started (for delta calculation)
+- `seekDirection` - 'forward' | 'backward' | null
+- `startSeeking()` - Enter seeking mode
+- `updateSeekPosition()` - Update position during drag
+- `commitSeek()` - Finalize seek
+- `cancelSeek()` - Cancel and return to original position
+- `seekTo()` - Instant seek (tap-to-seek, chapter jumps)
+- `startContinuousSeeking()` - Hold-to-seek (rewind/FF buttons)
+- `stopContinuousSeeking()` - Stop continuous seek
+- `clearSeekInterval()` - Clear interval on cleanup
+- `resetSeekingState()` - Reset all seeking state
+- Helper selectors: useIsSeeking, useSeekPosition, useSeekStartPosition, useSeekDirection, useSeekDelta, useSeekingState
+
+### Changes to playerStore.ts
+- [x] Import seekingStore (line 111)
+- [x] Updated onPositionUpdate to check seekingStore.isSeeking (lines 1852-1857)
+- [x] Updated loadBook to call seekingStore.resetSeekingState() (line 590)
+- [x] Updated cleanup to call seekingStore.resetSeekingState() (line 1109)
+- [x] Updated all seeking actions to delegate to seekingStore (lines 1384-1488)
+- [x] Removed module-level seekInterval variable (moved to seekingStore)
+- [x] Removed REWIND_STEP, FF_STEP, REWIND_INTERVAL imports (moved to seekingStore)
+- [x] Local state sync for backward compatibility
+
+### Critical Integration
+- **IMPORTANT:** playerStore's onPositionUpdate checks `useSeekingStore.getState().isSeeking` to block stale position updates during seeking operations
+
+### TypeScript Verification
+- [x] No new TypeScript errors introduced
+- [x] Expo export build succeeds (3844ms bundle time)
+
+### Tests (to be verified manually)
+- [ ] Timeline scrubbing works (start, update, commit)
+- [ ] Skip forward/back works
+- [ ] Chapter navigation works
+- [ ] Hold-to-seek (continuous) works
+- [ ] Position updates blocked during seek
+
+### Commit
+- [ ] Committed with message: `refactor(player): phase 7 - extract seeking store`
 
 ---
 

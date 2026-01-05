@@ -58,7 +58,7 @@ import { generateAndCacheTicks, ChapterInput } from '../services/tickCache';
 import { trackEvent } from '@/core/monitoring';
 
 // Import constants
-import { REWIND_STEP, REWIND_INTERVAL, FF_STEP } from '../constants';
+// REWIND_STEP, REWIND_INTERVAL, FF_STEP moved to seekingStore (Phase 7)
 
 // Import haptics for sleep timer feedback
 import { haptics } from '@/core/native/haptics';
@@ -106,6 +106,9 @@ import { useSpeedStore } from './speedStore';
 
 // Import completion store (Phase 6 refactor)
 import { useCompletionStore } from './completionStore';
+
+// Import seeking store (Phase 7 refactor)
+import { useSeekingStore, type SeekDirection as SeekDirectionImport } from './seekingStore';
 
 const DEBUG = __DEV__;
 const log = (msg: string, ...args: any[]) => audioLog.store(msg, ...args);
@@ -397,7 +400,7 @@ const AUTO_DOWNLOAD_THRESHOLD = 0.8;  // Trigger auto-download at 80% progress
 let currentLoadId = 0;
 let lastProgressSave = 0;
 let lastFinishedBookId: string | null = null; // Track which book we've already handled finish for
-let seekInterval: NodeJS.Timeout | null = null;
+// seekInterval moved to seekingStore (Phase 7)
 
 // Track when seek was last committed to prevent stale position updates
 // NOTE: With Option C architecture, audioService owns position.
@@ -583,6 +586,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         }
       }
 
+      // Reset seeking state first (Phase 7)
+      useSeekingStore.getState().resetSeekingState();
+
       // Set new book immediately with early position (also sync viewingBook)
       set({
         isLoading: true,
@@ -593,7 +599,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         isBuffering: true,
         // Set position early to avoid jarring jump from stale/0 to resume position
         position: earlyPosition,
-        // Reset seeking state
+        // Reset seeking state (synced from seekingStore for backward compatibility)
         isSeeking: false,
         seekPosition: 0,
         seekStartPosition: 0,
@@ -1102,11 +1108,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Clear download completion listener
       cleanupDownloadCompletionListener();
 
-      // Clear seeking interval
-      if (seekInterval) {
-        clearInterval(seekInterval);
-        seekInterval = null;
-      }
+      // Clear seeking state (Phase 7)
+      useSeekingStore.getState().resetSeekingState();
 
       // Clear sleep timer (Phase 4)
       useSleepTimerStore.getState().clearSleepTimer();
@@ -1379,72 +1382,54 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     },
 
     // =========================================================================
-    // SEEKING - THE CORE FIX
+    // SEEKING - Phase 7: Delegates to seekingStore
     // =========================================================================
 
     startSeeking: (direction?: SeekDirection) => {
       const { position } = get();
-      log(`startSeeking: position=${position.toFixed(1)}, direction=${direction || 'none'}`);
+      // Delegate to seekingStore
+      useSeekingStore.getState().startSeeking(position, direction);
+      // Sync to local state for backward compatibility
+      const seekState = useSeekingStore.getState();
       set({
-        isSeeking: true,
-        seekPosition: position,
-        seekStartPosition: position,
-        seekDirection: direction || null,
+        isSeeking: seekState.isSeeking,
+        seekPosition: seekState.seekPosition,
+        seekStartPosition: seekState.seekStartPosition,
+        seekDirection: seekState.seekDirection,
       });
     },
 
     updateSeekPosition: async (newPosition: number) => {
-      const { duration, isSeeking } = get();
-
-      if (!isSeeking) {
-        log('updateSeekPosition called but not seeking - calling startSeeking first');
-        get().startSeeking();
-      }
-
-      const clampedPosition = Math.max(0, Math.min(duration, newPosition));
-      set({ seekPosition: clampedPosition });
-
-      // Send seek command to audio service
-      await audioService.seekTo(clampedPosition);
+      const { duration } = get();
+      // Delegate to seekingStore
+      await useSeekingStore.getState().updateSeekPosition(newPosition, duration);
+      // Sync to local state for backward compatibility
+      const seekState = useSeekingStore.getState();
+      set({
+        isSeeking: seekState.isSeeking,
+        seekPosition: seekState.seekPosition,
+      });
     },
 
     commitSeek: async () => {
-      const { seekPosition, isSeeking } = get();
-
-      if (!isSeeking) {
-        log('commitSeek called but not seeking - ignoring');
-        return;
-      }
-
-      log(`commitSeek: finalPosition=${seekPosition.toFixed(1)}`);
-
-      // Ensure audio is at final position - audioService owns position
-      await audioService.seekTo(seekPosition);
-
-      // Exit seeking mode (position will be synced via audioService callback)
+      // Delegate to seekingStore
+      await useSeekingStore.getState().commitSeek();
+      // Sync to local state for backward compatibility
+      const seekState = useSeekingStore.getState();
       set({
-        isSeeking: false,
-        seekDirection: null,
+        isSeeking: seekState.isSeeking,
+        seekDirection: seekState.seekDirection,
       });
     },
 
     cancelSeek: async () => {
-      const { seekStartPosition, isSeeking } = get();
-
-      if (!isSeeking) {
-        log('cancelSeek called but not seeking - ignoring');
-        return;
-      }
-
-      log(`cancelSeek: returning to ${seekStartPosition.toFixed(1)}`);
-
-      // Return to original position - audioService owns position
-      await audioService.seekTo(seekStartPosition);
-
-      // Exit seeking mode (position will be synced via audioService callback)
+      // Delegate to seekingStore
+      await useSeekingStore.getState().cancelSeek();
+      // Sync to local state for backward compatibility
+      const seekState = useSeekingStore.getState();
       set({
-        isSeeking: false,
-        seekDirection: null,
+        isSeeking: seekState.isSeeking,
+        seekDirection: seekState.seekDirection,
       });
     },
 
@@ -1457,21 +1442,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // INSTANT: Update store position immediately for responsive UI
       set({ position: clampedPosition });
 
-      // Fire seek command (don't block - audio will catch up)
-      audioService.seekTo(clampedPosition).catch(() => {});
-
-      // Save position locally only - server sync happens on pause
-      if (currentBook) {
-        backgroundSyncService.saveProgressLocal(
-          currentBook.id,
-          clampedPosition,
-          duration
-        ).catch(() => {});
-      }
+      // Delegate to seekingStore (handles audio seek and local progress save)
+      await useSeekingStore.getState().seekTo(clampedPosition, duration, currentBook?.id);
     },
 
     // =========================================================================
-    // CONTINUOUS SEEKING (Rewind/FF Buttons)
+    // CONTINUOUS SEEKING (Rewind/FF Buttons) - Phase 7: Delegates to seekingStore
     // =========================================================================
 
     startContinuousSeeking: async (direction: SeekDirection) => {
@@ -1479,72 +1455,36 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       log(`startContinuousSeeking: direction=${direction}, position=${position.toFixed(1)}`);
 
-      // Clear any existing interval
-      if (seekInterval) {
-        clearInterval(seekInterval);
-        seekInterval = null;
-      }
+      // Delegate to seekingStore with pause callback
+      await useSeekingStore.getState().startContinuousSeeking(
+        direction,
+        position,
+        duration,
+        async () => {
+          if (isPlaying) await pause();
+        }
+      );
 
-      // Pause playback during continuous seek
-      if (isPlaying) {
-        await pause();
-      }
-
-      // Enter seeking mode
+      // Sync to local state for backward compatibility
+      const seekState = useSeekingStore.getState();
       set({
-        isSeeking: true,
-        seekPosition: position,
-        seekStartPosition: position,
-        seekDirection: direction,
+        isSeeking: seekState.isSeeking,
+        seekPosition: seekState.seekPosition,
+        seekStartPosition: seekState.seekStartPosition,
+        seekDirection: seekState.seekDirection,
       });
-
-      const step = direction === 'backward' ? -REWIND_STEP : FF_STEP;
-
-      // Immediate first step
-      const firstNewPosition = Math.max(0, Math.min(duration, position + step));
-      set({ seekPosition: firstNewPosition });
-      await audioService.seekTo(firstNewPosition);
-
-      // Start interval
-      seekInterval = setInterval(async () => {
-        const state = get();
-
-        if (!state.isSeeking) {
-          // Seeking was stopped externally
-          if (seekInterval) {
-            clearInterval(seekInterval);
-            seekInterval = null;
-          }
-          return;
-        }
-
-        const newPosition = Math.max(0, Math.min(state.duration, state.seekPosition + step));
-
-        // Stop at boundaries
-        if ((direction === 'backward' && newPosition <= 0) ||
-            (direction === 'forward' && newPosition >= state.duration)) {
-          set({ seekPosition: newPosition });
-          await audioService.seekTo(newPosition);
-          await get().stopContinuousSeeking();
-          return;
-        }
-
-        set({ seekPosition: newPosition });
-        await audioService.seekTo(newPosition);
-      }, REWIND_INTERVAL);
     },
 
     stopContinuousSeeking: async () => {
       log('stopContinuousSeeking');
-
-      // Clear interval
-      if (seekInterval) {
-        clearInterval(seekInterval);
-        seekInterval = null;
-      }
-
-      // Commit final position
-      await get().commitSeek();
+      // Delegate to seekingStore
+      await useSeekingStore.getState().stopContinuousSeeking();
+      // Sync to local state for backward compatibility
+      const seekState = useSeekingStore.getState();
+      set({
+        isSeeking: seekState.isSeeking,
+        seekDirection: seekState.seekDirection,
+      });
     },
 
     // =========================================================================
@@ -1846,11 +1786,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Don't flip from playing to not-playing due to buffering
       const newIsPlaying = state.isBuffering ? wasPlaying : state.isPlaying;
 
-      // CRITICAL: Skip position updates during seeking operations.
+      // CRITICAL: Skip position updates during seeking operations (Phase 7).
       // When isSeeking is true (e.g., during endScrub), the seek operation sets
       // the position and we must not let audio callbacks overwrite it with stale values.
-      const { isSeeking } = get();
-      if (isSeeking) {
+      // Check seekingStore directly for the authoritative isSeeking state.
+      const seekingState = useSeekingStore.getState();
+      if (seekingState.isSeeking) {
         // Only update play state, not position
         set({
           isPlaying: newIsPlaying,
