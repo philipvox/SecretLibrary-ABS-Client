@@ -48,3 +48,22 @@ export const formatTimeVerbose = (seconds: number): string => {
 
   return parts.join(' ');
 };
+
+/**
+ * Format bookmark date as "Mon 5" style
+ * Example: 1704067200000 -> "Jan 1"
+ */
+export const formatBookmarkDate = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+/**
+ * Format sleep timer countdown as mm:ss
+ * Example: 125 -> "2:05"
+ */
+export const formatSleepCountdown = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};

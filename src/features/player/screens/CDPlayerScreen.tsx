@@ -86,7 +86,7 @@ import { useToast } from '@/shared/hooks/useToast';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
 // Extracted utilities
-import { formatTime, formatTimeHHMMSS, formatTimeVerbose } from '../utils/timeFormatters';
+import { formatTime, formatTimeHHMMSS, formatTimeVerbose, formatSleepCountdown } from '../utils/timeFormatters';
 import { usePlayerColors } from '../utils/playerTheme';
 // Extracted components
 import { CircularProgress } from '../components/CircularProgress';
@@ -99,6 +99,7 @@ import {
   SettingsIconCircle,
 } from '../components/PlayerIcons';
 import { ChapterListItem } from '../components/ChapterListItem';
+import { ChaptersSheet, SettingsSheet, BookmarksSheet, type Bookmark as BookmarkType } from '../components/sheets';
 import {
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
@@ -1645,400 +1646,9 @@ export function CDPlayerScreen() {
     }
   }, [deletedBookmark, addBookmark]);
 
-  // Format date for bookmark display
-  const formatBookmarkDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
-
-  // ==========================================================================
-  // RENDER HELPERS
-  // ==========================================================================
-
-  const renderChaptersSheet = () => (
-    <View style={[styles.sheet, styles.chaptersSheet, { backgroundColor: themeColors.sheetBackground }]}>
-      <View style={styles.sheetHeader}>
-        <Text style={[styles.sheetTitle, { color: themeColors.textPrimary }]}>Chapters</Text>
-        <TouchableOpacity
-          onPress={closeSheet}
-          style={styles.sheetClose}
-          accessibilityLabel="Close chapters"
-          accessibilityRole="button"
-        >
-          <X size={24} color={themeColors.iconPrimary} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-      <ScrollView style={styles.chaptersList} showsVerticalScrollIndicator={false}>
-        {normalizedChapters.map((chapter, index: number) => (
-          <ChapterListItem
-            key={chapter.start}
-            chapter={chapter}
-            index={index}
-            isCurrentChapter={index === chapterIndex}
-            onSelect={handleChapterSelect}
-            themeColors={themeColors}
-            isDarkMode={isDarkMode}
-          />
-        ))}
-      </ScrollView>
-    </View>
-  );
-
-  // Custom speed input state - show current value if not a quick option
-  const isSpeedQuickOption = SPEED_QUICK_OPTIONS.includes(playbackRate);
-  const [customSpeedInput, setCustomSpeedInput] = useState(
-    isSpeedQuickOption ? '' : String(playbackRate)
-  );
-
-  // Custom sleep input state - show current minutes if not a quick option
-  const currentSleepMinutes = sleepTimer ? Math.ceil(sleepTimer / 60) : 0;
-  const isSleepQuickOption = SLEEP_QUICK_OPTIONS.includes(currentSleepMinutes);
-  const [customSleepInput, setCustomSleepInput] = useState(
-    sleepTimer && !isSleepQuickOption ? String(currentSleepMinutes) : ''
-  );
-
-  // Update custom inputs when values change externally
-  useEffect(() => {
-    if (!SPEED_QUICK_OPTIONS.includes(playbackRate)) {
-      setCustomSpeedInput(String(playbackRate));
-    } else {
-      setCustomSpeedInput('');
-    }
-  }, [playbackRate]);
-
-  useEffect(() => {
-    const mins = sleepTimer ? Math.ceil(sleepTimer / 60) : 0;
-    if (sleepTimer && !SLEEP_QUICK_OPTIONS.includes(mins)) {
-      setCustomSleepInput(String(mins));
-    } else {
-      setCustomSleepInput('');
-    }
-  }, [sleepTimer]);
-
-  const handleCustomSpeedSubmit = useCallback(() => {
-    Keyboard.dismiss();
-    const parsed = parseFloat(customSpeedInput);
-    if (!isNaN(parsed) && parsed >= 0.1 && parsed <= 4) {
-      setPlaybackRate(Math.round(parsed * 100) / 100);
-      haptics.selection();
-    }
-  }, [customSpeedInput, setPlaybackRate]);
-
-  const handleCustomSleepSubmit = useCallback(() => {
-    Keyboard.dismiss();
-    const parsed = parseInt(customSleepInput, 10);
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 720) {
-      setSleepTimer(parsed);
-      haptics.selection();
-    }
-  }, [customSleepInput, setSleepTimer]);
-
-  // Format sleep timer as mm:ss for live countdown
-  const formatSleepCountdown = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const renderSettingsSheet = () => (
-    <View style={[styles.sheet, { backgroundColor: themeColors.sheetBackground }]}>
-      <View style={styles.sheetHeader}>
-        <Text style={[styles.sheetTitle, { color: themeColors.textPrimary }]}>Settings</Text>
-        <TouchableOpacity onPress={closeSheet} style={styles.sheetClose}>
-          <X size={24} color={themeColors.iconPrimary} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Progress Bar: Book/Chapter Toggle */}
-      <View style={styles.settingsSection}>
-        <Text style={[styles.settingsSectionTitle, { color: themeColors.textTertiary }]}>Progress Bar</Text>
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[
-              styles.toggleOption,
-              { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0' },
-              progressMode === 'book' && { backgroundColor: themeColors.buttonBackground },
-            ]}
-            onPress={() => {
-              setProgressMode('book');
-              haptics.selection();
-            }}
-          >
-            <Text style={[
-              styles.toggleOptionText,
-              { color: themeColors.textSecondary },
-              progressMode === 'book' && { color: themeColors.buttonText, fontWeight: '600' },
-            ]}>Book</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleOption,
-              { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0' },
-              progressMode === 'chapter' && { backgroundColor: themeColors.buttonBackground },
-            ]}
-            onPress={() => {
-              setProgressMode('chapter');
-              haptics.selection();
-            }}
-          >
-            <Text style={[
-              styles.toggleOptionText,
-              { color: themeColors.textSecondary },
-              progressMode === 'chapter' && { color: themeColors.buttonText, fontWeight: '600' },
-            ]}>Chapter</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Speed */}
-      <View style={styles.settingsSection}>
-        <View style={styles.settingsTitleRow}>
-          <Gauge size={16} color={themeColors.textTertiary} strokeWidth={2} />
-          <Text style={[styles.settingsSectionTitle, { marginBottom: 0, marginLeft: 6, color: themeColors.textTertiary }]}>Speed</Text>
-          <Text style={[styles.settingStatusText, { color: themeColors.textPrimary }]}>{playbackRate}x</Text>
-        </View>
-        <View style={styles.optionsRow}>
-          {SPEED_QUICK_OPTIONS.map((speed) => (
-            <TouchableOpacity
-              key={speed}
-              style={[
-                styles.quickOption,
-                { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0' },
-                playbackRate === speed && { backgroundColor: themeColors.buttonBackground },
-              ]}
-              onPress={() => {
-                setPlaybackRate(speed);
-                haptics.selection();
-              }}
-            >
-              <Text style={[
-                styles.quickOptionText,
-                { color: themeColors.textSecondary },
-                playbackRate === speed && { color: themeColors.buttonText, fontWeight: '600' },
-              ]}>
-                {speed}x
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <View style={[styles.customInputContainer, { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0', borderColor: themeColors.border }]}>
-            <TextInput
-              style={[styles.customInput, { color: themeColors.textPrimary }]}
-              value={customSpeedInput}
-              onChangeText={setCustomSpeedInput}
-              onSubmitEditing={handleCustomSpeedSubmit}
-              onBlur={handleCustomSpeedSubmit}
-              placeholder="0.1-4"
-              placeholderTextColor={themeColors.textTertiary}
-              keyboardType="decimal-pad"
-              returnKeyType="done"
-            />
-          </View>
-        </View>
-      </View>
-
-      {/* Sleep Timer */}
-      <View style={styles.settingsSection}>
-        <View style={styles.settingsTitleRow}>
-          <Moon size={16} color={themeColors.textTertiary} strokeWidth={2} />
-          <Text style={[styles.settingsSectionTitle, { marginBottom: 0, marginLeft: 6, color: themeColors.textTertiary }]}>Sleep Timer</Text>
-          <Text style={[styles.settingStatusText, { color: sleepTimer ? '#E53935' : themeColors.textPrimary }]}>
-            {sleepTimer ? `${Math.ceil(sleepTimer / 60)}m` : 'Off'}
-          </Text>
-          {sleepTimer && (
-            <TouchableOpacity
-              style={styles.offButtonSmall}
-              onPress={() => {
-                clearSleepTimer();
-                haptics.selection();
-              }}
-            >
-              <X size={14} color="#E53935" strokeWidth={2.5} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <View style={styles.optionsRow}>
-          {SLEEP_QUICK_OPTIONS.map((mins) => (
-            <TouchableOpacity
-              key={mins}
-              style={[
-                styles.quickOption,
-                { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0' },
-                sleepTimer && Math.ceil(sleepTimer / 60) === mins && { backgroundColor: themeColors.buttonBackground },
-              ]}
-              onPress={() => {
-                setSleepTimer(mins);
-                haptics.selection();
-              }}
-            >
-              <Text style={[
-                styles.quickOptionText,
-                { color: themeColors.textSecondary },
-                sleepTimer && Math.ceil(sleepTimer / 60) === mins && { color: themeColors.buttonText, fontWeight: '600' },
-              ]}>
-                {mins >= 60 ? `${mins / 60}h` : `${mins}m`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <View style={[styles.customInputContainer, { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0', borderColor: themeColors.border }]}>
-            <TextInput
-              style={[styles.customInput, { color: themeColors.textPrimary }]}
-              value={customSleepInput}
-              onChangeText={setCustomSleepInput}
-              onSubmitEditing={handleCustomSleepSubmit}
-              onBlur={handleCustomSleepSubmit}
-              placeholder="min"
-              placeholderTextColor={themeColors.textTertiary}
-              keyboardType="number-pad"
-              returnKeyType="done"
-            />
-          </View>
-        </View>
-      </View>
-
-      {/* Action Buttons - Stacked */}
-      <View style={styles.settingsActionsColumn}>
-        <TouchableOpacity
-          style={[styles.settingsActionButtonFull, { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0' }]}
-          onPress={() => {
-            haptics.selection();
-            setActiveSheet('bookmarks');
-          }}
-        >
-          <Bookmark size={18} color={themeColors.iconPrimary} strokeWidth={2} />
-          <Text style={[styles.settingsActionText, { color: themeColors.textPrimary }]}>Bookmarks</Text>
-          {bookmarks.length > 0 && (
-            <View style={[styles.settingsActionBadge, { backgroundColor: themeColors.buttonBackground }]}>
-              <Text style={[styles.settingsActionBadgeText, { color: themeColors.buttonText }]}>{bookmarks.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.settingsActionButtonFull, { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F0F0F0' }, queueCount === 0 && styles.settingsActionButtonDisabled]}
-          onPress={() => {
-            if (queueCount > 0) {
-              haptics.impact('medium');
-              clearQueue();
-            }
-          }}
-        >
-          <Trash2 size={18} color={queueCount > 0 ? themeColors.iconPrimary : themeColors.textTertiary} strokeWidth={2} />
-          <Text style={[styles.settingsActionText, { color: themeColors.textPrimary }, queueCount === 0 && { color: themeColors.textTertiary }]}>
-            Clear Queue
-          </Text>
-          {queueCount > 0 && (
-            <View style={[styles.settingsActionBadge, { backgroundColor: themeColors.buttonBackground }]}>
-              <Text style={[styles.settingsActionBadgeText, { color: themeColors.buttonText }]}>{queueCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  // Bookmarks sheet renderer
-  const renderBookmarksSheet = () => (
-    <View style={[styles.sheet, { backgroundColor: themeColors.sheetBackground }]}>
-      <View style={styles.sheetHeader}>
-        <TouchableOpacity
-          onPress={openSettings}
-          style={styles.sheetBackButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={[styles.sheetBackText, { color: themeColors.textSecondary }]}>← Settings</Text>
-        </TouchableOpacity>
-        <Text style={[styles.sheetTitle, { color: themeColors.textPrimary }]}>Bookmarks</Text>
-        <TouchableOpacity onPress={closeSheet} style={styles.sheetClose}>
-          <X size={24} color={themeColors.iconPrimary} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-      <ScrollView style={styles.bookmarksScrollView} showsVerticalScrollIndicator={false}>
-        {bookmarks.length === 0 ? (
-          <View style={styles.bookmarksEmpty}>
-            <Bookmark size={48} color={themeColors.textTertiary} strokeWidth={1.5} />
-            <Text style={[styles.bookmarksEmptyText, { color: themeColors.textPrimary }]}>No bookmarks yet</Text>
-            <Text style={[styles.bookmarksEmptySubtext, { color: themeColors.textSecondary }]}>
-              Tap the bookmark button while listening to save your place.
-            </Text>
-            <Text style={[styles.bookmarksEmptyHint, { color: themeColors.textTertiary }]}>
-              Perfect for favorite quotes, important passages, or where you left off.
-            </Text>
-          </View>
-        ) : (
-          bookmarks.map((bookmark) => (
-            <View key={bookmark.id} style={[styles.bookmarkCard, { backgroundColor: isDarkMode ? themeColors.backgroundTertiary : '#F8F8F8' }]}>
-              {/* Main content - tap to play */}
-              <TouchableOpacity
-                style={styles.bookmarkCardContent}
-                onPress={() => {
-                  seekTo(bookmark.time);
-                  haptics.selection();
-                  setActiveSheet('none');
-                }}
-                onLongPress={() => {
-                  setEditingBookmarkId(bookmark.id);
-                  setNoteInputValue(bookmark.note || '');
-                  setShowNoteInput(true);
-                  haptics.impact('medium');
-                }}
-              >
-                {/* Cover thumbnail */}
-                {coverUrl && (
-                  <Image
-                    source={coverUrl}
-                    style={styles.bookmarkCover}
-                    contentFit="cover"
-                  />
-                )}
-                <View style={styles.bookmarkInfo}>
-                  <Text style={[styles.bookmarkChapter, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                    {bookmark.chapterTitle || 'Unknown Chapter'}
-                  </Text>
-                  <Text style={[styles.bookmarkTime, { color: themeColors.accentRed }]}>
-                    {formatTime(bookmark.time)}
-                  </Text>
-                  {bookmark.note && (
-                    <Text style={[styles.bookmarkNote, { color: themeColors.textSecondary }]} numberOfLines={2}>
-                      "{bookmark.note}"
-                    </Text>
-                  )}
-                  <Text style={[styles.bookmarkDate, { color: themeColors.textTertiary }]}>
-                    {formatBookmarkDate(bookmark.createdAt)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Action buttons */}
-              <View style={styles.bookmarkActions}>
-                <TouchableOpacity
-                  style={[styles.bookmarkPlayButton, { backgroundColor: themeColors.buttonBackground }]}
-                  onPress={() => {
-                    seekTo(bookmark.time);
-                    haptics.selection();
-                    setActiveSheet('none');
-                  }}
-                >
-                  <Play size={16} color={themeColors.buttonText} fill={themeColors.buttonText} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.bookmarkDeleteButton}
-                  onPress={() => {
-                    handleDeleteBookmark(bookmark);
-                    haptics.impact('light');
-                  }}
-                >
-                  <Trash2 size={16} color={themeColors.textTertiary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
-    </View>
-  );
-
   // ==========================================================================
   // MAIN RENDER
+  // (Sheets extracted to components/sheets/)
   // ==========================================================================
 
   if (!isPlayerVisible || !currentBook) return null;
@@ -2465,8 +2075,34 @@ export function CDPlayerScreen() {
           onPress={closeSheet}
         >
           <View style={[styles.sheetContainer, { marginBottom: insets.bottom + scale(90) }]}>
-            {activeSheet === 'chapters' && renderChaptersSheet()}
-            {activeSheet === 'settings' && renderSettingsSheet()}
+            {activeSheet === 'chapters' && (
+              <ChaptersSheet
+                themeColors={themeColors}
+                isDarkMode={isDarkMode}
+                chapters={normalizedChapters}
+                currentChapterIndex={chapterIndex}
+                onChapterSelect={handleChapterSelect}
+                onClose={closeSheet}
+              />
+            )}
+            {activeSheet === 'settings' && (
+              <SettingsSheet
+                themeColors={themeColors}
+                isDarkMode={isDarkMode}
+                progressMode={progressMode}
+                setProgressMode={setProgressMode}
+                playbackRate={playbackRate}
+                setPlaybackRate={setPlaybackRate}
+                sleepTimer={sleepTimer}
+                setSleepTimer={setSleepTimer}
+                clearSleepTimer={clearSleepTimer}
+                bookmarksCount={bookmarks.length}
+                queueCount={queueCount}
+                clearQueue={clearQueue}
+                onOpenBookmarks={() => setActiveSheet('bookmarks')}
+                onClose={closeSheet}
+              />
+            )}
             {activeSheet === 'queue' && (
               <QueuePanel
                 onClose={() => setActiveSheet('none')}
@@ -2479,7 +2115,23 @@ export function CDPlayerScreen() {
             {activeSheet === 'speed' && (
               <SpeedSheet onClose={() => setActiveSheet('none')} />
             )}
-            {activeSheet === 'bookmarks' && renderBookmarksSheet()}
+            {activeSheet === 'bookmarks' && (
+              <BookmarksSheet
+                themeColors={themeColors}
+                isDarkMode={isDarkMode}
+                bookmarks={bookmarks}
+                coverUrl={coverUrl}
+                onGoBack={openSettings}
+                onClose={closeSheet}
+                onSeekTo={seekTo}
+                onEditBookmark={(bookmark: BookmarkType) => {
+                  setEditingBookmarkId(bookmark.id);
+                  setNoteInputValue(bookmark.note || '');
+                  setShowNoteInput(true);
+                }}
+                onDeleteBookmark={handleDeleteBookmark}
+              />
+            )}
           </View>
         </TouchableOpacity>
       )}
