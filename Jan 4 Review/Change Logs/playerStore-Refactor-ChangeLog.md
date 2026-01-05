@@ -311,13 +311,42 @@
 - [ ] Position updates blocked during seek
 
 ### Commit
-- [ ] Committed with message: `refactor(player): phase 7 - extract seeking store`
+- [x] Committed: `50cc227` - `refactor(player): phase 7 - extract seeking store`
 
 ---
 
 ## Phase 8: Extract Selectors
 
-**Status:** Pending
+**Status:** Complete ✓
+**Started:** January 5, 2026
+**Completed:** January 5, 2026
+
+### Files Created
+- [x] `src/features/player/stores/playerSelectors.ts` - Dedicated selector hooks (~200 lines)
+
+### Selectors Extracted
+- **Position:** useDisplayPosition, useEffectivePosition
+- **Seek:** useSeekDelta, useIsSeeking, useSeekDirection
+- **Chapter:** useCurrentChapterIndex, useCurrentChapter, useChapterProgress
+- **Progress:** useBookProgress, usePercentComplete, useTimeRemaining
+- **Book:** useIsViewingDifferentBook, useViewingBook, usePlayingBook
+- **Sleep Timer:** useIsShakeDetectionActive, useSleepTimerState
+- **Playback:** usePlaybackState, usePlayerVisibility, useCurrentBookId
+
+### Changes to playerStore.ts
+- [x] Added comment noting selectors also available from playerSelectors.ts
+- [x] Kept original selectors for backward compatibility
+
+### TypeScript Verification
+- [x] No new TypeScript errors introduced
+- [x] Expo export build succeeds
+
+### Tests (to be verified manually)
+- [ ] All selectors return correct values
+- [ ] No circular dependency issues
+
+### Commit
+- [ ] Committed with message: `refactor(player): phase 8 - extract selectors`
 
 ---
 

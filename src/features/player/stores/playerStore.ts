@@ -2039,6 +2039,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
 // =============================================================================
 // SELECTORS (for derived state)
+// Phase 8: Selectors are also available from playerSelectors.ts
+// These are kept here for backward compatibility
 // =============================================================================
 
 /**
