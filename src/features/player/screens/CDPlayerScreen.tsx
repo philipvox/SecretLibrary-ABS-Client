@@ -85,98 +85,35 @@ import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/hooks/useToast';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 
-// =============================================================================
-// THEME COLORS
-// =============================================================================
-
-// Player colors for light and dark modes
-const playerColors = {
-  light: {
-    // Main backgrounds
-    background: '#FFFFFF',
-    backgroundSecondary: '#F5F5F5',
-    backgroundTertiary: '#E8E8E8',
-    // Text
-    textPrimary: '#000000',
-    textSecondary: 'rgba(0,0,0,0.6)',
-    textTertiary: 'rgba(0,0,0,0.4)',
-    textMuted: 'rgba(0,0,0,0.25)',
-    // Borders & dividers
-    border: 'rgba(0,0,0,0.1)',
-    borderStrong: 'rgba(0,0,0,0.2)',
-    // Sheet backgrounds
-    sheetBackground: '#FFFFFF',
-    sheetHandle: '#E0E0E0',
-    // Timeline
-    tickDefault: '#000000',
-    tickActive: '#F50101',
-    markerColor: '#F50101',
-    // Overlays
-    overlayLight: 'rgba(0,0,0,0.05)',
-    overlayMedium: 'rgba(0,0,0,0.3)',
-    overlayHeavy: 'rgba(0,0,0,0.5)',
-    // Accents
-    accent: colors.accent,
-    accentRed: '#E53935',
-    // Icons
-    iconPrimary: '#000000',
-    iconSecondary: 'rgba(0,0,0,0.5)',
-    iconMuted: 'rgba(0,0,0,0.3)',
-    // Buttons
-    buttonBackground: '#FFFFFF',
-    buttonText: '#000000',
-    // Status bar
-    statusBar: 'dark-content' as const,
-  },
-  dark: {
-    // Main backgrounds
-    background: '#000000',
-    backgroundSecondary: '#1A1A1A',
-    backgroundTertiary: '#262626',
-    // Text
-    textPrimary: '#FFFFFF',
-    textSecondary: 'rgba(255,255,255,0.7)',
-    textTertiary: 'rgba(255,255,255,0.5)',
-    textMuted: 'rgba(255,255,255,0.3)',
-    // Borders & dividers
-    border: 'rgba(255,255,255,0.1)',
-    borderStrong: 'rgba(255,255,255,0.2)',
-    // Sheet backgrounds
-    sheetBackground: '#1C1C1E',
-    sheetHandle: 'rgba(255,255,255,0.3)',
-    // Timeline
-    tickDefault: 'rgba(255,255,255,0.4)',
-    tickActive: '#F50101',
-    markerColor: '#F50101',
-    // Overlays
-    overlayLight: 'rgba(255,255,255,0.05)',
-    overlayMedium: 'rgba(0,0,0,0.5)',
-    overlayHeavy: 'rgba(0,0,0,0.7)',
-    // Accents
-    accent: colors.accent,
-    accentRed: '#E53935',
-    // Icons
-    iconPrimary: '#FFFFFF',
-    iconSecondary: 'rgba(255,255,255,0.7)',
-    iconMuted: 'rgba(255,255,255,0.4)',
-    // Buttons
-    buttonBackground: '#000000',
-    buttonText: '#FFFFFF',
-    // Status bar
-    statusBar: 'light-content' as const,
-  },
-};
-const COVER_SIZE = scale(360); // Large centered cover
-// Hook to get player colors based on theme
-function usePlayerColors() {
-  const mode = useThemeStore((state) => state.mode);
-  return playerColors[mode];
-}
-
-const SCREEN_WIDTH = wp(100);
-const SCREEN_HEIGHT = hp(100);
-
-const ACCENT_COLOR = colors.accent;
+// Extracted utilities
+import { formatTime, formatTimeHHMMSS, formatTimeVerbose } from '../utils/timeFormatters';
+import { usePlayerColors } from '../utils/playerTheme';
+import {
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
+  COVER_SIZE,
+  ACCENT_COLOR,
+  SPEED_QUICK_OPTIONS,
+  SLEEP_QUICK_OPTIONS,
+  TIMELINE_WIDTH,
+  TIMELINE_MARKER_RADIUS,
+  TIMELINE_MAJOR_TICK_HEIGHT,
+  TIMELINE_MINOR_TICK_HEIGHT,
+  CHAPTER_MARKER_X,
+  CHAPTER_MARKER_CIRCLE_SIZE,
+  CHAPTER_TICK_HEIGHT,
+  TEN_MIN_TICK_HEIGHT,
+  ONE_MIN_TICK_HEIGHT,
+  FIFTEEN_SEC_TICK_HEIGHT,
+  CHAPTER_LABEL_Y,
+  MINUTES_PER_SCREEN,
+  PIXELS_PER_SECOND,
+  CHAPTER_TIMELINE_TOTAL_HEIGHT,
+  CHAPTER_TICKS_AREA_HEIGHT,
+  CHAPTER_MARKER_LINE_HEIGHT,
+  EDGE_ZONE,
+  SPEED_MODE_LABELS,
+} from '../constants/playerConstants';
 
 // =============================================================================
 // TYPES
@@ -184,54 +121,6 @@ const ACCENT_COLOR = colors.accent;
 
 type SheetType = 'none' | 'chapters' | 'settings' | 'queue' | 'sleep' | 'speed' | 'bookmarks';
 type ProgressMode = 'chapter' | 'book';
-
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-// Quick speed options for settings panel
-const SPEED_QUICK_OPTIONS = [1, 1.25, 1.5, 2];
-// Sleep timer quick options (in minutes)
-const SLEEP_QUICK_OPTIONS = [5, 15, 30, 60];
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-const formatTime = (seconds: number): string => {
-  if (!seconds || seconds < 0) return '0:00';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }
-  return `${m}:${s.toString().padStart(2, '0')}`;
-};
-
-// Format time as "00:00:00" - always show hours:minutes:seconds
-const formatTimeHHMMSS = (seconds: number): string => {
-  if (!seconds || seconds < 0) return '00:00:00';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-};
-
-// Format time as "5h 23m 10s" - verbose format for chapter remaining display
-const formatTimeVerbose = (seconds: number): string => {
-  if (!seconds || seconds < 0) return '0s';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-
-  const parts: string[] = [];
-  if (h > 0) parts.push(`${h}h`);
-  if (m > 0 || h > 0) parts.push(`${m}m`);
-  parts.push(`${s}s`);
-
-  return parts.join(' ');
-};
 
 // =============================================================================
 // CIRCULAR PROGRESS INDICATOR
@@ -383,11 +272,6 @@ const SettingsIconCircle = ({ color = "#FFFFFF", dark = false }: { color?: strin
 // =============================================================================
 // Timeline Progress Bar
 // =============================================================================
-
-const TIMELINE_WIDTH = SCREEN_WIDTH - scale(44); // Match progress bar padding
-const TIMELINE_MARKER_RADIUS = 8;
-const TIMELINE_MAJOR_TICK_HEIGHT = 10;
-const TIMELINE_MINOR_TICK_HEIGHT = 5;
 
 interface TimelineChapter {
   start: number;
@@ -704,18 +588,6 @@ const timelineStyles = StyleSheet.create({
 // =============================================================================
 // Chapter Timeline Progress Bar (Scrolling Chapter View)
 // =============================================================================
-
-// Chapter timeline - time-based scale (zoomed to ~1 chapter per screen)
-const CHAPTER_MARKER_X = TIMELINE_WIDTH / 2; // Fixed center position
-const CHAPTER_MARKER_CIRCLE_SIZE = scale(100); // Large red circle
-const CHAPTER_TICK_HEIGHT = scale(80); // Tallest - chapter boundaries
-const TEN_MIN_TICK_HEIGHT = scale(45); // Medium - 10 minute marks
-const ONE_MIN_TICK_HEIGHT = scale(24); // Small - 1 minute marks
-const FIFTEEN_SEC_TICK_HEIGHT = scale(11); // Smallest - 15 second marks
-const CHAPTER_LABEL_Y = scale(16); // Labels above ticks
-const MINUTES_PER_SCREEN = 5; // ~5 minutes visible at once (zoomed in)
-const PIXELS_PER_SECOND = TIMELINE_WIDTH / (MINUTES_PER_SCREEN * 60);
-const CHAPTER_TIMELINE_TOTAL_HEIGHT = scale(220); // Total height from circle to bottom
 
 const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, onSeek, bookmarks = [], libraryItemId }: TimelineProgressBarProps) => {
   // Get theme colors
@@ -1250,9 +1122,6 @@ const ChapterTimelineProgressBar = React.memo(({ position, duration, chapters, o
     </View>
   );
 });
-
-const CHAPTER_TICKS_AREA_HEIGHT = CHAPTER_LABEL_Y + CHAPTER_TICK_HEIGHT + scale(8);
-const CHAPTER_MARKER_LINE_HEIGHT = CHAPTER_TIMELINE_TOTAL_HEIGHT - CHAPTER_MARKER_CIRCLE_SIZE;
 
 const chapterTimelineStyles = StyleSheet.create({
   outerContainer: {

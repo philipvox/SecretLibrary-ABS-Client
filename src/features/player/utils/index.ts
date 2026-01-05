@@ -76,3 +76,17 @@ export {
   type ResolutionOptions,
   type ResolutionResult,
 } from './positionResolver';
+
+// Time formatters (for player UI)
+export {
+  formatTime,
+  formatTimeHHMMSS,
+  formatTimeVerbose,
+} from './timeFormatters';
+
+// Player theme
+export {
+  playerColors,
+  usePlayerColors,
+  type PlayerColors,
+} from './playerTheme';
