@@ -346,13 +346,92 @@
 - [ ] No circular dependency issues
 
 ### Commit
-- [ ] Committed with message: `refactor(player): phase 8 - extract selectors`
+- [x] Committed: `89796c6` - `refactor(player): phase 8 - extract selectors`
 
 ---
 
 ## Phase 9: Create Facade
 
-**Status:** Pending
+**Status:** Complete ✓
+**Started:** January 5, 2026
+**Completed:** January 5, 2026
+
+### Files Created
+- [x] `src/features/player/stores/index.ts` - Centralized facade for all player stores (~150 lines)
+
+### Features
+- Re-exports all stores: playerStore, playerSettingsStore, bookmarksStore, sleepTimerStore, speedStore, completionStore, seekingStore
+- Re-exports all selectors from playerSelectors.ts
+- Re-exports all types: Chapter, Bookmark, SeekDirection, ControlMode, ProgressMode
+- Provides clean import path: `import { usePlayerStore, useSpeedStore } from '@/features/player/stores'`
+
+### TypeScript Verification
+- [x] No new TypeScript errors introduced
+- [x] Expo export build succeeds
+
+### Commit
+- [ ] Committed with message: `refactor(player): phase 9 - create facade`
+
+---
+
+## Final Results
+
+**Status:** Complete ✓
+**Total Refactor Time:** January 5, 2026 (single session)
+
+### Line Counts
+
+| File | Lines | Description |
+|------|-------|-------------|
+| **playerStore.ts** | 2,156 | Core playback (down from ~2,838) |
+| **playerStore.backup.ts** | 2,841 | Original backup |
+| **seekingStore.ts** | 362 | Seeking state/operations |
+| **sleepTimerStore.ts** | 265 | Sleep timer |
+| **completionStore.ts** | 255 | Book completion |
+| **playerSettingsStore.ts** | 232 | UI/behavior settings |
+| **bookmarksStore.ts** | 224 | Bookmark CRUD |
+| **speedStore.ts** | 208 | Playback speed |
+| **playerSelectors.ts** | 205 | Derived selectors |
+| **index.ts** | 147 | Facade exports |
+
+### Utility Files (Phase 1)
+
+| File | Lines | Description |
+|------|-------|-------------|
+| **bookLoadingHelpers.ts** | 220 | Chapter extraction, duration, paths |
+| **downloadListener.ts** | 189 | Download completion handling |
+| **smartRewind.ts** | 140 | Smart rewind persistence |
+| **listeningSession.ts** | 109 | Session tracking |
+
+### Summary
+
+- **Original playerStore:** ~2,838 lines
+- **Refactored playerStore:** 2,156 lines (24% reduction)
+- **New store files:** 7 (1,898 lines total)
+- **New utility files:** 4 (658 lines total)
+- **Selectors file:** 205 lines
+- **Facade file:** 147 lines
+
+### Architecture
+
+```
+playerStore (core)
+├── playerSettingsStore (UI/behavior settings)
+├── bookmarksStore (bookmark CRUD)
+├── sleepTimerStore (sleep timer + shake)
+├── speedStore (per-book speed memory)
+├── completionStore (book completion)
+└── seekingStore (CRITICAL - seeking state)
+
+utils/
+├── smartRewind.ts
+├── listeningSession.ts
+├── downloadListener.ts
+└── bookLoadingHelpers.ts
+
+playerSelectors.ts (derived state)
+index.ts (facade)
+```
 
 ---
 
