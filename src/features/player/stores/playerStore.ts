@@ -104,6 +104,9 @@ import { useSleepTimerStore } from './sleepTimerStore';
 // Import speed store (Phase 5 refactor)
 import { useSpeedStore } from './speedStore';
 
+// Import completion store (Phase 6 refactor)
+import { useCompletionStore } from './completionStore';
+
 const DEBUG = __DEV__;
 const log = (msg: string, ...args: any[]) => audioLog.store(msg, ...args);
 const logError = (msg: string, ...args: any[]) => audioLog.error(msg, ...args);
@@ -379,8 +382,7 @@ const ACTIVE_PLAYBACK_RATE_KEY = 'playerActivePlaybackRate';
 const SMART_REWIND_PAUSE_TIMESTAMP_KEY = 'smartRewindPauseTimestamp';
 const SMART_REWIND_PAUSE_BOOK_ID_KEY = 'smartRewindPauseBookId';
 const SMART_REWIND_PAUSE_POSITION_KEY = 'smartRewindPausePosition';
-const SHOW_COMPLETION_PROMPT_KEY = 'playerShowCompletionPrompt';
-const AUTO_MARK_FINISHED_KEY = 'playerAutoMarkFinished';
+// SHOW_COMPLETION_PROMPT_KEY and AUTO_MARK_FINISHED_KEY moved to completionStore (Phase 6)
 const PROGRESS_SAVE_INTERVAL = 30000; // Save progress every 30 seconds
 const MIN_PAUSE_FOR_REWIND_MS = 3000; // Minimum pause before smart rewind applies
 const PREV_CHAPTER_THRESHOLD = 3;     // Seconds before going to prev vs restart
@@ -1745,20 +1747,13 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         await useSpeedStore.getState().loadSpeedSettings();
         const speedState = useSpeedStore.getState();
 
-        // Load remaining settings not yet extracted to separate stores
-        const [
-          lastPlayedBookIdStr,
-          showCompletionPromptStr,
-          autoMarkFinishedStr,
-        ] = await Promise.all([
-          AsyncStorage.getItem(LAST_PLAYED_BOOK_ID_KEY),
-          AsyncStorage.getItem(SHOW_COMPLETION_PROMPT_KEY),
-          AsyncStorage.getItem(AUTO_MARK_FINISHED_KEY),
-        ]);
+        // Phase 6: Load completion settings
+        await useCompletionStore.getState().loadCompletionSettings();
+        const completionState = useCompletionStore.getState();
 
+        // Load remaining settings not yet extracted to separate stores
+        const lastPlayedBookIdStr = await AsyncStorage.getItem(LAST_PLAYED_BOOK_ID_KEY);
         const lastPlayedBookId = lastPlayedBookIdStr || null;
-        const showCompletionPrompt = showCompletionPromptStr !== 'false'; // Default true
-        const autoMarkFinished = autoMarkFinishedStr === 'true'; // Default false
 
         set({
           // Settings from playerSettingsStore (keep local state in sync)
@@ -1776,10 +1771,11 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           playbackRate: speedState.playbackRate,
           bookSpeedMap: speedState.bookSpeedMap,
           globalDefaultRate: speedState.globalDefaultRate,
+          // Settings from completionStore (Phase 6)
+          showCompletionPrompt: completionState.showCompletionPrompt,
+          autoMarkFinished: completionState.autoMarkFinished,
           // Settings still managed locally (to be extracted in later phases)
           lastPlayedBookId,
-          showCompletionPrompt,
-          autoMarkFinished,
         });
       } catch (error) {
         log('[loadPlayerSettings] Error loading settings:', error);
@@ -1939,18 +1935,20 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             session?.id
           ).catch(() => {});
 
-          // Get completion preferences
-          const { showCompletionPrompt, autoMarkFinished } = get();
+          // Get completion preferences from completionStore (Phase 6)
+          const completionState = useCompletionStore.getState();
 
-          if (showCompletionPrompt) {
+          if (completionState.showCompletionPrompt) {
             // Show completion sheet for user to decide
             log('BOOK FINISHED - showing completion sheet');
+            useCompletionStore.getState().showCompletionForBook(currentBook);
+            // Sync to local state for backward compatibility
             set({
               showCompletionSheet: true,
               completionSheetBook: currentBook,
             });
             // Don't auto-play next book - let user decide via sheet
-          } else if (autoMarkFinished) {
+          } else if (completionState.autoMarkFinished) {
             // Auto-mark as finished when prompt is disabled
             log('BOOK FINISHED - auto-marking as finished');
             get().markBookFinished(currentBook.id);
@@ -2057,16 +2055,17 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     // BOOK COMPLETION
     // =========================================================================
 
+    // Phase 6: Completion actions delegate to completionStore
     setShowCompletionPrompt: async (enabled: boolean) => {
+      await useCompletionStore.getState().setShowCompletionPrompt(enabled);
+      // Sync to local state for backward compatibility
       set({ showCompletionPrompt: enabled });
-      await AsyncStorage.setItem(SHOW_COMPLETION_PROMPT_KEY, enabled.toString());
-      log('[Completion] Show completion prompt set to:', enabled);
     },
 
     setAutoMarkFinished: async (enabled: boolean) => {
+      await useCompletionStore.getState().setAutoMarkFinished(enabled);
+      // Sync to local state for backward compatibility
       set({ autoMarkFinished: enabled });
-      await AsyncStorage.setItem(AUTO_MARK_FINISHED_KEY, enabled.toString());
-      log('[Completion] Auto-mark finished set to:', enabled);
     },
 
     markBookFinished: async (bookId?: string) => {
@@ -2078,67 +2077,21 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         return;
       }
 
-      log('[Completion] Marking book as finished:', targetBookId);
+      // Delegate to completionStore
+      await useCompletionStore.getState().markBookFinished(targetBookId, duration, currentBook);
 
-      try {
-        // Provide haptic feedback
-        haptics.bookmarkCreated(); // Reuse success haptic
-
-        // Mark as finished in local SQLite (single source of truth)
-        await sqliteCache.markUserBookFinished(targetBookId, true, 'progress');
-        log('[Completion] Marked as finished in SQLite');
-
-        // Sync to server (don't await - runs in background)
-        import('@/core/services/finishedBooksSync').then(({ finishedBooksSync }) => {
-          finishedBooksSync.syncBook(targetBookId, true, duration);
-        }).catch((err) => {
-          log('[Completion] Background sync failed:', err);
-        });
-
-        // Update local progress to 100%
-        if (currentBook?.id === targetBookId && duration > 0) {
-          await sqliteCache.setPlaybackProgress(targetBookId, duration, duration, false);
-        }
-
-        // Add to reading history
-        if (currentBook?.id === targetBookId) {
-          const metadata = currentBook.media?.metadata as any;
-          if (metadata) {
-            await sqliteCache.addToReadHistory({
-              itemId: targetBookId,
-              title: metadata.title || 'Unknown Title',
-              authorName: metadata.authorName || metadata.authors?.[0]?.name || 'Unknown Author',
-              narratorName: metadata.narratorName || metadata.narrators?.[0]?.name,
-              genres: metadata.genres || [],
-            });
-            log('[Completion] Added to reading history');
-          }
-        }
-
-        // Remove from queue if present
-        try {
-          const { useQueueStore } = await import('@/features/queue/stores/queueStore');
-          const queueStore = useQueueStore.getState();
-          if (queueStore.isInQueue(targetBookId)) {
-            await queueStore.removeFromQueue(targetBookId);
-            log('[Completion] Removed from queue');
-          }
-        } catch (err) {
-          log('[Completion] Queue removal failed:', err);
-        }
-
-        // Dismiss the completion sheet
-        set({ showCompletionSheet: false, completionSheetBook: null });
-
-        log('[Completion] Book marked as finished successfully');
-      } catch (err) {
-        logError('[Completion] Failed to mark book as finished:', err);
-      }
+      // Sync completion sheet state for backward compatibility
+      const completionState = useCompletionStore.getState();
+      set({
+        showCompletionSheet: completionState.showCompletionSheet,
+        completionSheetBook: completionState.completionSheetBook,
+      });
     },
 
     dismissCompletionSheet: () => {
+      useCompletionStore.getState().dismissCompletionSheet();
+      // Sync to local state for backward compatibility
       set({ showCompletionSheet: false, completionSheetBook: null });
-      log('[Completion] Sheet dismissed');
     },
   }))
 );

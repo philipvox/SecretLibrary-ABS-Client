@@ -208,13 +208,56 @@
 - [ ] Speed restored on book reload
 
 ### Commit
-- [ ] Committed with message: `refactor(player): phase 5 - extract speed store`
+- [x] Committed: `c3dbaa4` - `refactor(player): phase 5 - extract speed store`
 
 ---
 
 ## Phase 6: Extract Completion Store
 
-**Status:** Pending
+**Status:** Complete ✓
+**Started:** January 5, 2026
+**Completed:** January 5, 2026
+
+### Files Created
+- [x] `src/features/player/stores/completionStore.ts` - Book completion management store (~230 lines)
+
+### Features Extracted
+- `showCompletionPrompt` - Show prompt when book ends (default true)
+- `autoMarkFinished` - Auto-mark books finished when prompt disabled (default false)
+- `showCompletionSheet` - Currently showing completion sheet (transient)
+- `completionSheetBook` - Book that just finished (for completion sheet)
+- `setShowCompletionPrompt()` - Set completion prompt preference
+- `setAutoMarkFinished()` - Set auto-mark preference
+- `showCompletionForBook()` - Show completion sheet for a book
+- `dismissCompletionSheet()` - Dismiss the completion sheet
+- `markBookFinished()` - Mark book as finished (SQLite, server sync, reading history, queue removal)
+- `loadCompletionSettings()` - Load settings from AsyncStorage
+- Helper selectors: useShowCompletionPrompt, useAutoMarkFinished, useIsCompletionSheetVisible, useCompletionSheetBook, useCompletionState
+
+### Changes to playerStore.ts
+- [x] Import completionStore (line 108)
+- [x] Updated loadPlayerSettings to load from completionStore first (lines 1751-1753)
+- [x] Updated book finish handling to use completionStore (lines 1939-1952)
+- [x] Updated all completion actions to delegate to completionStore (lines 2057-2094)
+- [x] Removed unused constants (SHOW_COMPLETION_PROMPT_KEY, AUTO_MARK_FINISHED_KEY)
+- [x] Local state sync for backward compatibility
+
+### Cross-Store Communication
+- completionStore coordinates with queueStore to remove finished books from queue
+- completionStore uses finishedBooksSync for server synchronization
+
+### TypeScript Verification
+- [x] No new TypeScript errors introduced
+- [x] Expo export build succeeds (5159ms bundle time)
+
+### Tests (to be verified manually)
+- [ ] Completion prompt shows when book ends
+- [ ] Auto-mark finished works when prompt disabled
+- [ ] Book marked as finished in SQLite
+- [ ] Finished book removed from queue
+
+### Commit
+- [ ] Committed with message: `refactor(player): phase 6 - extract completion store`
 
 ---
 
