@@ -953,7 +953,7 @@ export function KidModeSettingsScreen() {
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View style={[styles.modalIconContainer, { backgroundColor: 'rgba(243,182,12,0.15)' }]}>
-                <Lock size={scale(24)} color={ACCENT} strokeWidth={2} />
+                <Lock size={scale(32)} color={ACCENT} strokeWidth={2} />
               </View>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {getPinModalTitle()}
@@ -1009,11 +1009,11 @@ export function KidModeSettingsScreen() {
             {/* Modal Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancelButton, { borderColor: colors.border }]}
+                style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={closePinModal}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>
+                <Text style={[styles.modalButtonText, { color: 'rgba(255,255,255,0.6)' }]}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -1347,75 +1347,89 @@ const styles = StyleSheet.create({
   // PIN Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   modalContent: {
     width: '100%',
-    maxWidth: scale(320),
-    borderRadius: scale(16),
-    padding: spacing.xl,
+    maxWidth: scale(340),
+    borderRadius: scale(24),
+    paddingTop: scale(32),
+    paddingBottom: scale(24),
+    paddingHorizontal: scale(24),
     alignItems: 'center',
+    // Subtle shadow for depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 16,
   },
   modalHeader: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalIconContainer: {
-    width: scale(56),
-    height: scale(56),
-    borderRadius: scale(14),
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: spacing.md,
   },
+  modalIconContainer: {
+    width: scale(72),
+    height: scale(72),
+    borderRadius: scale(36),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
   modalTitle: {
-    fontSize: scale(18),
+    fontSize: scale(22),
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: spacing.xs,
+    letterSpacing: -0.3,
   },
   modalSubtitle: {
-    fontSize: scale(13),
+    fontSize: scale(14),
     textAlign: 'center',
-    lineHeight: scale(18),
+    lineHeight: scale(20),
+    opacity: 0.7,
   },
   pinErrorText: {
-    fontSize: scale(13),
+    fontSize: scale(14),
     color: DANGER,
     textAlign: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
+    fontWeight: '500',
   },
   confirmHint: {
-    fontSize: scale(12),
+    fontSize: scale(13),
     textAlign: 'center',
     marginTop: spacing.sm,
+    opacity: 0.6,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
+    gap: spacing.md,
+    marginTop: scale(28),
     width: '100%',
   },
   modalButton: {
     flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: scale(10),
+    paddingVertical: scale(14),
+    borderRadius: scale(12),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: scale(48),
   },
   modalCancelButton: {
-    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   modalConfirmButton: {
-    // backgroundColor set inline
+    // backgroundColor set inline (ACCENT)
   },
   modalButtonText: {
-    fontSize: scale(15),
+    fontSize: scale(16),
     fontWeight: '600',
   },
   modalButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
 });
