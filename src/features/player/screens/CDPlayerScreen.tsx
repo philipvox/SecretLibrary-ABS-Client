@@ -76,6 +76,8 @@ import { useNormalizedChapters } from '@/shared/hooks';
 // CoverPlayButton removed - using long-press + pan on timeline instead
 import { haptics } from '@/core/native/haptics';
 import { useTimelineHaptics, Chapter as HapticChapter } from '../hooks/useTimelineHaptics';
+import { useContinuousSeeking } from '../hooks/useContinuousSeeking';
+import { useBookmarkActions } from '../hooks/useBookmarkActions';
 import { getCachedTicks, generateAndCacheTicks, TimelineTick, ChapterInput } from '../services/tickCache';
 import { getVisibleTicks } from '../utils/tickGenerator';
 import { audioService } from '../services/audioService';
@@ -1429,222 +1431,44 @@ export function CDPlayerScreen() {
   }, [pause, play]);
 
   // ==========================================================================
-  // CONTINUOUS SEEKING (hold to scrub)
+  // CONTINUOUS SEEKING (hold to scrub) - extracted to hook
   // ==========================================================================
-  const seekIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const seekDelayRef = useRef<NodeJS.Timeout | null>(null);
-  const seekStartTimeRef = useRef<number>(0);
-  const seekDirectionRef = useRef<'back' | 'forward' | null>(null);
-  const didStartSeekingRef = useRef<boolean>(false);
+  const {
+    handleRewindPressIn,
+    handleFastForwardPressIn,
+    handleSeekPressOut,
+    handleSkipBackWithCheck,
+    handleSkipForwardWithCheck,
+  } = useContinuousSeeking({
+    seekTo,
+    handleSkipBack,
+    handleSkipForward,
+  });
 
-  // Calculate seek amount based on how long button has been held
-  // Starts at 2 seconds, accelerates up to 15 seconds per tick
-  const getSeekAmount = useCallback(() => {
-    const holdDuration = Date.now() - seekStartTimeRef.current;
-    if (holdDuration < 1000) return 2;     // First 1s: 2 seconds per tick
-    if (holdDuration < 2000) return 5;     // 1-2s: 5 seconds per tick
-    if (holdDuration < 4000) return 10;    // 2-4s: 10 seconds per tick
-    return 15;                              // 4s+: 15 seconds per tick
-  }, []);
-
-  // Start continuous seeking (called after delay)
-  const beginContinuousSeeking = useCallback((direction: 'back' | 'forward') => {
-    if (seekIntervalRef.current) return;
-
-    didStartSeekingRef.current = true;
-    seekStartTimeRef.current = Date.now();
-    haptics.selection();
-
-    // Prevent SmartRewind from activating when we release
-    audioService.setScrubbing(true);
-
-    // Continue seeking every 100ms
-    seekIntervalRef.current = setInterval(() => {
-      const currentState = usePlayerStore.getState();
-      const seekAmount = getSeekAmount();
-
-      let newPosition: number;
-      if (direction === 'back') {
-        newPosition = Math.max(0, currentState.position - seekAmount);
-      } else {
-        newPosition = Math.min(currentState.duration, currentState.position + seekAmount);
-      }
-
-      seekTo?.(newPosition);
-
-      // Haptic feedback when accelerating
-      if (seekAmount >= 10) {
-        haptics.impact('light');
-      }
-    }, 100);
-  }, [seekTo, getSeekAmount]);
-
-  // Handle press in - start delay timer for continuous seeking
-  const handleRewindPressIn = useCallback(() => {
-    didStartSeekingRef.current = false;
-    seekDirectionRef.current = 'back';
-
-    // Start continuous seeking after 300ms hold
-    seekDelayRef.current = setTimeout(() => {
-      beginContinuousSeeking('back');
-    }, 300);
-  }, [beginContinuousSeeking]);
-
-  const handleFastForwardPressIn = useCallback(() => {
-    didStartSeekingRef.current = false;
-    seekDirectionRef.current = 'forward';
-
-    // Start continuous seeking after 300ms hold
-    seekDelayRef.current = setTimeout(() => {
-      beginContinuousSeeking('forward');
-    }, 300);
-  }, [beginContinuousSeeking]);
-
-  // Handle press out - stop seeking
-  const handleSeekPressOut = useCallback(() => {
-    // Clear the delay timer
-    if (seekDelayRef.current) {
-      clearTimeout(seekDelayRef.current);
-      seekDelayRef.current = null;
-    }
-
-    // Stop continuous seeking
-    if (seekIntervalRef.current) {
-      clearInterval(seekIntervalRef.current);
-      seekIntervalRef.current = null;
-      // Re-enable SmartRewind now that seeking is done
-      audioService.setScrubbing(false);
-    }
-
-    seekDirectionRef.current = null;
-  }, []);
-
-  // Modified skip handlers - only skip if we didn't start continuous seeking
-  const handleSkipBackWithCheck = useCallback(() => {
-    if (didStartSeekingRef.current) return; // Was holding, don't skip
-    handleSkipBack();
-  }, [handleSkipBack]);
-
-  const handleSkipForwardWithCheck = useCallback(() => {
-    if (didStartSeekingRef.current) return; // Was holding, don't skip
-    handleSkipForward();
-  }, [handleSkipForward]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (seekIntervalRef.current) clearInterval(seekIntervalRef.current);
-      if (seekDelayRef.current) clearTimeout(seekDelayRef.current);
-    };
-  }, []);
-
-  // Bookmark popup pill state (grows from bookmark button)
-  const [showBookmarkPill, setShowBookmarkPill] = useState(false);
-  const bookmarkPillAnim = useRef(new Animated.Value(0)).current;
-  const [lastCreatedBookmarkId, setLastCreatedBookmarkId] = useState<string | null>(null);
-  const [showNoteInput, setShowNoteInput] = useState(false);
-  const [noteInputValue, setNoteInputValue] = useState('');
-  const [editingBookmarkId, setEditingBookmarkId] = useState<string | null>(null);
-  const [deletedBookmark, setDeletedBookmark] = useState<{ bookmark: any; timeout: NodeJS.Timeout } | null>(null);
-  const updateBookmark = usePlayerStore((s) => s.updateBookmark);
-  const removeBookmark = usePlayerStore((s) => s.removeBookmark);
-
-  // Add bookmark at current position with toast feedback
-  const handleAddBookmark = useCallback(() => {
-    const state = usePlayerStore.getState();
-    const currentPos = state.position;
-    const chapter = chapters[chapterIndex];
-    const chapterTitle = chapter?.title || `Chapter ${chapterIndex + 1}`;
-
-    // Generate bookmark ID for tracking
-    const bookmarkId = `bm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    addBookmark?.({
-      title: `Bookmark at ${formatTime(currentPos)}`,
-      note: null,
-      time: currentPos,
-      chapterTitle,
-    });
-
-    // Show pill popup with grow animation
-    setLastCreatedBookmarkId(bookmarkId);
-    setShowBookmarkPill(true);
-    bookmarkPillAnim.setValue(0);
-    Animated.spring(bookmarkPillAnim, {
-      toValue: 1,
-      tension: 100,
-      friction: 10,
-      useNativeDriver: true,
-    }).start();
-
-    // Auto-hide pill after 4 seconds
-    setTimeout(() => {
-      Animated.timing(bookmarkPillAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowBookmarkPill(false);
-        setLastCreatedBookmarkId(null);
-      });
-    }, 4000);
-  }, [chapters, chapterIndex, addBookmark, bookmarkPillAnim]);
-
-  // Handle adding note from pill popup
-  const handleAddNoteFromPill = useCallback(() => {
-    setShowBookmarkPill(false);
-    // Find the most recently added bookmark
-    const latestBookmark = bookmarks[bookmarks.length - 1];
-    if (latestBookmark) {
-      setEditingBookmarkId(latestBookmark.id);
-      setNoteInputValue(latestBookmark.note || '');
-      setShowNoteInput(true);
-    }
-  }, [bookmarks]);
-
-  // Save note
-  const handleSaveNote = useCallback(() => {
-    if (editingBookmarkId) {
-      updateBookmark(editingBookmarkId, { note: noteInputValue || null });
-      haptics.selection();
-    }
-    setShowNoteInput(false);
-    setNoteInputValue('');
-    setEditingBookmarkId(null);
-  }, [editingBookmarkId, noteInputValue, updateBookmark]);
-
-  // Delete bookmark with undo
-  const handleDeleteBookmark = useCallback((bookmark: any) => {
-    // Clear any existing undo timeout
-    if (deletedBookmark?.timeout) {
-      clearTimeout(deletedBookmark.timeout);
-    }
-
-    // Remove from store
-    removeBookmark(bookmark.id);
-
-    // Set up undo with 5 second window
-    const timeout = setTimeout(() => {
-      setDeletedBookmark(null);
-    }, 5000);
-
-    setDeletedBookmark({ bookmark, timeout });
-  }, [removeBookmark, deletedBookmark]);
-
-  // Undo delete
-  const handleUndoDelete = useCallback(() => {
-    if (deletedBookmark) {
-      clearTimeout(deletedBookmark.timeout);
-      // Re-add the bookmark
-      addBookmark?.({
-        title: deletedBookmark.bookmark.title,
-        note: deletedBookmark.bookmark.note,
-        time: deletedBookmark.bookmark.time,
-        chapterTitle: deletedBookmark.bookmark.chapterTitle,
-      });
-      setDeletedBookmark(null);
-    }
-  }, [deletedBookmark, addBookmark]);
+  // ==========================================================================
+  // BOOKMARK ACTIONS - extracted to hook
+  // ==========================================================================
+  const {
+    showBookmarkPill,
+    bookmarkPillAnim,
+    showNoteInput,
+    noteInputValue,
+    editingBookmarkId,
+    setNoteInputValue,
+    setShowNoteInput,
+    setEditingBookmarkId,
+    deletedBookmark,
+    handleAddBookmark,
+    handleAddNoteFromPill,
+    handleSaveNote,
+    handleDeleteBookmark,
+    handleUndoDelete,
+  } = useBookmarkActions({
+    chapters,
+    chapterIndex,
+    bookmarks,
+    addBookmark,
+  });
 
   // ==========================================================================
   // MAIN RENDER
