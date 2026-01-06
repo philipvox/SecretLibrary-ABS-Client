@@ -16,8 +16,18 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Image } from 'expo-image';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import {
+  Download,
+  Play,
+  Plus,
+  Check,
+  Cloud,
+  CloudOff,
+  Bookmark,
+  Pause,
+} from 'lucide-react-native';
 import { useCoverUrl } from '@/core/cache';
 import type { LibraryItem } from '@/core/types';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
@@ -36,97 +46,10 @@ import {
   scale,
   formatProgress,
   formatDuration,
+  iconSizes,
 } from '@/shared/theme';
 import { useThemeColors } from '@/shared/theme/themeStore';
 import { ThumbnailProgressBar } from './ThumbnailProgressBar';
-
-// Download Icon
-const DownloadIcon = ({ size = 20, color = '#fff' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
-// Play Icon
-const PlayIcon = ({ size = 20, color = '#fff' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M5 4.99l14 7-14 7V5z"
-      fill={color}
-    />
-  </Svg>
-);
-
-// Small Plus Icon for cover overlay
-const SmallPlusIcon = ({ size = 14, color = '#fff' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M12 5v14M5 12h14"
-      stroke={color}
-      strokeWidth={3}
-      strokeLinecap="round"
-    />
-  </Svg>
-);
-
-// Checkmark for in-queue
-const CheckIcon = ({ size = 14, color = '#000' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M5 12l5 5 9-9"
-      stroke={color}
-      strokeWidth={3}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
-// Cloud Icon for streaming
-const CloudIcon = ({ size = 14, color = '#fff' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
-// Cloud Off Icon for offline unavailable
-const CloudOffIcon = ({ size = 14, color = '#fff' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M2 2l20 20M5 5a8 8 0 0011.26 5H18a5 5 0 015 5c0 1.05-.33 2.03-.89 2.83M5.64 9.36A8 8 0 004 14a8 8 0 005 7.36M18.36 18.36L5 5"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
-// Bookmark Icon for wishlist
-const BookmarkIcon = ({ size = 14, color = '#fff', fill = false }: { size?: number; color?: string; fill?: boolean }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2v16z"
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill={fill ? color : 'none'}
-    />
-  </Svg>
-);
 
 // Inline Progress Bar for book cards (UX: visual progress + time remaining)
 const InlineProgressBar = ({ progress, height = 4 }: { progress: number; height?: number }) => {
@@ -152,16 +75,6 @@ const inlineProgressStyles = StyleSheet.create({
     borderRadius: scale(2),
   },
 });
-
-// Pause Icon for paused downloads
-const PauseIcon = ({ size = 12, color = '#FF9800' }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"
-      fill={color}
-    />
-  </Svg>
-);
 
 // Progress Ring for downloading
 const ProgressRing = ({ progress, size = 28, isPaused = false }: { progress: number; size?: number; isPaused?: boolean }) => {
@@ -197,7 +110,7 @@ const ProgressRing = ({ progress, size = 28, isPaused = false }: { progress: num
         />
       </Svg>
       {isPaused ? (
-        <PauseIcon size={size * 0.4} color="#FF9800" />
+        <Pause size={size * 0.4} color="#FF9800" fill="#FF9800" />
       ) : (
         <Text style={styles.progressText}>{progressPct === 0 ? '...' : `${progressPct}%`}</Text>
       )}
@@ -451,7 +364,7 @@ export function BookCard({
               onPress={handlePlayPress}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <PlayIcon size={scale(16)} color="#fff" />
+              <Play size={iconSizes.sm} color="#fff" fill="#fff" />
             </TouchableOpacity>
           )}
 
@@ -464,9 +377,9 @@ export function BookCard({
             >
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 {isInQueue ? (
-                  <CheckIcon size={12} color={colors.backgroundPrimary} />
+                  <Check size={iconSizes.xs} color={colors.backgroundPrimary} strokeWidth={3} />
                 ) : (
-                  <SmallPlusIcon size={12} color={colors.textPrimary} />
+                  <Plus size={iconSizes.xs} color={colors.textPrimary} strokeWidth={3} />
                 )}
               </Animated.View>
             </TouchableOpacity>
@@ -481,11 +394,11 @@ export function BookCard({
               styles.streamBadge
             ]}>
               {isDownloaded ? (
-                <CheckIcon size={10} color="#000" />
+                <Check size={10} color="#000" strokeWidth={3} />
               ) : isUnavailableOffline ? (
-                <CloudOffIcon size={10} color="#fff" />
+                <CloudOff size={10} color="#fff" />
               ) : (
-                <CloudIcon size={10} color="#fff" />
+                <Cloud size={10} color="#fff" />
               )}
             </View>
           )}
@@ -498,10 +411,10 @@ export function BookCard({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Animated.View style={{ transform: [{ scale: wishlistScaleAnim }] }}>
-                <BookmarkIcon
-                  size={12}
+                <Bookmark
+                  size={iconSizes.xs}
                   color={isOnWishlist ? '#000' : colors.textPrimary}
-                  fill={isOnWishlist}
+                  fill={isOnWishlist ? '#000' : 'none'}
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -553,9 +466,9 @@ export function BookCard({
           {isDownloading || isPaused || isPending ? (
             <ProgressRing progress={progress * 100} size={scale(28)} isPaused={isPaused} />
           ) : isUnavailableOffline ? (
-            <CloudOffIcon size={scale(20)} color={colors.textTertiary} />
+            <CloudOff size={iconSizes.md} color={colors.textTertiary} />
           ) : (
-            <DownloadIcon size={scale(20)} color={colors.textSecondary} />
+            <Download size={iconSizes.md} color={colors.textSecondary} />
           )}
         </TouchableOpacity>
       )}
@@ -566,7 +479,7 @@ export function BookCard({
           style={styles.playButton}
           onPress={handlePlayPress}
         >
-          <PlayIcon size={scale(16)} color={colors.backgroundPrimary} />
+          <Play size={iconSizes.sm} color={colors.backgroundPrimary} fill={colors.backgroundPrimary} />
         </TouchableOpacity>
       )}
     </View>
