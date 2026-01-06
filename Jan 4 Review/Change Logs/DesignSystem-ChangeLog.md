@@ -385,10 +385,45 @@ Replaced all 29 hardcoded `fontSize: scale()` values with typography tokens:
 
 ---
 
-### C.5 - Other Settings Screens Typography (Pending)
+### C.5 - JoystickSeekSettingsScreen Typography
+**Status:** Complete
+**Files Modified:**
+- `src/features/profile/screens/JoystickSeekSettingsScreen.tsx`
+
+**Changes:**
+Replaced all 20 hardcoded `fontSize: scale()` values with typography tokens:
+
+**Headline text:**
+- [x] `headerTitle` → `typography.headlineLarge`
+- [x] `rowLabel` → `typography.headlineMedium`
+- [x] `sliderValue` → `typography.headlineLarge`
+- [x] `testStatValue` → `typography.headlineLarge`
+- [x] `resetButtonText` → `typography.headlineMedium`
+
+**Body text:**
+- [x] `description` → `typography.bodyLarge`
+- [x] `sectionHeader` → `typography.bodyMedium`
+- [x] `rowValue` → `typography.bodyLarge`
+- [x] `presetLabel` → `typography.bodyMedium`
+- [x] `presetPillText` → `typography.bodySmall`
+- [x] `sliderLabel` → `typography.bodyLarge`
+- [x] `sliderNote` → `typography.bodySmall`
+- [x] `sliderDescription` → `typography.bodySmall`
+- [x] `testAreaTitle` → `typography.bodyLarge`
+- [x] `testAreaSubtitle` → `typography.bodySmall`
+- [x] `rowNote` → `typography.bodySmall`
+
+**Label text:**
+- [x] `dragHintText` → `typography.labelSmall`
+- [x] `customNote` → `typography.labelMedium`
+- [x] `sliderMinMax` → `typography.labelMedium`
+- [x] `testStatLabel` → `typography.labelMedium`
+
+---
+
+### C.6 - Other Settings Screens Typography (Pending)
 
 **Remaining screens:**
-- `JoystickSeekSettingsScreen.tsx`: 30+ hardcoded font sizes
 - `HapticSettingsScreen.tsx`
 - `ChapterCleaningSettingsScreen.tsx`
 - Various other settings screens

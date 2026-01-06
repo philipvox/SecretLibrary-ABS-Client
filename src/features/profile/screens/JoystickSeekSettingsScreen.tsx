@@ -49,8 +49,8 @@ import {
 } from '@/features/player/stores/joystickSeekStore';
 import { haptics } from '@/core/native/haptics';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { accentColors, scale, wp } from '@/shared/theme';
-import { useThemeColors, ThemeColors } from '@/shared/theme/themeStore';
+import { accentColors, scale, wp, typography, fontWeight } from '@/shared/theme';
+import { useThemeColors, ThemeColors } from '@/shared/theme';
 
 const ACCENT = accentColors.gold;
 
@@ -839,8 +839,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   headerTitle: {
-    fontSize: scale(18),
-    fontWeight: '600',
+    ...typography.headlineLarge,
+    fontWeight: fontWeight.semibold,
     // color set via colors.text in JSX
   },
   headerSpacer: {
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
     paddingBottom: scale(20),
   },
   description: {
-    fontSize: scale(14),
+    ...typography.bodyLarge,
     // color set via colors.textSecondary in JSX
     lineHeight: scale(20),
     marginHorizontal: scale(20),
@@ -865,8 +865,8 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   sectionHeader: {
-    fontSize: scale(13),
-    fontWeight: '600',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     // color set via colors.textTertiary in JSX
     letterSpacing: 0.5,
     marginHorizontal: scale(20),
@@ -910,19 +910,19 @@ const styles = StyleSheet.create({
     marginLeft: scale(12),
   },
   rowLabel: {
-    fontSize: scale(15),
-    fontWeight: '500',
+    ...typography.headlineMedium,
+    fontWeight: fontWeight.medium,
     // color set via colors.text in JSX
   },
   rowNote: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     // color set via colors.textTertiary in JSX
     marginTop: scale(2),
   },
   rowValue: {
-    fontSize: scale(14),
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.medium,
     // color set via colors.accent in JSX
-    fontWeight: '500',
   },
 
   // Curve Preview
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     marginTop: scale(4),
   },
   dragHintText: {
-    fontSize: scale(10),
+    ...typography.labelSmall,
     color: 'rgba(255,255,255,0.4)',
   },
 
@@ -951,8 +951,8 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   presetLabel: {
-    fontSize: scale(13),
-    fontWeight: '600',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     color: 'rgba(255,255,255,0.5)',
     letterSpacing: 0.5,
     marginBottom: scale(10),
@@ -974,15 +974,15 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
   },
   presetPillText: {
-    fontSize: scale(12),
-    fontWeight: '600',
+    ...typography.bodySmall,
+    fontWeight: fontWeight.semibold,
     color: 'rgba(255,255,255,0.7)',
   },
   presetPillTextSelected: {
     color: '#000',
   },
   customNote: {
-    fontSize: scale(11),
+    ...typography.labelMedium,
     color: 'rgba(255,255,255,0.4)',
     marginTop: scale(8),
     marginLeft: scale(4),
@@ -1000,17 +1000,17 @@ const styles = StyleSheet.create({
     marginBottom: scale(4),
   },
   sliderLabel: {
-    fontSize: scale(14),
-    fontWeight: '500',
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.medium,
     color: '#fff',
   },
   sliderValue: {
-    fontSize: scale(16),
-    fontWeight: '700',
+    ...typography.headlineLarge,
+    fontWeight: fontWeight.bold,
     color: ACCENT,
   },
   sliderNote: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     color: 'rgba(255,255,255,0.5)',
     marginBottom: scale(12),
   },
@@ -1031,11 +1031,11 @@ const styles = StyleSheet.create({
     marginTop: scale(8),
   },
   sliderMinMax: {
-    fontSize: scale(11),
+    ...typography.labelMedium,
     color: 'rgba(255,255,255,0.4)',
   },
   sliderDescription: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     color: 'rgba(255,255,255,0.5)',
     marginTop: scale(8),
     textAlign: 'center',
@@ -1054,13 +1054,13 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   testAreaTitle: {
-    fontSize: scale(14),
-    fontWeight: '600',
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.semibold,
     color: '#fff',
     marginBottom: scale(4),
   },
   testAreaSubtitle: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     color: 'rgba(255,255,255,0.5)',
     marginBottom: scale(20),
   },
@@ -1095,13 +1095,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testStatLabel: {
-    fontSize: scale(11),
+    ...typography.labelMedium,
     color: 'rgba(255,255,255,0.5)',
     marginBottom: scale(4),
   },
   testStatValue: {
-    fontSize: scale(16),
-    fontWeight: '700',
+    ...typography.headlineLarge,
+    fontWeight: fontWeight.bold,
     color: 'rgba(255,255,255,0.3)',
   },
   testStatValueActive: {
@@ -1124,8 +1124,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resetButtonText: {
-    fontSize: scale(15),
-    fontWeight: '500',
+    ...typography.headlineMedium,
+    fontWeight: fontWeight.medium,
     color: 'rgba(255,255,255,0.6)',
   },
 });
