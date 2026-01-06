@@ -167,6 +167,8 @@ export const themeColors = {
     border: 'rgba(0,0,0,0.1)',
     tabActive: '#000000',
     tabInactive: 'rgba(0,0,0,0.25)',
+    surfaceElevated: '#FFFFFF',
+    card: 'rgba(0,0,0,0.03)',
     statusBar: 'dark-content' as const,
   },
   dark: {
@@ -179,6 +181,8 @@ export const themeColors = {
     border: 'rgba(255,255,255,0.1)',
     tabActive: '#FFFFFF',
     tabInactive: 'rgba(255,255,255,0.25)',
+    surfaceElevated: '#262626',
+    card: 'rgba(255,255,255,0.05)',
     statusBar: 'light-content' as const,
   },
 };

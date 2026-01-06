@@ -37,7 +37,7 @@ import {
 } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { accentColors, scale, spacing, typography, fontWeight } from '@/shared/theme';
-import { useThemeColors, ThemeColors } from '@/shared/theme';
+import { useColors, ThemeColors } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
 import { PinInput } from '@/shared/components/PinInput';
 import {
@@ -60,16 +60,16 @@ const DANGER = '#FF3B30';
 const SUCCESS = '#34C759';
 
 // Helper to create theme-aware colors
-function createColors(themeColors: ThemeColors) {
+function createColors(c: ThemeColors) {
   return {
     accent: ACCENT,
-    background: themeColors.backgroundSecondary,
-    text: themeColors.text,
-    textSecondary: themeColors.textSecondary,
-    textTertiary: themeColors.textTertiary,
-    card: themeColors.border,
-    border: themeColors.border,
-    iconBg: themeColors.border,
+    background: c.background.secondary,
+    text: c.text.primary,
+    textSecondary: c.text.secondary,
+    textTertiary: c.text.tertiary,
+    card: c.border.default,
+    border: c.border.default,
+    iconBg: c.border.default,
   };
 }
 
@@ -190,7 +190,7 @@ function SectionHeader({
 export function KidModeSettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const themeColors = useThemeColors();
+  const themeColors = useColors();
   const colors = createColors(themeColors);
 
   // Kid Mode settings from store

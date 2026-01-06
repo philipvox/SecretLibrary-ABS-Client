@@ -16,9 +16,8 @@ import {
 } from 'react-native';
 import { CloudDownload, ChevronRight } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import { colors, scale } from '@/shared/theme';
-
-const ACCENT = colors.accent;
+import { scale } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 interface StorageSummaryProps {
   usedBytes: number;
@@ -35,6 +34,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function StorageSummary({ usedBytes, bookCount = 0, onManagePress }: StorageSummaryProps) {
+  const colors = useColors();
   const [availableBytes, setAvailableBytes] = useState<number | null>(null);
 
   useEffect(() => {
@@ -57,26 +57,36 @@ export function StorageSummary({ usedBytes, bookCount = 0, onManagePress }: Stor
   const usagePercent = totalStorage ? Math.min((usedBytes / totalStorage) * 100, 100) : 5;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {
+      backgroundColor: colors.surface.card,
+      borderColor: colors.border.light,
+    }]}>
       {/* Header row */}
       <View style={styles.headerRow}>
         <View style={styles.iconLabel}>
-          <CloudDownload size={scale(16)} color={ACCENT} strokeWidth={2} />
-          <Text style={styles.headerText}>Downloaded</Text>
+          <CloudDownload size={scale(16)} color={colors.text.accent} strokeWidth={2} />
+          <Text style={[styles.headerText, { color: colors.text.primary }]}>
+            Downloaded
+          </Text>
         </View>
-        <Text style={styles.usedText}>{formatBytes(usedBytes)}</Text>
+        <Text style={[styles.usedText, { color: colors.text.accent }]}>
+          {formatBytes(usedBytes)}
+        </Text>
       </View>
 
       {/* Progress bar */}
       <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${usagePercent}%` }]} />
+        <View style={[styles.progressBar, { backgroundColor: colors.progress.track }]}>
+          <View style={[styles.progressFill, {
+            width: `${usagePercent}%`,
+            backgroundColor: colors.progress.fill,
+          }]} />
         </View>
       </View>
 
       {/* Details row */}
       <View style={styles.detailsRow}>
-        <Text style={styles.detailText}>
+        <Text style={[styles.detailText, { color: colors.text.secondary }]}>
           {bookCount} {bookCount === 1 ? 'book' : 'books'}
           {availableBytes && ` · ${formatBytes(availableBytes)} available`}
         </Text>
@@ -86,8 +96,10 @@ export function StorageSummary({ usedBytes, bookCount = 0, onManagePress }: Stor
             onPress={onManagePress}
             activeOpacity={0.7}
           >
-            <Text style={styles.manageText}>Manage</Text>
-            <ChevronRight size={scale(12)} color={ACCENT} strokeWidth={2} />
+            <Text style={[styles.manageText, { color: colors.text.accent }]}>
+              Manage
+            </Text>
+            <ChevronRight size={scale(12)} color={colors.text.accent} strokeWidth={2} />
           </TouchableOpacity>
         )}
       </View>
@@ -100,10 +112,8 @@ const styles = StyleSheet.create({
     marginHorizontal: scale(20),
     marginVertical: scale(16),
     padding: scale(14),
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: scale(12),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   headerRow: {
     flexDirection: 'row',
@@ -119,25 +129,21 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: scale(14),
     fontWeight: '600',
-    color: colors.textPrimary,
   },
   usedText: {
     fontSize: scale(14),
     fontWeight: '600',
-    color: ACCENT,
   },
   progressContainer: {
     marginBottom: scale(10),
   },
   progressBar: {
     height: scale(6),
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: scale(3),
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: ACCENT,
     borderRadius: scale(3),
   },
   detailsRow: {
@@ -147,7 +153,6 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: scale(12),
-    color: colors.textSecondary,
   },
   manageButton: {
     flexDirection: 'row',
@@ -157,6 +162,5 @@ const styles = StyleSheet.create({
   manageText: {
     fontSize: scale(12),
     fontWeight: '500',
-    color: ACCENT,
   },
 });

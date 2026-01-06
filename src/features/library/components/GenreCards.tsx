@@ -19,7 +19,7 @@ import { Library, BookOpen } from 'lucide-react-native';
 import { apiClient } from '@/core/api';
 import { GenreWithData, getMetaCategoryForGenre } from '../constants/genreCategories';
 import { colors, wp, spacing, radius, accentColors } from '@/shared/theme';
-import { useThemeColors, useIsDarkMode } from '@/shared/theme/themeStore';
+import { useColors, useIsDarkMode } from '@/shared/theme/themeStore';
 
 const ACCENT = accentColors.red;
 
@@ -35,7 +35,7 @@ interface GenreCardLargeProps {
 }
 
 export function GenreCardLarge({ genre, onPress }: GenreCardLargeProps) {
-  const themeColors = useThemeColors();
+  const colors = useColors();
   const isDarkMode = useIsDarkMode();
   const metaCategory = getMetaCategoryForGenre(genre.name);
   const accentColor = metaCategory?.color || ACCENT;
@@ -89,10 +89,10 @@ export function GenreCardLarge({ genre, onPress }: GenreCardLargeProps) {
       </View>
 
       {/* Genre Info */}
-      <Text style={[styles.largeName, { color: themeColors.text }]} numberOfLines={1}>
+      <Text style={[styles.largeName, { color: colors.text.primary }]} numberOfLines={1}>
         {genre.name}
       </Text>
-      <Text style={[styles.largeCount, { color: themeColors.textTertiary }]}>{genre.bookCount} books</Text>
+      <Text style={[styles.largeCount, { color: colors.text.tertiary }]}>{genre.bookCount} books</Text>
     </TouchableOpacity>
   );
 }
@@ -107,7 +107,7 @@ interface GenreCardCompactProps {
 }
 
 export function GenreCardCompact({ genre, onPress }: GenreCardCompactProps) {
-  const themeColors = useThemeColors();
+  const colors = useColors();
   const isDarkMode = useIsDarkMode();
   const coverUrl = genre.coverIds[0]
     ? apiClient.getItemCoverUrl(genre.coverIds[0])
@@ -132,21 +132,21 @@ export function GenreCardCompact({ genre, onPress }: GenreCardCompactProps) {
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.compactPlaceholder, { backgroundColor: themeColors.surfaceElevated }]}>
-            <BookOpen size={20} color={themeColors.textTertiary} strokeWidth={1.5} />
+          <View style={[styles.compactPlaceholder, { backgroundColor: colors.surface.raised }]}>
+            <BookOpen size={20} color={colors.text.tertiary} strokeWidth={1.5} />
           </View>
         )}
       </View>
 
       {/* Genre Info */}
       <View style={styles.compactInfo}>
-        <Text style={[styles.compactName, { color: themeColors.text }]} numberOfLines={1}>
+        <Text style={[styles.compactName, { color: colors.text.primary }]} numberOfLines={1}>
           {genre.name}
         </Text>
       </View>
 
       {/* Book Count */}
-      <Text style={[styles.compactCount, { color: themeColors.textTertiary }]}>{genre.bookCount}</Text>
+      <Text style={[styles.compactCount, { color: colors.text.tertiary }]}>{genre.bookCount}</Text>
     </TouchableOpacity>
   );
 }
@@ -161,14 +161,14 @@ interface GenreListItemProps {
 }
 
 export function GenreListItem({ genre, onPress }: GenreListItemProps) {
-  const themeColors = useThemeColors();
+  const colors = useColors();
   const coverUrl = genre.coverIds[0]
     ? apiClient.getItemCoverUrl(genre.coverIds[0])
     : null;
 
   return (
     <TouchableOpacity
-      style={[styles.listItem, { borderBottomColor: themeColors.border }]}
+      style={[styles.listItem, { borderBottomColor: colors.border.default }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -182,15 +182,15 @@ export function GenreListItem({ genre, onPress }: GenreListItemProps) {
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.listCoverPlaceholder, { backgroundColor: themeColors.surfaceElevated }]}>
-            <BookOpen size={16} color={themeColors.textTertiary} strokeWidth={1.5} />
+          <View style={[styles.listCoverPlaceholder, { backgroundColor: colors.surface.raised }]}>
+            <BookOpen size={16} color={colors.text.tertiary} strokeWidth={1.5} />
           </View>
         )}
       </View>
-      <Text style={[styles.listName, { color: themeColors.text }]} numberOfLines={2}>
+      <Text style={[styles.listName, { color: colors.text.primary }]} numberOfLines={2}>
         {genre.name}
       </Text>
-      <Text style={[styles.listCount, { color: themeColors.textTertiary }]}>{genre.bookCount}</Text>
+      <Text style={[styles.listCount, { color: colors.text.tertiary }]}>{genre.bookCount}</Text>
     </TouchableOpacity>
   );
 }
@@ -205,7 +205,7 @@ interface PopularGenreCardProps {
 }
 
 export function PopularGenreCard({ genre, onPress }: PopularGenreCardProps) {
-  const themeColors = useThemeColors();
+  const colors = useColors();
   const isDarkMode = useIsDarkMode();
   const metaCategory = getMetaCategoryForGenre(genre.name);
   const accentColor = metaCategory?.color || ACCENT;
@@ -251,10 +251,10 @@ export function PopularGenreCard({ genre, onPress }: PopularGenreCardProps) {
 
       {/* Info */}
       <View style={styles.popularInfo}>
-        <Text style={[styles.popularName, { color: themeColors.text }]} numberOfLines={1}>
+        <Text style={[styles.popularName, { color: colors.text.primary }]} numberOfLines={1}>
           {genre.name}
         </Text>
-        <Text style={[styles.popularCount, { color: themeColors.textTertiary }]}>{genre.bookCount} books</Text>
+        <Text style={[styles.popularCount, { color: colors.text.tertiary }]}>{genre.bookCount} books</Text>
       </View>
     </TouchableOpacity>
   );

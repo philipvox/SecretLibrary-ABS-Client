@@ -23,7 +23,7 @@ import { formatDuration, formatDurationLong } from '@/shared/utils/format';
 import { ShareStatsCard } from '../components/ShareStatsCard';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { accentColors, wp } from '@/shared/theme';
-import { useThemeColors, ThemeColors } from '@/shared/theme/themeStore';
+import { useColors, ThemeColors } from '@/shared/theme';
 
 const SCREEN_WIDTH = wp(100);
 
@@ -38,15 +38,15 @@ const STATIC_COLORS = {
 };
 
 // Helper to create theme-aware colors object
-function createColors(themeColors: ThemeColors) {
+function createColors(c: ThemeColors) {
   return {
     ...STATIC_COLORS,
-    background: themeColors.backgroundSecondary,
-    card: themeColors.border,
-    cardBorder: themeColors.border,
-    text: themeColors.text,
-    textSecondary: themeColors.textSecondary,
-    textTertiary: themeColors.textTertiary,
+    background: c.background.secondary,
+    card: c.border.default,
+    cardBorder: c.border.default,
+    text: c.text.primary,
+    textSecondary: c.text.secondary,
+    textTertiary: c.text.tertiary,
   };
 }
 
@@ -225,7 +225,7 @@ type ShareType = 'weekly' | 'streak' | 'allTime' | null;
 
 export function StatsScreen() {
   const insets = useSafeAreaInsets();
-  const themeColors = useThemeColors();
+  const themeColors = useColors();
   const colors = createColors(themeColors);
   const { today, weekly, streak, allTime, topBooks, byHour, isLoading, refetch } =
     useStatsScreen();

@@ -14,9 +14,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, scale, spacing, radius } from '@/shared/theme';
-
-const ACCENT = colors.accent;
+import { scale, spacing, radius } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 export type FilterOption = 'all' | 'in-progress' | 'not-started' | 'completed';
 
@@ -39,6 +38,8 @@ const FILTERS: { value: FilterOption; label: string }[] = [
 ];
 
 export function FilterChips({ selected, onSelect, counts }: FilterChipsProps) {
+  const colors = useColors();
+
   const getCount = (filter: FilterOption): number | undefined => {
     if (!counts) return undefined;
     switch (filter) {
@@ -68,14 +69,25 @@ export function FilterChips({ selected, onSelect, counts }: FilterChipsProps) {
         return (
           <TouchableOpacity
             key={filter.value}
-            style={[styles.chip, isSelected && styles.chipSelected]}
+            style={[
+              styles.chip,
+              { backgroundColor: colors.background.tertiary },
+              isSelected && {
+                backgroundColor: colors.button.disabled,
+                borderColor: colors.text.accent,
+              }
+            ]}
             onPress={() => handleSelect(filter.value)}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={`Filter by ${filter.label}${count !== undefined ? `, ${count} items` : ''}`}
           >
-            <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+            <Text style={[
+              styles.chipText,
+              { color: colors.text.secondary },
+              isSelected && { color: colors.text.accent, fontWeight: '600' }
+            ]}>
               {filter.label}
               {count !== undefined && count > 0 && ` (${count})`}
             </Text>
@@ -96,21 +108,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(14),
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
-    backgroundColor: colors.backgroundTertiary,
     borderWidth: 1,
     borderColor: 'transparent',
-  },
-  chipSelected: {
-    backgroundColor: colors.accentSubtle,
-    borderColor: colors.accent,
   },
   chipText: {
     fontSize: scale(13),
     fontWeight: '500',
-    color: colors.textSecondary,
-  },
-  chipTextSelected: {
-    color: colors.accent,
-    fontWeight: '600',
   },
 });

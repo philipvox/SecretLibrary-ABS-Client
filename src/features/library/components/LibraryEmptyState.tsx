@@ -25,7 +25,8 @@ import {
   Play,
   type LucideIcon,
 } from 'lucide-react-native';
-import { colors, scale, spacing } from '@/shared/theme';
+import { scale, spacing } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 type TabType = 'all' | 'downloaded' | 'in-progress' | 'not-started' | 'completed' | 'favorites';
 
@@ -106,23 +107,33 @@ const getConfig = (tab: TabType): EmptyStateConfig => {
 };
 
 export function LibraryEmptyState({ tab, onAction }: LibraryEmptyStateProps) {
+  const colors = useColors();
   const config = getConfig(tab);
   const { Icon, ActionIcon } = config;
 
   return (
     <View style={styles.container}>
-      <Icon size={scale(48)} color="rgba(255,255,255,0.25)" strokeWidth={1.5} />
+      <Icon size={scale(48)} color={colors.text.disabled} strokeWidth={1.5} />
 
-      <Text style={styles.title}>{config.title}</Text>
-      <Text style={styles.subtitle}>{config.subtitle}</Text>
+      <Text style={[styles.title, { color: colors.text.primary }]}>
+        {config.title}
+      </Text>
+      <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+        {config.subtitle}
+      </Text>
 
       <TouchableOpacity
-        style={styles.actionButton}
+        style={[styles.actionButton, {
+          backgroundColor: colors.text.accent,
+          shadowColor: colors.text.accent,
+        }]}
         onPress={onAction}
         activeOpacity={0.8}
       >
-        <ActionIcon size={scale(18)} color="#000" strokeWidth={2} />
-        <Text style={styles.actionText}>{config.actionText}</Text>
+        <ActionIcon size={scale(18)} color={colors.text.inverse} strokeWidth={2} />
+        <Text style={[styles.actionText, { color: colors.text.inverse }]}>
+          {config.actionText}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -137,14 +148,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: scale(18),
     fontWeight: '600',
-    color: colors.textPrimary,
     marginTop: scale(16),
     marginBottom: scale(8),
     textAlign: 'center',
   },
   subtitle: {
     fontSize: scale(14),
-    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: scale(20),
     marginBottom: scale(24),
@@ -152,12 +161,10 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.accent,
     paddingHorizontal: scale(24),
     paddingVertical: scale(12),
     borderRadius: scale(24),
     gap: scale(8),
-    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -166,7 +173,6 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: scale(15),
     fontWeight: '600',
-    color: '#000',
   },
 });
 

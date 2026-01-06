@@ -25,7 +25,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Play } from 'lucide-react-native';
 import { LibraryItem, BookChapter } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { colors, scale } from '@/shared/theme';
+import { scale } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 interface ContinueListeningHeroProps {
   /** The in-progress book to display */
@@ -93,6 +94,7 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
   onPlay,
   onPress,
 }: ContinueListeningHeroProps) {
+  const colors = useColors();
   const { title, author, narrator } = getMetadata(book);
   const coverUrl = apiClient.getItemCoverUrl(book.id);
   const progressPercent = Math.round(progress * 100);
@@ -106,10 +108,15 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>Continue Listening</Text>
+      <Text style={[styles.sectionLabel, { color: colors.player.accent }]}>
+        Continue Listening
+      </Text>
 
       <TouchableOpacity
-        style={styles.heroCard}
+        style={[styles.heroCard, {
+          backgroundColor: colors.player.surface,
+          borderColor: colors.player.accent,
+        }]}
         onPress={onPress}
         activeOpacity={0.9}
         accessibilityRole="button"
@@ -126,27 +133,27 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
 
         {/* Gradient Overlay */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.95)']}
+          colors={['transparent', colors.player.overlayHeavy]}
           style={styles.gradient}
         />
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={[styles.title, { color: colors.player.text }]} numberOfLines={2}>
             {title}
           </Text>
-          <Text style={styles.author} numberOfLines={1}>
+          <Text style={[styles.author, { color: colors.player.textSecondary }]} numberOfLines={1}>
             {author}
           </Text>
           {narrator && (
-            <Text style={styles.narrator} numberOfLines={1}>
+            <Text style={[styles.narrator, { color: colors.player.textTertiary }]} numberOfLines={1}>
               Narrated by {narrator}
             </Text>
           )}
 
           {/* Chapter info */}
           {currentChapter && (
-            <Text style={styles.chapterInfo} numberOfLines={1}>
+            <Text style={[styles.chapterInfo, { color: colors.player.accent }]} numberOfLines={1}>
               {currentChapter.title}
             </Text>
           )}
@@ -154,17 +161,19 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
           {/* Progress Section */}
           <View style={styles.progressSection}>
             <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarBackground}>
+              <View style={[styles.progressBarBackground, { backgroundColor: colors.player.border }]}>
                 <View
                   style={[
                     styles.progressBarFill,
-                    { width: `${progressPercent}%` }
+                    { width: `${progressPercent}%`, backgroundColor: colors.player.accent }
                   ]}
                 />
               </View>
-              <Text style={styles.progressPercent}>{progressPercent}%</Text>
+              <Text style={[styles.progressPercent, { color: colors.player.accent }]}>
+                {progressPercent}%
+              </Text>
             </View>
-            <Text style={styles.timeRemaining}>
+            <Text style={[styles.timeRemaining, { color: colors.player.textSecondary }]}>
               {formatTimeRemaining(remainingSeconds)}
             </Text>
           </View>
@@ -172,7 +181,7 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
 
         {/* Play Button */}
         <TouchableOpacity
-          style={styles.playButton}
+          style={[styles.playButton, { backgroundColor: colors.player.accent }]}
           onPress={onPlay}
           activeOpacity={0.8}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -180,7 +189,7 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
           accessibilityLabel={`Resume playing ${title}`}
           accessibilityHint="Double tap to resume playback"
         >
-          <Play size={scale(28)} color="#000" fill="#000" strokeWidth={0} />
+          <Play size={scale(28)} color={colors.text.inverse} fill={colors.text.inverse} strokeWidth={0} />
         </TouchableOpacity>
       </TouchableOpacity>
     </View>
@@ -196,7 +205,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: scale(13),
     fontWeight: '600',
-    color: colors.accent,
     letterSpacing: 0.5,
     marginBottom: scale(10),
     textTransform: 'uppercase',
@@ -207,9 +215,7 @@ const styles = StyleSheet.create({
     height: scale(200),
     borderRadius: scale(16),
     overflow: 'hidden',
-    backgroundColor: colors.cardBackground,
     borderWidth: 2,
-    borderColor: colors.accent,
   },
 
   coverImage: {
@@ -236,26 +242,22 @@ const styles = StyleSheet.create({
   title: {
     fontSize: scale(18),
     fontWeight: '700',
-    color: colors.textPrimary,
     marginBottom: scale(2),
   },
 
   author: {
     fontSize: scale(13),
-    color: colors.textSecondary,
     marginBottom: scale(2),
   },
 
   narrator: {
     fontSize: scale(11),
-    color: 'rgba(255,255,255,0.5)',
     marginBottom: scale(6),
     fontStyle: 'italic',
   },
 
   chapterInfo: {
     fontSize: scale(12),
-    color: colors.accent,
     fontWeight: '500',
     marginBottom: scale(8),
   },
@@ -273,28 +275,24 @@ const styles = StyleSheet.create({
   progressBarBackground: {
     flex: 1,
     height: scale(4),
-    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: scale(2),
     overflow: 'hidden',
   },
 
   progressBarFill: {
     height: '100%',
-    backgroundColor: colors.accent,
     borderRadius: scale(2),
   },
 
   progressPercent: {
     fontSize: scale(12),
     fontWeight: '600',
-    color: colors.accent,
     minWidth: scale(35),
     textAlign: 'right',
   },
 
   timeRemaining: {
     fontSize: scale(11),
-    color: 'rgba(255,255,255,0.6)',
   },
 
   playButton: {
@@ -304,7 +302,6 @@ const styles = StyleSheet.create({
     width: scale(52),
     height: scale(52),
     borderRadius: scale(26),
-    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

@@ -20,7 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Check, ChevronLeft, Code, Info, ArrowRight, type LucideIcon } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { accentColors, scale, typography, fontWeight, spacing } from '@/shared/theme';
-import { useThemeColors, ThemeColors } from '@/shared/theme';
+import { useColors, ThemeColors } from '@/shared/theme';
 import {
   useChapterCleaningStore,
   CLEANING_LEVEL_INFO,
@@ -29,17 +29,17 @@ import {
 
 const ACCENT = accentColors.gold;
 
-// Helper to create theme-aware colors
-function createColors(themeColors: ThemeColors) {
+// Helper to create theme-aware colors from nested ThemeColors
+function createColors(c: ThemeColors) {
   return {
     accent: ACCENT,
-    background: themeColors.backgroundSecondary,
-    text: themeColors.text,
-    textSecondary: themeColors.textSecondary,
-    textTertiary: themeColors.textTertiary,
-    card: themeColors.border,
-    border: themeColors.border,
-    iconBg: themeColors.border,
+    background: c.background.secondary,
+    text: c.text.primary,
+    textSecondary: c.text.secondary,
+    textTertiary: c.text.tertiary,
+    card: c.border.default,
+    border: c.border.default,
+    iconBg: c.border.default,
   };
 }
 
@@ -139,7 +139,7 @@ function SectionHeader({ title, colors }: { title: string; colors: ReturnType<ty
 export function ChapterCleaningSettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const themeColors = useThemeColors();
+  const themeColors = useColors();
   const colors = createColors(themeColors);
 
   // Settings from store

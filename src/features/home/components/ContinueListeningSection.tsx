@@ -23,7 +23,9 @@ import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { colors, wp, hp, moderateScale } from '@/shared/theme';
+import { wp, hp, moderateScale } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
+import { ThemeColors } from '@/shared/theme/colors';
 
 // Format time ago (e.g., "30 sec ago", "5 min ago", "2 hours ago")
 function formatTimeAgo(timestamp: number): string {
@@ -98,10 +100,12 @@ const ContinueListeningCard = ({
   book,
   onCoverPress,
   onDetailsPress,
+  colors,
 }: {
   book: LibraryItem;
   onCoverPress: () => void;
   onDetailsPress: () => void;
+  colors: ThemeColors;
 }) => {
   const coverUrl = apiClient.getItemCoverUrl(book.id);
   const metadata = book.media?.metadata as any;
@@ -158,7 +162,10 @@ const ContinueListeningCard = ({
           {/* Progress bar at bottom of cover */}
           {hasProgress && (
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+              <View style={[
+                styles.progressBarFill,
+                { width: `${progress * 100}%`, backgroundColor: colors.progress.fill }
+              ]} />
             </View>
           )}
         </View>
@@ -166,14 +173,14 @@ const ContinueListeningCard = ({
 
       {/* Title - tap for details */}
       <TouchableOpacity onPress={onDetailsPress} activeOpacity={0.7}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
+        <Text style={[styles.cardTitle, { color: colors.text.primary }]} numberOfLines={2}>
           {title}
         </Text>
       </TouchableOpacity>
 
       {/* Time since last played */}
       {timeAgo ? (
-        <Text style={styles.timeAgo}>{timeAgo}</Text>
+        <Text style={[styles.timeAgo, { color: colors.text.secondary }]}>{timeAgo}</Text>
       ) : null}
     </View>
   );
@@ -185,15 +192,18 @@ export function ContinueListeningSection({
   onDetailsPress,
   onViewAll,
 }: ContinueListeningSectionProps) {
+  const colors = useColors();
+
   const renderCard = useCallback(
     ({ item }: { item: LibraryItem }) => (
       <ContinueListeningCard
         book={item}
         onCoverPress={() => onCoverPress(item)}
         onDetailsPress={() => onDetailsPress(item)}
+        colors={colors}
       />
     ),
-    [onCoverPress, onDetailsPress]
+    [onCoverPress, onDetailsPress, colors]
   );
 
   if (books.length === 0) return null;
@@ -201,7 +211,9 @@ export function ContinueListeningSection({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <Text style={styles.header}>Continue Listening</Text>
+      <Text style={[styles.header, { color: colors.text.primary }]}>
+        Continue Listening
+      </Text>
 
       {/* Horizontal scroll of book cards - extends to screen edges */}
       <FlatList
@@ -223,7 +235,6 @@ const styles = StyleSheet.create({
     marginTop: hp(2),
   },
   header: {
-    color: colors.textPrimary,
     fontSize: moderateScale(16),
     fontWeight: '600',
     marginBottom: GAP,
@@ -249,7 +260,7 @@ const styles = StyleSheet.create({
   },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Fixed dark overlay for cover visibility
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -259,23 +270,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: wp(1),
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fixed dark overlay for cover visibility
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: colors.accent,
   },
   cardTitle: {
     width: CARD.titleWidth,
     textAlign: 'left',
-    color: colors.textPrimary,
     fontSize: moderateScale(11),
     marginTop: hp(0.6),
   },
   timeAgo: {
     width: CARD.titleWidth,
     textAlign: 'left',
-    color: colors.textSecondary,
     fontSize: moderateScale(10),
     marginTop: hp(0.3),
   },

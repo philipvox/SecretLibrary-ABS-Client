@@ -10,7 +10,8 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { colors, wp, moderateScale } from '@/shared/theme';
+import { wp, moderateScale } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 interface HomeHeaderProps {
   /** Book title - null when nothing playing */
@@ -51,12 +52,18 @@ export function HomeHeader({
   currentTime,
   isPlaying,
 }: HomeHeaderProps) {
+  const colors = useColors();
+
   // Empty state when no book is loaded - show personalized greeting
   if (!title) {
     return (
       <View style={styles.headerEmpty}>
-        <Text style={styles.emptyTitle}>{getGreeting()}</Text>
-        <Text style={styles.emptySubtitle}>Ready to listen?</Text>
+        <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>
+          {getGreeting()}
+        </Text>
+        <Text style={[styles.emptySubtitle, { color: colors.text.tertiary }]}>
+          Ready to listen?
+        </Text>
       </View>
     );
   }
@@ -64,12 +71,14 @@ export function HomeHeader({
   return (
     <View style={styles.header}>
       <View style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: colors.text.primary }]} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.time}>{formatTime(currentTime)}</Text>
+        <Text style={[styles.time, { color: colors.text.secondary }]}>
+          {formatTime(currentTime)}
+        </Text>
       </View>
-      <Text style={styles.author} numberOfLines={1}>
+      <Text style={[styles.author, { color: colors.text.tertiary }]} numberOfLines={1}>
         {author || 'Unknown Author'}
       </Text>
     </View>
@@ -88,19 +97,16 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: colors.textPrimary,
     fontSize: moderateScale(17),
     fontWeight: '600',
     marginRight: wp(3),
   },
   time: {
-    color: colors.textSecondary,
     fontSize: moderateScale(14),
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontVariant: ['tabular-nums'],
   },
   author: {
-    color: colors.textTertiary,
     fontSize: moderateScale(14),
     marginTop: wp(1),
   },
@@ -112,13 +118,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: {
-    color: colors.textPrimary,
     fontSize: moderateScale(24),
     fontWeight: '700',
     textAlign: 'center',
   },
   emptySubtitle: {
-    color: colors.textTertiary,
     fontSize: moderateScale(14),
     textAlign: 'center',
     marginTop: wp(1),

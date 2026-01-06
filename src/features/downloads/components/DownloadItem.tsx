@@ -13,18 +13,8 @@ import { DownloadTask } from '@/core/services/downloadManager';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { LibraryItem } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
-import { colors, scale } from '@/shared/theme';
-
-const COLORS = {
-  textPrimary: colors.textPrimary,
-  textSecondary: colors.textSecondary,
-  accent: colors.success,
-  warning: colors.warning,
-  error: colors.error,
-  cardBg: colors.cardBackground,
-  progressBg: colors.progressTrack,
-  progressFill: colors.success,
-};
+import { scale } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 // Pause icon
 const PauseIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) => (
@@ -93,6 +83,7 @@ interface DownloadItemProps {
 }
 
 export function DownloadItem({ download, onPause, onResume, onDelete }: DownloadItemProps) {
+  const colors = useColors();
   const [book, setBook] = useState<LibraryItem | null>(null);
   const coverUrl = useCoverUrl(download.itemId);
 
@@ -147,37 +138,37 @@ export function DownloadItem({ download, onPause, onResume, onDelete }: Download
           : `Downloading ${progressPct}%${bytesInfo}`;
         return {
           text: statusText,
-          color: COLORS.accent,
+          color: colors.semantic.success,
           showProgress: true, // Always show progress bar for downloading state
         };
       case 'pending':
         return {
           text: 'Queued - waiting to start...',
-          color: COLORS.textSecondary,
+          color: colors.text.secondary,
           showProgress: false,
         };
       case 'paused':
         return {
           text: `Paused at ${Math.round(download.progress * 100)}%${bytesInfo}`,
-          color: COLORS.warning,
+          color: colors.semantic.warning,
           showProgress: true,
         };
       case 'error':
         return {
           text: `Failed: ${download.error || 'Unknown error'} - tap to retry`,
-          color: COLORS.error,
+          color: colors.semantic.error,
           showProgress: false,
         };
       case 'complete':
         return {
           text: `Downloaded • ${formatBytes(download.totalBytes || 0)}`,
-          color: COLORS.accent,
+          color: colors.semantic.success,
           showProgress: false,
         };
       default:
         return {
           text: '',
-          color: COLORS.textSecondary,
+          color: colors.text.secondary,
           showProgress: false,
         };
     }
@@ -191,31 +182,31 @@ export function DownloadItem({ download, onPause, onResume, onDelete }: Download
       case 'downloading':
         return (
           <Pressable style={styles.actionButton} onPress={handlePause}>
-            <PauseIcon size={scale(18)} color={COLORS.accent} />
+            <PauseIcon size={scale(18)} color={colors.semantic.success} />
           </Pressable>
         );
       case 'paused':
         return (
           <Pressable style={styles.actionButton} onPress={handleResume}>
-            <PlayIcon size={scale(18)} color={COLORS.warning} />
+            <PlayIcon size={scale(18)} color={colors.semantic.warning} />
           </Pressable>
         );
       case 'pending':
         return (
           <View style={styles.actionButton}>
-            <ActivityIndicator size="small" color={COLORS.textSecondary} />
+            <ActivityIndicator size="small" color={colors.text.secondary} />
           </View>
         );
       case 'error':
         return (
           <Pressable style={styles.actionButton} onPress={handleResume}>
-            <AlertIcon size={scale(18)} color={COLORS.error} />
+            <AlertIcon size={scale(18)} color={colors.semantic.error} />
           </Pressable>
         );
       case 'complete':
         return (
           <Pressable style={styles.actionButton} onPress={handleDelete}>
-            <CheckIcon size={scale(18)} color={COLORS.accent} />
+            <CheckIcon size={scale(18)} color={colors.semantic.success} />
           </Pressable>
         );
       default:
@@ -224,17 +215,17 @@ export function DownloadItem({ download, onPause, onResume, onDelete }: Download
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface.card }]}>
       {/* Cover */}
-      <Image source={coverUrl} style={styles.cover} contentFit="cover" />
+      <Image source={coverUrl} style={[styles.cover, { backgroundColor: colors.background.tertiary }]} contentFit="cover" />
 
       {/* Info */}
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: colors.text.primary }]} numberOfLines={1}>
           {title}
         </Text>
         {author ? (
-          <Text style={styles.author} numberOfLines={1}>
+          <Text style={[styles.author, { color: colors.text.secondary }]} numberOfLines={1}>
             {author}
           </Text>
         ) : null}
@@ -244,7 +235,7 @@ export function DownloadItem({ download, onPause, onResume, onDelete }: Download
 
         {/* Progress bar */}
         {statusInfo.showProgress && (
-          <View style={styles.progressContainer}>
+          <View style={[styles.progressContainer, { backgroundColor: colors.progress.track }]}>
             <View
               style={[
                 styles.progressFill,
@@ -266,7 +257,7 @@ export function DownloadItem({ download, onPause, onResume, onDelete }: Download
         style={[
           styles.deleteButton,
           (download.status === 'downloading' || download.status === 'pending' || download.status === 'paused') &&
-            styles.cancelButton,
+            [styles.cancelButton, { backgroundColor: colors.semantic.errorLight }],
         ]}
         onPress={handleDelete}
         accessibilityLabel={
@@ -278,8 +269,8 @@ export function DownloadItem({ download, onPause, onResume, onDelete }: Download
           size={scale(18)}
           color={
             download.status === 'downloading' || download.status === 'pending' || download.status === 'paused'
-              ? COLORS.error
-              : COLORS.textSecondary
+              ? colors.semantic.error
+              : colors.text.secondary
           }
         />
       </Pressable>
@@ -293,7 +284,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: scale(10),
     paddingHorizontal: scale(12),
-    backgroundColor: COLORS.cardBg,
     borderRadius: scale(12),
     marginBottom: scale(8),
     gap: scale(10),
@@ -302,7 +292,6 @@ const styles = StyleSheet.create({
     width: scale(50),
     height: scale(50),
     borderRadius: scale(6),
-    backgroundColor: '#262626',
   },
   info: {
     flex: 1,
@@ -310,12 +299,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: scale(14),
     fontWeight: '500',
-    color: COLORS.textPrimary,
     marginBottom: scale(2),
   },
   author: {
     fontSize: scale(12),
-    color: COLORS.textSecondary,
     marginBottom: scale(2),
   },
   status: {
@@ -324,7 +311,6 @@ const styles = StyleSheet.create({
   progressContainer: {
     marginTop: scale(6),
     height: scale(3),
-    backgroundColor: COLORS.progressBg,
     borderRadius: scale(2),
     overflow: 'hidden',
   },
@@ -346,7 +332,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     borderRadius: scale(22),
   },
 });

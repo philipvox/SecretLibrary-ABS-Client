@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { List } from 'lucide-react-native';
-import { colors, wp, moderateScale, radius } from '@/shared/theme';
+import { wp, moderateScale, radius } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 import { useQueueCount } from '@/features/queue/stores/queueStore';
 
 interface HomePillsRowProps {
@@ -33,7 +34,6 @@ interface HomePillsRowProps {
 }
 
 const ICON_SIZE = wp(3.5);
-const ACCENT = colors.accent;
 
 /**
  * Moon icon for sleep timer
@@ -69,6 +69,7 @@ export function HomePillsRow({
   onQueuePress,
   visible,
 }: HomePillsRowProps) {
+  const colors = useColors();
   const queueCount = useQueueCount();
 
   if (!visible) return null;
@@ -82,7 +83,7 @@ export function HomePillsRow({
       {/* Sleep Timer Pill - Far Left */}
       <TouchableOpacity
         onPress={onSleepPress}
-        style={styles.pill}
+        style={[styles.pill, { backgroundColor: colors.background.elevated }]}
         activeOpacity={0.7}
         accessibilityLabel={isSleepActive
           ? `Sleep timer active, ${formatSleepTimer(sleepTimer)} remaining`
@@ -90,7 +91,11 @@ export function HomePillsRow({
         accessibilityRole="button"
       >
         <MoonIcon />
-        <Text style={[styles.pillText, isSleepActive && styles.pillTextActive]}>
+        <Text style={[
+          styles.pillText,
+          { color: colors.text.primary },
+          isSleepActive && { color: colors.text.accent }
+        ]}>
           {formatSleepTimer(sleepTimer)}
         </Text>
       </TouchableOpacity>
@@ -99,7 +104,7 @@ export function HomePillsRow({
       <View style={styles.queuePillWrapper}>
         <TouchableOpacity
           onPress={onQueuePress}
-          style={styles.queuePill}
+          style={[styles.queuePill, { backgroundColor: colors.background.elevated }]}
           activeOpacity={0.7}
           accessibilityLabel={hasQueueItems
             ? `Queue with ${queueCount} items`
@@ -108,11 +113,11 @@ export function HomePillsRow({
         >
           <List
             size={ICON_SIZE}
-            color={hasQueueItems ? ACCENT : colors.textPrimary}
+            color={hasQueueItems ? colors.text.accent : colors.text.primary}
             strokeWidth={2}
           />
           {hasQueueItems && (
-            <Text style={[styles.pillText, styles.pillTextActive]}>
+            <Text style={[styles.pillText, { color: colors.text.accent }]}>
               {queueCount}
             </Text>
           )}
@@ -122,12 +127,16 @@ export function HomePillsRow({
       {/* Playback Speed Pill - Far Right */}
       <TouchableOpacity
         onPress={onSpeedPress}
-        style={styles.pill}
+        style={[styles.pill, { backgroundColor: colors.background.elevated }]}
         activeOpacity={0.7}
         accessibilityLabel={`Playback speed ${playbackSpeed}x. Tap to change.`}
         accessibilityRole="button"
       >
-        <Text style={[styles.pillText, isSpeedModified && styles.pillTextActive]}>
+        <Text style={[
+          styles.pillText,
+          { color: colors.text.primary },
+          isSpeedModified && { color: colors.text.accent }
+        ]}>
           {playbackSpeed}x
         </Text>
       </TouchableOpacity>
@@ -148,7 +157,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.backgroundElevated,
     borderRadius: radius.lg,
     paddingVertical: wp(2),
     paddingHorizontal: wp(3),
@@ -167,19 +175,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.backgroundElevated,
     borderRadius: radius.lg,
     paddingVertical: wp(2),
     paddingHorizontal: wp(3),
     gap: wp(1.5),
   },
   pillText: {
-    color: colors.textPrimary,
     fontSize: moderateScale(14),
     fontWeight: '500',
-  },
-  pillTextActive: {
-    color: colors.accent,
   },
 });
 

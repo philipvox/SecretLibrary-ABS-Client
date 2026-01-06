@@ -349,7 +349,8 @@ export function BooksList({ books, onBookPress, maxItems = 5 }: BooksListProps) 
           <BookRow
             key={book.id}
             book={book}
-            onPress={() => onBookPress(book)}
+            onCoverPress={() => onBookPress(book)}
+            onDetailsPress={() => onBookPress(book)}
             themeColors={themeColors}
           />
         ))}

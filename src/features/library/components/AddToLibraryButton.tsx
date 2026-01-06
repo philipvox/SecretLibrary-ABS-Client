@@ -6,7 +6,8 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { Icon } from '@/shared/components/Icon';
-import { colors, spacing, radius } from '@/shared/theme';
+import { spacing, radius } from '@/shared/theme';
+import { useColors } from '@/shared/theme/themeStore';
 
 interface AddToLibraryButtonProps {
   bookId: string;
@@ -14,11 +15,12 @@ interface AddToLibraryButtonProps {
   size?: 'small' | 'medium' | 'large';
 }
 
-export function AddToLibraryButton({ 
-  bookId, 
+export function AddToLibraryButton({
+  bookId,
   variant = 'button',
   size = 'medium',
 }: AddToLibraryButtonProps) {
+  const colors = useColors();
   const { isInLibrary, addToLibrary, removeFromLibrary } = useMyLibraryStore();
   const inLibrary = isInLibrary(bookId);
 
@@ -32,39 +34,41 @@ export function AddToLibraryButton({
 
   if (variant === 'icon') {
     const iconSize = size === 'small' ? 20 : size === 'large' ? 28 : 24;
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={handlePress}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Icon
           name="Heart"
           size={iconSize}
-          color={inLibrary ? "#EF4444" : colors.textSecondary}
+          color={inLibrary ? colors.feature.heartFill : colors.text.secondary}
         />
       </TouchableOpacity>
     );
   }
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.button, 
-        inLibrary && styles.buttonActive,
+        styles.button,
+        { backgroundColor: colors.background.secondary },
+        inLibrary && { backgroundColor: colors.semantic.error },
         size === 'small' && styles.buttonSmall,
         size === 'large' && styles.buttonLarge,
-      ]} 
+      ]}
       onPress={handlePress}
     >
       <Icon
         name="Heart"
         size={size === 'small' ? 16 : 20}
-        color={inLibrary ? '#FFFFFF' : colors.textPrimary}
+        color={inLibrary ? colors.text.inverse : colors.text.primary}
       />
       <Text style={[
         styles.buttonText,
-        inLibrary && styles.buttonTextActive,
+        { color: colors.text.primary },
+        inLibrary && { color: colors.text.inverse },
         size === 'small' && styles.buttonTextSmall,
       ]}>
         {inLibrary ? 'In Library' : 'Add to Library'}
@@ -78,14 +82,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.backgroundSecondary,
     borderRadius: radius.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
-  },
-  buttonActive: {
-    backgroundColor: '#EF4444',
   },
   buttonSmall: {
     paddingVertical: spacing.xs,
@@ -98,10 +98,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  buttonTextActive: {
-    color: '#FFFFFF',
   },
   buttonTextSmall: {
     fontSize: 12,

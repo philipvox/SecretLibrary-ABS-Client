@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically
   },
   streamBadge: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.6)', // Fixed dark overlay for visibility on cover
   },
   completedBadge: {
     position: 'absolute',
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     width: scale(20),
     height: scale(20),
     borderRadius: scale(10),
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.6)', // Fixed dark overlay for visibility on cover
     justifyContent: 'center',
     alignItems: 'center',
   },
