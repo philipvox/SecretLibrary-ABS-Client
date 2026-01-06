@@ -183,19 +183,7 @@ All Phase B component unification tasks complete:
 
 ---
 
-## Phase C: Screen Updates (Pending)
-
-### Scope Assessment
-
-Phase C requires updating typography/spacing/colors across many screens.
-
-**High-priority screens with hardcoded values:**
-- `CDPlayerScreen.tsx`: 70+ hardcoded `fontSize: scale()` values
-- `ProfileScreen.tsx`: 20+ hardcoded font sizes
-- `PlaybackSettingsScreen.tsx`: 20+ hardcoded font sizes
-- `KidModeSettingsScreen.tsx`: 40+ hardcoded font sizes
-- `JoystickSeekSettingsScreen.tsx`: 30+ hardcoded font sizes
-- Various other settings screens
+## Phase C: Screen Updates
 
 ### Typography Token Mapping Reference
 
@@ -204,10 +192,10 @@ Phase C requires updating typography/spacing/colors across many screens.
 | `scale(32)` | `typography.displayLarge` |
 | `scale(24)` | `typography.displayMedium` |
 | `scale(22)` | `typography.displaySmall` |
-| `scale(18)` | `typography.headlineLarge` |
+| `scale(18)` | `typography.displaySmall` |
 | `scale(17)` | `typography.headlineLarge` |
 | `scale(16)` | `typography.headlineMedium` |
-| `scale(15)` | `typography.headlineSmall` |
+| `scale(15)` | `typography.headlineMedium` |
 | `scale(14)` | `typography.bodyLarge` |
 | `scale(13)` | `typography.bodyMedium` |
 | `scale(12)` | `typography.bodySmall` |
@@ -215,13 +203,90 @@ Phase C requires updating typography/spacing/colors across many screens.
 | `scale(10)` | `typography.labelSmall` |
 | `scale(9)` | `typography.caption` |
 
-### Recommended Approach
+---
 
-Given the scope, Phase C should be executed incrementally:
-1. Start with highest-impact screens (CDPlayerScreen, ProfileScreen)
-2. Create helper components for common patterns (SettingsRow, etc.)
-3. Use search/replace for common patterns
-4. Test dark/light mode after each screen
+### C.1 - CDPlayerScreen Typography
+**Status:** Complete
+**Files Modified:**
+- `src/features/player/screens/CDPlayerScreen.tsx`
+
+**Changes:**
+Replaced all 40+ hardcoded `fontSize: scale()` values with typography tokens:
+
+**Display text (large headings):**
+- [x] `standardTitle` → `typography.displayLarge` with `fontSize['4xl']`
+- [x] `noteInputTitle` → `typography.displaySmall`
+- [x] `chapterTimeCentered` → `typography.displaySmall`
+- [x] `standardChapterTextTop` → `typography.displaySmall` with `fontSize.xl`
+
+**Headline text (section headers, titles):**
+- [x] `title` → `typography.headlineMedium`
+- [x] `bookmarkTitle` → `typography.headlineMedium`
+- [x] `bookmarkToastText` → `typography.headlineMedium`
+- [x] `bookmarkToastAction` → `typography.headlineMedium`
+- [x] `noteInputSaveText` → `typography.headlineMedium`
+- [x] `bookmarksEmptyText` → `typography.headlineLarge`
+- [x] `noteInput` → `typography.headlineLarge`
+
+**Body text (content, descriptions):**
+- [x] `author` → `typography.bodyMedium`
+- [x] `speedIndicatorText` → `typography.bodyMedium`
+- [x] `scrubTooltipText` → `typography.bodyMedium`
+- [x] `overviewTitle` → `typography.bodyMedium`
+- [x] `overviewText` → `typography.bodySmall`
+- [x] `chapter` → `typography.bodyMedium`
+- [x] `time` → `typography.bodyMedium`
+- [x] `chapterCentered` → `typography.bodyLarge`
+- [x] `chapterRemaining` → `typography.bodyLarge`
+- [x] `pillText` → `typography.bodyLarge`
+- [x] `pillTextSmall` → `typography.bodyMedium`
+- [x] `standardChapterText` → `typography.bodyLarge`
+- [x] `standardChapterTime` → `typography.bodyLarge`
+- [x] `standardMetaLabel` → `typography.bodySmall`
+- [x] `standardMetaValue` → `typography.bodyLarge`
+- [x] `settingsActionText` → `typography.bodyLarge`
+- [x] `sheetBackText` → `typography.bodyLarge`
+- [x] `bookmarksEmptySubtext` → `typography.bodyLarge`
+- [x] `bookmarkChapter` → `typography.bodyMedium`
+- [x] `bookmarkTime` → `typography.bodyLarge`
+- [x] `bookmarksEmptyHint` → `typography.bodyMedium`
+- [x] `bookmarkNote` → `typography.bodyMedium`
+- [x] `bookmarkDate` → `typography.bodySmall`
+- [x] `bookmarkPillText` → `typography.bodyLarge`
+- [x] `bookmarkPillNoteText` → `typography.bodyMedium`
+- [x] `noteCharCount` → `typography.bodyMedium`
+
+**Label text (badges, small UI elements):**
+- [x] `sourceText` → `typography.labelMedium`
+- [x] `queueBadgeText` → `typography.labelSmall`
+- [x] `standardChapterTimeTop` → `typography.labelSmall`
+- [x] `coverButtonBadgeText` → `typography.labelSmall`
+- [x] `settingsActionBadgeText` → `typography.labelMedium`
+- [x] `skipButtonLabel` → `typography.labelMedium`
+- [x] `scrubScaleText` → `typography.labelSmall`
+- [x] `playingBadgeText` → `typography.labelMedium`
+- [x] `speedBadgeOnDiscText` → `typography.labelMedium`
+- [x] `bufferingBadgeText` → `typography.labelMedium`
+
+**Caption text:**
+- [x] `progressTimeText` → `typography.caption`
+
+**Font weight token replacements:**
+- [x] All `fontWeight: '400'` → `fontWeight.regular`
+- [x] All `fontWeight: '500'` → `fontWeight.medium`
+- [x] All `fontWeight: '600'` → `fontWeight.semibold`
+- [x] All `fontWeight: '700'` → `fontWeight.bold`
+
+---
+
+### C.2 - Other Screens Typography (Pending)
+
+**Remaining screens:**
+- `ProfileScreen.tsx`: 20+ hardcoded font sizes
+- `PlaybackSettingsScreen.tsx`: 20+ hardcoded font sizes
+- `KidModeSettingsScreen.tsx`: 40+ hardcoded font sizes
+- `JoystickSeekSettingsScreen.tsx`: 30+ hardcoded font sizes
+- Various other settings screens
 
 ---
 

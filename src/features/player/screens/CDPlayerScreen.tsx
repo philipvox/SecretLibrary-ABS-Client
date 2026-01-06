@@ -81,7 +81,7 @@ import { useBookmarkActions } from '../hooks/useBookmarkActions';
 import { getCachedTicks, generateAndCacheTicks, TimelineTick, ChapterInput } from '../services/tickCache';
 import { getVisibleTicks } from '../utils/tickGenerator';
 import { audioService } from '../services/audioService';
-import { colors, spacing, radius, scale, wp, hp, layout } from '@/shared/theme';
+import { colors, spacing, radius, scale, wp, hp, layout, typography, fontSize, fontWeight } from '@/shared/theme';
 import { useThemeStore } from '@/shared/theme/themeStore';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/hooks/useToast';
@@ -1053,9 +1053,9 @@ const chapterTimelineStyles = StyleSheet.create({
     zIndex: 20,
   },
   speedIndicatorText: {
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     color: '#FFFFFF',
-    fontSize: scale(13),
-    fontWeight: '600',
     textAlign: 'center',
   },
   scrubTooltip: {
@@ -1069,9 +1069,9 @@ const chapterTimelineStyles = StyleSheet.create({
     zIndex: 20,
   },
   scrubTooltipText: {
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     color: '#FFFFFF',
-    fontSize: scale(13),
-    fontWeight: '600',
     textAlign: 'center',
   },
 });
@@ -2139,9 +2139,9 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   sourceText: {
+    ...typography.labelMedium,
+    fontWeight: fontWeight.medium,
     color: colors.textTertiary,
-    fontSize: scale(11),
-    fontWeight: '500',
   },
   sourceTextDownloaded: {
     color: colors.success,
@@ -2153,15 +2153,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    ...typography.headlineMedium,
     color: colors.textPrimary,
-    fontSize: scale(15),
-    fontWeight: '500',
     textAlign: 'center',
   },
   author: {
+    ...typography.bodyMedium,
     color: colors.textTertiary,
-    fontSize: scale(14),
-    fontWeight: '400',
     marginTop: scale(6),
     textAlign: 'center',
   },
@@ -2182,8 +2180,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(20),
   },
   standardTitle: {
-    fontSize: scale(32),
-    fontWeight: '700',
+    ...typography.displayLarge,
+    fontSize: fontSize['4xl'], // 32px - larger than displayLarge
     color: '#000',
     marginBottom: scale(12),
     textAlign: 'center',
@@ -2198,16 +2196,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   standardMetaLabel: {
-    fontSize: scale(12),
-    fontWeight: '500',
+    ...typography.bodySmall,
+    fontWeight: fontWeight.medium,
     color: 'rgba(0,0,0,0.4)',
     textTransform: 'capitalize',
     marginBottom: scale(2),
     textAlign: 'center',
   },
   standardMetaValue: {
-    fontSize: scale(14),
-    fontWeight: '700',
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.bold,
     color: '#000',
     textAlign: 'center',
   },
@@ -2224,9 +2222,9 @@ const styles = StyleSheet.create({
     marginBottom: scale(10),
   },
   overviewTitle: {
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.regular,
     color: colors.textPrimary,
-    fontSize: scale(13),
-    fontWeight: '400',
     letterSpacing: 0,
     marginBottom: scale(10),
   },
@@ -2237,10 +2235,10 @@ const styles = StyleSheet.create({
     marginBottom: scale(5),
   },
   overviewText: {
+    ...typography.bodySmall,
+    fontWeight: fontWeight.regular,
     color: colors.textSecondary,
-    fontSize: scale(12),
     lineHeight: scale(18),
-    fontWeight: '400',
   },
   infoRow: {
     flexDirection: 'row',
@@ -2261,38 +2259,36 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   chapterCentered: {
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.medium,
     color: colors.textSecondary,
-    fontSize: scale(14),
-    fontWeight: '500',
     textAlign: 'center',
     marginBottom: scale(4),
   },
   chapterTimeCentered: {
+    ...typography.displaySmall,
     color: colors.accent,
-    fontSize: scale(18),
-    letterSpacing: 0.3,
     fontVariant: ['tabular-nums'],
-    fontWeight: '600',
     textAlign: 'center',
   },
   chapter: {
+    ...typography.bodyMedium,
     color: colors.textSecondary,
-    fontSize: scale(13),
     letterSpacing: 0.28,
     maxWidth: SCREEN_WIDTH * 0.5,
   },
   time: {
+    ...typography.bodyMedium,
     color: colors.textTertiary,
-    fontSize: scale(13),
     letterSpacing: 0.28,
     fontVariant: ['tabular-nums'],
   },
   chapterRemaining: {
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.regular,
     color: colors.accent,
-    fontSize: scale(14),
     letterSpacing: 0.28,
     fontVariant: ['tabular-nums'],
-    fontWeight: '400',
   },
   // Standard player mode (white background) - dark text
   chapterStandard: {
@@ -2307,8 +2303,8 @@ const styles = StyleSheet.create({
     marginBottom: scale(6),
   },
   progressTimeText: {
+    ...typography.caption,
     color: colors.textTertiary,
-    fontSize: scale(9),
     letterSpacing: 0.18,
     fontVariant: ['tabular-nums'],
   },
@@ -2413,15 +2409,15 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(80,80,80,0.5)',
   },
   pillText: {
+    ...typography.bodyLarge,
     color: colors.textPrimary,
-    fontSize: scale(14),
   },
   pillTextActive: {
     color: colors.accent,
   },
   pillTextSmall: {
+    ...typography.bodyMedium,
     color: colors.textPrimary,
-    fontSize: scale(13),
   },
   speedPill: {
     minWidth: scale(40),
@@ -2439,8 +2435,8 @@ const styles = StyleSheet.create({
     marginLeft: scale(2),
   },
   queueBadgeText: {
-    fontSize: scale(10),
-    fontWeight: '700',
+    ...typography.labelSmall,
+    fontWeight: fontWeight.bold,
     color: colors.backgroundPrimary,
   },
   scrubButtonContainer: {
@@ -2470,15 +2466,15 @@ const styles = StyleSheet.create({
   },
   standardTimeText: {
     color: '#000',
-    fontSize: scale(24),
-    fontWeight: '300',
+    fontSize: fontSize['2xl'], // 22px - display time
+    fontWeight: fontWeight.regular,
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.5,
   },
   standardTimeSeparator: {
     color: 'rgba(0,0,0,0.3)',
-    fontSize: scale(24),
-    fontWeight: '300',
+    fontSize: fontSize['2xl'], // 22px
+    fontWeight: fontWeight.regular,
     marginHorizontal: scale(8),
   },
   playButtonBorderStandard: {
@@ -2532,14 +2528,14 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   standardChapterText: {
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.regular,
     color: '#000',
-    fontSize: scale(14),
-    fontWeight: '400',
   },
   standardChapterTime: {
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.medium,
     color: '#E53935',
-    fontSize: scale(14),
-    fontWeight: '500',
     fontVariant: ['tabular-nums'],
   },
   // Standard player chapter row - centered directly above marker
@@ -2555,15 +2551,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   standardChapterTextTop: {
-    fontSize: scale(20),
-    fontWeight: '700',
+    ...typography.displaySmall,
+    fontSize: fontSize.xl, // 20px
+    fontWeight: fontWeight.bold,
     textAlign: 'center',
     marginBottom: scale(4),
   },
   standardChapterTimeTop: {
+    ...typography.labelSmall,
+    fontWeight: fontWeight.regular,
     color: '#FFFFFF',
-    fontSize: scale(10),
-    fontWeight: '400',
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },
@@ -2671,9 +2668,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(4),
   },
   coverButtonBadgeText: {
+    ...typography.labelSmall,
+    fontWeight: fontWeight.bold,
     color: '#000',
-    fontSize: scale(10),
-    fontWeight: '700',
   },
 
   // Bottom Sheet styles
@@ -2711,10 +2708,9 @@ const styles = StyleSheet.create({
     marginBottom: scale(20),
   },
   sheetTitle: {
-    fontSize: scale(20),
-    fontWeight: '600',
+    ...typography.displaySmall,
+    fontSize: fontSize.xl, // 20px
     color: '#000000',
-    letterSpacing: -0.5,
   },
   sheetClose: {
     width: layout.minTouchTarget,
@@ -2740,8 +2736,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   optionText: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.headlineMedium,
+    fontSize: fontSize.md, // 16px
     color: colors.textPrimary,
   },
   optionTextActive: {
@@ -2764,7 +2760,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSubtle,
   },
   listOptionText: {
-    fontSize: 16,
+    ...typography.bodyLarge,
     color: colors.textPrimary,
   },
   listOptionTextActive: {
@@ -2787,8 +2783,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
   chapterNumber: {
+    ...typography.bodyMedium,
     width: scale(28),
-    fontSize: scale(14),
     color: '#999999',
   },
   chapterInfo: {
@@ -2796,7 +2792,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   chapterTitle: {
-    fontSize: scale(15),
+    ...typography.headlineMedium,
     color: '#000000',
     marginBottom: 2,
   },
@@ -2805,7 +2801,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chapterDuration: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     color: '#666666',
   },
 
@@ -2814,8 +2810,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(20),
   },
   settingsSectionTitle: {
-    fontSize: scale(12),
-    fontWeight: '600',
+    ...typography.labelMedium,
     color: '#888888',
     marginBottom: scale(14),
     textTransform: 'uppercase',
@@ -2836,7 +2831,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSubtle,
   },
   settingsOptionText: {
-    fontSize: 16,
+    ...typography.bodyLarge,
     color: colors.textPrimary,
   },
   settingsOptionTextActive: {
@@ -2844,9 +2839,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   settingsOptionValue: {
-    fontSize: 15,
+    ...typography.headlineMedium,
     color: colors.textSecondary,
-    fontWeight: '500',
   },
   // Speed grid for Standard Player settings
   speedGrid: {
@@ -2866,8 +2860,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   speedGridText: {
-    fontSize: scale(14),
-    fontWeight: '500',
+    ...typography.labelLarge,
     color: colors.textPrimary,
   },
   speedGridTextActive: {
@@ -2905,8 +2898,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   toggleOptionText: {
-    fontSize: scale(14),
-    fontWeight: '500',
+    ...typography.labelLarge,
     color: '#333333',
   },
   toggleOptionTextActive: {
@@ -2929,8 +2921,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   speedQuickText: {
-    fontSize: scale(12),
-    fontWeight: '500',
+    ...typography.labelMedium,
     color: colors.textPrimary,
   },
   speedQuickTextActive: {
@@ -2942,8 +2933,8 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   sleepTimerStatus: {
-    fontSize: scale(12),
-    fontWeight: '600',
+    ...typography.labelMedium,
+    fontWeight: fontWeight.semibold,
     color: colors.accent,
     marginLeft: 'auto',
   },
@@ -2964,8 +2955,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   sleepQuickText: {
-    fontSize: scale(12),
-    fontWeight: '500',
+    ...typography.labelMedium,
     color: colors.textPrimary,
   },
   sleepQuickTextActive: {
@@ -2981,8 +2971,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   sleepCustomText: {
-    fontSize: scale(12),
-    fontWeight: '500',
+    ...typography.labelMedium,
     color: colors.textSecondary,
   },
   sleepOffButton: {
@@ -2990,8 +2979,8 @@ const styles = StyleSheet.create({
   },
   // Modernist unified settings styles
   settingStatusText: {
-    fontSize: scale(13),
-    fontWeight: '600',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     color: '#000000',
     marginLeft: 'auto',
   },
@@ -3012,8 +3001,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   quickOptionText: {
-    fontSize: scale(13),
-    fontWeight: '500',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.medium,
     color: '#333333',
   },
   quickOptionTextActive: {
@@ -3028,8 +3017,8 @@ const styles = StyleSheet.create({
     minWidth: scale(54),
   },
   customInput: {
-    fontSize: scale(13),
-    fontWeight: '500',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.medium,
     color: '#000000',
     paddingVertical: scale(8),
     paddingHorizontal: scale(12),
@@ -3059,8 +3048,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sleepTimerText: {
-    fontSize: scale(14),
-    fontWeight: '700',
+    ...typography.labelLarge,
+    fontWeight: fontWeight.bold,
     color: '#E53935',
     marginTop: scale(2),
   },
@@ -3084,8 +3073,8 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   settingsActionText: {
-    fontSize: scale(14),
-    fontWeight: '500',
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.medium,
     color: '#000000',
   },
   settingsActionTextDisabled: {
@@ -3101,8 +3090,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(6),
   },
   settingsActionBadgeText: {
-    fontSize: scale(11),
-    fontWeight: '700',
+    ...typography.labelMedium,
+    fontWeight: fontWeight.bold,
     color: '#FFFFFF',
   },
 
@@ -3112,7 +3101,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(10),
   },
   sheetBackText: {
-    fontSize: scale(14),
+    ...typography.bodyLarge,
     color: '#666666',
   },
   bookmarksScrollView: {
@@ -3123,13 +3112,12 @@ const styles = StyleSheet.create({
     paddingVertical: scale(48),
   },
   bookmarksEmptyText: {
-    fontSize: scale(17),
-    fontWeight: '600',
+    ...typography.headlineLarge,
     color: '#000000',
     marginTop: scale(20),
   },
   bookmarksEmptySubtext: {
-    fontSize: scale(14),
+    ...typography.bodyLarge,
     color: '#666666',
     marginTop: scale(10),
     textAlign: 'center',
@@ -3149,24 +3137,24 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   bookmarkTitle: {
-    fontSize: scale(15),
-    fontWeight: '500',
+    ...typography.headlineMedium,
+    fontWeight: fontWeight.medium,
     color: '#000000',
   },
   bookmarkChapter: {
-    fontSize: scale(13),
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.medium,
     color: '#333333',
-    fontWeight: '500',
     marginTop: 2,
   },
   bookmarkTime: {
-    fontSize: scale(14),
-    fontWeight: '600',
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.semibold,
     color: '#000000',
     marginTop: scale(2),
   },
   bookmarksEmptyHint: {
-    fontSize: scale(13),
+    ...typography.bodyMedium,
     color: '#999999',
     marginTop: scale(6),
     textAlign: 'center',
@@ -3193,13 +3181,13 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   bookmarkNote: {
-    fontSize: scale(13),
+    ...typography.bodyMedium,
     fontStyle: 'italic',
     color: '#666666',
     marginTop: scale(4),
   },
   bookmarkDate: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     color: '#999999',
     marginTop: scale(4),
   },
@@ -3237,8 +3225,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   bookmarkPillText: {
-    fontSize: scale(14),
-    fontWeight: '600',
+    ...typography.bodyLarge,
+    fontWeight: fontWeight.semibold,
     color: '#000000',
   },
   bookmarkPillNoteButton: {
@@ -3248,8 +3236,8 @@ const styles = StyleSheet.create({
     borderRadius: scale(16),
   },
   bookmarkPillNoteText: {
-    fontSize: scale(13),
-    fontWeight: '600',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     color: '#666666',
   },
   // Bookmark toast (for delete undo)
@@ -3275,15 +3263,15 @@ const styles = StyleSheet.create({
     // Same white design for consistency
   },
   bookmarkToastText: {
+    ...typography.headlineMedium,
     flex: 1,
-    fontSize: scale(16),
-    fontWeight: '500',
+    fontWeight: fontWeight.medium,
     color: '#000000',
     letterSpacing: -0.2,
   },
   bookmarkToastAction: {
-    fontSize: scale(15),
-    fontWeight: '600',
+    ...typography.headlineMedium,
+    fontWeight: fontWeight.semibold,
     color: '#000000',
     textDecorationLine: 'underline',
   },
@@ -3320,17 +3308,17 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   noteInputTitle: {
-    fontSize: scale(22),
-    fontWeight: '600',
+    ...typography.displaySmall,
+    fontWeight: fontWeight.semibold,
     color: '#000000',
     letterSpacing: -0.5,
   },
   noteInput: {
+    ...typography.headlineLarge,
     backgroundColor: '#F5F5F5',
     borderRadius: scale(16),
     paddingVertical: scale(18),
     paddingHorizontal: scale(18),
-    fontSize: scale(17),
     color: '#000000',
     minHeight: scale(140),
     textAlignVertical: 'top',
@@ -3343,9 +3331,9 @@ const styles = StyleSheet.create({
     marginTop: scale(20),
   },
   noteCharCount: {
-    fontSize: scale(13),
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.regular,
     color: '#999999',
-    fontWeight: '400',
   },
   noteInputSaveButton: {
     backgroundColor: '#000000',
@@ -3354,8 +3342,8 @@ const styles = StyleSheet.create({
     borderRadius: scale(24),
   },
   noteInputSaveText: {
-    fontSize: scale(15),
-    fontWeight: '600',
+    ...typography.headlineMedium,
+    fontWeight: fontWeight.semibold,
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
@@ -3379,9 +3367,9 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   skipButtonLabel: {
+    ...typography.labelMedium,
+    fontWeight: fontWeight.medium,
     color: colors.textTertiary,
-    fontSize: scale(11),
-    fontWeight: '500',
     marginTop: scale(2),
   },
   // Scrub Speed Scale
@@ -3395,8 +3383,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrubScaleText: {
+    ...typography.labelSmall,
     color: 'rgba(91,91,91,0.7)',
-    fontSize: scale(10),
     fontVariant: ['tabular-nums'],
     marginBottom: scale(4),
   },
@@ -3419,9 +3407,9 @@ const styles = StyleSheet.create({
     borderRadius: scale(12),
   },
   playingBadgeText: {
+    ...typography.labelMedium,
+    fontWeight: fontWeight.bold,
     color: colors.backgroundPrimary,
-    fontSize: scale(11),
-    fontWeight: '700',
   },
 
   // Speed badge on disc
@@ -3435,9 +3423,9 @@ const styles = StyleSheet.create({
     borderRadius: scale(10),
   },
   speedBadgeOnDiscText: {
+    ...typography.labelMedium,
+    fontWeight: fontWeight.bold,
     color: colors.backgroundPrimary,
-    fontSize: scale(11),
-    fontWeight: '700',
   },
 
   // Buffering badge container - positioned absolutely above all layers
@@ -3461,9 +3449,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   bufferingBadgeText: {
+    ...typography.labelMedium,
+    fontWeight: fontWeight.medium,
     color: colors.textSecondary,
-    fontSize: scale(11),
-    fontWeight: '500',
   },
 
   // Timer countdown indicator
