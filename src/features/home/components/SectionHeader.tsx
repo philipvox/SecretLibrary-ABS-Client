@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline', // Align text baselines for proper visual alignment
     paddingHorizontal: SECTION_PADDING,
     marginBottom: scale(12),
   },
