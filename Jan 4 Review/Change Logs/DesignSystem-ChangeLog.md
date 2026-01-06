@@ -148,5 +148,29 @@
 - [x] NarratorCard now wraps EntityCard (backward compatible)
 - [x] PersonCard remains separate (different layout for horizontal lists)
 
+### B.6 - Update Icon Component Default Color
+**Status:** Complete
+**Files Modified:**
+- `src/shared/components/Icon.tsx`
+
+**Changes:**
+- [x] Replaced legacy `colors.textPrimary` default with theme-aware color
+- [x] Added `useThemeColors()` hook import
+- [x] Color now defaults to `themeColors.text` if not provided
+- [x] Removed dependency on legacy `colors` object
+- [x] Added JSDoc note about theme-aware default color
+
+---
+
+## Phase B Summary
+
+All Phase B component unification tasks complete:
+- B.1: Merged SeriesCard variants into shared component
+- B.2: Migrated AuthorCard to use theme tokens
+- B.3: Replaced 8 BookCard custom SVGs with Lucide icons
+- B.4: Replaced 10 EmptyState custom SVGs with Lucide icons
+- B.5: Created unified EntityCard for Author/Narrator cards
+- B.6: Updated Icon component to use theme-aware default color
+
 ---
 
