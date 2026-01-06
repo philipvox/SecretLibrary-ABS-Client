@@ -421,12 +421,59 @@ Replaced all 20 hardcoded `fontSize: scale()` values with typography tokens:
 
 ---
 
-### C.6 - Other Settings Screens Typography (Pending)
+### C.6 - HapticSettingsScreen Typography
+**Status:** Complete
+**Files Modified:**
+- `src/features/profile/screens/HapticSettingsScreen.tsx`
 
-**Remaining screens:**
-- `HapticSettingsScreen.tsx`
-- `ChapterCleaningSettingsScreen.tsx`
-- Various other settings screens
+**Changes:**
+Replaced all 5 hardcoded `fontSize: scale()` values with typography tokens:
+
+**Headline text:**
+- [x] `headerTitle` → `typography.headlineLarge`
+- [x] `rowLabel` → `typography.headlineMedium`
+
+**Body text:**
+- [x] `sectionHeader` → `typography.bodyMedium`
+- [x] `rowNote` → `typography.bodySmall`
+- [x] `infoText` → `typography.bodySmall`
+
+---
+
+### C.7 - ChapterCleaningSettingsScreen Typography
+**Status:** Complete
+**Files Modified:**
+- `src/features/profile/screens/ChapterCleaningSettingsScreen.tsx`
+
+**Changes:**
+Replaced all 14 hardcoded `fontSize: scale()` values with typography tokens:
+
+**Headline text:**
+- [x] `headerTitle` → `typography.headlineLarge`
+- [x] `levelLabel` → `typography.headlineMedium`
+- [x] `rowLabel` → `typography.headlineMedium`
+
+**Body text:**
+- [x] `introText` → `typography.bodyLarge`
+- [x] `sectionHeader` → `typography.bodyMedium`
+- [x] `levelDescription` → `typography.bodySmall`
+- [x] `rowNote` → `typography.bodySmall`
+- [x] `exampleText` → `typography.bodySmall`
+- [x] `exampleTextClean` → `typography.bodySmall`
+- [x] `infoText` → `typography.bodySmall`
+
+**Label text:**
+- [x] `recommendedText` → `typography.labelSmall`
+- [x] `levelExample` → `typography.labelMedium`
+- [x] `exampleLabel` → `typography.labelSmall`
+- [x] `exampleNote` → `typography.labelSmall`
+
+---
+
+### C.8 - Remaining Settings Screens (Pending)
+
+**Screens to check:**
+- Various other profile settings screens
 
 ---
 

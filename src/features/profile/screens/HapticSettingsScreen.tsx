@@ -32,8 +32,8 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { accentColors, scale } from '@/shared/theme';
-import { useThemeColors, ThemeColors } from '@/shared/theme/themeStore';
+import { accentColors, scale, typography, fontWeight } from '@/shared/theme';
+import { useThemeColors, ThemeColors } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
 import { useHapticSettingsStore } from '../stores/hapticSettingsStore';
 
@@ -298,8 +298,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   headerTitle: {
-    fontSize: scale(18),
-    fontWeight: '600',
+    ...typography.headlineLarge,
+    fontWeight: fontWeight.semibold,
     // color set via colors.text in JSX
   },
   headerSpacer: {
@@ -315,8 +315,8 @@ const styles = StyleSheet.create({
     marginBottom: scale(24),
   },
   sectionHeader: {
-    fontSize: scale(13),
-    fontWeight: '600',
+    ...typography.bodyMedium,
+    fontWeight: fontWeight.semibold,
     // color set via colors.textTertiary in JSX
     letterSpacing: 0.5,
     marginHorizontal: scale(20),
@@ -359,12 +359,12 @@ const styles = StyleSheet.create({
     marginRight: scale(12),
   },
   rowLabel: {
-    fontSize: scale(15),
-    fontWeight: '500',
+    ...typography.headlineMedium,
+    fontWeight: fontWeight.medium,
     // color set via colors.text in JSX
   },
   rowNote: {
-    fontSize: scale(12),
+    ...typography.bodySmall,
     // color set via colors.textTertiary in JSX
     marginTop: scale(2),
   },
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    fontSize: scale(12),
+    ...typography.bodySmall,
     // color set via colors.textTertiary in JSX
     lineHeight: scale(18),
   },
