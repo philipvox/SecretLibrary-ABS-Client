@@ -34,7 +34,7 @@ import { downloadManager } from '@/core/services/downloadManager';
 import { useLibraryCache } from '@/core/cache';
 import { networkMonitor } from '@/core/services/networkMonitor';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { accentColors, scale, typography, fontWeight } from '@/shared/theme';
+import { accentColors, scale, typography, fontWeight, spacing } from '@/shared/theme';
 import { useThemeColors, ThemeColors } from '@/shared/theme';
 import { logger } from '@/shared/utils/logger';
 
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     paddingVertical: scale(12),
   },
   backButton: {
@@ -378,9 +378,9 @@ const styles = StyleSheet.create({
   },
   // Storage Overview
   storageOverview: {
-    marginHorizontal: scale(16),
-    marginBottom: scale(24),
-    padding: scale(20),
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
+    padding: spacing.xl,
     // backgroundColor set via colors.card in JSX
     borderRadius: scale(16),
   },
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   storageInfo: {
-    marginLeft: scale(16),
+    marginLeft: spacing.lg,
   },
   storageValue: {
     ...typography.displayMedium,
@@ -411,18 +411,18 @@ const styles = StyleSheet.create({
   },
   // Sections
   section: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   sectionHeader: {
     ...typography.bodyMedium,
     fontWeight: fontWeight.semibold,
     // color set via colors.textTertiary in JSX
     letterSpacing: 0.5,
-    marginHorizontal: scale(20),
-    marginBottom: scale(8),
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
   },
   sectionCard: {
-    marginHorizontal: scale(16),
+    marginHorizontal: spacing.lg,
     // backgroundColor set via colors.card in JSX
     borderRadius: scale(12),
     overflow: 'hidden',
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     // borderBottomColor set via colors.border in JSX
   },
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
-    marginLeft: scale(12),
+    marginLeft: spacing.md,
   },
   rowLabel: {
     ...typography.headlineMedium,
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   rowRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
+    gap: spacing.sm,
   },
   rowValue: {
     ...typography.bodyLarge,
@@ -478,9 +478,9 @@ const styles = StyleSheet.create({
   infoSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: scale(8),
-    marginHorizontal: scale(20),
-    marginTop: scale(8),
+    gap: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.sm,
   },
   infoText: {
     flex: 1,

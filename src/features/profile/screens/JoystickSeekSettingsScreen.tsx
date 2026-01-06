@@ -49,7 +49,7 @@ import {
 } from '@/features/player/stores/joystickSeekStore';
 import { haptics } from '@/core/native/haptics';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { accentColors, scale, wp, typography, fontWeight } from '@/shared/theme';
+import { accentColors, scale, wp, typography, fontWeight, spacing } from '@/shared/theme';
 import { useThemeColors, ThemeColors } from '@/shared/theme';
 
 const ACCENT = accentColors.gold;
@@ -829,8 +829,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   backButton: {
     width: scale(40),
@@ -856,24 +856,24 @@ const styles = StyleSheet.create({
     ...typography.bodyLarge,
     // color set via colors.textSecondary in JSX
     lineHeight: scale(20),
-    marginHorizontal: scale(20),
-    marginBottom: scale(20),
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
   },
 
   // Sections
   section: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   sectionHeader: {
     ...typography.bodyMedium,
     fontWeight: fontWeight.semibold,
     // color set via colors.textTertiary in JSX
     letterSpacing: 0.5,
-    marginHorizontal: scale(20),
-    marginBottom: scale(8),
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
   },
   sectionCard: {
-    marginHorizontal: scale(16),
+    marginHorizontal: spacing.lg,
     // backgroundColor set via colors.card in JSX
     borderRadius: scale(12),
     overflow: 'hidden',
@@ -885,7 +885,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     // borderBottomColor set via colors.border in JSX
   },
@@ -907,7 +907,7 @@ const styles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
-    marginLeft: scale(12),
+    marginLeft: spacing.md,
   },
   rowLabel: {
     ...typography.headlineMedium,
@@ -927,11 +927,11 @@ const styles = StyleSheet.create({
 
   // Curve Preview
   curvePreviewContainer: {
-    marginHorizontal: scale(16),
-    marginBottom: scale(20),
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: scale(12),
-    padding: scale(12),
+    padding: spacing.md,
     alignItems: 'center',
   },
   dragHint: {
@@ -947,8 +947,8 @@ const styles = StyleSheet.create({
 
   // Preset Pills
   presetContainer: {
-    marginHorizontal: scale(16),
-    marginBottom: scale(24),
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   presetLabel: {
     ...typography.bodyMedium,
@@ -960,7 +960,7 @@ const styles = StyleSheet.create({
   },
   presetPills: {
     flexDirection: 'row',
-    gap: scale(8),
+    gap: spacing.sm,
   },
   presetPill: {
     flex: 1,
@@ -984,14 +984,14 @@ const styles = StyleSheet.create({
   customNote: {
     ...typography.labelMedium,
     color: 'rgba(255,255,255,0.4)',
-    marginTop: scale(8),
+    marginTop: spacing.sm,
     marginLeft: scale(4),
   },
 
   // Speed Slider
   sliderContainer: {
-    marginHorizontal: scale(16),
-    marginBottom: scale(24),
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
   },
   sliderHeader: {
     flexDirection: 'row',
@@ -1015,8 +1015,8 @@ const styles = StyleSheet.create({
     marginBottom: scale(12),
   },
   sliderRow: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: scale(8),
+    marginTop: spacing.sm,
   },
   sliderMinMax: {
     ...typography.labelMedium,
@@ -1037,17 +1037,17 @@ const styles = StyleSheet.create({
   sliderDescription: {
     ...typography.bodySmall,
     color: 'rgba(255,255,255,0.5)',
-    marginTop: scale(8),
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
 
   // Test Area
   testAreaContainer: {
-    marginHorizontal: scale(16),
-    marginBottom: scale(24),
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: scale(12),
-    padding: scale(20),
+    padding: spacing.xl,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
   testAreaSubtitle: {
     ...typography.bodySmall,
     color: 'rgba(255,255,255,0.5)',
-    marginBottom: scale(20),
+    marginBottom: spacing.xl,
   },
   testAreaCircle: {
     width: scale(160),
@@ -1071,7 +1071,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: scale(20),
+    marginBottom: spacing.xl,
   },
   testButton: {
     width: scale(64),
@@ -1115,8 +1115,8 @@ const styles = StyleSheet.create({
 
   // Reset Button
   resetButton: {
-    marginHorizontal: scale(16),
-    marginTop: scale(8),
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
     paddingVertical: scale(14),
     borderRadius: scale(12),
     borderWidth: 1,

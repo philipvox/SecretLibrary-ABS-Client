@@ -32,7 +32,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { accentColors, scale, typography, fontWeight } from '@/shared/theme';
+import { accentColors, scale, typography, fontWeight, spacing } from '@/shared/theme';
 import { useThemeColors, ThemeColors } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
 import { useHapticSettingsStore } from '../stores/hapticSettingsStore';
@@ -288,8 +288,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   backButton: {
     width: scale(40),
@@ -312,18 +312,18 @@ const styles = StyleSheet.create({
     paddingBottom: SCREEN_BOTTOM_PADDING,
   },
   section: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   sectionHeader: {
     ...typography.bodyMedium,
     fontWeight: fontWeight.semibold,
     // color set via colors.textTertiary in JSX
     letterSpacing: 0.5,
-    marginHorizontal: scale(20),
-    marginBottom: scale(8),
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
   },
   sectionCard: {
-    marginHorizontal: scale(16),
+    marginHorizontal: spacing.lg,
     // backgroundColor set via colors.card in JSX
     borderRadius: scale(12),
     overflow: 'hidden',
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     // borderBottomColor set via colors.border in JSX
   },
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
-    marginLeft: scale(12),
+    marginLeft: spacing.md,
     marginRight: scale(12),
   },
   rowLabel: {
@@ -371,9 +371,9 @@ const styles = StyleSheet.create({
   infoSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: scale(8),
-    marginHorizontal: scale(20),
-    marginTop: scale(8),
+    gap: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.sm,
   },
   infoText: {
     flex: 1,

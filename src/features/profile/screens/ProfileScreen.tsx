@@ -50,7 +50,7 @@ import { useDismissedCount } from '@/features/recommendations/stores/dismissedIt
 import { haptics } from '@/core/native/haptics';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { APP_VERSION, BUILD_NUMBER, VERSION_DATE } from '@/constants/version';
-import { accentColors, scale, typography, fontWeight } from '@/shared/theme';
+import { accentColors, scale, typography, fontWeight, spacing, layout } from '@/shared/theme';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 import { generateErrorReport, exportErrorReportJSON } from '@/utils/runtimeMonitor';
 import { logger } from '@/shared/utils/logger';
@@ -456,8 +456,8 @@ const styles = StyleSheet.create({
     paddingBottom: SCREEN_BOTTOM_PADDING,
   },
   header: {
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(12),
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
   },
   headerTitle: {
     ...typography.displayLarge,
@@ -469,12 +469,12 @@ const styles = StyleSheet.create({
   userHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(20),
-    marginHorizontal: scale(16),
-    marginBottom: scale(24),
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xxl,
     // backgroundColor set via themeColors.border in JSX
-    borderRadius: scale(16),
+    borderRadius: spacing.lg,
   },
   avatar: {
     width: scale(64),
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     flex: 1,
-    marginLeft: scale(16),
+    marginLeft: spacing.lg,
   },
   username: {
     ...typography.displaySmall,
@@ -521,27 +521,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,75,75,0.15)', // Red tint (intentional)
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: scale(8),
+    marginLeft: spacing.sm,
   },
   headerSignOutDisabled: {
     opacity: 0.5,
   },
   // Section Group
   sectionGroup: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   sectionTitle: {
     ...typography.bodyMedium,
     fontWeight: fontWeight.semibold,
     // color set via themeColors.textSecondary in JSX
     letterSpacing: 0.5,
-    marginHorizontal: scale(20),
-    marginBottom: scale(8),
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
   },
   sectionContent: {
-    marginHorizontal: scale(16),
+    marginHorizontal: spacing.lg,
     // backgroundColor set via themeColors.border in JSX
-    borderRadius: scale(12),
+    borderRadius: spacing.md,
     overflow: 'hidden',
   },
   // Profile Link
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     // borderBottomColor set via themeColors.border in JSX
   },
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   linkContent: {
     flex: 1,
-    marginLeft: scale(12),
+    marginLeft: spacing.md,
   },
   linkLabel: {
     ...typography.headlineMedium,
@@ -591,18 +591,18 @@ const styles = StyleSheet.create({
   },
   // Sign Out
   signOutSection: {
-    paddingHorizontal: scale(16),
-    marginTop: scale(8),
-    marginBottom: scale(24),
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xxl,
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(8),
+    gap: spacing.sm,
     paddingVertical: scale(14),
     backgroundColor: 'rgba(255,75,75,0.15)', // Red tint (intentional)
-    borderRadius: scale(12),
+    borderRadius: spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(255,75,75,0.3)', // Red tint (intentional)
   },
@@ -617,15 +617,15 @@ const styles = StyleSheet.create({
   // Footer
   footer: {
     alignItems: 'center',
-    paddingVertical: scale(24),
+    paddingVertical: spacing.xxl,
   },
   footerLogoContainer: {
     width: scale(80),
     height: scale(80),
-    borderRadius: scale(20),
+    borderRadius: spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: scale(12),
+    marginBottom: spacing.md,
   },
   footerLogo: {
     width: scale(64),

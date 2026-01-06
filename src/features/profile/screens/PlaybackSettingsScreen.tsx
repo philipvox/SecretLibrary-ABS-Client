@@ -33,7 +33,7 @@ import {
 } from 'lucide-react-native';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { accentColors, scale, typography, fontWeight } from '@/shared/theme';
+import { accentColors, scale, typography, fontWeight, spacing } from '@/shared/theme';
 import { useThemeColors, ThemeColors } from '@/shared/theme';
 
 const ACCENT = accentColors.gold;
@@ -444,8 +444,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   backButton: {
     width: scale(40),
@@ -468,18 +468,18 @@ const styles = StyleSheet.create({
     paddingBottom: SCREEN_BOTTOM_PADDING,
   },
   section: {
-    marginBottom: scale(24),
+    marginBottom: spacing.xxl,
   },
   sectionHeader: {
     ...typography.bodyMedium,
     fontWeight: fontWeight.semibold,
     // color set via colors.textTertiary in JSX
     letterSpacing: 0.5,
-    marginHorizontal: scale(20),
-    marginBottom: scale(8),
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
   },
   sectionCard: {
-    marginHorizontal: scale(16),
+    marginHorizontal: spacing.lg,
     // backgroundColor set via colors.card in JSX
     borderRadius: scale(12),
     overflow: 'hidden',
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     // borderBottomColor set via colors.border in JSX
   },
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   rowContent: {
     flex: 1,
-    marginLeft: scale(12),
+    marginLeft: spacing.md,
   },
   rowLabel: {
     ...typography.headlineMedium,
@@ -541,8 +541,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: scale(8),
-    marginHorizontal: scale(20),
-    marginTop: scale(8),
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.sm,
   },
   infoText: {
     ...typography.bodySmall,
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   // Smart Rewind max selector styles
   maxRewindContainer: {
-    paddingHorizontal: scale(16),
+    paddingHorizontal: spacing.lg,
     paddingTop: scale(8),
     paddingBottom: scale(16),
     borderTopWidth: 1,
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: scale(12),
+    paddingVertical: spacing.md,
     paddingHorizontal: scale(12),
     borderRadius: scale(8),
   },

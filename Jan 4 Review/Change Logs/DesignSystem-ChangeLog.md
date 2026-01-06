@@ -534,3 +534,42 @@ All profile settings screens have been migrated to typography tokens:
 
 ---
 
+## Phase D: Spacing Standardization
+
+### D.1 - Profile Screens Spacing
+**Status:** Complete
+**Files Modified:**
+- `src/features/profile/screens/ProfileScreen.tsx`
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx`
+- `src/features/profile/screens/HapticSettingsScreen.tsx`
+- `src/features/profile/screens/StorageSettingsScreen.tsx`
+- `src/features/profile/screens/ChapterCleaningSettingsScreen.tsx`
+- `src/features/profile/screens/JoystickSeekSettingsScreen.tsx`
+
+**Pattern Replacements:**
+| Pattern | Token |
+|---------|-------|
+| `scale(8)` | `spacing.sm` |
+| `scale(12)` | `spacing.md` |
+| `scale(16)` | `spacing.lg` |
+| `scale(20)` | `spacing.xl` |
+| `scale(24)` | `spacing.xxl` |
+
+**Property Replacements:**
+- `marginHorizontal: scale(16)` → `marginHorizontal: spacing.lg`
+- `marginHorizontal: scale(20)` → `marginHorizontal: spacing.xl`
+- `paddingHorizontal: scale(16)` → `paddingHorizontal: spacing.lg`
+- `paddingHorizontal: scale(20)` → `paddingHorizontal: spacing.xl`
+- `marginBottom: scale(24)` → `marginBottom: spacing.xxl`
+- `marginBottom: scale(8)` → `marginBottom: spacing.sm`
+- `marginLeft: scale(12)` → `marginLeft: spacing.md`
+- `marginTop: scale(8)` → `marginTop: spacing.sm`
+- `paddingVertical: scale(12)` → `paddingVertical: spacing.md`
+- `gap: scale(8)` → `gap: spacing.sm`
+- `padding: scale(12)` → `padding: spacing.md`
+- `padding: scale(20)` → `padding: spacing.xl`
+
+**Total:** 44+ spacing replacements across 6 screens.
+
+---
+
