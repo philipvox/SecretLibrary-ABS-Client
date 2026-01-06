@@ -126,5 +126,27 @@
 - [x] Uses `iconSizes.xxxl` (64px) token for empty state icons
 - [x] Uses `EMPTY_STATE_ICON_COLOR` constant for consistent color
 
+### B.5 - Create EntityCard Component
+**Status:** Complete
+**Files Created:**
+- `src/shared/components/EntityCard.tsx`
+
+**Files Modified:**
+- `src/shared/components/index.ts` - Added EntityCard export
+- `src/features/author/components/AuthorCard.tsx` - Refactored to use EntityCard
+- `src/features/narrator/components/NarratorCard.tsx` - Refactored to use EntityCard
+
+**Changes:**
+- [x] Created unified EntityCard component for Author/Narrator grid cards
+- [x] Uses `useThemeColors()` for theme-aware colors
+- [x] Uses `typography.headlineMedium` and `typography.bodySmall`
+- [x] Uses `interactiveStates.press.opacity` for touch feedback
+- [x] Uses `scale()` for responsive sizing
+- [x] Uses `elevation.small` for avatar shadow
+- [x] Generates consistent initials and colors from name
+- [x] AuthorCard now wraps EntityCard (backward compatible)
+- [x] NarratorCard now wraps EntityCard (backward compatible)
+- [x] PersonCard remains separate (different layout for horizontal lists)
+
 ---
 

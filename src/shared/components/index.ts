@@ -108,6 +108,12 @@ export type {
 } from './SeriesCard';
 
 // =============================================================================
+// ENTITY CARDS (Author/Narrator)
+// =============================================================================
+export { EntityCard } from './EntityCard';
+export type { EntityCardProps, EntityType } from './EntityCard';
+
+// =============================================================================
 // NETWORK STATUS
 // =============================================================================
 export { NetworkStatusBar, useNetworkStatus } from './NetworkStatusBar';
