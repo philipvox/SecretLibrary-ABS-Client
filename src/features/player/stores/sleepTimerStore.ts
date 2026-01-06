@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptics } from '@/core/native/haptics';
 
@@ -255,11 +256,14 @@ export const useIsShakeDetectionActive = () => useSleepTimerStore((s) => s.isSha
 
 /**
  * Get full sleep timer state for display
+ * Uses useShallow to prevent unnecessary re-renders when object reference changes
  */
 export const useSleepTimerState = () =>
-  useSleepTimerStore((s) => ({
-    sleepTimer: s.sleepTimer,
-    isActive: s.sleepTimer !== null,
-    shakeToExtendEnabled: s.shakeToExtendEnabled,
-    isShakeDetectionActive: s.isShakeDetectionActive,
-  }));
+  useSleepTimerStore(
+    useShallow((s) => ({
+      sleepTimer: s.sleepTimer,
+      isActive: s.sleepTimer !== null,
+      shakeToExtendEnabled: s.shakeToExtendEnabled,
+      isShakeDetectionActive: s.isShakeDetectionActive,
+    }))
+  );

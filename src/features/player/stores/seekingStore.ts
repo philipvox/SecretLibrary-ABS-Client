@@ -16,6 +16,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import { audioService } from '@/features/player/services/audioService';
 import { backgroundSyncService } from '@/features/player/services/backgroundSyncService';
 import { REWIND_STEP, REWIND_INTERVAL, FF_STEP } from '../constants';
@@ -352,11 +353,14 @@ export const useSeekDelta = () =>
 
 /**
  * Get full seeking state for display
+ * Uses useShallow to prevent unnecessary re-renders when object reference changes
  */
 export const useSeekingState = () =>
-  useSeekingStore((s) => ({
-    isSeeking: s.isSeeking,
-    seekPosition: s.seekPosition,
-    seekStartPosition: s.seekStartPosition,
-    seekDirection: s.seekDirection,
-  }));
+  useSeekingStore(
+    useShallow((s) => ({
+      isSeeking: s.isSeeking,
+      seekPosition: s.seekPosition,
+      seekStartPosition: s.seekStartPosition,
+      seekDirection: s.seekDirection,
+    }))
+  );

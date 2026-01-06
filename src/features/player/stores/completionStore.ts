@@ -13,6 +13,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { useShallow } from 'zustand/react/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { haptics } from '@/core/native/haptics';
@@ -245,11 +246,14 @@ export const useCompletionSheetBook = () =>
 
 /**
  * Get full completion state for UI
+ * Uses useShallow to prevent unnecessary re-renders when object reference changes
  */
 export const useCompletionState = () =>
-  useCompletionStore((s) => ({
-    showCompletionPrompt: s.showCompletionPrompt,
-    autoMarkFinished: s.autoMarkFinished,
-    showCompletionSheet: s.showCompletionSheet,
-    completionSheetBook: s.completionSheetBook,
-  }));
+  useCompletionStore(
+    useShallow((s) => ({
+      showCompletionPrompt: s.showCompletionPrompt,
+      autoMarkFinished: s.autoMarkFinished,
+      showCompletionSheet: s.showCompletionSheet,
+      completionSheetBook: s.completionSheetBook,
+    }))
+  );
