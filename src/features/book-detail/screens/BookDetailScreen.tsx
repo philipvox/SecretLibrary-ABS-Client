@@ -48,6 +48,7 @@ import { ChaptersTab } from '../components/ChaptersTab';
 import { ErrorView, BookDetailSkeleton, Snackbar, useSnackbar } from '@/shared/components';
 import { useCoverUrl } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
+import { apiClient } from '@/core/api';
 import { userApi } from '@/core/api/endpoints/user';
 import { useDownloadStatus as useDownloadStatusHook } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
@@ -467,7 +468,7 @@ export function BookDetailScreen() {
         {coverUrl && (
           <View style={styles.heroBackground}>
             <Image
-              source={coverUrl}
+              source={apiClient.getItemCoverUrl(bookId, { width: 800 })}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
               blurRadius={Platform.OS === 'ios' ? 0 : 0}

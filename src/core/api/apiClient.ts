@@ -57,10 +57,33 @@ class ApiClient extends BaseApiClient {
   }
 
   async getItemsInProgress(): Promise<LibraryItem[]> {
+    // Fetch items in progress
     const response = await this.get<{ libraryItems: LibraryItem[] }>(
       endpoints.user.itemsInProgress
     );
-    return response.libraryItems || [];
+    const items = response.libraryItems || [];
+
+    // Fetch user data to get mediaProgress array
+    const user = await this.getCurrentUser();
+    const progressMap = new Map<string, any>();
+
+    // Build map of libraryItemId -> progress data
+    if ((user as any).mediaProgress) {
+      for (const mp of (user as any).mediaProgress) {
+        if (mp.libraryItemId) {
+          progressMap.set(mp.libraryItemId, mp);
+        }
+      }
+    }
+
+    // Attach progress to each item
+    return items.map((item) => {
+      const progress = progressMap.get(item.id);
+      if (progress) {
+        (item as any).mediaProgress = progress;
+      }
+      return item;
+    });
   }
 
   // ==================== Libraries ====================
@@ -102,13 +125,27 @@ class ApiClient extends BaseApiClient {
     this._coverCacheVersion = Date.now();
   }
 
-  getItemCoverUrl(itemId: string): string {
+  getItemCoverUrl(itemId: string, options?: { width?: number; height?: number }): string {
     const baseUrl = `${this.getBaseURL()}${endpoints.items.cover(itemId)}`;
-    // Always include cache version to ensure fresh covers after refresh
+
+    // Build query params
+    const params = new URLSearchParams();
+
+    // Add cache version for cache busting
     if (this._coverCacheVersion > 0) {
-      return `${baseUrl}?v=${this._coverCacheVersion}`;
+      params.append('v', this._coverCacheVersion.toString());
     }
-    return baseUrl;
+
+    // Add size params if provided (AudiobookShelf API supports width/height)
+    if (options?.width) {
+      params.append('width', options.width.toString());
+    }
+    if (options?.height) {
+      params.append('height', options.height.toString());
+    }
+
+    const queryString = params.toString();
+    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
   }
 
   // ==================== Progress ====================
