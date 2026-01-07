@@ -470,18 +470,18 @@ export function BookDetailScreen() {
               source={coverUrl}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              blurRadius={Platform.OS === 'ios' ? 25 : 25}
+              blurRadius={Platform.OS === 'ios' ? 0 : 0}
               // blurRadius={25}
             />
             {/* BlurView for Android */}
-            <BlurView intensity={25} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+            <BlurView intensity={0} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
             {/* Smooth fade at bottom */}
             <LinearGradient
               colors={isDark
                 ? ['transparent', 'transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', COLORS.background]
                 : ['transparent', 'transparent', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.7)', COLORS.background]
               }
-              locations={[0, 0.5, 0.7, 0.85, 1]}
+              locations={[0, 0.5, 0.6, 0.8, .9]}
               style={StyleSheet.absoluteFill}
             />
           </View>
@@ -555,6 +555,26 @@ export function BookDetailScreen() {
             <Text style={[styles.statsDot, { color: COLORS.textTertiary }]}>·</Text>
             <List size={scale(14)} color={COLORS.textTertiary} strokeWidth={2} />
             <Text style={[styles.statsText, { color: COLORS.textTertiary }]}>{chapters.length} chapters</Text>
+            {series && (
+              <>
+                <Text style={[styles.statsDot, { color: COLORS.textTertiary }]}>·</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    const seriesName = typeof series === 'string' ? series : series.name;
+                    if (seriesName) {
+                      (navigation as any).navigate('SeriesDetail', { seriesName });
+                    }
+                  }}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={[styles.statsText, styles.seriesLink, { color: COLORS.textSecondary }]}>
+                    {typeof series === 'string' ? series : series.name}
+                    {seriesSequence ? ` #${seriesSequence}` : ''}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -671,7 +691,7 @@ export function BookDetailScreen() {
               {isDownloaded ? (
                 <CheckCircle size={scale(18)} color={COLORS.textPrimary} strokeWidth={2} />
               ) : isPaused ? (
-                <Pause size={scale(18)} color="#FF9800" strokeWidth={2} />
+                <Pause size={scale(18)} color="#FF9800" fill="#FF9800" strokeWidth={0} />
               ) : (isDownloading || isPending) ? (
                 <ActivityIndicator size="small" color={COLORS.textPrimary} />
               ) : (
@@ -689,7 +709,7 @@ export function BookDetailScreen() {
               accessibilityRole="button"
             >
               {playContent.icon === 'pause' ? (
-                <Pause size={scale(18)} color={COLORS.background} strokeWidth={2} />
+                <Pause size={scale(18)} color={COLORS.background} fill={COLORS.background} strokeWidth={0} />
               ) : (
                 <Play size={scale(18)} color={COLORS.background} fill={COLORS.background} strokeWidth={0} />
               )}
@@ -805,7 +825,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: scale(400), // Covers hero area
+    height: scale(550), // Covers hero area
   },
   loadingContainer: {
     flex: 1,
@@ -835,6 +855,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+    opacity: 0,
   },
   cover: {
     width: '100%',
@@ -948,6 +969,10 @@ const styles = StyleSheet.create({
   statsDot: {
     fontSize: scale(13),
     marginHorizontal: scale(4),
+  },
+  seriesLink: {
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 
   // Button Container

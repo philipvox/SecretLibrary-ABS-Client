@@ -17,14 +17,35 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
-import { accentColors, scale, spacing, radius, layout, wp } from '@/shared/theme';
-import { useThemeColors } from '@/shared/theme/themeStore';
+import { scale, spacing, radius, layout, wp } from '@/shared/theme';
+import { useThemeColors, useColors } from '@/shared/theme/themeStore';
 import { CompleteBadgeOverlay } from '@/features/completion';
 import { BookSummary, ContentRow, RowDisplayMode } from '../types';
+import { haptics } from '@/core/native/haptics';
 
-const ACCENT = accentColors.primary; // Red for progress indicators
+// Format time ago (e.g., "30 sec ago", "5 min ago", "2 hours ago")
+function formatTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+
+  if (months > 0) return months === 1 ? '1 month ago' : `${months} months ago`;
+  if (weeks > 0) return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+  if (days > 0) return days === 1 ? '1 day ago' : `${days} days ago`;
+  if (hours > 0) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  if (minutes > 0) return minutes === 1 ? '1 min ago' : `${minutes} min ago`;
+  if (seconds > 10) return `${seconds} sec ago`;
+  return 'just now';
+}
 
 // Grid layout - 2 columns with square covers
 const GRID_GAP = 12;
@@ -46,6 +67,7 @@ interface BookCardProps {
   textColor: string;
   textSecondaryColor: string;
   bgColor: string;
+  accentColor: string;
 }
 
 // Serendipity badge colors
@@ -57,9 +79,13 @@ const GridBookCard = React.memo(function GridBookCard({ book, onPress, textColor
   const coverUrl = useCoverUrl(book.id);
   const author = book.author || 'Unknown';
   const narrator = book.narrator || '';
+  const timeAgo = book.lastPlayedAt ? formatTimeAgo(book.lastPlayedAt) : '';
+  const progress = book.progress || 0;
+  const hasProgress = progress > 0;
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+      {/* Cover container */}
       <View style={[styles.coverContainer, { backgroundColor: bgColor }]}>
         <Image
           source={coverUrl || book.coverUrl}
@@ -69,14 +95,27 @@ const GridBookCard = React.memo(function GridBookCard({ book, onPress, textColor
           transition={200}
         />
         <CompleteBadgeOverlay bookId={book.id} size="small" />
-        {book.progress !== undefined && book.progress > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${book.progress * 100}%` }]} />
-          </View>
-        )}
         {book.isSerendipity && (
           <View style={styles.serendipityBadge}>
             <Text style={styles.serendipityIcon}>✨</Text>
+          </View>
+        )}
+        {/* Last played badge on cover */}
+        {timeAgo ? (
+          <View style={styles.timeAgoBadge}>
+            <Text style={styles.timeAgoBadgeText}>{timeAgo}</Text>
+          </View>
+        ) : null}
+
+        {/* Progress bar across bottom */}
+        {hasProgress && (
+          <View style={styles.progressBottomTrack}>
+            <LinearGradient
+              colors={['#FFFFFF', 'rgba(255,255,255,0.7)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.progressBottomBar, { width: `${progress * 100}%` }]}
+            />
           </View>
         )}
       </View>
@@ -85,26 +124,15 @@ const GridBookCard = React.memo(function GridBookCard({ book, onPress, textColor
         {book.title}
       </Text>
 
-      <View style={styles.creditsRow}>
-        {author && (
-          <View style={styles.creditColumn}>
-            <Text style={[styles.creditLabel, { color: textSecondaryColor }]}>Written by</Text>
-            <Text style={[styles.creditName, { color: textColor }]} numberOfLines={1}>{author}</Text>
-          </View>
-        )}
-        {narrator && (
-          <View style={styles.creditColumn}>
-            <Text style={[styles.creditLabel, { color: textSecondaryColor }]}>Read by</Text>
-            <Text style={[styles.creditName, { color: textColor }]} numberOfLines={1}>{narrator}</Text>
-          </View>
-        )}
-      </View>
+      <Text style={[styles.credits, { color: textSecondaryColor }]} numberOfLines={1}>
+        {author}{narrator ? ` | ${narrator}` : ''}
+      </Text>
     </TouchableOpacity>
   );
 });
 
 // Carousel card for horizontal scroll layout
-const CarouselBookCard = React.memo(function CarouselBookCard({ book, onPress, textColor, textSecondaryColor, bgColor }: BookCardProps) {
+const CarouselBookCard = React.memo(function CarouselBookCard({ book, onPress, textColor, textSecondaryColor, bgColor, accentColor }: BookCardProps) {
   const coverUrl = useCoverUrl(book.id);
 
   return (
@@ -120,7 +148,7 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ book, onPress, t
         <CompleteBadgeOverlay bookId={book.id} size="small" />
         {book.progress !== undefined && book.progress > 0 && (
           <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${book.progress * 100}%` }]} />
+            <View style={[styles.progressBar, { width: `${book.progress * 100}%`, backgroundColor: accentColor }]} />
           </View>
         )}
         {book.isSerendipity && (
@@ -140,7 +168,7 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ book, onPress, t
 });
 
 // Compact card for smaller horizontal scroll
-const CompactBookCard = React.memo(function CompactBookCard({ book, onPress, textColor, textSecondaryColor, bgColor }: BookCardProps) {
+const CompactBookCard = React.memo(function CompactBookCard({ book, onPress, textColor, textSecondaryColor, bgColor, accentColor }: BookCardProps) {
   const coverUrl = useCoverUrl(book.id);
 
   return (
@@ -153,10 +181,10 @@ const CompactBookCard = React.memo(function CompactBookCard({ book, onPress, tex
           cachePolicy="memory-disk"
           transition={200}
         />
-        <CompleteBadgeOverlay bookId={book.id} size="tiny" />
+        <CompleteBadgeOverlay bookId={book.id} size="small" />
         {book.progress !== undefined && book.progress > 0 && (
           <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${book.progress * 100}%` }]} />
+            <View style={[styles.progressBar, { width: `${book.progress * 100}%`, backgroundColor: accentColor }]} />
           </View>
         )}
       </View>
@@ -175,6 +203,8 @@ interface ContentRowCarouselProps {
 export function ContentRowCarousel({ row, onSeeAll }: ContentRowCarouselProps) {
   const navigation = useNavigation<any>();
   const themeColors = useThemeColors();
+  const colors = useColors();
+  const accent = colors.accent.primary;
 
   const handleBookPress = useCallback((bookId: string) => {
     navigation.navigate('BookDetail', { id: bookId });
@@ -284,6 +314,7 @@ export function ContentRowCarousel({ row, onSeeAll }: ContentRowCarouselProps) {
                 textColor={themeColors.text}
                 textSecondaryColor={themeColors.textSecondary}
                 bgColor={themeColors.backgroundSecondary}
+                accentColor={accent}
               />
             ))}
           </ScrollView>
@@ -304,6 +335,7 @@ export function ContentRowCarousel({ row, onSeeAll }: ContentRowCarouselProps) {
                 textColor={themeColors.text}
                 textSecondaryColor={themeColors.textSecondary}
                 bgColor={themeColors.backgroundSecondary}
+                accentColor={accent}
               />
             ))}
           </ScrollView>
@@ -322,6 +354,7 @@ export function ContentRowCarousel({ row, onSeeAll }: ContentRowCarouselProps) {
                 textColor={themeColors.text}
                 textSecondaryColor={themeColors.textSecondary}
                 bgColor={themeColors.backgroundSecondary}
+                accentColor={accent}
               />
             ))}
           </View>
@@ -372,7 +405,6 @@ const styles = StyleSheet.create({
     fontSize: scale(18),
     fontWeight: '700',
     letterSpacing: -0.3,
-    flex: 1,
   },
   sourceLink: {
     textDecorationLine: 'underline',
@@ -408,6 +440,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  // Progress bar across bottom of cover
+  progressBottomTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: scale(3),
+  },
+  progressBottomBar: {
+    height: '100%',
+  },
   progressContainer: {
     position: 'absolute',
     bottom: 0,
@@ -418,7 +461,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: ACCENT,
+    // backgroundColor set dynamically via accentColor prop
   },
   serendipityBadge: {
     position: 'absolute',
@@ -433,26 +476,28 @@ const styles = StyleSheet.create({
     fontSize: scale(12),
     color: SERENDIPITY_TEXT,
   },
+  timeAgoBadge: {
+    position: 'absolute',
+    top: spacing.xs,
+    left: spacing.xs,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: radius.sm,
+    paddingHorizontal: scale(6),
+    paddingVertical: scale(3),
+  },
+  timeAgoBadgeText: {
+    fontSize: scale(10),
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
   title: {
     fontSize: scale(14),
     fontWeight: '600',
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.xs,
   },
-  creditsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  creditColumn: {
-    flex: 1,
-  },
-  creditLabel: {
-    fontSize: scale(10),
-    marginBottom: scale(1),
-  },
-  creditName: {
+  credits: {
     fontSize: scale(12),
-    fontWeight: '600',
+    marginTop: scale(2),
   },
 
   // Title container for header with subtitle

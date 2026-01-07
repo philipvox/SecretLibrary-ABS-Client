@@ -18,8 +18,8 @@ import { Image } from 'expo-image';
 import { Play, Pause, Check, Download } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
-import { scale, spacing, radius, layout, elevation, accentColors } from '@/shared/theme';
-import { useThemeColors } from '@/shared/theme/themeStore';
+import { scale, spacing, radius, layout, elevation } from '@/shared/theme';
+import { useThemeColors, useColors } from '@/shared/theme/themeStore';
 import { CompleteBadgeOverlay } from '@/features/completion';
 import { usePlayerStore } from '@/features/player';
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
@@ -46,7 +46,11 @@ interface HeroSectionProps {
 export function HeroSection({ hero }: HeroSectionProps) {
   const navigation = useNavigation<any>();
   const themeColors = useThemeColors();
+  const colors = useColors();
+  const accentColor = colors.accent.primary;
   const loadBook = usePlayerStore((s) => s.loadBook);
+  const play = usePlayerStore((s) => s.play);
+  const pause = usePlayerStore((s) => s.pause);
   const currentBook = usePlayerStore((s) => s.currentBook);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
 
@@ -69,19 +73,48 @@ export function HeroSection({ hero }: HeroSectionProps) {
   const isCurrentBook = currentBook?.id === hero.book.id;
   const isCurrentlyPlaying = isCurrentBook && isPlaying;
 
-  const handlePress = useCallback(() => {
-    navigation.navigate('BookDetail', { id: hero.book.id });
-  }, [navigation, hero.book.id]);
+  const handlePress = useCallback(async () => {
+    haptics.selection();
+
+    // If this book is already loaded, just open the player
+    if (isCurrentBook) {
+      usePlayerStore.setState({ isPlayerVisible: true });
+      return;
+    }
+
+    // Otherwise load the book (paused) and show player
+    try {
+      const fullBook = await apiClient.getItem(hero.book.id);
+      await loadBook(fullBook, { autoPlay: false, showPlayer: true });
+    } catch {
+      // Fallback: navigate to book details
+      navigation.navigate('BookDetail', { id: hero.book.id });
+    }
+  }, [hero.book.id, isCurrentBook, loadBook, navigation]);
 
   const handlePlay = useCallback(async () => {
     haptics.buttonPress();
+
+    // If this book is currently playing, pause it
+    if (isCurrentlyPlaying) {
+      await pause();
+      return;
+    }
+
+    // If this book is loaded but paused, resume it
+    if (isCurrentBook) {
+      await play();
+      return;
+    }
+
+    // Otherwise, load the book and start playing
     try {
       const fullBook = await apiClient.getItem(hero.book.id);
       await loadBook(fullBook, { autoPlay: true, showPlayer: false });
     } catch {
       navigation.navigate('BookDetail', { id: hero.book.id });
     }
-  }, [hero.book.id, loadBook, navigation]);
+  }, [hero.book.id, loadBook, navigation, isCurrentlyPlaying, isCurrentBook, play, pause]);
 
   const handleDownload = useCallback(async () => {
     haptics.buttonPress();
@@ -121,6 +154,26 @@ export function HeroSection({ hero }: HeroSectionProps) {
 
   // Get narrator from book (if available)
   const narrator = book.narrator || null;
+
+  // Navigation handlers for title, author, and narrator
+  const handleTitlePress = useCallback(() => {
+    haptics.selection();
+    navigation.navigate('BookDetail', { id: book.id });
+  }, [navigation, book.id]);
+
+  const handleAuthorPress = useCallback(() => {
+    if (book.author) {
+      haptics.selection();
+      navigation.navigate('AuthorDetail', { authorName: book.author });
+    }
+  }, [navigation, book.author]);
+
+  const handleNarratorPress = useCallback(() => {
+    if (narrator) {
+      haptics.selection();
+      navigation.navigate('NarratorDetail', { narratorName: narrator });
+    }
+  }, [navigation, narrator]);
 
   return (
     <View style={styles.container}>
@@ -175,29 +228,58 @@ export function HeroSection({ hero }: HeroSectionProps) {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             {isCurrentlyPlaying ? (
-              <Pause size={scale(18)} color="#000" strokeWidth={2.5} />
+              <Pause size={scale(18)} color="#000" fill="#000" strokeWidth={0} />
             ) : (
               <Play size={scale(18)} color="#000" fill="#000" strokeWidth={0} style={{ marginLeft: scale(2) }} />
             )}
           </TouchableOpacity>
+
         </View>
       </TouchableOpacity>
 
-      {/* Title below cover */}
-      <Text style={[styles.title, { color: themeColors.text }]} numberOfLines={2}>
-        {book.title}
-      </Text>
+      {/* Progress bar below cover - horizontal blue bar */}
+      {book.progress !== undefined && book.progress > 0 && (
+        <View style={styles.heroProgressContainer}>
+          <View style={styles.heroProgressTrack}>
+            <View
+              style={[
+                styles.heroProgressBar,
+                { width: `${book.progress * 100}%`, backgroundColor: accentColor },
+              ]}
+            />
+          </View>
+        </View>
+      )}
 
-      {/* Credits row: Written by / Read by */}
+      {/* Title below cover - tappable */}
+      <TouchableOpacity onPress={handleTitlePress} activeOpacity={0.7}>
+        <Text style={[styles.title, { color: themeColors.text }]} numberOfLines={2}>
+          {book.title}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Credits row: Written by / Read by - tappable names */}
       <View style={styles.creditsRow}>
         <Text style={[styles.creditText, { color: themeColors.textSecondary }]}>
-          Written by <Text style={[styles.creditName, { color: themeColors.text }]}>{book.author}</Text>
+          Written by{' '}
+          <Text
+            style={[styles.creditName, { color: themeColors.text }]}
+            onPress={handleAuthorPress}
+          >
+            {book.author}
+          </Text>
         </Text>
         {narrator && (
           <>
             <View style={[styles.creditDivider, { backgroundColor: themeColors.border }]} />
             <Text style={[styles.creditText, { color: themeColors.textSecondary }]}>
-              Read by <Text style={[styles.creditName, { color: themeColors.text }]}>{narrator}</Text>
+              Read by{' '}
+              <Text
+                style={[styles.creditName, { color: themeColors.text }]}
+                onPress={handleNarratorPress}
+              >
+                {narrator}
+              </Text>
             </Text>
           </>
         )}
@@ -214,7 +296,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   coverWrapper: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   coverContainer: {
     width: COVER_SIZE,
@@ -297,7 +379,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: scale(26),
-    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
     paddingHorizontal: layout.screenPaddingH,
     // color set via themeColors.text in JSX
   },
@@ -323,5 +406,21 @@ const styles = StyleSheet.create({
     width: 1,
     height: scale(14),
     // backgroundColor set via themeColors.border in JSX
+  },
+
+  // Hero progress bar - horizontal below cover
+  heroProgressContainer: {
+    width: COVER_SIZE,
+    marginTop: spacing.xs,
+  },
+  heroProgressTrack: {
+    height: scale(3),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: scale(1.5),
+    overflow: 'hidden',
+  },
+  heroProgressBar: {
+    height: '100%',
+    borderRadius: scale(1.5),
   },
 });
