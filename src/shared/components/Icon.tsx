@@ -18,6 +18,7 @@
  */
 
 import React from 'react';
+import { View, Platform } from 'react-native';
 import * as LucideIcons from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { scale, useTheme } from '@/shared/theme';
@@ -68,7 +69,8 @@ export function Icon({
 
   if (!IconComponent) {
     console.warn(`Icon "${name}" not found in Lucide icons`);
-    return null;
+    // Return empty View on Android to prevent SafeAreaProvider crash
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   const resolvedSize = resolveSize(size);

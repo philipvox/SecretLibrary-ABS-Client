@@ -5,11 +5,12 @@
  * Displayed on a cream background.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useTopAuthors } from '../hooks/useTopAuthors';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { logger } from '@/shared/utils/logger';
 
 interface AuthorsTextListProps {
   onAuthorPress?: (authorName: string) => void;
@@ -17,10 +18,21 @@ interface AuthorsTextListProps {
 }
 
 export function AuthorsTextList({ onAuthorPress, onViewAll }: AuthorsTextListProps) {
+  const renderStart = useRef(Date.now());
+
   // Theme-aware colors
   const colors = useSecretLibraryColors();
 
+  // Get authors - measure time
+  const authorsStart = Date.now();
   const authors = useTopAuthors(10);
+  const authorsTime = Date.now() - authorsStart;
+
+  // Log component timing
+  useEffect(() => {
+    const totalTime = Date.now() - renderStart.current;
+    logger.debug(`[Browse Perf] AuthorsTextList mounted in ${totalTime}ms (authors: ${authorsTime}ms, count: ${authors.length})`);
+  }, []);
 
   const handleAuthorPress = useCallback(
     (name: string) => {

@@ -9,6 +9,12 @@
  * API endpoint paths
  */
 export const endpoints = {
+  // Server Status
+  server: {
+    status: '/api/status',       // Returns server version and features
+    healthCheck: '/api/healthcheck',  // Quick health check
+  },
+
   // Authentication
   auth: {
     login: '/login',

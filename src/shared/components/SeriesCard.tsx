@@ -102,7 +102,7 @@ function SeriesCardComponent({
   // Get cover URLs for up to 5 books
   const bookCovers = useMemo(() => {
     const books = series.books || [];
-    return books.slice(0, MAX_VISIBLE_BOOKS).map((book) => apiClient.getItemCoverUrl(book.id));
+    return books.slice(0, MAX_VISIBLE_BOOKS).map((book) => apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 }));
   }, [series.books]);
 
   const numCovers = bookCovers.length;

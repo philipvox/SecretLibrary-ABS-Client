@@ -118,7 +118,7 @@ export function CollectionDetailScreen() {
 
   // Get cover URLs for stacked display
   const coverUrls = useMemo(() => {
-    return books.slice(0, 4).map((book) => apiClient.getItemCoverUrl(book.id));
+    return books.slice(0, 4).map((book) => apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 }));
   }, [books]);
 
   // First book cover for background

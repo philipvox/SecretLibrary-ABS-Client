@@ -16,14 +16,13 @@
 /**
  * Mood represents the primary emotional experience the user is seeking.
  * This is the core filter - every book must match the mood.
+ * Reduced to 4 core moods for simpler UX.
  */
 export type Mood =
   | 'comfort'   // Warm and reassuring
   | 'thrills'   // Edge-of-your-seat tension
   | 'escape'    // Transported to another world
-  | 'laughs'    // Funny and entertaining
-  | 'feels'     // Emotionally powerful
-  | 'thinking'; // Makes you reflect
+  | 'feels';    // Emotionally powerful
 
 export interface MoodConfig {
   id: Mood;
@@ -56,25 +55,11 @@ export const MOODS: MoodConfig[] = [
     description: 'Another world entirely',
   },
   {
-    id: 'laughs',
-    label: 'Laughs',
-    icon: 'Smile',
-    iconSet: 'lucide',
-    description: 'Light and funny',
-  },
-  {
     id: 'feels',
     label: 'Feels',
     icon: 'Heart',
     iconSet: 'lucide',
     description: 'Emotional and moving',
-  },
-  {
-    id: 'thinking',
-    label: 'Think',
-    icon: 'Lightbulb',
-    iconSet: 'lucide',
-    description: 'Mind-expanding',
   },
 ];
 
@@ -121,11 +106,11 @@ export const PACES: PaceConfig[] = [
   },
   {
     id: 'any',
-    label: 'Any pace',
+    label: 'Surprise me',
     icon: 'Shuffle',
     iconSet: 'lucide',
-    description: 'No preference',
-    isDefault: true,
+    description: 'Mix it up',
+    // Tier 2.2: Removed isDefault - no pre-selection
   },
 ];
 
@@ -172,11 +157,11 @@ export const WEIGHTS: WeightConfig[] = [
   },
   {
     id: 'any',
-    label: 'Any tone',
+    label: 'Surprise me',
     icon: 'Shuffle',
     iconSet: 'lucide',
-    description: 'No preference',
-    isDefault: true,
+    description: 'Mix it up',
+    // Tier 2.2: Removed isDefault - no pre-selection
   },
 ];
 
@@ -229,11 +214,11 @@ export const WORLDS: WorldConfig[] = [
   },
   {
     id: 'any',
-    label: 'Any setting',
-    icon: 'Globe',
+    label: 'Surprise me',
+    icon: 'Shuffle',
     iconSet: 'lucide',
-    description: 'No preference',
-    isDefault: true,
+    description: 'Any setting',
+    // Tier 2.2: Removed isDefault - no pre-selection
   },
 ];
 
@@ -282,11 +267,11 @@ export const LENGTHS: LengthConfig[] = [
   },
   {
     id: 'any',
-    label: 'Any length',
-    icon: 'Infinity',
+    label: 'Surprise me',
+    icon: 'Shuffle',
     iconSet: 'lucide',
-    description: 'No preference',
-    isDefault: true,
+    description: 'Any length',
+    // Tier 2.2: Removed isDefault - no pre-selection
   },
 ];
 
@@ -299,11 +284,17 @@ export const LENGTH_OPTIONS = LENGTHS;
 
 /**
  * A mood session captures the user's current preferences.
- * Sessions expire after 24 hours - ephemeral, not permanent profile data.
+ * Sessions have soft and hard expiry (Tier 2.4):
+ * - Soft (24hr): Results accessible, prompts refresh
+ * - Hard (48hr): Session fully expires
  */
 export interface MoodSession {
   /** Primary mood (required) */
   mood: Mood;
+  /** Flavor/sub-category based on mood (Step 2) */
+  flavor: string | null;
+  /** Seed book ID - "book you wish you could read again" (Step 3) */
+  seedBookId: string | null;
   /** Pace preference */
   pace: Pace;
   /** Weight preference */
@@ -312,9 +303,13 @@ export interface MoodSession {
   world: World;
   /** Length preference (can be adjusted on results) */
   length: LengthPreference;
+  /** Whether to exclude children's/juvenile books */
+  excludeChildrens: boolean;
   /** When the session was created (timestamp) */
   createdAt: number;
-  /** When the session expires (timestamp) - 24 hours after creation */
+  /** When the session soft-expires (Tier 2.4) - prompts refresh but results accessible */
+  softExpiresAt: number;
+  /** When the session fully expires (timestamp) */
   expiresAt: number;
 }
 
@@ -322,6 +317,26 @@ export interface MoodSession {
  * Default session duration in milliseconds (24 hours)
  */
 export const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Soft expiry duration (Tier 2.4)
+ * After this time, session becomes "soft" (results accessible but prompts refresh)
+ */
+export const SESSION_SOFT_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Hard expiry duration (Tier 2.4)
+ * After this time, session is fully expired
+ */
+export const SESSION_HARD_EXPIRY_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Session state (Tier 2.4)
+ * - active: Normal state, results are fresh
+ * - soft: Session is stale, shows "Refresh your mood?" but results accessible
+ * - expired: Session is gone, must start new quiz
+ */
+export type SessionState = 'active' | 'soft' | 'expired';
 
 // ============================================================================
 // GENRE MAPPINGS
@@ -343,6 +358,9 @@ export const MOOD_GENRE_MAP: Record<Mood, string[]> = {
     'comfort read',
     'sweet romance',
     'light romance',
+    'humor',        // Absorbed from laughs
+    'lighthearted',
+    'funny',
   ],
   thrills: [
     'thriller',
@@ -369,17 +387,6 @@ export const MOOD_GENRE_MAP: Record<Mood, string[]> = {
     'immersive',
     'atmospheric',
   ],
-  laughs: [
-    'humor',
-    'comedy',
-    'satire',
-    'romantic comedy',
-    'parody',
-    'comedic',
-    'witty',
-    'lighthearted',
-    'funny',
-  ],
   feels: [
     'emotional',
     'drama',
@@ -391,17 +398,9 @@ export const MOOD_GENRE_MAP: Record<Mood, string[]> = {
     'bittersweet',
     'tearjerker',
     'moving',
-  ],
-  thinking: [
-    'literary',
-    'philosophy',
-    'thought-provoking',
-    'psychological',
-    'challenging',
-    'intellectual',
+    'thought-provoking', // Absorbed from thinking
+    'philosophical',
     'reflective',
-    'social commentary',
-    'allegory',
   ],
 };
 
@@ -532,21 +531,23 @@ export const WORLD_GENRE_MAP: Record<Exclude<World, 'any'>, string[]> = {
 export const THEME_MOOD_MAP: Record<string, Mood[]> = {
   // Comfort themes
   'found family': ['comfort', 'feels'],
-  'friendship': ['comfort', 'laughs'],
+  'friendship': ['comfort'],
   'healing': ['comfort', 'feels'],
   'community': ['comfort'],
   'second chances': ['comfort', 'feels'],
   'small town': ['comfort'],
   'love': ['comfort', 'feels'],
   'hope': ['comfort', 'feels'],
+  'humor': ['comfort'],
+  'whimsy': ['comfort'],
 
   // Thrills themes
   'survival': ['thrills', 'feels'],
   'revenge': ['thrills', 'feels'],
-  'conspiracy': ['thrills', 'thinking'],
-  'justice': ['thrills', 'thinking'],
+  'conspiracy': ['thrills'],
+  'justice': ['thrills', 'feels'],
   'danger': ['thrills'],
-  'secrets': ['thrills', 'thinking'],
+  'secrets': ['thrills'],
   'betrayal': ['thrills', 'feels'],
   'race against time': ['thrills'],
 
@@ -558,31 +559,25 @@ export const THEME_MOOD_MAP: Record<string, Mood[]> = {
   'world-building': ['escape'],
   'destiny': ['escape', 'feels'],
 
-  // Laughs themes
-  'humor': ['laughs'],
-  'absurdity': ['laughs', 'thinking'],
-  'whimsy': ['laughs', 'comfort'],
-  'satire': ['laughs', 'thinking'],
-
   // Feels themes
   'grief': ['feels'],
   'loss': ['feels'],
   'sacrifice': ['feels', 'escape'],
-  'redemption': ['feels', 'thinking'],
+  'redemption': ['feels'],
   'family': ['feels', 'comfort'],
   'forgiveness': ['feels'],
-  'trauma': ['feels', 'thinking'],
-  'coming of age': ['feels', 'thinking'],
-
-  // Thinking themes
-  'morality': ['thinking', 'feels'],
-  'identity': ['thinking', 'feels'],
-  'power': ['thinking', 'escape'],
-  'corruption': ['thinking', 'thrills'],
-  'society': ['thinking'],
-  'free will': ['thinking'],
-  'human nature': ['thinking', 'feels'],
-  'philosophy': ['thinking'],
+  'trauma': ['feels'],
+  'coming of age': ['feels'],
+  'morality': ['feels'],
+  'identity': ['feels'],
+  'human nature': ['feels'],
+  'philosophy': ['feels'],
+  'absurdity': ['feels', 'comfort'],
+  'satire': ['feels'],
+  'power': ['feels', 'escape'],
+  'corruption': ['feels', 'thrills'],
+  'society': ['feels'],
+  'free will': ['feels'],
 };
 
 /**
@@ -595,16 +590,21 @@ export const TROPE_MOOD_MAP: Record<string, Mood[]> = {
   'friends to lovers': ['comfort', 'feels'],
   'small town romance': ['comfort'],
   'cozy mystery': ['comfort', 'thrills'],
-  'fake dating': ['comfort', 'laughs'],
+  'fake dating': ['comfort'],
+  'romcom': ['comfort'],
+  'fish out of water': ['comfort'],
+  'mistaken identity': ['comfort'],
 
   // Thrills tropes
-  'unreliable narrator': ['thrills', 'thinking'],
+  'unreliable narrator': ['thrills'],
   'whodunit': ['thrills'],
-  'locked room mystery': ['thrills', 'thinking'],
+  'locked room mystery': ['thrills'],
   'cat and mouse': ['thrills'],
-  'heist': ['thrills', 'laughs'],
-  'political intrigue': ['thrills', 'thinking'],
+  'heist': ['thrills'],
+  'political intrigue': ['thrills'],
   'reluctant hero': ['thrills', 'feels'],
+  'antihero': ['thrills', 'feels'],
+  'twist ending': ['thrills'],
 
   // Escape tropes
   'chosen one': ['escape'],
@@ -614,27 +614,18 @@ export const TROPE_MOOD_MAP: Record<string, Mood[]> = {
   'quest': ['escape', 'thrills'],
   'prophecy': ['escape'],
 
-  // Laughs tropes
-  'enemies to lovers': ['laughs', 'feels'],
-  'fish out of water': ['laughs'],
-  'mistaken identity': ['laughs'],
-  'romcom': ['laughs', 'comfort'],
-  'road trip': ['laughs', 'feels'],
-
   // Feels tropes
+  'enemies to lovers': ['feels', 'comfort'],
+  'road trip': ['feels', 'comfort'],
   'star-crossed lovers': ['feels'],
   'forbidden love': ['feels'],
   'second chance romance': ['feels', 'comfort'],
-  'redemption arc': ['feels', 'thinking'],
+  'redemption arc': ['feels'],
   'tragic backstory': ['feels'],
-  'bittersweet ending': ['feels', 'thinking'],
-
-  // Thinking tropes
-  'antihero': ['thinking', 'thrills'],
-  'morally grey': ['thinking', 'feels'],
-  'twist ending': ['thinking', 'thrills'],
-  'allegory': ['thinking'],
-  'social commentary': ['thinking'],
+  'bittersweet ending': ['feels'],
+  'morally grey': ['feels'],
+  'allegory': ['feels'],
+  'social commentary': ['feels'],
 };
 
 // ============================================================================
@@ -666,52 +657,194 @@ export interface MoodScore {
 }
 
 /**
+ * Confidence level for a recommendation (Tier 2.3)
+ * Based on metadata richness of the book
+ */
+export type MatchConfidence = 'high' | 'medium' | 'low';
+
+/**
  * A book with its mood match score
  */
 export interface ScoredBook {
-  /** Library item ID */
-  id: string;
+  /** Full library item */
+  item: import('@/core/types').LibraryItem;
   /** Calculated mood score */
   score: MoodScore;
   /** Match percentage (0-100) */
   matchPercent: number;
+  /** Confidence in the match based on metadata richness (Tier 2.3) */
+  confidence: MatchConfidence;
+  /** Whether this book has BookDNA tags for accurate scoring */
+  hasDNA?: boolean;
+  /** Reasons why this book matched (for UI display) */
+  matchReasons?: string[];
+  /** Boost from user's reading history preferences */
+  preferenceBoost?: number;
+  /** Boost from similarity to seed book */
+  seedSimilarityBoost?: number;
+  /** Final score with all boosts applied (used for sorting) */
+  boostedScore: number;
 }
+
+// ============================================================================
+// DNA SCORING OPTIONS
+// ============================================================================
+
+/**
+ * Options for DNA-aware mood recommendations.
+ * Controls how books without BookDNA are handled.
+ */
+export type DNAFilterMode =
+  | 'dna-only'      // Only show books WITH BookDNA tags (strictest)
+  | 'dna-preferred' // Show DNA books first, then non-DNA books (default)
+  | 'mixed';        // Mix DNA and non-DNA books by score only
+
+// ============================================================================
+// TIER 2.1: BRANCHING QUIZ LOGIC
+// ============================================================================
+
+/**
+ * Follow-up dimension types for branching quiz
+ */
+export type FollowupDimension = 'pace' | 'weight' | 'world' | 'length';
+
+/**
+ * Maps each mood to its most relevant follow-up question.
+ * This reduces the quiz from 5 steps to 2-3 by asking only what matters most.
+ *
+ * Rationale:
+ * - thrills → Pace: Fast vs slow-burn thriller matters most
+ * - comfort → Weight: Cozy vs bittersweet makes the biggest difference
+ * - escape → World: Fantasy vs scifi vs historical is the key differentiator
+ * - thinking → Length: Essay vs deep-dive determines the experience
+ * - feels → Weight: Tearjerker vs hopeful matters most for emotional books
+ * - laughs → Pace: Quick wit vs slow comedy changes the vibe
+ */
+export const MOOD_FOLLOWUP_MAP: Record<Mood, FollowupDimension> = {
+  thrills: 'pace',
+  comfort: 'weight',
+  escape: 'world',
+  feels: 'weight',
+};
+
+/**
+ * Follow-up question config for each dimension
+ */
+export const FOLLOWUP_CONFIG: Record<FollowupDimension, { question: string; subtitle: string; label: string }> = {
+  pace: {
+    question: 'How fast should it move?',
+    subtitle: 'Pick your tempo',
+    label: 'PACE',
+  },
+  weight: {
+    question: 'How heavy or light?',
+    subtitle: 'Pick your tone',
+    label: 'TONE',
+  },
+  world: {
+    question: 'What kind of world?',
+    subtitle: 'Pick your setting',
+    label: 'SETTING',
+  },
+  length: {
+    question: 'How long?',
+    subtitle: 'Pick your commitment',
+    label: 'LENGTH',
+  },
+};
+
+// ============================================================================
+// FLAVOR OPTIONS (Step 2 - Drill-down)
+// ============================================================================
+
+/**
+ * Flavor config for mood drill-down options.
+ */
+export interface FlavorConfig {
+  id: string;
+  label: string;
+  icon: string;
+  iconSet: 'lucide';
+  description: string;
+  /** Tags/tropes that match this flavor */
+  matchTags: string[];
+}
+
+/**
+ * Flavor options for each mood.
+ * These are sub-categories that refine the mood selection.
+ */
+export const MOOD_FLAVORS: Record<Mood, FlavorConfig[]> = {
+  thrills: [
+    { id: 'heist', label: 'Heists', icon: 'Vault', iconSet: 'lucide', description: 'Clever cons & capers', matchTags: ['heist', 'con artist', 'caper', 'theft'] },
+    { id: 'cat-mouse', label: 'Cat & Mouse', icon: 'Crosshair', iconSet: 'lucide', description: 'Hunter vs hunted', matchTags: ['cat and mouse', 'pursuit', 'chase', 'hunter'] },
+    { id: 'conspiracy', label: 'Conspiracy', icon: 'Network', iconSet: 'lucide', description: 'Deep rabbit holes', matchTags: ['conspiracy', 'political thriller', 'cover-up', 'secrets'] },
+    { id: 'survival', label: 'Survival', icon: 'Mountain', iconSet: 'lucide', description: 'Against all odds', matchTags: ['survival', 'stranded', 'apocalypse', 'disaster'] },
+  ],
+  comfort: [
+    { id: 'cozy-mystery', label: 'Cozy Mystery', icon: 'Search', iconSet: 'lucide', description: 'Low stakes sleuthing', matchTags: ['cozy mystery', 'amateur sleuth', 'village mystery'] },
+    { id: 'small-town', label: 'Small Town', icon: 'TreePine', iconSet: 'lucide', description: 'Community warmth', matchTags: ['small town', 'community', 'slice of life'] },
+    { id: 'second-chance', label: 'Second Chances', icon: 'RotateCcw', iconSet: 'lucide', description: 'Fresh starts', matchTags: ['second chance', 'starting over', 'redemption'] },
+    { id: 'comfort-food', label: 'Comfort Food', icon: 'Coffee', iconSet: 'lucide', description: 'Warm & familiar', matchTags: ['comfort read', 'feel-good', 'heartwarming', 'cozy'] },
+  ],
+  escape: [
+    { id: 'epic-quest', label: 'Epic Quest', icon: 'Compass', iconSet: 'lucide', description: 'Grand adventures', matchTags: ['quest', 'epic fantasy', 'adventure', 'journey'] },
+    { id: 'magic-system', label: 'Magic Systems', icon: 'Sparkles', iconSet: 'lucide', description: 'Rules of wonder', matchTags: ['hard magic', 'magic system', 'magical'] },
+    { id: 'portal', label: 'Portal Fantasy', icon: 'DoorOpen', iconSet: 'lucide', description: 'New worlds', matchTags: ['portal fantasy', 'isekai', 'transported'] },
+    { id: 'space-opera', label: 'Space Opera', icon: 'Rocket', iconSet: 'lucide', description: 'Galaxy-spanning', matchTags: ['space opera', 'space', 'galactic', 'sci-fi'] },
+  ],
+  feels: [
+    { id: 'redemption', label: 'Earned Redemption', icon: 'Sunrise', iconSet: 'lucide', description: 'Flawed heroes', matchTags: ['redemption arc', 'redemption', 'atonement'] },
+    { id: 'grief', label: 'Beautiful Grief', icon: 'CloudRain', iconSet: 'lucide', description: 'Cathartic tears', matchTags: ['grief', 'loss', 'healing', 'tearjerker'] },
+    { id: 'forbidden', label: 'Forbidden Love', icon: 'Lock', iconSet: 'lucide', description: 'Against all obstacles', matchTags: ['forbidden love', 'star-crossed', 'enemies to lovers'] },
+    { id: 'family', label: 'Family Saga', icon: 'Home', iconSet: 'lucide', description: 'Generational stories', matchTags: ['family saga', 'family drama', 'multi-generational'] },
+  ],
+};
 
 // ============================================================================
 // QUIZ STATE
 // ============================================================================
 
 /**
- * Current step in the discovery quiz (now 5 steps)
+ * Current step in the discovery quiz (3 steps):
+ * Step 1: Mood selection (required) - "What are you in the mood for?"
+ * Step 2: Flavor drill-down (optional) - Sub-categories for chosen mood
+ * Step 3: Seed book (optional) - "What book do you wish you could read again?"
  */
-export type QuizStep = 1 | 2 | 3 | 4 | 5;
+export type QuizStep = 1 | 2 | 3;
 
 /**
  * Total number of steps in the quiz
  */
-export const TOTAL_QUIZ_STEPS = 5;
+export const TOTAL_QUIZ_STEPS = 3;
 
 /**
  * Draft state while user is going through the quiz
  */
 export interface QuizDraft {
   mood: Mood | null;
-  pace: Pace;
-  weight: Weight;
-  world: World;
-  length: LengthPreference;
+  flavor: string | null;       // Selected flavor from MOOD_FLAVORS
+  seedBookId: string | null;   // Book ID for "read again" selection
+  pace: Pace | null;
+  weight: Weight | null;
+  world: World | null;
+  length: LengthPreference | null;
+  excludeChildrens: boolean;
   currentStep: QuizStep;
 }
 
 /**
- * Initial draft state with defaults
+ * Initial draft state with no pre-selection
  */
 export const INITIAL_QUIZ_DRAFT: QuizDraft = {
   mood: null,
-  pace: 'any',
-  weight: 'any',
-  world: 'any',
-  length: 'any',
+  flavor: null,
+  seedBookId: null,
+  pace: null,
+  weight: null,
+  world: null,
+  length: null,
+  excludeChildrens: false,
   currentStep: 1,
 };
 

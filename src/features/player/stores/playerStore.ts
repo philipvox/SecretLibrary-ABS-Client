@@ -26,7 +26,7 @@ import { playbackCache } from '@/core/services/playbackCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Import audioService directly (not from barrel) to avoid circular dependency
-import { audioService, PlaybackState, AudioTrackInfo } from '@/features/player/services/audioService';
+import { audioService, PlaybackState, AudioTrackInfo, AudioError } from '@/features/player/services/audioService';
 
 // Import debug utilities
 import {
@@ -43,6 +43,9 @@ import { getErrorMessage } from '@/shared/utils/errorUtils';
 
 // Import smart rewind utility
 import { calculateSmartRewindSeconds } from '../utils/smartRewindCalculator';
+
+// Import position utilities
+import { clampPosition } from '../utils/progressCalculator';
 
 // Import centralized logger for structured logging
 import { playerLogger } from '@/shared/utils/logger';
@@ -62,6 +65,7 @@ import { trackEvent } from '@/core/monitoring';
 
 // Import constants
 // REWIND_STEP, REWIND_INTERVAL, FF_STEP moved to seekingStore (Phase 7)
+import { isAudioFile } from '@/constants/audio';
 
 // Import haptics for sleep timer feedback
 import { haptics } from '@/core/native/haptics';
@@ -75,6 +79,7 @@ import {
   restoreSmartRewindState,
   clearSmartRewindState,
   getChapterStartForPosition,
+  markSmartRewindApplied,
 } from '../utils/smartRewind';
 import {
   startListeningSession,
@@ -135,12 +140,9 @@ function getBookMetadata(item: LibraryItem | null | undefined): BookMetadata | n
 // TYPES
 // =============================================================================
 
-export interface Chapter {
-  id: number;
-  start: number;
-  end: number;
-  title: string;
-}
+// Chapter type is defined in ../types.ts to avoid circular dependencies
+// Re-exported here for backwards compatibility
+export { Chapter } from '../types';
 
 export interface Bookmark {
   id: string;
@@ -370,6 +372,7 @@ interface PlayerActions {
   togglePlayer: () => void;
   closePlayer: () => void;
   clearPlaybackError: () => void;
+  handleAudioError: (error: AudioError) => Promise<void>;
 
   // ---------------------------------------------------------------------------
   // Internal (called by audioService)
@@ -795,6 +798,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
               // Continue session connection in background for sync only - NO SEEKING after playback starts
               sessionPromise.then((session) => {
                 if (session) {
+                  // FIX: Check if user has switched books before starting auto-sync
+                  // This prevents orphaned sessions from syncing to the wrong book
+                  const currentBookId = get().currentBook?.id;
+                  if (currentBookId !== book.id) {
+                    log(`Background session arrived but user switched books (${book.id} -> ${currentBookId}), closing orphaned session`);
+                    sessionService.closeSessionAsync();
+                    return;
+                  }
+
                   const actualWaitTime = Date.now() - timeoutStartTime + SESSION_TIMEOUT_MS;
                   log(`Background session connected after ${actualWaitTime}ms total (sync only, no position change)`);
                   log(`Server position was: ${session.currentTime?.toFixed(1)}s, we used: ${resumePosition.toFixed(1)}s`);
@@ -814,9 +826,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             // Multi-file audiobook - enumerate audio files in directory
             log('OFFLINE MULTI-FILE AUDIOBOOK');
             const dirContents = await FileSystem.readDirectoryAsync(localPath);
-            const audioExtensions = ['.m4b', '.m4a', '.mp3', '.mp4', '.opus', '.ogg', '.flac', '.aac'];
             const audioFileNames = dirContents
-              .filter(name => audioExtensions.some(ext => name.toLowerCase().endsWith(ext)))
+              .filter(isAudioFile)
               .sort(); // Files are named 000_, 001_, etc. so sorting works
 
             if (audioFileNames.length === 0) {
@@ -874,16 +885,18 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           timing('Starting session request');
 
           // Check for cached session first (pre-fetched during app startup)
-          const cachedSession = playbackCache.getSession(book.id);
+          let cachedSession = playbackCache.getSession(book.id);
 
           // NOTE: session can be either a full PlaybackSession from the server
           // or a CachedSession from playbackCache (which has fewer properties)
           let session: PlaybackSession | typeof cachedSession | null;
 
+          let sessionSource: 'cached' | 'fresh' = 'fresh';
           if (cachedSession) {
             // INSTANT: Use cached session (no network call needed!)
             log('Using cached session for streaming (instant)');
             session = cachedSession;
+            sessionSource = 'cached';
 
             // Ensure audio is ready
             if (!playbackCache.isAudioInitialized()) {
@@ -902,6 +915,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
               audioService.ensureSetup(),
             ]);
             session = fetchedSession;
+            sessionSource = 'fresh';
           }
           timing('Session + setup complete');
 
@@ -1104,6 +1118,14 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           get().updatePlaybackState(state);
         });
 
+        // Set up error callback for session refresh on URL expiration
+        audioService.setErrorCallback((error: AudioError) => {
+          get().handleAudioError(error);
+        });
+
+        // Set current book ID for error reporting
+        audioService.setCurrentBookId(book.id);
+
         // Set up remote command callback for chapter navigation
         audioService.setRemoteCommandCallback((command) => {
           if (command === 'nextChapter') {
@@ -1258,9 +1280,13 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             }
           }
 
+          // Reset seeking state on error to prevent UI being stuck
+          useSeekingStore.getState().resetSeekingState();
+
           set({
             isLoading: false,
             isBuffering: false,
+            isSeeking: false,
             // Preserve chapters on error to prevent disappearance
             chapters: preservedChapters,
             viewingChapters: preservedChapters,
@@ -1456,7 +1482,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         const bookToPlay = viewingBook || currentBook;
         if (bookToPlay) {
           log('play() called but audio not loaded - loading book first');
-          await get().loadBook(bookToPlay, true); // autoPlay=true
+          await get().loadBook(bookToPlay, { autoPlay: true });
           return; // loadBook will handle playing
         }
         // No book to load - silently ignore (can happen during iOS startup)
@@ -1590,11 +1616,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             log('[SmartRewind] Error applying smart rewind:', err);
           }
 
-          // Clear smart rewind state - MUST succeed to prevent re-application
+          // Mark as applied FIRST (in-memory) to prevent re-application
+          // even if AsyncStorage clear fails below
+          markSmartRewindApplied(currentBook.id);
+
+          // Clear smart rewind state from storage
           try {
             await clearSmartRewindState();
           } catch (clearErr) {
-            log('[SmartRewind] Failed to clear state:', clearErr);
+            log('[SmartRewind] Failed to clear state (in-memory flag prevents re-application):', clearErr);
           }
         })();
       }
@@ -1609,7 +1639,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       set({ isPlaying: false });
 
       // Fire pause command (don't await - let it happen in background)
-      audioService.pause().catch(() => {});
+      audioService.pause().catch((err) => {
+        logError('pause failed:', err);
+      });
 
       if (!currentBook) return;
 
@@ -1692,15 +1724,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
     seekTo: async (position: number) => {
       const { duration, currentBook } = get();
-      const clampedPosition = Math.max(0, Math.min(duration, position));
+      const clampedPos = clampPosition(position, duration);
 
-      log(`seekTo: ${clampedPosition.toFixed(1)}`);
+      log(`seekTo: ${clampedPos.toFixed(1)}`);
 
       // INSTANT: Update store position immediately for responsive UI
-      set({ position: clampedPosition });
+      set({ position: clampedPos });
 
       // Delegate to seekingStore (handles audio seek and local progress save)
-      await useSeekingStore.getState().seekTo(clampedPosition, duration, currentBook?.id);
+      await useSeekingStore.getState().seekTo(clampedPos, duration, currentBook?.id);
     },
 
     // =========================================================================
@@ -1749,15 +1781,45 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     // =========================================================================
 
     skipForward: async (seconds = 30) => {
-      const { position, duration } = get();
+      const { position, duration, isPlaying } = get();
       const newPosition = Math.min(position + seconds, duration);
-      await get().seekTo(newPosition);
+
+      // Set seeking flag to block position updates during seek
+      useSeekingStore.getState().startSeeking(position, 'forward');
+
+      try {
+        await get().seekTo(newPosition);
+      } finally {
+        // Always clear seeking flag
+        set({ isSeeking: false });
+        useSeekingStore.setState({ isSeeking: false, seekDirection: null });
+      }
+
+      // Ensure playback continues if it was playing
+      if (isPlaying && !audioService.getIsPlaying()) {
+        await audioService.play();
+      }
     },
 
     skipBackward: async (seconds = 30) => {
-      const { position } = get();
+      const { position, duration, isPlaying } = get();
       const newPosition = Math.max(position - seconds, 0);
-      await get().seekTo(newPosition);
+
+      // Set seeking flag to block position updates during seek
+      useSeekingStore.getState().startSeeking(position, 'backward');
+
+      try {
+        await get().seekTo(newPosition);
+      } finally {
+        // Always clear seeking flag
+        set({ isSeeking: false });
+        useSeekingStore.setState({ isSeeking: false, seekDirection: null });
+      }
+
+      // Ensure playback continues if it was playing
+      if (isPlaying && !audioService.getIsPlaying()) {
+        await audioService.play();
+      }
     },
 
     // =========================================================================
@@ -2005,6 +2067,57 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       set({ playbackError: null });
     },
 
+    /**
+     * Handle audio errors from audioService
+     * Detects URL expiration and refreshes session automatically
+     */
+    handleAudioError: async (error: AudioError) => {
+      const { currentBook, position } = get();
+
+      playerLogger.warn('[AUDIO_ERROR] Received error from audioService:', {
+        type: error.type,
+        message: error.message,
+        httpStatus: error.httpStatus,
+        position: error.position,
+        bookId: error.bookId,
+      });
+
+      if (error.type === 'URL_EXPIRED') {
+        // Session/URL expired - refresh session and reload at same position
+        set({ playbackError: 'Session expired - refreshing...' });
+
+        if (currentBook) {
+          const resumePosition = error.position ?? position;
+          playerLogger.info('[URL_EXPIRED] Refreshing session and reloading audio', {
+            bookId: currentBook.id,
+            resumePosition,
+          });
+
+          try {
+            // Clear any cached session to force a fresh one
+            playbackCache.clearSession(currentBook.id);
+
+            // Reload the book at the same position
+            await get().loadBook(currentBook, { startPosition: resumePosition, autoPlay: false });
+
+            // Resume playing automatically since user was already listening
+            await audioService.play();
+
+            set({ playbackError: null });
+            playerLogger.info('[URL_EXPIRED] Session refresh successful');
+          } catch (refreshError) {
+            playerLogger.error('[URL_EXPIRED] Session refresh failed:', refreshError);
+            set({ playbackError: 'Session expired. Tap to retry.' });
+          }
+        } else {
+          set({ playbackError: 'Playback failed. Tap to retry.' });
+        }
+      } else {
+        // Generic error - show message to user
+        set({ playbackError: error.message || 'Playback failed. Tap to retry.' });
+      }
+    },
+
     // =========================================================================
     // INTERNAL: PLAYBACK STATE UPDATES FROM AUDIO SERVICE
     // =========================================================================
@@ -2107,9 +2220,22 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         });
       }
 
+      // Validate position before setting - reject NaN, Infinity, or negative values
+      // This prevents corrupted audio service state from propagating to the UI
+      const validatedPosition = (
+        Number.isFinite(state.position) && state.position >= 0
+      ) ? state.position : prevPosition;
+
+      if (validatedPosition !== state.position) {
+        playerLogger.warn(`[POSITION_VALIDATION] Rejected invalid position:`, {
+          received: state.position,
+          using: validatedPosition,
+        });
+      }
+
       set({
         isPlaying: newIsPlaying,
-        position: state.position,
+        position: validatedPosition,
         ...(shouldUpdateDuration && { duration: displayDuration }),
         isBuffering: state.isBuffering,
       });
@@ -2118,12 +2244,16 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Server sync happens at key moments (pause, background, finish)
       const now = Date.now();
 
-      if (currentBook && newIsPlaying && state.position > 0 && now - lastProgressSave > PROGRESS_SAVE_INTERVAL) {
+      // Use validated position for progress save to avoid saving corrupted values
+      // Also skip save if seeking just ended (seekingStore.lastSeekTime within 500ms)
+      const recentlyFinishedSeeking = seekingState.lastSeekTime && (now - seekingState.lastSeekTime) < 500;
+      if (currentBook && newIsPlaying && validatedPosition > 0 &&
+          now - lastProgressSave > PROGRESS_SAVE_INTERVAL && !recentlyFinishedSeeking) {
         lastProgressSave = now;
         // Use local-only save during playback - no network overhead
         backgroundSyncService.saveProgressLocal(
           currentBook.id,
-          state.position,
+          validatedPosition,
           totalBookDuration
         ).catch(() => {});
 

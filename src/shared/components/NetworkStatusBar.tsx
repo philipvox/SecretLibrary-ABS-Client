@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { CloudOff, CloudDownload } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
@@ -69,7 +69,8 @@ export function NetworkStatusBar({ isLoading = false }: NetworkStatusBarProps) {
     }
   }, [isOffline, isLoading, slideAnim]);
 
-  if (!showBar) return null;
+  // Return empty View on Android to prevent SafeAreaProvider crash
+  if (!showBar) return Platform.OS === 'android' ? <View /> : null;
 
   const backgroundColor = isOffline ? colors.status.error : colors.accent.primary;
   const message = isOffline ? 'No internet connection' : 'Loading...';

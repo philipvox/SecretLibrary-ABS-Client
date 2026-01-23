@@ -47,7 +47,7 @@ export const secretLibraryLightColors = {
   green: '#1A4D2E',
   olive: '#9BA17B',
   blue: '#0047FF',
-  gold: '#E53935', // Primary accent color (updated to red theme)
+  gold: '#F3B60C', // Primary accent color (warm gold)
 
   // Shelf mode
   shelfBg: '#0f0f0f',
@@ -90,7 +90,7 @@ export const secretLibraryDarkColors = {
   green: '#1A4D2E',
   olive: '#9BA17B',
   blue: '#0047FF',
-  gold: '#E53935', // Primary accent color
+  gold: '#F3B60C', // Primary accent color (warm gold)
 
   // Shelf mode
   shelfBg: '#0f0f0f',

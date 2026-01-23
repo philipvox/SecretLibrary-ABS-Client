@@ -1,10 +1,12 @@
 /**
  * src/core/types/metadata.ts
- * 
+ *
  * TypeScript interfaces for metadata models (authors, series, narrators).
  */
 
-import { LibraryItem } from './library';
+// Use 'import type' to avoid runtime circular dependency
+// Types are erased at compile time so this doesn't cause import cycles
+import type { LibraryItem } from './library';
 
 /**
  * Author information

@@ -664,24 +664,13 @@ export function getAllGenres(): string[] {
 
 /**
  * Get genres sorted by book count (most popular first)
- * Returns array of { name, bookCount } objects
+ * Uses pre-computed genresWithBooks map for O(n log n) instead of O(n*m)
  */
 export function getGenresByPopularity(): GenreInfo[] {
-  const { items } = useLibraryCache.getState();
-  const genreCounts = new Map<string, number>();
+  const { genresWithBooks } = useLibraryCache.getState();
 
-  // Count books per genre
-  for (const item of items) {
-    const metadata = getMetadata(item);
-    const genres: string[] = metadata.genres || [];
-    for (const genre of genres) {
-      genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
-    }
-  }
-
-  // Convert to array and sort by count descending
-  return Array.from(genreCounts.entries())
-    .map(([name, bookCount]) => ({ name, bookCount }))
+  // Use pre-computed map and sort by count descending
+  return Array.from(genresWithBooks.values())
     .sort((a, b) => b.bookCount - a.bookCount);
 }
 
@@ -697,16 +686,35 @@ export function getSeriesNavigationInfo(currentBook: LibraryItem): {
   nextBook: LibraryItem | null;
 } | null {
   const metadata = getMetadata(currentBook);
-  const seriesNameRaw = metadata.seriesName || '';
 
-  if (!seriesNameRaw) return null;
+  let cleanSeriesName = '';
+  let currentSeq = 0;
 
-  // Extract sequence number
-  const seqMatch = seriesNameRaw.match(/#([\d.]+)/);
-  if (!seqMatch) return null;
+  // Try series array first (expanded API data format)
+  // e.g., series: [{ name: "Discworld", sequence: "12" }]
+  if (metadata.series?.length > 0) {
+    const seriesEntry = metadata.series[0];
+    const name = typeof seriesEntry === 'string' ? seriesEntry : seriesEntry?.name;
+    const seq = seriesEntry?.sequence;
+    if (name && typeof name === 'string') {
+      cleanSeriesName = name;
+      currentSeq = seq ? parseFloat(seq) : 1;
+    }
+  }
 
-  const currentSeq = parseFloat(seqMatch[1]);
-  const cleanSeriesName = seriesNameRaw.replace(/\s*#[\d.]+$/, '').trim();
+  // Fallback to seriesName string format (e.g., "Discworld #12")
+  if (!cleanSeriesName) {
+    const seriesNameRaw = metadata.seriesName || '';
+    if (!seriesNameRaw) return null;
+
+    const seqMatch = seriesNameRaw.match(/#([\d.]+)/);
+    if (!seqMatch) return null;
+
+    currentSeq = parseFloat(seqMatch[1]);
+    cleanSeriesName = seriesNameRaw.replace(/\s*#[\d.]+$/, '').trim();
+  }
+
+  if (!cleanSeriesName) return null;
 
   const seriesInfo = useLibraryCache.getState().getSeries(cleanSeriesName);
   if (!seriesInfo || seriesInfo.books.length === 0) return null;

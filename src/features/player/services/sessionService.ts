@@ -77,9 +77,17 @@ class SessionService {
     timing('Sending request');
 
     try {
-      const session = await apiClient.post<PlaybackSession>(
-        requestUrl,
-        {
+      // Use raw fetch instead of axios - axios was truncating large JSON responses
+      const token = apiClient.getAuthToken();
+      const fullUrl = `${baseUrl}${requestUrl}`;
+
+      const rawResponse = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
           deviceInfo: {
             clientName: 'AudiobookShelf-RN',
             clientVersion: '1.0.0',
@@ -98,8 +106,14 @@ class SessionService {
             'audio/aac',
           ],
           mediaPlayer: 'expo-audio',
-        }
-      );
+        }),
+      });
+
+      if (!rawResponse.ok) {
+        throw new Error(`Session request failed: ${rawResponse.status} ${rawResponse.statusText}`);
+      }
+
+      const session = JSON.parse(await rawResponse.text()) as PlaybackSession;
 
       timing('Response received');
 
@@ -196,7 +210,10 @@ class SessionService {
   }
 
   /**
-   * Sync progress - fire and forget (non-blocking)
+   * Sync progress - non-blocking with retry
+   *
+   * FIX: Added retry logic to prevent lost progress syncs on transient failures.
+   * FIX: Added position validation to prevent corrupted data from being synced.
    */
   syncProgress(currentTime: number): void {
     if (!this.currentSession) {
@@ -204,24 +221,70 @@ class SessionService {
       return;
     }
 
+    // VALIDATION: Prevent corrupted position data from being synced
+    // This fixes the bug where position from one book gets applied to another
+    const duration = this.currentSession.duration;
+    if (currentTime < 0) {
+      audioLog.warn(`syncProgress: Rejecting negative position ${currentTime}`);
+      return;
+    }
+    if (duration > 0 && currentTime > duration + 60) {
+      // Allow up to 60 seconds past duration for edge cases, but reject clearly corrupted data
+      audioLog.warn(`syncProgress: Rejecting position ${currentTime} exceeding duration ${duration} by more than 60s`);
+      return;
+    }
+
     const sessionId = this.currentSession.id;
     audioLog.network('POST', `/api/session/${sessionId}/sync`);
 
-    // Fire and forget - don't await
-    apiClient.post(`/api/session/${sessionId}/sync`, {
-      currentTime,
-      timeListened: 0,
-    }).catch((error) => {
-      audioLog.warn('Sync failed (non-blocking):', error.message);
-    });
+    // Non-blocking with retry
+    this.syncProgressWithRetry(sessionId, currentTime, 3);
+  }
+
+  /**
+   * Helper to sync progress with retries
+   */
+  private async syncProgressWithRetry(sessionId: string, currentTime: number, maxRetries: number): Promise<void> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await apiClient.post(`/api/session/${sessionId}/sync`, {
+          currentTime,
+          timeListened: 0,
+        });
+        if (attempt > 1) {
+          log(`Progress synced successfully (attempt ${attempt})`);
+        }
+        return;
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (attempt === maxRetries) {
+          audioLog.warn(`Sync progress failed after ${maxRetries} attempts:`, message);
+        } else {
+          // Wait before retry (500ms, 1000ms)
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+        }
+      }
+    }
   }
 
   /**
    * Sync progress and wait (for important saves)
+   * FIX: Added position validation to prevent corrupted data from being synced.
    */
   async syncProgressAsync(currentTime: number): Promise<void> {
     if (!this.currentSession) {
       log('syncProgressAsync: No active session');
+      return;
+    }
+
+    // VALIDATION: Prevent corrupted position data from being synced
+    const duration = this.currentSession.duration;
+    if (currentTime < 0) {
+      audioLog.warn(`syncProgressAsync: Rejecting negative position ${currentTime}`);
+      return;
+    }
+    if (duration > 0 && currentTime > duration + 60) {
+      audioLog.warn(`syncProgressAsync: Rejecting position ${currentTime} exceeding duration ${duration} by more than 60s`);
       return;
     }
 
@@ -260,10 +323,13 @@ class SessionService {
   }
 
   /**
-   * Close session - NON-BLOCKING (fire and forget)
+   * Close session - NON-BLOCKING with retry
    *
    * Clears currentSession immediately to prevent new requests using stale session.
    * Chapters are backed up in lastKnownChapters for fallback during race conditions.
+   *
+   * FIX: Added retry logic to prevent orphaned sessions on the server.
+   * FIX: Added position validation to prevent corrupted data from being synced.
    */
   closeSessionAsync(finalTime?: number): void {
     this.stopAutoSync();
@@ -273,6 +339,19 @@ class SessionService {
     // Capture session data before clearing
     const sessionToClose = this.currentSession;
     const sessionId = sessionToClose.id;
+    const duration = sessionToClose.duration;
+
+    // VALIDATION: Sanitize finalTime before sending
+    let sanitizedFinalTime = finalTime;
+    if (finalTime !== undefined) {
+      if (finalTime < 0) {
+        audioLog.warn(`closeSessionAsync: Clamping negative position ${finalTime} to 0`);
+        sanitizedFinalTime = 0;
+      } else if (duration > 0 && finalTime > duration + 60) {
+        audioLog.warn(`closeSessionAsync: Clamping position ${finalTime} to duration ${duration}`);
+        sanitizedFinalTime = duration;
+      }
+    }
 
     // Backup chapters before clearing (for race condition safety)
     if (sessionToClose.chapters?.length) {
@@ -280,24 +359,45 @@ class SessionService {
     }
 
     log('Closing session (async):', sessionId);
-    if (finalTime !== undefined) {
-      log('  Final time:', formatDuration(finalTime));
+    if (sanitizedFinalTime !== undefined) {
+      log('  Final time:', formatDuration(sanitizedFinalTime));
     }
 
     // Clear immediately to prevent stale session usage
     this.currentSession = null;
 
-    // Fire and forget - session already cleared above
-    apiClient.post(`/api/session/${sessionId}/close`, {
-      currentTime: finalTime,
-      timeListened: 0,
-    }).catch((error) => {
-      audioLog.warn(`Close session ${sessionId} failed (non-blocking):`, error.message);
-    });
+    // Close with retry to prevent orphaned sessions
+    this.closeSessionWithRetry(sessionId, sanitizedFinalTime, 3);
+  }
+
+  /**
+   * Helper to close session with retries
+   */
+  private async closeSessionWithRetry(sessionId: string, finalTime: number | undefined, maxRetries: number): Promise<void> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await apiClient.post(`/api/session/${sessionId}/close`, {
+          currentTime: finalTime,
+          timeListened: 0,
+        });
+        log(`Session ${sessionId} closed successfully (attempt ${attempt})`);
+        return;
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (attempt === maxRetries) {
+          audioLog.warn(`Close session ${sessionId} failed after ${maxRetries} attempts:`, message);
+        } else {
+          log(`Close session ${sessionId} attempt ${attempt} failed, retrying...`);
+          // Wait before retry (exponential backoff: 500ms, 1000ms, 2000ms)
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+        }
+      }
+    }
   }
 
   /**
    * Close session and wait (for app shutdown)
+   * FIX: Added position validation to prevent corrupted data from being synced.
    */
   async closeSession(finalTime?: number): Promise<void> {
     this.stopAutoSync();
@@ -308,15 +408,29 @@ class SessionService {
     }
 
     const sessionId = this.currentSession.id;
+    const duration = this.currentSession.duration;
+
+    // VALIDATION: Sanitize finalTime before sending
+    let sanitizedFinalTime = finalTime;
+    if (finalTime !== undefined) {
+      if (finalTime < 0) {
+        audioLog.warn(`closeSession: Clamping negative position ${finalTime} to 0`);
+        sanitizedFinalTime = 0;
+      } else if (duration > 0 && finalTime > duration + 60) {
+        audioLog.warn(`closeSession: Clamping position ${finalTime} to duration ${duration}`);
+        sanitizedFinalTime = duration;
+      }
+    }
+
     logSection('CLOSE SESSION');
     log('Session ID:', sessionId);
-    if (finalTime !== undefined) {
-      log('Final time:', formatDuration(finalTime));
+    if (sanitizedFinalTime !== undefined) {
+      log('Final time:', formatDuration(sanitizedFinalTime));
     }
 
     try {
       await apiClient.post(`/api/session/${sessionId}/close`, {
-        currentTime: finalTime,
+        currentTime: sanitizedFinalTime,
         timeListened: 0,
       });
       log('Session closed successfully');

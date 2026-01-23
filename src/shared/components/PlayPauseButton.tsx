@@ -20,6 +20,7 @@ import {
   ActivityIndicator,
   StyleProp,
   ViewStyle,
+  View,
 } from 'react-native';
 import { Play, Pause } from 'lucide-react-native';
 import { haptics } from '@/core/native/haptics';
@@ -50,8 +51,10 @@ export interface PlayPauseButtonProps {
   size?: PlayPauseButtonSize;
   /** Whether button is disabled */
   disabled?: boolean;
-  /** Whether to show loading spinner instead of icon */
+  /** Whether to show loading spinner instead of icon (initial load) */
   loading?: boolean;
+  /** Whether audio is buffering (streaming stall) - shows spinner with play/pause */
+  isBuffering?: boolean;
   /** Accessibility label override */
   accessibilityLabel?: string;
   /** Additional styles for the container */
@@ -70,6 +73,7 @@ export function PlayPauseButton({
   size = 'md',
   disabled = false,
   loading = false,
+  isBuffering = false,
   accessibilityLabel,
   style,
   hapticFeedback = true,
@@ -128,7 +132,10 @@ export function PlayPauseButton({
 
   // Generate accessibility label
   const label = accessibilityLabel ||
-    (loading ? 'Loading' : isPlaying ? 'Pause' : 'Play');
+    (loading ? 'Loading' : isBuffering ? 'Buffering' : isPlaying ? 'Pause' : 'Play');
+
+  // Smaller icon when buffering to make room for spinner
+  const bufferingIconSize = Math.round(iconSize * 0.7);
 
   // Button container styles
   const buttonStyles = useMemo<StyleProp<ViewStyle>>(() => [
@@ -157,6 +164,31 @@ export function PlayPauseButton({
     >
       {loading ? (
         <ActivityIndicator size={iconSize} color={iconColor} />
+      ) : isBuffering ? (
+        // Buffering: show spinner around smaller play/pause icon
+        <View style={styles.bufferingContainer}>
+          <ActivityIndicator
+            size={buttonSize * 0.85}
+            color={iconColor}
+            style={styles.bufferingSpinner}
+          />
+          {isPlaying ? (
+            <Pause
+              size={bufferingIconSize}
+              color={iconColor}
+              fill={iconColor}
+              strokeWidth={0}
+            />
+          ) : (
+            <Play
+              size={bufferingIconSize}
+              color={iconColor}
+              fill={iconColor}
+              strokeWidth={0}
+              style={{ marginLeft: scale(1) }}
+            />
+          )}
+        </View>
       ) : isPlaying ? (
         <Pause
           size={iconSize}
@@ -199,6 +231,14 @@ const styles = StyleSheet.create({
   // Slight offset to visually center play triangle (optical centering)
   playIconOffset: {
     marginLeft: scale(2),
+  },
+  // Buffering state: spinner around icon
+  bufferingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bufferingSpinner: {
+    position: 'absolute',
   },
 });
 

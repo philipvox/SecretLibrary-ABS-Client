@@ -1,8 +1,10 @@
 package com.secretlibrary.app
 import expo.modules.splashscreen.SplashScreenManager
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -12,6 +14,10 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  companion object {
+    private const val TAG = "MainActivity"
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.
@@ -21,6 +27,19 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
+    Log.d(TAG, "onCreate called")
+  }
+
+  /**
+   * Handle new intents when the activity already exists (singleTask mode).
+   * This is critical for Android Auto - when it tries to launch the app,
+   * if the app is already running, this method receives the intent instead
+   * of creating a new activity instance.
+   */
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent) // Update the activity's intent
+    Log.d(TAG, "onNewIntent called: ${intent.action}")
   }
 
   /**

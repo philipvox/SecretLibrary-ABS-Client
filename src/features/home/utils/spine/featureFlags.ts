@@ -6,6 +6,9 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createLogger } from '@/shared/utils/logger';
+
+const log = createLogger('SpineSystem');
 
 // =============================================================================
 // FEATURE FLAG CONFIGURATION
@@ -63,7 +66,7 @@ export function isSpineFeatureEnabled(feature: keyof typeof SPINE_FEATURE_FLAGS)
  * Call this from dev tools or error boundary.
  */
 export function disableNewSpineSystem(): void {
-  console.warn('[SpineSystem] Rolling back to old system');
+  log.warn('Rolling back to old system');
   USE_NEW_SPINE_SYSTEM = false;
   AsyncStorage.setItem('spine:useNewSystem', 'false');
 }
@@ -72,7 +75,7 @@ export function disableNewSpineSystem(): void {
  * Re-enable new spine system.
  */
 export function enableNewSpineSystem(): void {
-  console.log('[SpineSystem] Enabling new system');
+  log.debug('Enabling new system');
   USE_NEW_SPINE_SYSTEM = true;
   AsyncStorage.setItem('spine:useNewSystem', 'true');
 }
@@ -81,7 +84,7 @@ export function enableNewSpineSystem(): void {
  * Disable specific feature.
  */
 export function disableSpineFeature(feature: keyof typeof SPINE_FEATURE_FLAGS): void {
-  console.warn(`[SpineSystem] Disabling feature: ${feature}`);
+  log.warn(`Disabling feature: ${feature}`);
   SPINE_FEATURE_FLAGS[feature] = false;
 }
 
@@ -93,10 +96,10 @@ export async function loadSpineFeatureFlags(): Promise<void> {
     const stored = await AsyncStorage.getItem('spine:useNewSystem');
     if (stored !== null) {
       USE_NEW_SPINE_SYSTEM = stored === 'true';
-      console.log('[SpineSystem] Loaded flag:', USE_NEW_SPINE_SYSTEM ? 'NEW' : 'OLD');
+      log.debug('Loaded flag:', USE_NEW_SPINE_SYSTEM ? 'NEW' : 'OLD');
     }
   } catch (error) {
-    console.error('[SpineSystem] Failed to load flags:', error);
+    log.error('Failed to load flags:', error);
   }
 }
 
@@ -123,8 +126,5 @@ if (__DEV__) {
     disableFeature: disableSpineFeature,
   };
 
-  console.log('[SpineSystem] Dev helpers available:');
-  console.log('  __spineSystem.enable()  - Enable new system');
-  console.log('  __spineSystem.disable() - Rollback to old system');
-  console.log('  __spineSystem.getFlags() - Check current flags');
+  log.debug('Dev helpers available: __spineSystem.enable(), __spineSystem.disable(), __spineSystem.getFlags()');
 }

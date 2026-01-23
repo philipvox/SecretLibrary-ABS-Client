@@ -78,6 +78,30 @@ export function clampPosition(position: number, duration: number): number {
 }
 
 /**
+ * Validate position data for sync operations.
+ * Returns error message if invalid, null if valid.
+ * Use this for data integrity checks where you want to REJECT bad data (not clamp it).
+ *
+ * @param position - Position to validate
+ * @param duration - Expected duration (0 if unknown)
+ * @param tolerance - How far past duration is allowed (default 60s for buffering)
+ * @returns Error message if invalid, null if valid
+ */
+export function validatePositionForSync(
+  position: number,
+  duration: number,
+  tolerance: number = 60
+): string | null {
+  if (position < 0) {
+    return `Negative position: ${position}`;
+  }
+  if (duration > 0 && position > duration + tolerance) {
+    return `Position ${position} exceeds duration ${duration} by more than ${tolerance}s`;
+  }
+  return null;
+}
+
+/**
  * Calculate position after skip (forward or backward).
  *
  * @param currentPosition - Current position in seconds

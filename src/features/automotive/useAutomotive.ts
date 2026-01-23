@@ -106,12 +106,9 @@ export function useAutomotive() {
   const { handleAction } = useAutomotiveActions();
 
   useEffect(() => {
-    // Set up action handler on automotive service
-    automotiveService.setCallbacks({
-      onConnect: () => {},
-      onDisconnect: () => {},
-      onAction: handleAction,
-    });
+    // Update only the action handler, preserving connection callbacks
+    // Note: useAutomotiveConnection already sets up onConnect/onDisconnect
+    automotiveService.setActionHandler(handleAction);
   }, [handleAction]);
 
   return {

@@ -14,6 +14,7 @@ import {
   Modal,
   Pressable,
   Image,
+  Platform,
 } from 'react-native';
 import { BookOpen, CheckCircle, Check, RotateCcw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,8 +41,9 @@ export function BookCompletionSheet() {
     dismissCompletionSheet();
   }, [dismissCompletionSheet]);
 
+  // Return empty View on Android to prevent SafeAreaProvider crash
   if (!showCompletionSheet || !completionSheetBook) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   // Get book metadata

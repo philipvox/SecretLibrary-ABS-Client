@@ -1,14 +1,15 @@
 /**
  * src/features/library/screens/AuthorsListScreen.tsx
  *
- * Browse all authors with:
- * - A-Z scrubber (iOS Contacts pattern)
- * - "Your Authors" section (based on listening history)
- * - Search functionality
- * - Sort by name, book count, recently added
+ * Redesigned Author Browse page matching GenresListScreen pattern:
+ * - View mode toggle (grouped vs flat A-Z)
+ * - Your Authors section (personalized from listening history)
+ * - Popular Authors section (top by book count)
+ * - Browse by Category (grouped by primary genre)
+ * - Collapsible meta-category sections
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,30 +18,32 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLibraryCache, getAllAuthors } from '@/core/cache';
+import { useLibraryCache } from '@/core/cache';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, UserIcon } from '@/shared/components';
+import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, UserIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { spacing, radius, useTheme } from '@/shared/theme';
+import { spacing, radius, useTheme, scale } from '@/shared/theme';
+import {
+  META_CATEGORIES,
+  MetaCategory,
+  getMetaCategoryForGenre,
+} from '../constants/genreCategories';
+import {
+  PersonWithData,
+  YourPersonsSection,
+  PopularPersonsSection,
+  MetaCategoryPersonSection,
+} from '../components/PersonSections';
+import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 
-type SortType = 'name' | 'bookCount' | 'recent';
-
-interface AuthorWithGenres {
-  id?: string;
-  name: string;
-  bookCount: number;
-  imagePath?: string;
-  description?: string;
-  topGenres: string[];
-  addedAt?: number;
-}
+type ViewMode = 'grouped' | 'flat';
 
 // Avatar color generator based on name
 const AVATAR_COLORS = [
@@ -64,110 +67,172 @@ export function AuthorsListScreen() {
   const accent = colors.accent.primary;
   const sectionListRef = useRef<SectionList>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortType>('name');
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const { refreshCache, isLoaded, filterItems } = useLibraryCache();
+  // Mark as mounted after first render and hide global loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+      globalLoading.hide();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const { refreshCache, isLoaded } = useLibraryCache();
+  const authorsMap = useLibraryCache((s) => s.authors);
   const { items: inProgressItems } = useContinueListening();
 
-  // Get all authors with genre info
-  const authorsWithGenres = useMemo((): AuthorWithGenres[] => {
-    const allAuthors = getAllAuthors();
-    return allAuthors.map(author => {
-      // Get top genres from this author's books
+  // Get all authors with genre info and meta-category (from pre-indexed cache)
+  const authorsWithData = useMemo((): PersonWithData[] => {
+    if (!authorsMap || authorsMap.size === 0) return [];
+
+    return Array.from(authorsMap.values()).map(author => {
+      // Count genres across all books (books already indexed in cache)
       const genreCounts = new Map<string, number>();
+      const sampleBookIds: string[] = [];
+
       author.books?.forEach(book => {
+        if (sampleBookIds.length < 3) {
+          sampleBookIds.push(book.id);
+        }
         const genres = (book.media?.metadata as any)?.genres || [];
         genres.forEach((genre: string) => {
           genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
         });
       });
-      const topGenres = [...genreCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 2)
-        .map(([genre]) => genre);
+
+      // Find primary genre (most common)
+      const primaryGenre = [...genreCounts.entries()]
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+      // Map to meta-category
+      const metaCategory = primaryGenre ? getMetaCategoryForGenre(primaryGenre) : null;
 
       return {
         id: author.id,
         name: author.name,
         bookCount: author.bookCount,
         imagePath: author.imagePath,
-        description: author.description,
-        topGenres,
-        addedAt: (author as any).addedAt,
+        primaryGenre,
+        metaCategoryId: metaCategory?.id || null,
+        sampleBookIds,
+        books: author.books, // Keep reference for yourAuthors lookup
       };
     });
-  }, [isLoaded]);
+  }, [authorsMap]);
 
   // Filter by search query
   const filteredAuthors = useMemo(() => {
-    if (!searchQuery.trim()) return authorsWithGenres;
+    if (!searchQuery.trim()) return authorsWithData;
     const lowerQuery = searchQuery.toLowerCase();
-    return authorsWithGenres.filter(a => a.name.toLowerCase().includes(lowerQuery));
-  }, [authorsWithGenres, searchQuery]);
-
-  // Sort authors
-  const sortedAuthors = useMemo(() => {
-    const sorted = [...filteredAuthors];
-    switch (sortBy) {
-      case 'name':
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'bookCount':
-        sorted.sort((a, b) => b.bookCount - a.bookCount);
-        break;
-      case 'recent':
-        sorted.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-        break;
-    }
-    return sorted;
-  }, [filteredAuthors, sortBy]);
+    return authorsWithData.filter(a => a.name.toLowerCase().includes(lowerQuery));
+  }, [authorsWithData, searchQuery]);
 
   // Get "Your Authors" - authors from books user is listening to
-  const yourAuthors = useMemo((): AuthorWithGenres[] => {
+  const yourAuthors = useMemo((): PersonWithData[] => {
     const listenedBookIds = new Set(inProgressItems.map(item => item.id));
     if (listenedBookIds.size === 0) return [];
 
     const authorCounts = new Map<string, number>();
-    authorsWithGenres.forEach(author => {
-      const listenedCount = author.bookCount > 0 ?
-        (filterItems({ authors: [author.name] }) || []).filter(b => listenedBookIds.has(b.id)).length : 0;
+    authorsWithData.forEach(author => {
+      // Use pre-indexed books from cache instead of filterItems
+      const listenedCount = (author.books || []).filter(b => listenedBookIds.has(b.id)).length;
       if (listenedCount > 0) {
         authorCounts.set(author.name, listenedCount);
       }
     });
 
-    return authorsWithGenres
+    return authorsWithData
       .filter(a => authorCounts.has(a.name))
       .sort((a, b) => (authorCounts.get(b.name) || 0) - (authorCounts.get(a.name) || 0))
-      .slice(0, 8);
-  }, [authorsWithGenres, inProgressItems, filterItems]);
+      .slice(0, 5);
+  }, [authorsWithData, inProgressItems]);
 
-  // Create sections for A-Z list
-  const sections = useMemo(() => {
-    if (sortBy !== 'name') {
-      // Non-alphabetical sort - single section
-      return [{ title: '', data: sortedAuthors }];
-    }
+  // Get popular authors (top 6 by book count)
+  const popularAuthors = useMemo((): PersonWithData[] => {
+    return [...filteredAuthors]
+      .sort((a, b) => b.bookCount - a.bookCount)
+      .slice(0, 6);
+  }, [filteredAuthors]);
 
-    const sectionMap = new Map<string, AuthorWithGenres[]>();
-    sortedAuthors.forEach(author => {
-      const letter = author.name[0].toUpperCase();
-      const section = sectionMap.get(letter) || [];
-      section.push(author);
-      sectionMap.set(letter, section);
+  // Group authors by meta-category
+  const authorsByCategory = useMemo(() => {
+    const grouped = new Map<MetaCategory, PersonWithData[]>();
+
+    // Initialize all categories
+    META_CATEGORIES.forEach(cat => grouped.set(cat, []));
+
+    // Assign authors
+    filteredAuthors.forEach(author => {
+      const category = META_CATEGORIES.find(c => c.id === author.metaCategoryId);
+      if (category) {
+        const existing = grouped.get(category) || [];
+        existing.push(author);
+        grouped.set(category, existing);
+      } else {
+        // Fallback to Fiction
+        const fiction = META_CATEGORIES[0];
+        const existing = grouped.get(fiction) || [];
+        existing.push(author);
+        grouped.set(fiction, existing);
+      }
     });
 
-    return [...sectionMap.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([title, data]) => ({ title, data }));
-  }, [sortedAuthors, sortBy]);
+    // Sort authors within each category by book count
+    grouped.forEach((authors, category) => {
+      authors.sort((a, b) => b.bookCount - a.bookCount);
+    });
 
-  // Available letters for scrubber
+    return grouped;
+  }, [filteredAuthors]);
+
+  // Get total books per category
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    authorsByCategory.forEach((authors, category) => {
+      totals.set(category.id, authors.reduce((sum, a) => sum + a.bookCount, 0));
+    });
+    return totals;
+  }, [authorsByCategory]);
+
+  // Flat list sections (A-Z) for SectionList
+  const flatSections = useMemo(() => {
+    const sorted = [...filteredAuthors].sort((a, b) => a.name.localeCompare(b.name));
+    const sections: { title: string; data: PersonWithData[] }[] = [];
+
+    sorted.forEach(author => {
+      const letter = author.name[0].toUpperCase();
+      const existing = sections.find(s => s.title === letter);
+      if (existing) {
+        existing.data.push(author);
+      } else {
+        sections.push({ title: letter, data: [author] });
+      }
+    });
+
+    return sections;
+  }, [filteredAuthors]);
+
+  // Available letters for alphabet index
   const availableLetters = useMemo(() => {
-    if (sortBy !== 'name') return [];
-    return sections.filter(s => s.title).map(s => s.title);
-  }, [sections, sortBy]);
+    return flatSections.map(s => s.title);
+  }, [flatSections]);
+
+  // Handle alphabet letter press - scroll to section
+  const handleLetterPress = useCallback((letter: string) => {
+    const sectionIndex = flatSections.findIndex(s => s.title === letter);
+    if (sectionIndex >= 0 && sectionListRef.current) {
+      sectionListRef.current.scrollToLocation({
+        sectionIndex,
+        itemIndex: 0,
+        animated: true,
+        viewPosition: 0,
+      });
+    }
+  }, [flatSections]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -181,17 +246,17 @@ export function AuthorsListScreen() {
     navigation.navigate('AuthorDetail', { authorName });
   };
 
-  const handleLetterPress = useCallback((letter: string) => {
-    const sectionIndex = sections.findIndex(s => s.title === letter);
-    if (sectionIndex >= 0 && sectionListRef.current) {
-      sectionListRef.current.scrollToLocation({
-        sectionIndex,
-        itemIndex: 0,
-        animated: true,
-        viewPosition: 0,
-      });
-    }
-  }, [sections]);
+  const handleToggleCategory = useCallback((categoryId: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -204,8 +269,19 @@ export function AuthorsListScreen() {
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Render author list item
-  const renderAuthorItem = ({ item }: { item: AuthorWithGenres }) => (
+  if (!isLoaded) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Render author list item for flat view
+  const renderAuthorItem = ({ item }: { item: PersonWithData }) => (
     <TouchableOpacity
       style={styles.authorRow}
       onPress={() => handleAuthorPress(item.name)}
@@ -229,50 +305,117 @@ export function AuthorsListScreen() {
       <View style={styles.authorInfo}>
         <Text style={[styles.authorName, { color: colors.text.primary }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.bookCount, { color: colors.text.secondary }]}>{item.bookCount} books in library</Text>
-        {item.topGenres.length > 0 && (
-          <Text style={[styles.genres, { color: colors.text.tertiary }]} numberOfLines={1}>
-            {item.topGenres.join(', ')}
-          </Text>
-        )}
       </View>
     </TouchableOpacity>
   );
 
-  // Render "Your Authors" card
-  const renderYourAuthorCard = (author: AuthorWithGenres) => (
-    <TouchableOpacity
-      key={author.name}
-      style={styles.yourAuthorCard}
-      onPress={() => handleAuthorPress(author.name)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.yourAuthorAvatar, { backgroundColor: getAvatarColor(author.name) }]}>
-        {author.id && author.imagePath ? (
-          <Image
-            source={apiClient.getAuthorImageUrl(author.id)}
-            style={styles.yourAuthorAvatarImage}
-            contentFit="cover"
-            cachePolicy="memory-disk"
+  // Render grouped view
+  const renderGroupedView = () => (
+    <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Your Authors Section */}
+        {!isSearching && yourAuthors.length > 0 && (
+          <YourPersonsSection
+            persons={yourAuthors}
+            onPersonPress={handleAuthorPress}
+            type="author"
           />
-        ) : (
-          <Text style={styles.yourAuthorAvatarText}>{getInitials(author.name)}</Text>
         )}
-      </View>
-      <Text style={[styles.yourAuthorName, { color: colors.text.primary }]} numberOfLines={2}>{author.name}</Text>
-      <Text style={[styles.yourAuthorBooks, { color: colors.text.secondary }]}>{author.bookCount} books</Text>
-    </TouchableOpacity>
+
+        {/* Popular Authors Section */}
+        {!isSearching && (
+          <PopularPersonsSection
+            persons={popularAuthors}
+            onPersonPress={handleAuthorPress}
+            type="author"
+          />
+        )}
+
+        {/* Browse by Category Header */}
+        {!isSearching && (
+          <View style={styles.browseHeader}>
+            <Text style={[styles.browseTitle, { color: colors.text.secondary }]}>Browse by Category</Text>
+          </View>
+        )}
+
+        {/* Meta-Category Sections */}
+        {META_CATEGORIES.map(category => {
+          const authors = authorsByCategory.get(category) || [];
+          if (authors.length === 0) return null;
+
+          return (
+            <MetaCategoryPersonSection
+              key={category.id}
+              metaCategory={category}
+              persons={authors}
+              totalBooks={categoryTotals.get(category.id) || 0}
+              isExpanded={expandedCategories.has(category.id)}
+              onToggle={() => handleToggleCategory(category.id)}
+              onPersonPress={handleAuthorPress}
+              type="author"
+              label={`${category.name} Authors`}
+            />
+          );
+        })}
+
+        {/* Empty State */}
+        {filteredAuthors.length === 0 && (
+          <View style={styles.emptyState}>
+            <Icon name="Search" size={48} color={colors.text.tertiary} />
+            <Text style={[styles.emptyText, { color: colors.text.primary }]}>No authors found</Text>
+            <Text style={[styles.emptySubtext, { color: colors.text.secondary }]}>Try a different search term</Text>
+          </View>
+        )}
+      </ScrollView>
+    </SkullRefreshControl>
   );
 
-  if (!isLoaded) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading...</Text>
+  // Render flat A-Z view with SectionList
+  const renderFlatView = () => (
+    <View style={styles.flatContainer}>
+      <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+        <SectionList
+          ref={sectionListRef}
+          sections={flatSections}
+          keyExtractor={(item) => item.name}
+          stickySectionHeadersEnabled
+          contentContainerStyle={{ paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom, paddingRight: 28 }}
+          showsVerticalScrollIndicator={false}
+          renderSectionHeader={({ section }) => (
+            <View style={[styles.sectionHeader, { backgroundColor: colors.background.primary }]}>
+              <Text style={[styles.sectionHeaderText, { color: accent }]}>{section.title}</Text>
+            </View>
+          )}
+          renderItem={renderAuthorItem}
+          onScrollToIndexFailed={() => {}}
+          getItemLayout={(data, index) => ({
+            length: 72,
+            offset: 72 * index,
+            index,
+          })}
+        />
+      </SkullRefreshControl>
+
+      {/* Custom Alphabet Index */}
+      {availableLetters.length > 1 && (
+        <View style={[styles.alphabetIndex, { bottom: SCREEN_BOTTOM_PADDING + insets.bottom + 60 }]}>
+          {availableLetters.map((letter) => (
+            <TouchableOpacity
+              key={letter}
+              style={styles.alphabetLetterButton}
+              onPress={() => handleLetterPress(letter)}
+            >
+              <Text style={[styles.alphabetLetter, { color: accent }]}>{letter}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </View>
-    );
-  }
+      )}
+    </View>
+  );
 
   const handleLogoPress = useCallback(() => {
     navigation.navigate('Main', { screen: 'HomeTab' });
@@ -281,6 +424,9 @@ export function AuthorsListScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+
+      {/* Loading overlay for initial load */}
+      <ScreenLoadingOverlay visible={!mounted} />
 
       {/* TopNav with skull logo and integrated search bar */}
       <TopNav
@@ -309,73 +455,40 @@ export function AuthorsListScreen() {
         }}
       />
 
-      {/* Sort Bar */}
-      <View style={styles.sortBar}>
+      {/* View Mode Toggle & Count */}
+      <View style={styles.controlBar}>
         <Text style={[styles.resultCount, { color: colors.text.secondary }]}>{filteredAuthors.length} authors</Text>
-        <View style={styles.sortButtons}>
-          {(['name', 'bookCount', 'recent'] as SortType[]).map(type => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.sortButton, { backgroundColor: colors.border.default }, sortBy === type && { backgroundColor: accent }]}
-              onPress={() => setSortBy(type)}
-            >
-              <Text style={[styles.sortButtonText, { color: colors.text.secondary }, sortBy === type && [styles.sortButtonTextActive, { color: colors.text.inverse }]]}>
-                {type === 'name' ? 'A-Z' : type === 'bookCount' ? 'Books' : 'Recent'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={[
+          styles.viewToggle,
+          {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+          }
+        ]}>
+          <TouchableOpacity
+            style={[styles.toggleButton, viewMode === 'grouped' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
+            onPress={() => setViewMode('grouped')}
+          >
+            <Icon
+              name="LayoutGrid"
+              size={16}
+              color={viewMode === 'grouped' ? colors.text.primary : colors.text.tertiary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButton, viewMode === 'flat' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
+            onPress={() => setViewMode('flat')}
+          >
+            <Icon
+              name="List"
+              size={16}
+              color={viewMode === 'flat' ? colors.text.primary : colors.text.tertiary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-          <SectionList
-            ref={sectionListRef}
-            sections={sections}
-            keyExtractor={(item) => item.name}
-            stickySectionHeadersEnabled={sortBy === 'name'}
-            contentContainerStyle={{ paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom, paddingRight: sortBy === 'name' ? 28 : 0 }}
-            showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            !isSearching && yourAuthors.length > 0 ? (
-              <View style={styles.yourAuthorsSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>Your Authors</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.yourAuthorsScroll}
-                >
-                  {yourAuthors.map(renderYourAuthorCard)}
-                </ScrollView>
-              </View>
-            ) : null
-          }
-          renderSectionHeader={({ section }) =>
-            section.title ? (
-              <View style={[styles.letterHeader, { backgroundColor: colors.background.primary }]}>
-                <Text style={[styles.letterText, { color: accent }]}>{section.title}</Text>
-              </View>
-            ) : null
-          }
-          renderItem={renderAuthorItem}
-          onScrollToIndexFailed={() => {}}
-          getItemLayout={(data, index) => ({
-            length: 72,
-            offset: 72 * index,
-            index,
-          })}
-          />
-        </SkullRefreshControl>
-
-        {/* A-Z Scrubber */}
-        <AlphabetScrubber
-          letters={availableLetters}
-          onLetterSelect={handleLetterPress}
-          visible={availableLetters.length > 1 && !isSearching}
-          style={{ bottom: SCREEN_BOTTOM_PADDING + insets.bottom + 60 }}
-        />
-      </View>
+      {/* Content */}
+      {viewMode === 'grouped' || isSearching ? renderGroupedView() : renderFlatView()}
     </View>
   );
 }
@@ -383,30 +496,6 @@ export function AuthorsListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor set via themeColors.background in JSX
-  },
-  searchRow: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    // backgroundColor set via themeColors.border in JSX
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  searchInput: {
-    flex: 1,
-    // color set via themeColors.text in JSX
-    fontSize: 15,
-    marginLeft: 8,
-    paddingVertical: 0,
-  },
-  clearButton: {
-    padding: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -414,10 +503,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    // color set via themeColors.textSecondary in JSX
     fontSize: 16,
   },
-  sortBar: {
+  controlBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -425,94 +513,84 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   resultCount: {
-    // color set via themeColors.textSecondary in JSX
     fontSize: 14,
   },
-  sortButtons: {
+  viewToggle: {
     flexDirection: 'row',
-    gap: 8,
+    borderRadius: 8,
+    padding: 2,
   },
-  sortButton: {
+  toggleButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
-    // backgroundColor set via themeColors.border in JSX
+    borderRadius: 6,
   },
-  sortButtonActive: {
-    // backgroundColor set dynamically via accent in JSX
-  },
-  sortButtonText: {
-    fontSize: 12,
-    // color set via themeColors.textSecondary in JSX
-    fontWeight: '500',
-  },
-  sortButtonTextActive: {
-    // color applied inline via colors.text.inverse
+  toggleButtonActive: {
+    // backgroundColor applied inline
   },
   content: {
     flex: 1,
   },
-  // Your Authors section
-  yourAuthorsSection: {
-    marginBottom: 16,
+  scrollContent: {
+    paddingTop: 8,
   },
-  sectionTitle: {
+  flatContainer: {
+    flex: 1,
+  },
+  browseHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  browseTitle: {
     fontSize: 13,
     fontWeight: '600',
-    // color set via themeColors.textSecondary in JSX
     letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    marginBottom: 12,
   },
-  yourAuthorsScroll: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  yourAuthorCard: {
-    width: 100,
-    alignItems: 'center',
-  },
-  yourAuthorAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    overflow: 'hidden',
+    paddingTop: 80,
   },
-  yourAuthorAvatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  yourAuthorAvatarText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000', // Black on colored avatar (intentional)
-  },
-  yourAuthorName: {
-    fontSize: 13,
+  emptyText: {
+    fontSize: 18,
     fontWeight: '600',
-    // color set via themeColors.text in JSX
-    textAlign: 'center',
-    marginBottom: 2,
+    marginTop: 16,
   },
-  yourAuthorBooks: {
-    fontSize: 11,
-    // color set via themeColors.textSecondary in JSX
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 4,
   },
-  // Letter header
-  letterHeader: {
-    // backgroundColor set via themeColors.background in JSX
+  // Flat view styles
+  sectionHeader: {
     paddingVertical: 6,
     paddingHorizontal: 16,
   },
-  letterText: {
+  sectionHeaderText: {
     fontSize: 14,
     fontWeight: '700',
-    // color set dynamically via accent in JSX
   },
-  // Author row
+  alphabetIndex: {
+    position: 'absolute',
+    right: 2,
+    top: 8,
+    width: 24,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  alphabetLetterButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 24,
+    minHeight: 14,
+  },
+  alphabetLetter: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  // Author row for flat view
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -536,7 +614,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000', // Black on colored avatar (intentional)
+    color: '#000',
   },
   authorInfo: {
     flex: 1,
@@ -544,16 +622,10 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 16,
     fontWeight: '500',
-    // color set via themeColors.text in JSX
     marginBottom: 2,
   },
   bookCount: {
     fontSize: 14,
-    // color set via themeColors.textSecondary in JSX
     marginBottom: 2,
-  },
-  genres: {
-    fontSize: 12,
-    // color set via themeColors.textTertiary in JSX
   },
 });

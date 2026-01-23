@@ -105,7 +105,7 @@ export const ContinueListeningHero = memo(function ContinueListeningHero({
 }: ContinueListeningHeroProps) {
   const colors = useColors();
   const { title, author, narrator } = getMetadata(book);
-  const coverUrl = apiClient.getItemCoverUrl(book.id);
+  const coverUrl = apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 });
   const progressPercent = Math.round(progress * 100);
 
   // Get current chapter from userMediaProgress

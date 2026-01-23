@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, InteractionManager } from 'react-native';
+import { StyleSheet, InteractionManager, View } from 'react-native';
 import { NavigationContainer, NavigationContainerRef, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -20,7 +20,8 @@ import { NarratorsListScreen } from '@/features/library/screens/NarratorsListScr
 import { GenresListScreen } from '@/features/library/screens/GenresListScreen';
 import { GenreDetailScreen } from '@/features/library/screens/GenreDetailScreen';
 import { FilteredBooksScreen } from '@/features/library/screens/FilteredBooksScreen';
-import { HomeScreen, LibraryScreen } from '@/features/home';
+import { AllBooksScreen } from '@/features/library/screens/AllBooksScreen';
+import { LibraryScreen } from '@/features/home';
 import { MyLibraryScreen } from '@/features/library';
 import { CassetteTestScreen } from '@/features/home/screens/CassetteTestScreen';
 import { SpineTemplatePreviewScreen } from '@/features/home/screens/SpineTemplatePreviewScreen';
@@ -64,14 +65,6 @@ const AppTheme = {
 };
 
 // Wrap main tab screens with error boundaries for crash prevention
-function HomeScreenWithBoundary() {
-  return (
-    <ErrorBoundary context="HomeScreen" level="screen">
-      <HomeScreen />
-    </ErrorBoundary>
-  );
-}
-
 function SecretLibraryScreenWithBoundary() {
   return (
     <ErrorBoundary context="LibraryScreen" level="screen">
@@ -246,7 +239,7 @@ function AuthenticatedApp() {
     }
   }, [library?.id, loadCache]);
 
-  // Render immediately - HomeScreen handles empty state gracefully
+  // Render immediately - LibraryScreen handles empty state gracefully
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -262,13 +255,21 @@ function AuthenticatedApp() {
         <Stack.Screen name="GenresList" component={GenresListScreen} />
         <Stack.Screen name="GenreDetail" component={GenreDetailScreen} />
         <Stack.Screen name="FilteredBooks" component={FilteredBooksScreen} />
+        <Stack.Screen name="AllBooks" component={AllBooksScreen} />
         <Stack.Screen name="DurationFilter" component={DurationFilterScreen} />
         <Stack.Screen name="BrowsePage" component={SecretLibraryBrowseScreen} />
         <Stack.Screen name="SeriesDetail" component={SeriesDetailScreenWithBoundary} />
         <Stack.Screen name="AuthorDetail" component={AuthorDetailScreenWithBoundary} />
         <Stack.Screen name="NarratorDetail" component={NarratorDetailScreenWithBoundary} />
         <Stack.Screen name="CollectionDetail" component={CollectionDetailScreen} />
-        <Stack.Screen name="BookDetail" component={BookDetailScreenWithBoundary} />
+        <Stack.Screen
+          name="BookDetail"
+          component={BookDetailScreenWithBoundary}
+          options={({ route }) => ({
+            // No animation for series carousel - we handle it ourselves
+            animation: (route.params as any)?.animationDirection ? 'none' : 'default',
+          })}
+        />
         <Stack.Screen name="Preferences" component={PreferencesScreen} />
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
         <Stack.Screen name="Downloads" component={DownloadsScreen} />
@@ -314,12 +315,16 @@ function AuthenticatedApp() {
           options={{ presentation: 'modal' }}
         />
       </Stack.Navigator>
-      <SecretLibraryPlayerScreen />
-      <GlobalMiniPlayer />
-      {/* <NavigationBar /> */}
-      <NetworkStatusBar />
-      <BookCompletionSheet />
-      <ToastContainer />
+      {/* Wrap overlay components in stable View to prevent Android SafeAreaProvider crash */}
+      {/* The View always renders; children can conditionally return null inside */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <SecretLibraryPlayerScreen />
+        <GlobalMiniPlayer />
+        {/* <NavigationBar /> */}
+        <NetworkStatusBar />
+        <BookCompletionSheet />
+        <ToastContainer />
+      </View>
     </NavigationContainer>
   );
 }

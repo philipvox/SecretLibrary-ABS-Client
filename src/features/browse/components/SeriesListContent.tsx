@@ -51,7 +51,7 @@ const SeriesFannedCard = memo(function SeriesFannedCard({ series }: SeriesFanned
     if (series.books && series.books.length > 0) {
       return series.books
         .slice(0, MAX_VISIBLE_BOOKS)
-        .map(book => apiClient.getItemCoverUrl(book.id));
+        .map(book => apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 }));
     }
     return [];
   }, [series.books]);

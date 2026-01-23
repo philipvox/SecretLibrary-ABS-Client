@@ -101,8 +101,9 @@ export function AlphabetScrubber({
     setContainerHeight(event.nativeEvent.layout.height);
   }, []);
 
+  // Return empty View on Android to prevent SafeAreaProvider crash
   if (!visible || letters.length <= 1) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   return (

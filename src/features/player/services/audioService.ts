@@ -28,6 +28,17 @@ try {
   audioLog.warn('[AudioService] expo-media-control not available (Expo Go mode)');
 }
 
+// Try to import audio-noisy-module for Android headphone unplug detection
+let AudioNoisyModule: any = null;
+try {
+  AudioNoisyModule = require('@modules/audio-noisy-module');
+} catch (e) {
+  // Module may not be available in Expo Go
+  if (Platform.OS === 'android') {
+    audioLog.warn('[AudioService] audio-noisy-module not available');
+  }
+}
+
 // Remote command callback type for chapter navigation
 type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter') => void;
 let remoteCommandCallback: RemoteCommandCallback | null = null;
@@ -40,6 +51,7 @@ import {
   formatDuration,
 } from '@/shared/utils/audioDebug';
 import { getErrorMessage } from '@/shared/utils/errorUtils';
+import { bufferRecoveryService } from './bufferRecoveryService';
 
 export interface PlaybackState {
   isPlaying: boolean;
@@ -57,7 +69,19 @@ export interface AudioTrackInfo {
   duration: number;
 }
 
+// Error types for error callback
+export type AudioErrorType = 'URL_EXPIRED' | 'NETWORK_ERROR' | 'LOAD_FAILED';
+
+export interface AudioError {
+  type: AudioErrorType;
+  message: string;
+  httpStatus?: number;      // HTTP status code if applicable
+  position?: number;        // Position when error occurred (for resume)
+  bookId?: string;          // Book ID for session refresh
+}
+
 type StatusCallback = (status: PlaybackState) => void;
+type ErrorCallback = (error: AudioError) => void;
 
 const DEBUG = __DEV__;
 const log = (...args: unknown[]) => audioLog.audio(args.map(String).join(' '));
@@ -68,6 +92,8 @@ class AudioService {
   private preloadedTrackIndex: number = -1; // Index of preloaded track
   private isSetup = false;
   private statusCallback: StatusCallback | null = null;
+  private errorCallback: ErrorCallback | null = null;  // Callback for errors like URL expiration
+  private currentBookId: string | null = null;  // Track current book for error reporting
   private currentUrl: string | null = null;
   private isLoaded = false;
   private progressInterval: NodeJS.Timeout | null = null;
@@ -83,6 +109,10 @@ class AudioService {
   private hasReachedEnd = false; // Prevent repeated end handling
   private mediaControlEnabled = false;
   private removeMediaControlListener: (() => void) | null = null;
+  private audioNoisySubscription: { remove: () => void } | null = null;  // Android headphone unplug
+
+  // Buffer recovery tracking
+  private wasBuffering = false;  // Track buffering state transitions
 
   // Dynamic polling rates for better performance
   private readonly POLL_RATE_PLAYING = 100;  // Sub-second accuracy (10 updates/sec)
@@ -90,7 +120,8 @@ class AudioService {
   private currentPollRate = 100;
 
   // Pre-buffer threshold (seconds before track end to start preloading)
-  private readonly PRELOAD_THRESHOLD = 30;
+  // 60 seconds gives ample time to prefetch next chapter for smooth transitions
+  private readonly PRELOAD_THRESHOLD = 60;
 
   // Media control position update counter (every N updates)
   private mediaControlUpdateCounter = 0;
@@ -115,6 +146,10 @@ class AudioService {
   private stuckDetectionLastPosition = 0;
   private stuckDetectionLastTime = 0;
   private readonly STUCK_THRESHOLD_MS = 5000; // 5 seconds without position change = stuck
+
+  // NETWORK RETRY CONFIG - for transient network failures (not 403/401)
+  private readonly MAX_LOAD_RETRIES = 3;
+  private readonly INITIAL_RETRY_DELAY_MS = 1000;  // 1s, 2s, 4s exponential backoff
 
   constructor() {
     // Pre-warm on construction - don't await, let it run in background
@@ -162,12 +197,17 @@ class AudioService {
       timing('Start');
 
       // Configure audio mode for background playback
+      // CRITICAL: Use 'doNotMix' to properly handle audio focus
+      // - On iOS: Pauses when other apps play audio (phone calls, Siri, etc.)
+      // - On Android: Pauses when audio focus is lost (calls, navigation, assistant)
       await setAudioModeAsync({
         playsInSilentMode: true,
         shouldPlayInBackground: true,
         shouldRouteThroughEarpiece: false,
+        interruptionMode: 'doNotMix', // iOS: Pause when other audio plays
+        interruptionModeAndroid: 'doNotMix', // Android: Pause on audio focus loss
       });
-      timing('setAudioModeAsync done');
+      timing('setAudioModeAsync done (with audio focus handling)');
 
       // Create the audio player with no source (will be set when loading audio)
       // Note: Empty string '' causes ExoPlayer to try opening "/" which fails on Android
@@ -185,6 +225,10 @@ class AudioService {
       // Initialize media controls for lock screen / notification
       await this.setupMediaControls();
       timing('media controls done');
+
+      // Set up Android headphone unplug detection
+      await this.setupAudioNoisyListener();
+      timing('audio noisy listener done');
 
       this.isSetup = true;
       log('expo-audio ready');
@@ -288,6 +332,36 @@ class AudioService {
     } catch (error) {
       audioLog.warn('Media controls setup failed:', getErrorMessage(error));
       // Non-fatal - continue without media controls
+    }
+  }
+
+  /**
+   * Set up Android headphone unplug detection.
+   * When headphones are unplugged, we pause playback automatically.
+   * iOS handles this natively through expo-audio's route change notification.
+   */
+  private async setupAudioNoisyListener(): Promise<void> {
+    // Only needed on Android - iOS handles this natively
+    if (Platform.OS !== 'android' || !AudioNoisyModule) {
+      return;
+    }
+
+    try {
+      // Start listening for audio becoming noisy events
+      await AudioNoisyModule.startListening();
+
+      // Add listener to pause when headphones are unplugged
+      this.audioNoisySubscription = AudioNoisyModule.addAudioNoisyListener(
+        (event: { reason: string; timestamp: number }) => {
+          audioLog.warn('[HEADPHONE_UNPLUG] Audio becoming noisy - pausing playback');
+          this.pause();
+        }
+      );
+
+      log('Audio noisy listener set up (Android headphone unplug detection)');
+    } catch (error) {
+      audioLog.warn('Audio noisy listener setup failed:', getErrorMessage(error));
+      // Non-fatal - playback continues without this feature
     }
   }
 
@@ -435,6 +509,8 @@ class AudioService {
     const currentPlayerPos = this.player?.currentTime || 0;
     const playerDuration = this.player?.duration || 0;
     log(`🔸 handleTrackEnd ENTRY: tracks=${this.tracks.length}, currentIndex=${this.currentTrackIndex}, playerPos=${currentPlayerPos.toFixed(1)}s, playerDur=${playerDuration.toFixed(1)}s, totalDur=${this.totalDuration.toFixed(1)}s`);
+    // DIAGNOSTIC: Always log track end to debug 2-chapter issue
+    console.error(`[AUDIO_DIAGNOSTIC] handleTrackEnd: track ${this.currentTrackIndex + 1}/${this.tracks.length}, playerPos=${currentPlayerPos.toFixed(1)}s, playerDur=${playerDuration.toFixed(1)}s`);
 
     // GUARD: Ignore spurious didJustFinish from pre-buffered tracks
     // Pre-buffered tracks can report didJustFinish=true with duration=0 or position=0
@@ -459,6 +535,8 @@ class AudioService {
       this.currentTrackIndex++;
       const nextTrack = this.tracks[this.currentTrackIndex];
       log(`Auto-advancing to track ${this.currentTrackIndex}: ${nextTrack.title}`);
+      // DIAGNOSTIC: Log track advance to help debug 2-chapter issue
+      console.error(`[AUDIO_DIAGNOSTIC] Auto-advancing to track ${this.currentTrackIndex + 1}/${this.tracks.length}: ${nextTrack.title}`);
 
       // Use preloaded player if available for seamless transition
       if (this.preloadedTrackIndex === this.currentTrackIndex && this.preloadPlayer) {
@@ -580,6 +658,8 @@ class AudioService {
       // Last track in multi-track mode finished
       this.hasReachedEnd = true;
       log(`Last track (${this.currentTrackIndex + 1}/${this.tracks.length}) finished - book complete`);
+      // DIAGNOSTIC: Always log when book is marked complete to debug 2-chapter issue
+      console.error(`[AUDIO_DIAGNOSTIC] BOOK MARKED COMPLETE: track ${this.currentTrackIndex + 1}/${this.tracks.length}, totalDuration=${this.totalDuration.toFixed(1)}s`);
       this.statusCallback?.({
         isPlaying: false,
         position: this.totalDuration,
@@ -654,6 +734,37 @@ class AudioService {
     }
   }
 
+  /**
+   * Set callback for playback errors (URL expiration, network errors)
+   * Used by playerStore to handle session refresh when URLs expire
+   */
+  setErrorCallback(callback: ErrorCallback | null): void {
+    this.errorCallback = callback;
+  }
+
+  /**
+   * Set the current book ID for error reporting
+   * Called when loading a book so errors can include bookId for session refresh
+   */
+  setCurrentBookId(bookId: string | null): void {
+    this.currentBookId = bookId;
+  }
+
+  /**
+   * Report an error to the error callback if set
+   */
+  private reportError(type: AudioErrorType, message: string, httpStatus?: number): void {
+    if (this.errorCallback) {
+      this.errorCallback({
+        type,
+        message,
+        httpStatus,
+        position: this.lastKnownGoodPosition,
+        bookId: this.currentBookId ?? undefined,
+      });
+    }
+  }
+
   // Track last logged position for periodic debug output
   private lastLoggedPosition: number = 0;
   private playbackStartTime: number = 0;
@@ -661,6 +772,39 @@ class AudioService {
   private startProgressUpdates(): void {
     this.stopProgressUpdates();
     this.playbackStartTime = Date.now();
+    this.wasBuffering = false;
+
+    // Start buffer recovery monitoring
+    bufferRecoveryService.start({
+      onRecoveryStart: () => {
+        log('Buffer recovery started');
+      },
+      onRecoverySuccess: () => {
+        log('Buffer recovery succeeded');
+      },
+      onRecoveryFailed: (attempts) => {
+        audioLog.error(`Buffer recovery failed after ${attempts} attempts`);
+        // Notify via error callback so UI can show user message
+        this.errorCallback?.({
+          type: 'NETWORK_ERROR',
+          message: 'Streaming interrupted - please check your connection',
+          position: this.getGlobalPositionSync(),
+          bookId: this.currentBookId || undefined,
+        });
+      },
+      getCurrentPosition: () => this.getGlobalPositionSync(),
+      onSeekForRecovery: async (newPosition) => {
+        await this.seekTo(newPosition);
+      },
+      retryPlay: async () => {
+        try {
+          await this.play();
+          return this.player?.playing || false;
+        } catch {
+          return false;
+        }
+      },
+    });
 
     const updateProgress = () => {
       if (!this.isLoaded || !this.player) return;
@@ -681,6 +825,14 @@ class AudioService {
         const position = this.getGlobalPositionSync();
         const isPlaying = this.player.playing;
         const isBuffering = this.player.isBuffering;
+
+        // Report buffering state transitions to buffer recovery service
+        if (isBuffering && !this.wasBuffering) {
+          bufferRecoveryService.reportBufferingStarted();
+        } else if (!isBuffering && this.wasBuffering) {
+          bufferRecoveryService.reportBufferingEnded();
+        }
+        this.wasBuffering = isBuffering;
 
         // DEBUG: Log every 60 seconds of playback progress
         if (isPlaying && position - this.lastLoggedPosition >= 60) {
@@ -770,6 +922,8 @@ class AudioService {
       clearInterval(this.progressInterval);
       this.progressInterval = null;
     }
+    // Stop buffer recovery monitoring
+    bufferRecoveryService.stop();
   }
 
   async loadAudio(
@@ -804,6 +958,9 @@ class AudioService {
       return;
     }
 
+    // Reset buffer recovery for new playback session
+    bufferRecoveryService.resetStatus();
+
     try {
       this.metadata = metadata || {};
       this.tracks = [];
@@ -819,10 +976,8 @@ class AudioService {
       this.stuckDetectionLastPosition = 0;
       this.stuckDetectionLastTime = Date.now();
 
-      timing('Loading audio');
-      if (this.player) {
-        this.player.replace({ uri: url });
-      }
+      timing('Loading audio with retry');
+      await this.loadUrlWithRetry(url);
 
       if (this.loadId !== thisLoadId) {
         log('Cancelled after load');
@@ -889,9 +1044,23 @@ class AudioService {
       await this.updateMediaControlPlaybackState(autoPlay, startPositionSec);
     } catch (error) {
       if (this.loadId === thisLoadId) {
-        audioLog.error('Load failed:', getErrorMessage(error));
+        const errorMsg = getErrorMessage(error);
+        audioLog.error('Load failed:', errorMsg);
         audioLog.error('Stack:', (error instanceof Error ? error.stack : undefined));
         this.isLoaded = false;
+
+        // URL_EXPIRED DETECTION: Check for 403/401 errors indicating session/token expiration
+        // These can occur when streaming URLs expire or authentication tokens become invalid
+        const is403 = errorMsg.includes('403') || errorMsg.toLowerCase().includes('forbidden');
+        const is401 = errorMsg.includes('401') || errorMsg.toLowerCase().includes('unauthorized');
+
+        if (is403 || is401) {
+          audioLog.warn('[URL_EXPIRED] Detected expired URL/session - reporting for refresh');
+          this.reportError('URL_EXPIRED', `Streaming URL expired (${is403 ? '403' : '401'})`, is403 ? 403 : 401);
+        } else {
+          this.reportError('LOAD_FAILED', errorMsg);
+        }
+
         throw error;
       }
     }
@@ -906,6 +1075,60 @@ class AudioService {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     log('Warning: Duration not available after waiting');
+  }
+
+  /**
+   * Load audio URL with retry on network failures (CDN/server failover)
+   * Retries with exponential backoff for transient network errors
+   * Does NOT retry on 403/401 (those are handled by URL_EXPIRED)
+   */
+  private async loadUrlWithRetry(url: string): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < this.MAX_LOAD_RETRIES; attempt++) {
+      try {
+        if (this.player) {
+          this.player.replace({ uri: url });
+          // Wait briefly to detect immediate load failures
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+          // Check if player is in error state (heuristic: duration is 0 or NaN after load)
+          // Note: expo-audio may not throw on HTTP errors, they manifest as playback failures
+          if (this.player.duration === 0 || Number.isNaN(this.player.duration)) {
+            // Could be normal (duration not yet loaded) or an error
+            // Wait a bit more for streaming content
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          return; // Success
+        } else {
+          throw new Error('Player not initialized');
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMsg = getErrorMessage(error);
+
+        // Don't retry on auth errors - these need session refresh, not retries
+        if (errorMsg.includes('403') || errorMsg.includes('401') ||
+            errorMsg.toLowerCase().includes('forbidden') ||
+            errorMsg.toLowerCase().includes('unauthorized')) {
+          log(`[RETRY] Auth error detected (${errorMsg}) - not retrying`);
+          throw error;
+        }
+
+        if (attempt < this.MAX_LOAD_RETRIES - 1) {
+          const delay = this.INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
+          audioLog.warn(`[RETRY] Load failed (attempt ${attempt + 1}/${this.MAX_LOAD_RETRIES}): ${errorMsg}`);
+          audioLog.warn(`[RETRY] Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          audioLog.error(`[RETRY] All ${this.MAX_LOAD_RETRIES} attempts failed`);
+        }
+      }
+    }
+
+    // All retries exhausted
+    this.reportError('NETWORK_ERROR', `Failed to load audio after ${this.MAX_LOAD_RETRIES} attempts: ${lastError?.message || 'Unknown error'}`);
+    throw lastError || new Error('Failed to load audio');
   }
 
   /**
@@ -927,6 +1150,9 @@ class AudioService {
     log(`Start position: ${formatDuration(startPositionSec)} (${startPositionSec.toFixed(1)}s)`);
     log('AutoPlay:', autoPlay);
 
+    // DIAGNOSTIC: Always log track count to help debug 2-chapter issue
+    console.error(`[AUDIO_DIAGNOSTIC] Loading ${tracks.length} audio tracks, total duration: ${knownTotalDuration || 'calculating'}s`);
+
     // Log track details (only first and last to save time)
     if (tracks.length <= 3) {
       tracks.forEach((track, i) => {
@@ -940,6 +1166,9 @@ class AudioService {
 
     await this.ensureSetup();
     if (this.loadId !== thisLoadId) return;
+
+    // Reset buffer recovery for new playback session
+    bufferRecoveryService.resetStatus();
 
     try {
       this.metadata = metadata || {};
@@ -991,10 +1220,8 @@ class AudioService {
         }
       }
 
-      timing('Loading first track');
-      if (this.player) {
-        this.player.replace({ uri: firstTrack.url });
-      }
+      timing('Loading first track with retry');
+      await this.loadUrlWithRetry(firstTrack.url);
       if (this.loadId !== thisLoadId) return;
       timing('First track loaded');
 
@@ -1037,9 +1264,23 @@ class AudioService {
       await this.updateMediaControlPlaybackState(autoPlay, startPositionSec);
     } catch (error) {
       if (this.loadId === thisLoadId) {
-        audioLog.error('Load tracks failed:', getErrorMessage(error));
+        const errorMsg = getErrorMessage(error);
+        audioLog.error('Load tracks failed:', errorMsg);
         audioLog.error('Stack:', (error instanceof Error ? error.stack : undefined));
         this.isLoaded = false;
+
+        // URL_EXPIRED DETECTION: Check for 403/401 errors indicating session/token expiration
+        // These can occur when streaming URLs expire or authentication tokens become invalid
+        const is403 = errorMsg.includes('403') || errorMsg.toLowerCase().includes('forbidden');
+        const is401 = errorMsg.includes('401') || errorMsg.toLowerCase().includes('unauthorized');
+
+        if (is403 || is401) {
+          audioLog.warn('[URL_EXPIRED] Detected expired URL/session - reporting for refresh');
+          this.reportError('URL_EXPIRED', `Streaming URL expired (${is403 ? '403' : '401'})`, is403 ? 403 : 401);
+        } else {
+          this.reportError('LOAD_FAILED', errorMsg);
+        }
+
         throw error;
       }
     }
@@ -1362,6 +1603,30 @@ class AudioService {
     try {
       this.player.pause();
       this.updateMediaControlPlaybackState(false);
+
+      // GHOST PAUSED DETECTION: Verify audio actually stopped
+      // If the player is still playing after 500ms, we have a ghost paused state
+      setTimeout(() => {
+        if (this.player?.playing) {
+          audioLog.warn('[GHOST_PAUSED] Audio still playing after pause command - forcing stop');
+          // Try pause again
+          this.player?.pause();
+          // If still playing after second attempt, notify via callback
+          setTimeout(() => {
+            if (this.player?.playing) {
+              audioLog.error('[GHOST_PAUSED] Failed to pause after 2 attempts');
+              // Notify the status callback about the issue
+              this.statusCallback?.({
+                isPlaying: true, // Tell UI that audio is actually still playing
+                position: this.getGlobalPositionSync(),
+                duration: this.totalDuration,
+                isBuffering: false,
+                didJustFinish: false,
+              });
+            }
+          }, 200);
+        }
+      }, 500);
     } catch (error) {
       audioLog.warn('Pause failed:', getErrorMessage(error));
     }
@@ -1522,6 +1787,19 @@ class AudioService {
       try {
         await MediaControl.disableMediaControls();
         this.mediaControlEnabled = false;
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+
+    // Clean up Android headphone unplug listener
+    if (this.audioNoisySubscription) {
+      this.audioNoisySubscription.remove();
+      this.audioNoisySubscription = null;
+    }
+    if (Platform.OS === 'android' && AudioNoisyModule) {
+      try {
+        await AudioNoisyModule.stopListening();
       } catch (e) {
         // Ignore errors during cleanup
       }

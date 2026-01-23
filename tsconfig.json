@@ -6,6 +6,12 @@
     "paths": {
       "@/*": [
         "src/*"
+      ],
+      "@modules/*": [
+        "modules/*"
+      ],
+      "@assets/*": [
+        "assets/*"
       ]
     }
   },

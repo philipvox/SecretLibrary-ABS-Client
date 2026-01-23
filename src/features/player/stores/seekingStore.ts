@@ -20,6 +20,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { audioService } from '@/features/player/services/audioService';
 import { backgroundSyncService } from '@/features/player/services/backgroundSyncService';
 import { REWIND_STEP, REWIND_INTERVAL, FF_STEP } from '../constants';
+import { clampPosition } from '../utils/progressCalculator';
+import { createLogger } from '@/shared/utils/logger';
 
 // =============================================================================
 // TYPES
@@ -32,6 +34,7 @@ interface SeekingState {
   seekPosition: number;        // Position during seek (UI displays this)
   seekStartPosition: number;   // Where seek started (for delta display)
   seekDirection: SeekDirection | null;
+  lastSeekTime: number | null; // Timestamp of last seek completion (for debouncing progress saves)
 }
 
 interface SeekingActions {
@@ -106,10 +109,7 @@ interface SeekingActions {
 // LOGGING
 // =============================================================================
 
-const DEBUG = __DEV__;
-const log = (msg: string, ...args: any[]) => {
-  if (DEBUG) console.log(`[SeekingStore] ${msg}`, ...args);
-};
+const log = createLogger('SeekingStore');
 
 // =============================================================================
 // MODULE-LEVEL STATE
@@ -131,13 +131,14 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
     seekPosition: 0,
     seekStartPosition: 0,
     seekDirection: null,
+    lastSeekTime: null,
 
     // =========================================================================
     // ACTIONS
     // =========================================================================
 
     startSeeking: (position: number, direction?: SeekDirection) => {
-      log(`startSeeking: position=${position.toFixed(1)}, direction=${direction || 'none'}`);
+      log.debug(`startSeeking: position=${position.toFixed(1)}, direction=${direction || 'none'}`);
       set({
         isSeeking: true,
         seekPosition: position,
@@ -150,7 +151,7 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       const { isSeeking } = get();
 
       if (!isSeeking) {
-        log('updateSeekPosition called but not seeking - calling startSeeking first');
+        log.debug('updateSeekPosition called but not seeking - calling startSeeking first');
         get().startSeeking(newPosition);
       }
 
@@ -165,11 +166,11 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       const { seekPosition, isSeeking } = get();
 
       if (!isSeeking) {
-        log('commitSeek called but not seeking - ignoring');
+        log.debug('commitSeek called but not seeking - ignoring');
         return;
       }
 
-      log(`commitSeek: finalPosition=${seekPosition.toFixed(1)}`);
+      log.debug(`commitSeek: finalPosition=${seekPosition.toFixed(1)}`);
 
       // Ensure audio is at final position - audioService owns position
       await audioService.seekTo(seekPosition);
@@ -178,6 +179,7 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       set({
         isSeeking: false,
         seekDirection: null,
+        lastSeekTime: Date.now(),
       });
     },
 
@@ -185,11 +187,11 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       const { seekStartPosition, isSeeking } = get();
 
       if (!isSeeking) {
-        log('cancelSeek called but not seeking - ignoring');
+        log.debug('cancelSeek called but not seeking - ignoring');
         return;
       }
 
-      log(`cancelSeek: returning to ${seekStartPosition.toFixed(1)}`);
+      log.debug(`cancelSeek: returning to ${seekStartPosition.toFixed(1)}`);
 
       // Return to original position - audioService owns position
       await audioService.seekTo(seekStartPosition);
@@ -198,29 +200,35 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       set({
         isSeeking: false,
         seekDirection: null,
+        lastSeekTime: Date.now(),
       });
     },
 
     seekTo: async (position: number, duration: number, bookId?: string) => {
-      const clampedPosition = Math.max(0, Math.min(duration, position));
+      const clampedPos = clampPosition(position, duration);
 
-      log(`seekTo: ${clampedPosition.toFixed(1)}`);
+      log.debug(`seekTo: ${clampedPos.toFixed(1)}`);
 
       // AWAIT seek to prevent race condition where playback continues
       // while seeking is still in progress (caused skip back bug)
-      await audioService.seekTo(clampedPosition).catch(() => {});
+      await audioService.seekTo(clampedPos).catch((err) => {
+        log.warn(`seekTo failed: ${err}`);
+      });
 
       // Save position locally only - server sync happens on pause
       if (bookId) {
         backgroundSyncService.saveProgressLocal(
           bookId,
-          clampedPosition,
+          clampedPos,
           duration
         ).catch(() => {});
       }
 
+      // Record seek time for debouncing progress saves in playerStore
+      set({ lastSeekTime: Date.now() });
+
       // Return the clamped position for callers that need it
-      return clampedPosition;
+      return clampedPos;
     },
 
     startContinuousSeeking: async (
@@ -229,7 +237,7 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       duration: number,
       onPause: () => Promise<void>
     ) => {
-      log(`startContinuousSeeking: direction=${direction}, position=${position.toFixed(1)}`);
+      log.debug(`startContinuousSeeking: direction=${direction}, position=${position.toFixed(1)}`);
 
       // Clear any existing interval
       if (seekInterval) {
@@ -253,7 +261,9 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
       // Immediate first step
       const firstNewPosition = Math.max(0, Math.min(duration, position + step));
       set({ seekPosition: firstNewPosition });
-      await audioService.seekTo(firstNewPosition);
+      await audioService.seekTo(firstNewPosition).catch(err => {
+        log.warn('Continuous seek initial step failed:', err);
+      });
 
       // Start interval
       seekInterval = setInterval(async () => {
@@ -274,18 +284,28 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
         if ((direction === 'backward' && newPosition <= 0) ||
             (direction === 'forward' && newPosition >= duration)) {
           set({ seekPosition: newPosition });
-          await audioService.seekTo(newPosition);
+          await audioService.seekTo(newPosition).catch(err => {
+            log.warn('Continuous seek boundary step failed:', err);
+          });
           await get().stopContinuousSeeking();
           return;
         }
 
         set({ seekPosition: newPosition });
-        await audioService.seekTo(newPosition);
+        await audioService.seekTo(newPosition).catch(err => {
+          log.warn('Continuous seek step failed:', err);
+          // Stop seeking on repeated errors to prevent stuck UI
+          if (seekInterval) {
+            clearInterval(seekInterval);
+            seekInterval = null;
+          }
+          set({ isSeeking: false, seekDirection: null, lastSeekTime: Date.now() });
+        });
       }, REWIND_INTERVAL);
     },
 
     stopContinuousSeeking: async () => {
-      log('stopContinuousSeeking');
+      log.debug('stopContinuousSeeking');
 
       // Clear interval
       if (seekInterval) {
@@ -316,6 +336,7 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
         seekPosition: 0,
         seekStartPosition: 0,
         seekDirection: null,
+        lastSeekTime: null,
       });
     },
   }))

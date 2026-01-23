@@ -5,7 +5,6 @@
  */
 
 // Screens
-export { HomeScreen } from './screens/HomeScreen';
 export { LibraryScreen } from './screens/LibraryScreen';
 
 // Components

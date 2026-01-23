@@ -13,16 +13,23 @@
  * - Abandonment penalty: -0.3x per abandoned book (max -0.9x)
  */
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { LibraryItem } from '@/core/types';
 import { usePreferencesStore } from '../stores/preferencesStore';
 import { useMyLibraryStore } from '@/features/library';
-import { sqliteCache } from '@/core/services/sqliteCache';
 import { getGenres, getAuthorName, getNarratorName, getSeriesName, getDuration } from '@/shared/utils/metadata';
 import { createSeriesFilter } from '@/shared/utils/seriesFilter';
 import { useDismissedIds } from '../stores/dismissedItemsStore';
 import { useActiveSession } from '@/features/mood-discovery/stores/moodSessionStore';
 import { Mood } from '@/features/mood-discovery/types';
+import {
+  useRecommendationsCacheStore,
+  selectHistoryStats,
+  selectFinishedBookIds,
+  selectAbandonedBooks,
+  selectUserBooksMap,
+  selectIsLoaded,
+} from '../stores/recommendationsCacheStore';
 
 // === TYPES ===
 
@@ -325,42 +332,18 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
   const libraryIds = useMyLibraryStore((s) => s.libraryIds);
   const dismissedIds = useDismissedIds();
 
-  // Load data from SQLite
-  const [historyStats, setHistoryStats] = useState<ReadHistoryStats | null>(null);
-  const [finishedBookIds, setFinishedBookIds] = useState<Set<string>>(new Set());
-  const [abandonedBooks, setAbandonedBooks] = useState<AbandonedBook[]>([]);
-  const [userBooksMap, setUserBooksMap] = useState<Map<string, { progress: number; lastPlayedAt: string | null }>>(new Map());
+  // Use cached SQLite data (shared across all useRecommendations consumers)
+  const historyStats = useRecommendationsCacheStore(selectHistoryStats);
+  const finishedBookIds = useRecommendationsCacheStore(selectFinishedBookIds);
+  const abandonedBooks = useRecommendationsCacheStore(selectAbandonedBooks);
+  const userBooksMap = useRecommendationsCacheStore(selectUserBooksMap);
+  const isCacheLoaded = useRecommendationsCacheStore(selectIsLoaded);
+  const loadCache = useRecommendationsCacheStore((s) => s.loadCache);
 
+  // Trigger cache load on first mount (no-op if already loaded)
   useEffect(() => {
-    // Load history stats with temporal weighting
-    sqliteCache.getReadHistoryStats().then(setHistoryStats).catch(() => {});
-
-    // Load finished book IDs for series filtering
-    sqliteCache.getFinishedUserBooks().then(books => {
-      setFinishedBookIds(new Set(books.map(b => b.bookId)));
-
-      // Also build user books map for progress state machine
-      const map = new Map<string, { progress: number; lastPlayedAt: string | null }>();
-      books.forEach(b => {
-        map.set(b.bookId, { progress: b.progress, lastPlayedAt: b.lastPlayedAt });
-      });
-      setUserBooksMap(map);
-    }).catch(() => {});
-
-    // Load in-progress books for user books map
-    sqliteCache.getInProgressUserBooks().then(books => {
-      setUserBooksMap(prev => {
-        const map = new Map(prev);
-        books.forEach(b => {
-          map.set(b.bookId, { progress: b.progress, lastPlayedAt: b.lastPlayedAt });
-        });
-        return map;
-      });
-    }).catch(() => {});
-
-    // Load abandoned books for penalty calculation
-    sqliteCache.getAbandonedBooks().then(setAbandonedBooks).catch(() => {});
-  }, []);
+    loadCache();
+  }, [loadCache]);
 
   // Build author penalties from abandoned books
   const authorPenalties = useMemo(() => {
@@ -467,7 +450,8 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
 
   // Main recommendations logic
   const recommendations = useMemo(() => {
-    if (!allItems.length) return [];
+    // Wait for cache to load before computing recommendations
+    if (!isCacheLoaded || !allItems.length) return [];
 
     // Helpers for series filtering
     const isFinished = (bookId: string): boolean => {
@@ -576,7 +560,7 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     }
 
     return result.slice(0, limit);
-  }, [allItems, finishedBookIds, libraryIds, dismissedIds, userBooksMap, affinities, knownAuthors, knownNarrators, topGenres, authorPenalties, preferredLength, prefersSeries, limit]);
+  }, [allItems, finishedBookIds, libraryIds, dismissedIds, userBooksMap, affinities, knownAuthors, knownNarrators, topGenres, authorPenalties, preferredLength, prefersSeries, limit, isCacheLoaded]);
 
   // Group recommendations for display
   const groupedRecommendations = useMemo((): RecommendationGroup[] => {

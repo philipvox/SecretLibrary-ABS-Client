@@ -24,6 +24,7 @@ import { secretLibraryColors as staticColors } from '@/shared/theme/secretLibrar
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 // MIGRATED: Now using new spine system via adapter
 import { getSpineDimensions, calculateBookDimensions, hashString, MIN_TOUCH_TARGET, isLightColor, darkenColorForDisplay } from '../utils/spine/adapter';
+import { HEIGHT_SCALE } from '../utils/spine/constants';
 import { useSpineCacheStore } from '../stores/spineCache';
 import { haptics } from '@/core/native/haptics';
 
@@ -61,17 +62,14 @@ interface BookInfo {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Base spine dimensions (from spineCalculations.ts)
-const BASE_MAX_HEIGHT = 400;  // Tallest genre (Fantasy)
-const BASE_MAX_WIDTH = 70;    // Thickest (30+ hour books)
+// Base spine dimensions (unscaled - HEIGHT_SCALE applied via SHELF_SCALE_FACTOR)
+const BASE_MAX_HEIGHT = 450;  // Tallest genre base (Fantasy)
+const BASE_MAX_WIDTH = 200;    // Thickest (30+ hour books)
 
-// Available space calculations - SEPARATE for each view mode
-const SHELF_AVAILABLE_HEIGHT = SCREEN_HEIGHT * 0.65;  // Larger spines for shelf view
-const STACK_AVAILABLE_HEIGHT = SCREEN_HEIGHT * 0.35;  // Smaller spines for stack view (horizontal)
-
-// Dynamic scale factors - different for each mode
-const SHELF_SCALE_FACTOR = Math.min(0.95, SHELF_AVAILABLE_HEIGHT / BASE_MAX_HEIGHT);
-const STACK_SCALE_FACTOR = Math.min(0.95, STACK_AVAILABLE_HEIGHT / BASE_MAX_HEIGHT);
+// Scale factors - HEIGHT_SCALE directly controls book height
+// HEIGHT_SCALE = 1.0 → normal size, 1.5 → 50% taller, etc.
+const SHELF_SCALE_FACTOR = HEIGHT_SCALE;
+const STACK_SCALE_FACTOR = HEIGHT_SCALE * 0.45;  // Stack mode is smaller
 const THICKNESS_MULTIPLIER = 1;
 
 // Layout constants
@@ -81,8 +79,8 @@ const LEAN_ANGLE = 3;
 const STACK_GAP = 8;
 
 // Safety clamps - maximum dimensions even after scaling
-const SHELF_MAX_HEIGHT = SHELF_AVAILABLE_HEIGHT;
-const STACK_MAX_HEIGHT = SHELF_AVAILABLE_HEIGHT;
+const SHELF_MAX_HEIGHT = SCREEN_HEIGHT * 2;
+const STACK_MAX_HEIGHT = SCREEN_HEIGHT * 2;
 const MAX_SCALED_WIDTH = 120;
 
 // Animation timing

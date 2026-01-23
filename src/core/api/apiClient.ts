@@ -6,6 +6,9 @@
 
 import { BaseApiClient } from './baseClient';
 import { endpoints, buildQueryString } from './endpoints';
+import { createLogger } from '@/shared/utils/logger';
+
+const apiLogger = createLogger('API');
 import {
   LoginResponse,
   LibrariesResponse,
@@ -21,6 +24,7 @@ import {
   PlaylistsResponse,
   AuthorQuery,
   FilterData,
+  ExternalBookMatch,
 } from '../types/api';
 import { User } from '../types/user';
 import { Library, LibraryItem, Collection, Playlist } from '../types/library';
@@ -62,7 +66,7 @@ class ApiClient extends BaseApiClient {
       endpoints.user.itemsInProgress
     );
     const items = response.libraryItems || [];
-    console.log(`[API] getItemsInProgress: received ${items.length} items from ${endpoints.user.itemsInProgress}`);
+    apiLogger.debug(`getItemsInProgress: received ${items.length} items`);
 
     // Fetch user data to get mediaProgress array
     const user = await this.getCurrentUser();
@@ -124,6 +128,11 @@ class ApiClient extends BaseApiClient {
   /** Call this when library is refreshed to bust cover caches */
   bumpCoverCacheVersion(): void {
     this._coverCacheVersion = Date.now();
+  }
+
+  /** Reset cover cache version (call on logout to prevent stale covers) */
+  resetCoverCacheVersion(): void {
+    this._coverCacheVersion = 0;
   }
 
   getItemCoverUrl(itemId: string, options?: { width?: number; height?: number; format?: string }): string {
@@ -201,6 +210,34 @@ class ApiClient extends BaseApiClient {
     const queryString = buildQueryString(query as unknown as Record<string, unknown>);
     const url = `${endpoints.libraries.search(libraryId)}${queryString}`;
     return this.get<SearchResults>(url);
+  }
+
+  /**
+   * Search external metadata providers for book info by title/ISBN
+   * Uses server-configured providers (Hardcover, Audible, Google, etc.)
+   *
+   * @param query - Search query (title or ISBN)
+   * @param author - Optional author to narrow results
+   * @param provider - Optional specific provider (e.g., 'openlibrary', 'google', 'audible')
+   */
+  async searchExternalBooks(
+    query: string,
+    author?: string,
+    provider?: string
+  ): Promise<ExternalBookMatch[]> {
+    const params: Record<string, string> = { title: query };
+    if (author) params.author = author;
+    if (provider) params.provider = provider;
+    const queryString = buildQueryString(params);
+    const url = `${endpoints.search.books}${queryString}`;
+
+    try {
+      const response = await this.get<ExternalBookMatch[]>(url);
+      return response || [];
+    } catch (error) {
+      apiLogger.warn('searchExternalBooks failed:', error);
+      return [];
+    }
   }
 
   // ==================== Series ====================

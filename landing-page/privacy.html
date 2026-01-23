@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Secret Library</title>
+  <meta name="description" content="Privacy Policy for Secret Library">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --black: #000000;
+      --white: #ffffff;
+      --gray-400: #a3a3a3;
+      --gray-600: #525252;
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--black);
+      color: var(--white);
+      line-height: 1.8;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      background: var(--black);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-logo img {
+      height: 40px;
+      width: auto;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    .nav-links a {
+      font-size: 0.65rem;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+      opacity: 0.5;
+    }
+
+    /* Content */
+    .content {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 7rem 2rem 4rem;
+    }
+
+    .page-header {
+      margin-bottom: 3rem;
+    }
+
+    .page-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-family: var(--serif);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+
+    h1 em {
+      font-style: italic;
+    }
+
+    .last-updated {
+      color: var(--gray-600);
+      font-size: 0.75rem;
+    }
+
+    h2 {
+      font-family: var(--serif);
+      font-size: 1.25rem;
+      font-weight: 400;
+      margin: 2rem 0 1rem;
+      color: var(--white);
+    }
+
+    p {
+      color: var(--gray-400);
+      margin-bottom: 1rem;
+      font-size: 0.8125rem;
+      line-height: 1.8;
+    }
+
+    p strong {
+      color: var(--white);
+      font-weight: 500;
+    }
+
+    ul {
+      color: var(--gray-400);
+      margin-left: 1.25rem;
+      margin-bottom: 1rem;
+      font-size: 0.8125rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+      line-height: 1.7;
+    }
+
+    a {
+      color: var(--white);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    a:hover {
+      opacity: 0.7;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 3rem 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .footer-text {
+      font-size: 0.65rem;
+      color: var(--gray-600);
+      letter-spacing: 0.1em;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      nav {
+        padding: 1rem 1.5rem;
+      }
+
+      .nav-logo img {
+        height: 30px;
+      }
+
+      .nav-links {
+        gap: 1.25rem;
+      }
+
+      .nav-links a {
+        font-size: 0.55rem;
+      }
+
+      .content {
+        padding: 6rem 1.5rem 3rem;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+      }
+
+      h2 {
+        font-size: 1.125rem;
+        margin: 1.5rem 0 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html" class="nav-logo"><img src="logo.svg" alt="Secret Library"></a>
+    <div class="nav-links">
+      <a href="index.html">App</a>
+      <a href="tagger.html">Tagger</a>
+      <a href="docs.html">Docs</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </nav>
+
+  <main class="content">
+    <header class="page-header">
+      <span class="page-label">Legal</span>
+      <h1>Privacy <em>Policy</em></h1>
+      <p class="last-updated">Last updated: January 22, 2026</p>
+    </header>
+
+    <h2>Overview</h2>
+    <p>Secret Library ("the App") is an audiobook player that connects to your personal Audiobookshelf server. Your privacy is important to us. This policy explains what data the App accesses and how it's used.</p>
+
+    <h2>Data Collection</h2>
+    <p><strong>We do not collect any personal data.</strong> The App operates entirely between your device and your personal Audiobookshelf server.</p>
+
+    <p>The App stores the following data locally on your device:</p>
+    <ul>
+      <li>Server connection details (URL, authentication tokens)</li>
+      <li>Listening progress and bookmarks</li>
+      <li>Downloaded audiobook files (when you choose to download)</li>
+      <li>App preferences and settings</li>
+    </ul>
+
+    <h2>Server Communication</h2>
+    <p>The App communicates only with the Audiobookshelf server URL that you provide. We have no access to:</p>
+    <ul>
+      <li>Your server address</li>
+      <li>Your audiobook library</li>
+      <li>Your listening history</li>
+      <li>Any data on your server</li>
+    </ul>
+
+    <h2>Third-Party Services</h2>
+    <p>The App does not include any third-party analytics, advertising, or tracking services.</p>
+
+    <h2>Data Storage</h2>
+    <p>All data is stored locally on your device using secure storage mechanisms provided by iOS and Android. Authentication tokens are stored in the device's secure keychain/keystore.</p>
+
+    <h2>Data Deletion</h2>
+    <p>You can delete all App data at any time by:</p>
+    <ul>
+      <li>Using the "Log Out" feature in the App (clears server credentials and cached data)</li>
+      <li>Uninstalling the App (removes all local data)</li>
+    </ul>
+
+    <h2>Children's Privacy</h2>
+    <p>The App does not knowingly collect any information from children under 13 years of age.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.</p>
+
+    <h2>Contact</h2>
+    <p>If you have any questions about this Privacy Policy, please contact us through the App's GitHub repository.</p>
+  </main>
+
+  <footer>
+    <p class="footer-text">Secret Library</p>
+  </footer>
+</body>
+</html>

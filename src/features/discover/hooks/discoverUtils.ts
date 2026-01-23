@@ -51,9 +51,7 @@ export function getMoodAdjective(mood?: Mood): string {
     case 'comfort': return 'Cozy';
     case 'thrills': return 'Thrilling';
     case 'escape': return 'Escapist';
-    case 'laughs': return 'Fun';
     case 'feels': return 'Emotional';
-    case 'thinking': return 'Thought-Provoking';
     default: return '';
   }
 }

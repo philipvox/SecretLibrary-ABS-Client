@@ -1,45 +1,39 @@
 /**
  * src/features/automotive/androidAutoBridge.ts
  *
- * Bridge for syncing browse data to native Android Auto MediaPlaybackService.
+ * Bridge for syncing browse data to native Android Auto MediaBrowserService.
  *
- * Approach: Write JSON to a file in internal storage that both React Native
- * and native Android can access. MediaPlaybackService reads this file to
- * populate the browse tree.
+ * Uses native AndroidAutoModule to write browse data to a location
+ * accessible by both React Native and the native MediaBrowserService.
  */
 
-import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
+import { Platform, NativeModules } from 'react-native';
 import { BrowseSection } from './types';
 import { audioLog } from '@/shared/utils/audioDebug';
 
 const log = (...args: any[]) => audioLog.audio('[AndroidAutoBridge]', ...args);
 
-// File path for browse data (in app's internal storage)
-const BROWSE_DATA_FILENAME = 'android_auto_browse.json';
+// Get the native module
+const { AndroidAutoModule } = NativeModules;
 
 /**
- * Get the path to the browse data file
- */
-function getBrowseDataPath(): string {
-  return `${FileSystem.documentDirectory}${BROWSE_DATA_FILENAME}`;
-}
-
-/**
- * Write browse sections to file for Android Auto to read
+ * Write browse sections via native module for Android Auto to read
  */
 export async function updateAndroidAutoBrowseData(sections: BrowseSection[]): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   try {
-    const path = getBrowseDataPath();
-    const data = JSON.stringify(sections, null, 2);
+    const data = JSON.stringify(sections);
 
-    await FileSystem.writeAsStringAsync(path, data, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+    if (AndroidAutoModule?.writeBrowseData) {
+      // Use native module to write to correct location
+      await AndroidAutoModule.writeBrowseData(data);
+      log('Browse data written via native module');
+    } else {
+      // Fallback for when native module isn't available yet
+      log('AndroidAutoModule not available, browse data not written');
+    }
 
-    log('Browse data written to:', path);
     log('Sections:', sections.map(s => `${s.title} (${s.items.length} items)`).join(', '));
   } catch (error) {
     log('Failed to write browse data:', error);
@@ -47,45 +41,80 @@ export async function updateAndroidAutoBrowseData(sections: BrowseSection[]): Pr
 }
 
 /**
- * Read browse sections from file (for debugging)
+ * Notify native service that browse data has been updated
  */
-export async function getAndroidAutoBrowseData(): Promise<BrowseSection[] | null> {
-  if (Platform.OS !== 'android') return null;
+export function notifyBrowseDataUpdated(): void {
+  if (Platform.OS !== 'android') return;
 
   try {
-    const path = getBrowseDataPath();
-    const info = await FileSystem.getInfoAsync(path);
-
-    if (!info.exists) {
-      log('Browse data file does not exist');
-      return null;
-    }
-
-    const data = await FileSystem.readAsStringAsync(path, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-
-    return JSON.parse(data) as BrowseSection[];
+    AndroidAutoModule?.notifyBrowseDataUpdated?.();
   } catch (error) {
-    log('Failed to read browse data:', error);
-    return null;
+    log('Failed to notify browse data update:', error);
   }
 }
 
 /**
- * Clear browse data file
+ * Update playback state in native MediaSession
+ */
+export function updatePlaybackState(
+  isPlaying: boolean,
+  position: number,
+  speed: number
+): void {
+  if (Platform.OS !== 'android') return;
+
+  try {
+    AndroidAutoModule?.updatePlaybackState?.(isPlaying, position, speed);
+  } catch (error) {
+    log('Failed to update playback state:', error);
+  }
+}
+
+/**
+ * Update metadata in native MediaSession
+ */
+export function updateMetadata(
+  title: string,
+  author: string,
+  duration: number,
+  artworkUrl?: string | null
+): void {
+  if (Platform.OS !== 'android') return;
+
+  try {
+    AndroidAutoModule?.updateMetadata?.(title, author, duration, artworkUrl || null);
+  } catch (error) {
+    log('Failed to update metadata:', error);
+  }
+}
+
+/**
+ * Check if Android Auto is connected
+ */
+export async function isAndroidAutoConnected(): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+
+  try {
+    if (AndroidAutoModule?.isConnected) {
+      return await AndroidAutoModule.isConnected();
+    }
+    return false;
+  } catch (error) {
+    log('Failed to check Android Auto connection:', error);
+    return false;
+  }
+}
+
+/**
+ * Clear browse data (for cleanup)
  */
 export async function clearAndroidAutoBrowseData(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
   try {
-    const path = getBrowseDataPath();
-    const info = await FileSystem.getInfoAsync(path);
-
-    if (info.exists) {
-      await FileSystem.deleteAsync(path);
-      log('Browse data cleared');
-    }
+    // Write empty array to clear
+    await updateAndroidAutoBrowseData([]);
+    log('Browse data cleared');
   } catch (error) {
     log('Failed to clear browse data:', error);
   }

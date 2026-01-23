@@ -27,17 +27,28 @@
  *   The animated skull candle is the default indicator.
  */
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  useDerivedValue,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { spacing, scale, useTheme } from '../theme';
+
+// Create animated SVG Path component for UI thread animations
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 // =============================================================================
 // CONFIGURATION - Change loading behavior app-wide here
 // =============================================================================
 
-/** Use animated skull (true) or standard ActivityIndicator (false) */
-const USE_SKULL_ANIMATION = true;
+/** Use animated skull (true) or candle animation (false) for fullScreen mode */
+const USE_SKULL_ANIMATION = false;
 
 /** Default sizes for each mode */
 const DEFAULT_SIZES = {
@@ -127,7 +138,7 @@ export interface LoadingProps {
 }
 
 // =============================================================================
-// SKULL ANIMATION COMPONENT (Internal)
+// SKULL ANIMATION COMPONENT (Internal) - Uses Reanimated for UI thread animation
 // =============================================================================
 
 interface SkullAnimationProps {
@@ -136,20 +147,37 @@ interface SkullAnimationProps {
 }
 
 function SkullAnimation({ size, color }: SkullAnimationProps) {
-  const [frameIndex, setFrameIndex] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Animated value that cycles through frames on UI thread
+  const progress = useSharedValue(0);
+  const totalFrames = CANDLE_FRAMES.length;
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % CANDLE_FRAMES.length);
-    }, FRAME_DURATION_MS);
+    // Total animation duration for all frames
+    const totalDuration = FRAME_DURATION_MS * totalFrames;
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
+    // Start infinite repeating animation on UI thread
+    progress.value = withRepeat(
+      withTiming(totalFrames, {
+        duration: totalDuration,
+        easing: Easing.linear,
+      }),
+      -1, // Infinite repeat
+      false // Don't reverse
+    );
   }, []);
+
+  // Derive current frame index from progress (runs on UI thread)
+  const frameIndex = useDerivedValue(() => {
+    return Math.floor(progress.value) % totalFrames;
+  });
+
+  // Animated props for the flame path (runs on UI thread)
+  const animatedFlameProps = useAnimatedProps(() => {
+    const idx = frameIndex.value;
+    return {
+      d: CANDLE_FRAMES[idx] || CANDLE_FRAMES[0],
+    };
+  });
 
   const scaledHeight = scale(size);
   const scaledWidth = scaledHeight * ASPECT_RATIO;
@@ -165,13 +193,13 @@ function SkullAnimation({ size, color }: SkullAnimationProps) {
           <Path key={`skull-${i}`} d={d} fill={color} />
         ))}
       </G>
-      <Path d={CANDLE_FRAMES[frameIndex]} fill={color} />
+      <AnimatedPath animatedProps={animatedFlameProps} fill={color} />
     </Svg>
   );
 }
 
 // =============================================================================
-// CANDLE ANIMATION COMPONENT (Internal)
+// CANDLE ANIMATION COMPONENT (Internal) - Uses Reanimated for UI thread animation
 // =============================================================================
 
 interface CandleAnimationProps {
@@ -180,20 +208,37 @@ interface CandleAnimationProps {
 }
 
 function CandleAnimation({ size, holderColor }: CandleAnimationProps) {
-  const [frameIndex, setFrameIndex] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Animated value that cycles through frames on UI thread
+  const progress = useSharedValue(0);
+  const totalFrames = CANDLE_FLAME_FRAMES.length;
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % CANDLE_FLAME_FRAMES.length);
-    }, CANDLE_FRAME_DURATION_MS);
+    // Total animation duration for all frames
+    const totalDuration = CANDLE_FRAME_DURATION_MS * totalFrames;
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
+    // Start infinite repeating animation on UI thread
+    progress.value = withRepeat(
+      withTiming(totalFrames, {
+        duration: totalDuration,
+        easing: Easing.linear,
+      }),
+      -1, // Infinite repeat
+      false // Don't reverse
+    );
   }, []);
+
+  // Derive current frame index from progress (runs on UI thread)
+  const frameIndex = useDerivedValue(() => {
+    return Math.floor(progress.value) % totalFrames;
+  });
+
+  // Animated props for the flame path (runs on UI thread)
+  const animatedFlameProps = useAnimatedProps(() => {
+    const idx = frameIndex.value;
+    return {
+      d: CANDLE_FLAME_FRAMES[idx] || CANDLE_FLAME_FRAMES[0],
+    };
+  });
 
   const scaledHeight = scale(size);
   const scaledWidth = scaledHeight * CANDLE_ASPECT_RATIO;
@@ -206,7 +251,7 @@ function CandleAnimation({ size, holderColor }: CandleAnimationProps) {
     >
       {/* Flame - scaled and positioned */}
       <G transform="translate(36, 38) scale(0.825) translate(-72, -62)">
-        <Path d={CANDLE_FLAME_FRAMES[frameIndex]} fill={FLAME_COLOR} />
+        <AnimatedPath animatedProps={animatedFlameProps} fill={FLAME_COLOR} />
       </G>
       {/* Candle holder */}
       <Path d={CANDLE_HOLDER_PATH} fill={holderColor} />
@@ -253,8 +298,9 @@ export function Loading({
   const indicatorSize = size ?? DEFAULT_SIZES[mode];
 
   // Determine which animation to use
+  // Candle is used for fullScreen and candle modes, skull only if USE_SKULL_ANIMATION is true
+  const useCandle = mode === 'candle' || (mode === 'fullScreen' && !USE_SKULL_ANIMATION);
   const useSkull = USE_SKULL_ANIMATION && mode !== 'button' && mode !== 'candle';
-  const useCandle = mode === 'candle';
 
   // Container styles based on mode
   const containerStyle = [

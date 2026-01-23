@@ -12,6 +12,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { eventBus } from '@/core/events';
 import { queryClient, queryKeys } from '@/core/queryClient';
 import { backgroundSyncService } from '@/features/player/services/backgroundSyncService';
+import { useLibraryCache } from '@/core/cache/libraryCache';
 import { logger } from '@/shared/utils/logger';
 
 // Minimum time in background before triggering refetch (5 seconds)
@@ -84,6 +85,23 @@ async function handleForegroundReturn(timeInBackground: number): Promise<void> {
   logger.debug(`[AppStateListener] Refreshing data after ${Math.round(timeInBackground / 1000)}s in background`);
 
   try {
+    // CRITICAL: Check if library cache was cleared (e.g., by memory pressure)
+    // If so, reload it immediately so authors/series/genres are available
+    const libraryState = useLibraryCache.getState();
+    const hasLibraryId = !!libraryState.currentLibraryId;
+    const isCacheEmpty = libraryState.items.length === 0;
+
+    if (hasLibraryId && isCacheEmpty) {
+      logger.info('[AppStateListener] Library cache was cleared - reloading');
+      // Force refresh to reload from server (or SQLite cache)
+      await libraryState.loadCache(libraryState.currentLibraryId!, true);
+      logger.info('[AppStateListener] Library cache reloaded');
+    } else if (hasLibraryId && !libraryState.isLoaded) {
+      // Cache exists but not marked as loaded (partial state)
+      logger.info('[AppStateListener] Library cache not loaded - loading');
+      await libraryState.loadCache(libraryState.currentLibraryId!);
+    }
+
     // Process any pending syncs first (they may have failed while backgrounded)
     await backgroundSyncService.syncUnsyncedFromStorage();
 

@@ -18,6 +18,7 @@
  */
 
 import { Platform } from 'react-native';
+import { HEIGHT_SCALE, BASE_DIMENSIONS } from './spine/constants';
 
 // =============================================================================
 // TYPES
@@ -893,16 +894,16 @@ export const FONT_CHAR_RATIOS: Record<string, number> = {
   'default': 0.55,
 };
 
-// Dimension constants
-const BASE_HEIGHT = 350;  // Increased from 320 for taller spines
-const MIN_HEIGHT = 290;   // Increased from 260
-const MAX_HEIGHT = 450;   // Increased from 420
+// Dimension constants - imported from spine/constants.ts (single source of truth)
+const BASE_HEIGHT = BASE_DIMENSIONS.HEIGHT;
+const MIN_HEIGHT = BASE_DIMENSIONS.MIN_HEIGHT;
+const MAX_HEIGHT = BASE_DIMENSIONS.MAX_HEIGHT;
 
 // Width constants - directly tied to audiobook duration
 // Target: dramatic visual difference - epic books should be CHUNKY
 // Min matches touch target (44px), Epic (50+hr): 280px
 const MIN_WIDTH = 44;      // Minimum width - matches touch target
-const MAX_WIDTH = 280;     // Epic series like Oathbringer (~65hr) - TWICE as thick
+const MAX_WIDTH = 380;     // Epic series like Oathbringer (~65hr) - TWICE as thick
 const MEDIAN_WIDTH = 60;   // Fallback when duration unknown
 const MIN_TOUCH_TARGET = 44;  // Apple HIG minimum (use hitSlop for thin books)
 

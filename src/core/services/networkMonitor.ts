@@ -7,6 +7,7 @@
 
 import NetInfo, { NetInfoState, NetInfoStateType } from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createLogger } from '@/shared/utils/logger';
 
 // =============================================================================
 // CONSTANTS
@@ -15,11 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const WIFI_ONLY_KEY = 'downloadWifiOnly';
 const AUTO_DOWNLOAD_SERIES_KEY = 'autoDownloadNextInSeries';
 
-const LOG_PREFIX = '[NetworkMonitor]';
-
-function log(...args: any[]) {
-  console.log(LOG_PREFIX, ...args);
-}
+const log = createLogger('NetworkMonitor');
 
 // =============================================================================
 // TYPES
@@ -53,18 +50,18 @@ class NetworkMonitor {
    */
   async init(): Promise<void> {
     if (this.initialized) {
-      log('Already initialized');
+      log.debug('Already initialized');
       return;
     }
 
-    log('Initializing...');
+    log.debug('Initializing...');
 
     // Load preferences
     await this.loadPreferences();
 
     // Get initial state
     this.currentState = await NetInfo.fetch();
-    log(`Initial state: ${this.getConnectionType()} (connected: ${this.currentState?.isConnected})`);
+    log.debug(`Initial state: ${this.getConnectionType()} (connected: ${this.currentState?.isConnected})`);
 
     // Subscribe to changes
     this.unsubscribe = NetInfo.addEventListener((state) => {
@@ -72,14 +69,14 @@ class NetworkMonitor {
       this.currentState = state;
       const newType = this.getConnectionType();
 
-      log(`Network changed: ${previousType} → ${newType} (connected: ${state.isConnected})`);
+      log.debug(`Network changed: ${previousType} → ${newType} (connected: ${state.isConnected})`);
 
       // Notify listeners
       this.notifyListeners();
     });
 
     this.initialized = true;
-    log('Initialized');
+    log.debug('Initialized');
   }
 
   /**
@@ -92,7 +89,7 @@ class NetworkMonitor {
     }
     this.listeners.clear();
     this.initialized = false;
-    log('Destroyed');
+    log.debug('Destroyed');
   }
 
   // ===========================================================================
@@ -110,9 +107,9 @@ class NetworkMonitor {
       this.wifiOnlyEnabled = wifiOnly !== 'false';
       this.autoDownloadSeriesEnabled = autoDownload !== 'false';
 
-      log(`Preferences loaded: wifiOnly=${this.wifiOnlyEnabled}, autoDownloadSeries=${this.autoDownloadSeriesEnabled}`);
+      log.debug(`Preferences loaded: wifiOnly=${this.wifiOnlyEnabled}, autoDownloadSeries=${this.autoDownloadSeriesEnabled}`);
     } catch (err) {
-      log('Failed to load preferences, using defaults');
+      log.debug('Failed to load preferences, using defaults');
     }
   }
 
@@ -129,7 +126,7 @@ class NetworkMonitor {
   async setWifiOnlyEnabled(enabled: boolean): Promise<void> {
     this.wifiOnlyEnabled = enabled;
     await AsyncStorage.setItem(WIFI_ONLY_KEY, enabled.toString());
-    log(`WiFi-only preference set to: ${enabled}`);
+    log.debug(`WiFi-only preference set to: ${enabled}`);
     this.notifyListeners();
   }
 
@@ -146,7 +143,7 @@ class NetworkMonitor {
   async setAutoDownloadSeriesEnabled(enabled: boolean): Promise<void> {
     this.autoDownloadSeriesEnabled = enabled;
     await AsyncStorage.setItem(AUTO_DOWNLOAD_SERIES_KEY, enabled.toString());
-    log(`Auto-download series preference set to: ${enabled}`);
+    log.debug(`Auto-download series preference set to: ${enabled}`);
   }
 
   // ===========================================================================

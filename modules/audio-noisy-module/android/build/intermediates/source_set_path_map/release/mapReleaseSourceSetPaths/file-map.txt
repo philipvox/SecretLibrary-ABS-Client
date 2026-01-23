@@ -1,0 +1,33 @@
+expo.modules.audionoisymodule.audio-noisy-module-lifecycle-runtime-2.6.2-0 /Users/philips/.gradle/caches/8.14.3/transforms/15bf28075442f813720c016280bbbbb1/transformed/lifecycle-runtime-2.6.2/res
+expo.modules.audionoisymodule.audio-noisy-module-core-runtime-2.2.0-1 /Users/philips/.gradle/caches/8.14.3/transforms/20aacba62bf049d2aebb94c0284c11dd/transformed/core-runtime-2.2.0/res
+expo.modules.audionoisymodule.audio-noisy-module-appcompat-1.7.0-2 /Users/philips/.gradle/caches/8.14.3/transforms/3801e2b27cc2accee4db12bcdfa690df/transformed/appcompat-1.7.0/res
+expo.modules.audionoisymodule.audio-noisy-module-core-ktx-1.13.1-3 /Users/philips/.gradle/caches/8.14.3/transforms/40ce56934426bcdd9182abea2cc9fcb9/transformed/core-ktx-1.13.1/res
+expo.modules.audionoisymodule.audio-noisy-module-react-android-0.81.5-release-4 /Users/philips/.gradle/caches/8.14.3/transforms/4762830e397bd149d373528523b97553/transformed/react-android-0.81.5-release/res
+expo.modules.audionoisymodule.audio-noisy-module-profileinstaller-1.3.1-5 /Users/philips/.gradle/caches/8.14.3/transforms/55688cdb232f9564a5b3200f34b1d748/transformed/profileinstaller-1.3.1/res
+expo.modules.audionoisymodule.audio-noisy-module-swiperefreshlayout-1.1.0-6 /Users/philips/.gradle/caches/8.14.3/transforms/58034c6e7094df8a98d798e3efc9efe8/transformed/swiperefreshlayout-1.1.0/res
+expo.modules.audionoisymodule.audio-noisy-module-core-1.13.1-7 /Users/philips/.gradle/caches/8.14.3/transforms/5b56cdf22ebe19ac3530b457c4318990/transformed/core-1.13.1/res
+expo.modules.audionoisymodule.audio-noisy-module-lifecycle-process-2.6.2-8 /Users/philips/.gradle/caches/8.14.3/transforms/6faac38d2adfdd0b015b3795185519f8/transformed/lifecycle-process-2.6.2/res
+expo.modules.audionoisymodule.audio-noisy-module-drawee-3.6.0-9 /Users/philips/.gradle/caches/8.14.3/transforms/7395ba9f8179d158e26c8d4b57c8fd59/transformed/drawee-3.6.0/res
+expo.modules.audionoisymodule.audio-noisy-module-startup-runtime-1.1.1-10 /Users/philips/.gradle/caches/8.14.3/transforms/82ce29f1a245910aac35b7a792760e7d/transformed/startup-runtime-1.1.1/res
+expo.modules.audionoisymodule.audio-noisy-module-savedstate-1.2.1-11 /Users/philips/.gradle/caches/8.14.3/transforms/8ab68d40c5e416d08c7fe45b462a2761/transformed/savedstate-1.2.1/res
+expo.modules.audionoisymodule.audio-noisy-module-autofill-1.1.0-12 /Users/philips/.gradle/caches/8.14.3/transforms/9e386a95bda28bd04b122a3505f111c7/transformed/autofill-1.1.0/res
+expo.modules.audionoisymodule.audio-noisy-module-emoji2-views-helper-1.3.0-13 /Users/philips/.gradle/caches/8.14.3/transforms/a8f9337851c7ee0c746a80cf9dfd91b4/transformed/emoji2-views-helper-1.3.0/res
+expo.modules.audionoisymodule.audio-noisy-module-tracing-1.2.0-14 /Users/philips/.gradle/caches/8.14.3/transforms/b024332f7ecca6720587e73a30c51cf0/transformed/tracing-1.2.0/res
+expo.modules.audionoisymodule.audio-noisy-module-tracing-ktx-1.2.0-15 /Users/philips/.gradle/caches/8.14.3/transforms/b3d0e459bbe32f9432a9043ec95694ca/transformed/tracing-ktx-1.2.0/res
+expo.modules.audionoisymodule.audio-noisy-module-annotation-experimental-1.4.0-16 /Users/philips/.gradle/caches/8.14.3/transforms/b934afcb18870f7948dcd4fe6838c10a/transformed/annotation-experimental-1.4.0/res
+expo.modules.audionoisymodule.audio-noisy-module-activity-1.7.0-17 /Users/philips/.gradle/caches/8.14.3/transforms/bb68fde946aa9580fde1ee69f4c79424/transformed/activity-1.7.0/res
+expo.modules.audionoisymodule.audio-noisy-module-appcompat-resources-1.7.0-18 /Users/philips/.gradle/caches/8.14.3/transforms/cacb38e9f36b6f1c5045dff1a5fface3/transformed/appcompat-resources-1.7.0/res
+expo.modules.audionoisymodule.audio-noisy-module-lifecycle-viewmodel-savedstate-2.6.2-19 /Users/philips/.gradle/caches/8.14.3/transforms/d3f3e76e3911e66a3550255456a48c20/transformed/lifecycle-viewmodel-savedstate-2.6.2/res
+expo.modules.audionoisymodule.audio-noisy-module-emoji2-1.3.0-20 /Users/philips/.gradle/caches/8.14.3/transforms/da5ab3b5751a4e6b04c54e8d2544213d/transformed/emoji2-1.3.0/res
+expo.modules.audionoisymodule.audio-noisy-module-lifecycle-livedata-core-2.6.2-21 /Users/philips/.gradle/caches/8.14.3/transforms/edeb2a4b495323c45f32f44a96563694/transformed/lifecycle-livedata-core-2.6.2/res
+expo.modules.audionoisymodule.audio-noisy-module-fragment-1.5.4-22 /Users/philips/.gradle/caches/8.14.3/transforms/eefd4c11e89429fa98490b3b2fd679ec/transformed/fragment-1.5.4/res
+expo.modules.audionoisymodule.audio-noisy-module-lifecycle-viewmodel-2.6.2-23 /Users/philips/.gradle/caches/8.14.3/transforms/f6704fa21faa5a7c59dc9d95b0cfc65e/transformed/lifecycle-viewmodel-2.6.2/res
+expo.modules.audionoisymodule.audio-noisy-module-lifecycle-livedata-2.6.2-24 /Users/philips/.gradle/caches/8.14.3/transforms/f773881a4ac64da5849726656cf0d359/transformed/lifecycle-livedata-2.6.2/res
+expo.modules.audionoisymodule.audio-noisy-module-pngs-25 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/build/generated/res/pngs/release
+expo.modules.audionoisymodule.audio-noisy-module-resValues-26 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/build/generated/res/resValues/release
+expo.modules.audionoisymodule.audio-noisy-module-mergeReleaseResources-27 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+expo.modules.audionoisymodule.audio-noisy-module-mergeReleaseResources-28 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+expo.modules.audionoisymodule.audio-noisy-module-release-29 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/build/intermediates/merged_res/release/mergeReleaseResources
+expo.modules.audionoisymodule.audio-noisy-module-main-30 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/src/main/res
+expo.modules.audionoisymodule.audio-noisy-module-release-31 /Users/philips/Desktop/audiobookshelf-app Backup/modules/audio-noisy-module/android/src/release/res
+expo.modules.audionoisymodule.audio-noisy-module-release-32 /Users/philips/Desktop/audiobookshelf-app Backup/node_modules/expo-modules-core/android/build/intermediates/packaged_res/release/packageReleaseResources

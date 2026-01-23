@@ -2,7 +2,7 @@
  * src/features/mood-discovery/screens/MoodResultsScreen.tsx
  *
  * Results screen showing books that match the active mood session.
- * Features quick-tune bar, grouped results, and empty state.
+ * Features quick-tune bar, grouped results, and improved empty/sparse states (Tier 1.4).
  */
 
 import React, { useCallback, useMemo } from 'react';
@@ -29,6 +29,111 @@ import { useLibraryCache } from '@/core/cache/libraryCache';
 import { Icon } from '@/shared/components/Icon';
 import { Loading } from '@/shared/components/Loading';
 import { spacing, radius, useTheme } from '@/shared/theme';
+import { secretLibraryColors } from '@/shared/theme/secretLibrary';
+import { MOODS, MoodSession } from '../types';
+
+// ============================================================================
+// TIER 1.4: IMPROVED EMPTY/SPARSE MESSAGING
+// ============================================================================
+
+/**
+ * Get mood-specific suggestion for empty results
+ */
+function getMoodSuggestion(mood: string): string {
+  switch (mood) {
+    case 'comfort':
+      return 'cozy mysteries, romance, or slice-of-life';
+    case 'thrills':
+      return 'thrillers, mysteries, or suspense';
+    case 'escape':
+      return 'fantasy, sci-fi, or adventure';
+    case 'laughs':
+      return 'humor, romantic comedy, or satire';
+    case 'feels':
+      return 'literary fiction, drama, or love stories';
+    case 'thinking':
+      return 'philosophy, literary, or thought-provoking';
+    default:
+      return 'more books in this genre';
+  }
+}
+
+/**
+ * Get context-aware empty state content (Tier 1.4)
+ */
+function getEmptyStateContent(
+  session: MoodSession | null,
+  librarySize: number
+): { emoji: string; title: string; subtitle: string; buttonText: string } {
+  const moodLabel = session?.mood
+    ? MOODS.find(m => m.id === session.mood)?.label || session.mood
+    : 'this mood';
+
+  // Small library (< 20 books)
+  if (librarySize < 20) {
+    return {
+      emoji: '📖',
+      title: 'Your library is focused',
+      subtitle: `With ${librarySize} books, we don't have enough variety to match "${moodLabel}" preferences. Consider expanding your library with ${getMoodSuggestion(session?.mood || '')}.`,
+      buttonText: 'Adjust Preferences',
+    };
+  }
+
+  // Strict filters (user selected multiple non-any options)
+  const filterCount = [
+    session?.pace !== 'any' ? 1 : 0,
+    session?.weight !== 'any' ? 1 : 0,
+    session?.world !== 'any' ? 1 : 0,
+    session?.length !== 'any' ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
+
+  if (filterCount >= 3) {
+    return {
+      emoji: '🎯',
+      title: 'Nothing quite fits',
+      subtitle: `Your preferences are very specific. Try relaxing one or two filters — maybe let pace or length be "any"?`,
+      buttonText: 'Loosen Filters',
+    };
+  }
+
+  // Generic empty state
+  return {
+    emoji: '📚',
+    title: 'No matches found',
+    subtitle: `We couldn't find books matching your "${moodLabel}" mood. Try adjusting your preferences or checking if your books have genre tags.`,
+    buttonText: 'Adjust Preferences',
+  };
+}
+
+/**
+ * Get sparse results banner text (Tier 1.4)
+ * Shown when < 3 perfect matches
+ */
+function getSparseResultsBanner(
+  perfectCount: number,
+  totalCount: number,
+  session: MoodSession | null
+): { show: boolean; text: string } {
+  // Show banner if we have some results but few perfect ones
+  if (totalCount > 0 && perfectCount < 3 && totalCount < 10) {
+    const moodLabel = session?.mood
+      ? MOODS.find(m => m.id === session.mood)?.label || session.mood
+      : 'this mood';
+
+    if (perfectCount === 0) {
+      return {
+        show: true,
+        text: `Showing the best "${moodLabel}" options from your library`,
+      };
+    }
+    return {
+      show: true,
+      text: `Only ${perfectCount} perfect ${perfectCount === 1 ? 'match' : 'matches'} — showing best available`,
+    };
+  }
+
+  return { show: false, text: '' };
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - spacing.lg * 2 - spacing.sm * 2) / 3;
@@ -46,11 +151,13 @@ export function MoodResultsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const accent = colors.accent.primary;
+  const accent = secretLibraryColors.gold;
 
   const session = useActiveSession();
   const hasSession = useHasActiveSession();
   const getItem = useLibraryCache((s) => s.getItem);
+  const libraryItems = useLibraryCache((s) => s.items);
+  const librarySize = libraryItems.length;
 
   const { perfect, great, good, partial, isLoading } =
     useMoodRecommendationsByQuality(session);
@@ -64,7 +171,7 @@ export function MoodResultsScreen() {
         type: 'perfect',
         title: 'Perfect for You',
         subtitle: '80%+ match',
-        data: perfect.map((r) => r.id),
+        data: perfect.map((r) => r.item.id),
       });
     }
 
@@ -73,7 +180,7 @@ export function MoodResultsScreen() {
         type: 'great',
         title: 'Great Matches',
         subtitle: '60-79% match',
-        data: great.map((r) => r.id),
+        data: great.map((r) => r.item.id),
       });
     }
 
@@ -82,7 +189,7 @@ export function MoodResultsScreen() {
         type: 'good',
         title: 'Good Options',
         subtitle: '40-59% match',
-        data: good.map((r) => r.id),
+        data: good.map((r) => r.item.id),
       });
     }
 
@@ -91,7 +198,7 @@ export function MoodResultsScreen() {
         type: 'partial',
         title: 'Might Interest You',
         subtitle: '20-39% match',
-        data: partial.map((r) => r.id),
+        data: partial.map((r) => r.item.id),
       });
     }
 
@@ -102,10 +209,10 @@ export function MoodResultsScreen() {
   const getScoreData = useCallback(
     (id: string) => {
       return (
-        perfect.find((r) => r.id === id) ||
-        great.find((r) => r.id === id) ||
-        good.find((r) => r.id === id) ||
-        partial.find((r) => r.id === id)
+        perfect.find((r) => r.item.id === id) ||
+        great.find((r) => r.item.id === id) ||
+        good.find((r) => r.item.id === id) ||
+        partial.find((r) => r.item.id === id)
       );
     },
     [perfect, great, good, partial]
@@ -186,8 +293,10 @@ export function MoodResultsScreen() {
     );
   }
 
-  // Empty results
+  // Empty results - use improved messaging (Tier 1.4)
   if (sections.length === 0) {
+    const emptyContent = getEmptyStateContent(session, librarySize);
+
     return (
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
         <View style={styles.header}>
@@ -209,22 +318,24 @@ export function MoodResultsScreen() {
         />
 
         <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>📚</Text>
-          <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>No matches found</Text>
+          <Text style={styles.emptyEmoji}>{emptyContent.emoji}</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>{emptyContent.title}</Text>
           <Text style={[styles.emptySubtitle, { color: colors.text.secondary }]}>
-            Try adjusting your mood preferences or adding more vibes to find
-            books in your library.
+            {emptyContent.subtitle}
           </Text>
           <TouchableOpacity
             onPress={handleEditMood}
             style={[styles.emptyButton, { backgroundColor: accent }]}
           >
-            <Text style={[styles.emptyButtonText, { color: colors.text.inverse }]}>Adjust Mood</Text>
+            <Text style={[styles.emptyButtonText, { color: colors.text.inverse }]}>{emptyContent.buttonText}</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
+
+  // Calculate sparse banner (Tier 1.4)
+  const sparseBanner = getSparseResultsBanner(perfect.length, totalCount, session);
 
   // Results view
   return (
@@ -250,6 +361,16 @@ export function MoodResultsScreen() {
         onEditPress={handleEditMood}
         onClear={handleClearSession}
       />
+
+      {/* Sparse Results Banner (Tier 1.4) */}
+      {sparseBanner.show && (
+        <View style={[styles.sparseBanner, { backgroundColor: colors.background.tertiary }]}>
+          <Icon name="Info" size={14} color={colors.text.tertiary} />
+          <Text style={[styles.sparseBannerText, { color: colors.text.secondary }]}>
+            {sparseBanner.text}
+          </Text>
+        </View>
+      )}
 
       {/* Results */}
       <FlatList
@@ -390,5 +511,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginRight: -spacing.sm,
+  },
+  // Sparse banner styles (Tier 1.4)
+  sparseBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    borderRadius: radius.sm,
+    gap: spacing.xs,
+  },
+  sparseBannerText: {
+    fontSize: 13,
+    flex: 1,
   },
 });

@@ -20,7 +20,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
 // Note: Safe area is handled by TopNav component
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
@@ -31,6 +30,7 @@ import { useDownloads } from '@/core/hooks/useDownloads';
 import { useLibraryCache } from '@/core/cache';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { TopNav, TopNavSearchIcon, SkullRefreshControl, SkeletonBox } from '@/shared/components';
+import { useNavigationWithLoading } from '@/shared/hooks';
 import {
   secretLibraryColors as staticColors,
   secretLibraryTypography as typography,
@@ -60,10 +60,11 @@ function getBookDuration(item: LibraryItem | null | undefined): number {
 
 import { BookshelfView, LayoutMode } from '../components/BookshelfView';
 import { BookSpineVerticalData } from '../components/BookSpineVertical';
-import { RecommendedBook } from '../components/DiscoverMoreCard';
+import { DiscoverMoreCard, RecommendedBook } from '../components/DiscoverMoreCard';
 import { useHomeData } from '../hooks/useHomeData';
 import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
-import { useInProgressBooks } from '@/core/hooks/useUserBooks';
+import { useInProgressBooks, useFinishedBooks } from '@/core/hooks/useUserBooks';
+import { useShallow } from 'zustand/react/shallow';
 import { useProgressStore } from '@/core/stores/progressStore';
 import { usePlayerStore } from '@/features/player/stores/playerStore';
 import { GLOBAL_MINI_PLAYER_HEIGHT } from '@/navigation/components/GlobalMiniPlayer';
@@ -77,21 +78,21 @@ import { useAppReadyStore } from '@/core/stores/appReadyStore';
 const SHELF_PADDING_WITH_MINI_PLAYER = GLOBAL_MINI_PLAYER_HEIGHT - 50;
 const SHELF_PADDING_NO_MINI_PLAYER = 0;
 
-// STACK MODE (rotated pile, vertical scroll)
-const STACK_PADDING_WITH_MINI_PLAYER = GLOBAL_MINI_PLAYER_HEIGHT - 65;
-const STACK_PADDING_NO_MINI_PLAYER = 0;
-
 // LIST MODE (vertical list with covers)
 const LIST_PADDING_WITH_MINI_PLAYER = GLOBAL_MINI_PLAYER_HEIGHT + 20;
 const LIST_PADDING_NO_MINI_PLAYER = 40;
+
+// GRID MODE (2-column card grid)
+const GRID_PADDING_WITH_MINI_PLAYER = GLOBAL_MINI_PLAYER_HEIGHT + 20;
+const GRID_PADDING_NO_MINI_PLAYER = 40;
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-type ViewMode = 'shelf' | 'stack' | 'list';  // Shelf (upright spines), Stack (rotated pile), or List (vertical)
+type ViewMode = 'shelf' | 'list' | 'grid';  // Shelf (upright spines), List (vertical), or Grid (2-column cards)
 type SortMode = 'recent' | 'title' | 'author' | 'progress' | 'duration';
-type ContentMode = 'library' | 'lastPlayed';  // What content to show
+type ContentMode = 'library' | 'lastPlayed' | 'finished';  // What content to show
 type DownloadFilter = 'all' | 'downloaded' | 'not-downloaded';  // Download status filter
 
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
@@ -105,6 +106,7 @@ const SORT_OPTIONS: { key: SortMode; label: string }[] = [
 const CONTENT_OPTIONS: { key: ContentMode; label: string }[] = [
   { key: 'library', label: 'My Library' },
   { key: 'lastPlayed', label: 'Last Played' },
+  { key: 'finished', label: 'Finished' },
 ];
 
 const DOWNLOAD_OPTIONS: { key: DownloadFilter; label: string }[] = [
@@ -133,15 +135,6 @@ interface IconProps {
   color?: string;
 }
 
-// Stack icon - horizontal stacked books (filled)
-const StackIcon = ({ color = '#000' }: IconProps) => (
-  <Svg width={14} height={14} viewBox="0 0 24 24" fill={color}>
-    <Rect x={2} y={4} width={20} height={4} rx={1} />
-    <Rect x={4} y={10} width={16} height={4} rx={1} />
-    <Rect x={6} y={16} width={12} height={4} rx={1} />
-  </Svg>
-);
-
 // Shelf icon - upright books on shelf (filled)
 const ShelfIcon = ({ color = '#000' }: IconProps) => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill={color}>
@@ -161,6 +154,16 @@ const ListIcon = ({ color = '#000' }: IconProps) => (
     <Rect x={7} y={5} width={14} height={2} rx={1} />
     <Rect x={7} y={11} width={14} height={2} rx={1} />
     <Rect x={7} y={17} width={14} height={2} rx={1} />
+  </Svg>
+);
+
+// Grid icon - 2x2 squares (filled)
+const GridIcon = ({ color = '#000' }: IconProps) => (
+  <Svg width={14} height={14} viewBox="0 0 24 24" fill={color}>
+    <Rect x={3} y={3} width={8} height={8} rx={1.5} />
+    <Rect x={13} y={3} width={8} height={8} rx={1.5} />
+    <Rect x={3} y={13} width={8} height={8} rx={1.5} />
+    <Rect x={13} y={13} width={8} height={8} rx={1.5} />
   </Svg>
 );
 
@@ -210,7 +213,7 @@ function transformToLibraryBook(item: LibraryItem, downloadedIds: Set<string>): 
     duration: formatDuration(duration),
     durationSeconds: duration,
     progress,
-    coverUrl: apiClient.getItemCoverUrl(item.id),
+    coverUrl: apiClient.getItemCoverUrl(item.id, { width: 400, height: 400 }),
     lastPlayedAt,
     isDownloaded: downloadedIds.has(item.id),
   };
@@ -288,7 +291,7 @@ function transformToSpineData(
 // =============================================================================
 
 export function LibraryScreen() {
-  const navigation = useNavigation<any>();
+  const { navigateWithLoading, jumpToTabWithLoading, navigation } = useNavigationWithLoading();
   // Note: Safe area is handled by TopNav component (includeSafeArea={true} by default)
 
   // Theme-aware colors
@@ -312,7 +315,9 @@ export function LibraryScreen() {
 
   // Get library IDs (books user has added to their library)
   // Use progressStore which is the unified source of truth (same as book detail "IN LIBRARY" button)
-  const librarySet = useProgressStore((state) => state.librarySet);
+  // PERF FIX: Subscribe to version number instead of librarySet directly to prevent re-render loops
+  // The Set reference changes on every store update, causing cascading re-renders
+  const progressVersion = useProgressStore((state) => state.version);
   const isProgressLoaded = useProgressStore((state) => state.isLoaded);
 
   // Check if mini player is active (has a book loaded)
@@ -324,21 +329,32 @@ export function LibraryScreen() {
     switch (mode) {
       case 'shelf':
         return isMiniPlayerActive ? SHELF_PADDING_WITH_MINI_PLAYER : SHELF_PADDING_NO_MINI_PLAYER;
-      case 'stack':
-        return isMiniPlayerActive ? STACK_PADDING_WITH_MINI_PLAYER : STACK_PADDING_NO_MINI_PLAYER;
       case 'list':
         return isMiniPlayerActive ? LIST_PADDING_WITH_MINI_PLAYER : LIST_PADDING_NO_MINI_PLAYER;
+      case 'grid':
+        return isMiniPlayerActive ? GRID_PADDING_WITH_MINI_PLAYER : GRID_PADDING_NO_MINI_PLAYER;
     }
   }, [isMiniPlayerActive]);
 
   // Get local SQLite progress data as fallback for "Last Played"
   const { data: localInProgressBooks = [] } = useInProgressBooks();
 
-  // Get library cache for items and refresh functionality
-  const { items: allCacheItems, refreshCache, isLoading: isCacheLoading, isLoaded: isCacheLoaded } = useLibraryCache();
+  // Get finished books from SQLite
+  const { data: finishedBooks = [] } = useFinishedBooks();
 
-  // Get recommendations for "Find More Books" card
-  const { recommendations: recommendedItems } = useRecommendations(allCacheItems, 3);
+  // Get library cache for items and refresh functionality
+  // PERF FIX: Use selector to only subscribe to needed fields, preventing re-renders from other store changes
+  const { items: allCacheItems, refreshCache, isLoading: isCacheLoading, isLoaded: isCacheLoaded } = useLibraryCache(
+    useShallow((state) => ({
+      items: state.items,
+      refreshCache: state.refreshCache,
+      isLoading: state.isLoading,
+      isLoaded: state.isLoaded,
+    }))
+  );
+
+  // Get recommendations for "Find More Books" card (5 for empty state stack)
+  const { recommendations: recommendedItems } = useRecommendations(allCacheItems, 5);
 
   // Note: Auto-refresh now happens during app boot (App.tsx) to prevent library flash
   // Manual refresh is still available via pull-to-refresh
@@ -346,7 +362,7 @@ export function LibraryScreen() {
   // Transform recommendations to the format needed by DiscoverMoreCard
   // Include genres, tags, and duration so BookSpineVertical can render properly
   const discoverRecommendations = useMemo((): RecommendedBook[] => {
-    return recommendedItems.slice(0, 3).map((item) => {
+    return recommendedItems.slice(0, 5).map((item) => {
       const metadata = getBookMetadata(item);
       return {
         id: item.id,
@@ -362,14 +378,8 @@ export function LibraryScreen() {
   // Handler for "Find More Books" card press
   const handleDiscoverPress = useCallback(() => {
     haptics.buttonPress();
-    // Navigate to discover/browse tab
-    const parent = navigation.getParent();
-    if (parent?.jumpTo) {
-      parent.jumpTo('DiscoverTab');
-    } else {
-      navigation.navigate('Main', { screen: 'DiscoverTab' });
-    }
-  }, [navigation]);
+    jumpToTabWithLoading('DiscoverTab');
+  }, [jumpToTabWithLoading]);
 
   // Handler for recommendation book spine press - navigate to book detail
   const handleRecommendationPress = useCallback((book: RecommendedBook) => {
@@ -412,6 +422,39 @@ export function LibraryScreen() {
     return localItems.slice(0, 20);
   }, [recentlyListened, localInProgressBooks, allCacheItems]);
 
+  // Build finished books list from SQLite data
+  const finishedLibraryItems = useMemo(() => {
+    if (finishedBooks.length === 0) return [];
+
+    // Convert finished books to LibraryItems by looking up in cache
+    const cacheMap = new Map(allCacheItems.map(item => [item.id, item]));
+    const items: LibraryItem[] = [];
+
+    for (const userBook of finishedBooks) {
+      const cacheItem = cacheMap.get(userBook.bookId);
+      if (cacheItem) {
+        // Enrich cache item with finished data
+        const finishedTime = userBook.finishedAt ? new Date(userBook.finishedAt).getTime() : Date.now();
+        items.push({
+          ...cacheItem,
+          mediaProgress: {
+            id: userBook.bookId,
+            libraryItemId: userBook.bookId,
+            currentTime: userBook.currentTime,
+            duration: userBook.duration,
+            progress: userBook.progress,
+            isFinished: true,
+            hideFromContinueListening: false,
+            lastUpdate: finishedTime,
+            startedAt: finishedTime,
+          },
+        });
+      }
+    }
+
+    return items;
+  }, [finishedBooks, allCacheItems]);
+
   // Get downloaded books
   const { downloads, isLoading: isDownloadsLoading } = useDownloads();
   const downloadedIds = useMemo(() => {
@@ -443,23 +486,30 @@ export function LibraryScreen() {
 
   // Get books in user's library from cache
   // Now using progressStore.librarySet which is the same source as book detail screen
+  // PERF FIX: Use getState() inside useMemo instead of subscribing to librarySet
+  // This way we re-filter when progressVersion changes (number equality is stable)
   const libraryBooksFromCache = useMemo(() => {
+    const librarySet = useProgressStore.getState().librarySet;
     if (!isCacheLoaded || !isProgressLoaded || librarySet.size === 0) return [];
     return allCacheItems.filter(item => librarySet.has(item.id));
-  }, [allCacheItems, librarySet, isCacheLoaded, isProgressLoaded]);
+  }, [allCacheItems, progressVersion, isCacheLoaded, isProgressLoaded]);
 
-  // Select items based on content mode (Library vs Last Played)
+  // Select items based on content mode (Library vs Last Played vs Finished)
   const baseLibraryItems = useMemo(() => {
     switch (contentMode) {
       case 'library':
         // "My Library" - show books user has added to their library
         return libraryBooksFromCache;
       case 'lastPlayed':
-      default:
         // "Last Played" - use local SQLite data as fallback when server returns empty
         return localRecentlyListened;
+      case 'finished':
+        // "Finished" - show completed books from SQLite
+        return finishedLibraryItems;
+      default:
+        return libraryBooksFromCache;
     }
-  }, [contentMode, libraryBooksFromCache, localRecentlyListened]);
+  }, [contentMode, libraryBooksFromCache, localRecentlyListened, finishedLibraryItems]);
 
   // Apply download filter on top of content mode
   const effectiveLibraryItems = useMemo(() => {
@@ -641,24 +691,123 @@ export function LibraryScreen() {
     );
   };
 
+  // Render grid view (2-column cards with covers)
+  const renderGridView = () => {
+    // Split books into rows of 2
+    const rows: LibraryBook[][] = [];
+    for (let i = 0; i < allBooks.length; i += 2) {
+      rows.push(allBooks.slice(i, i + 2));
+    }
+
+    return (
+      <SkullRefreshControl
+        refreshing={isCacheLoading || isRefreshing}
+        onRefresh={handleRefreshPress}
+      >
+        <ScrollView
+          style={styles.gridScrollView}
+          contentContainerStyle={{ paddingBottom: getBottomPadding('grid') }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.gridContainer}>
+            {rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.gridRow}>
+                {row.map((book) => {
+                  const item = libraryItemsMap.get(book.id);
+                  const metadata = item ? getBookMetadata(item) : null;
+                  const seriesInfo = extractSeriesInfo(metadata);
+                  const coverUrl = apiClient.getItemCoverUrl(book.id, { width: 300, height: 300 });
+                  const narrator = item ? getNarratorName(item) : '';
+                  const durationText = formatDurationCompact(book.durationSeconds);
+
+                  return (
+                    <Pressable
+                      key={book.id}
+                      style={styles.gridCard}
+                      onPress={() => handleBookPress(book)}
+                    >
+                      <Image
+                        source={{ uri: coverUrl }}
+                        style={styles.gridCover}
+                        contentFit="cover"
+                      />
+                      <View style={styles.gridInfo}>
+                        <Text style={[styles.gridTitle, { color: colors.black }]} numberOfLines={2}>
+                          {book.title}
+                        </Text>
+                        <Text style={[styles.gridAuthor, { color: colors.gray }]} numberOfLines={1}>
+                          {book.author}
+                        </Text>
+                        {seriesInfo.name && (
+                          <Text style={[styles.gridMeta, { color: colors.gray }]} numberOfLines={1}>
+                            {seriesInfo.name}{seriesInfo.sequence ? ` #${seriesInfo.sequence}` : ''}
+                          </Text>
+                        )}
+                        {narrator && (
+                          <Text style={[styles.gridMeta, { color: colors.gray }]} numberOfLines={1}>
+                            {narrator}
+                          </Text>
+                        )}
+                        <Text style={[styles.gridMeta, { color: colors.gray }]}>
+                          {durationText}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+                {/* Empty spacer if odd number of books */}
+                {row.length === 1 && <View style={styles.gridCard} />}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </SkullRefreshControl>
+    );
+  };
+
   // Navigate to browse
   const handleBrowsePress = useCallback(() => {
     haptics.selection();
-    navigation.navigate('Main', { screen: 'DiscoverTab' });
-  }, [navigation]);
+    jumpToTabWithLoading('DiscoverTab');
+  }, [jumpToTabWithLoading]);
 
   // Render empty state based on content mode
   const renderEmptyState = () => {
-    const isLibraryMode = contentMode === 'library';
+    // For "My Library" mode with no books, use BookshelfView with empty books array
+    // This ensures DiscoverMoreCard is positioned exactly the same as when there are books
+    if (contentMode === 'library' && discoverRecommendations.length > 0) {
+      return (
+        <BookshelfView
+          books={[]}
+          onBookPress={() => {}}
+          layoutMode="shelf"
+          bottomPadding={getBottomPadding('shelf')}
+          recommendations={discoverRecommendations}
+          onDiscoverPress={handleDiscoverPress}
+          onRecommendationPress={handleRecommendationPress}
+        />
+      );
+    }
+
+    // Fallback text empty state for other modes or when no recommendations
+    let title = 'No Books Saved';
+    let subtitle = 'Add books to your library to see them here';
+
+    if (contentMode === 'lastPlayed') {
+      title = 'No Recently Played';
+      subtitle = 'Start listening to see your books here';
+    } else if (contentMode === 'finished') {
+      title = 'No Finished Books';
+      subtitle = 'Complete a book to see it here';
+    }
+
     return (
       <View style={styles.emptyState}>
         <Text style={[styles.emptyTitle, { color: colors.black }]}>
-          {isLibraryMode ? 'No Books Saved' : 'No Recently Played'}
+          {title}
         </Text>
         <Text style={[styles.emptySubtitle, { color: colors.gray }]}>
-          {isLibraryMode
-            ? 'Add books to your library to see them here'
-            : 'Start listening to see your books here'}
+          {subtitle}
         </Text>
         <Pressable
           style={[styles.browseButton, { backgroundColor: colors.black }]}
@@ -706,6 +855,11 @@ export function LibraryScreen() {
     // List view uses its own rendering
     if (viewMode === 'list') {
       return renderListView();
+    }
+
+    // Grid view uses 2-column cards
+    if (viewMode === 'grid') {
+      return renderGridView();
     }
 
     // Only show last played time when sorted by recent
@@ -756,10 +910,10 @@ export function LibraryScreen() {
             onPress: () => handleViewModeChange('shelf'),
           },
           {
-            key: 'stack',
-            icon: <StackIcon color={viewMode === 'stack' ? colors.white : buttonInactiveTextColor} />,
-            active: viewMode === 'stack',
-            onPress: () => handleViewModeChange('stack'),
+            key: 'grid',
+            icon: <GridIcon color={viewMode === 'grid' ? colors.white : buttonInactiveTextColor} />,
+            active: viewMode === 'grid',
+            onPress: () => handleViewModeChange('grid'),
           },
           {
             key: 'list',
@@ -1074,7 +1228,51 @@ const styles = StyleSheet.create({
     color: staticColors.gray,
   },
 
-  // Empty State
+  // Grid View Styles
+  gridScrollView: {
+    flex: 1,
+  },
+  gridContainer: {
+    paddingHorizontal: spacing.screenPaddingH,
+    paddingTop: 8,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  gridCard: {
+    width: '48%',
+  },
+  gridCover: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: staticColors.grayLine,
+  },
+  gridInfo: {
+    marginTop: 10,
+  },
+  gridTitle: {
+    fontFamily: fonts.playfair.regular,
+    fontSize: scale(15),
+    color: staticColors.black,
+    lineHeight: scale(18),
+  },
+  gridAuthor: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(11),
+    color: staticColors.gray,
+    marginTop: 4,
+  },
+  gridMeta: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    color: staticColors.gray,
+    marginTop: 2,
+  },
+
+  // Empty State - Text version
   emptyState: {
     flex: 1,
     justifyContent: 'center',

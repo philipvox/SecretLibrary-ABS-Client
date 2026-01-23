@@ -143,7 +143,7 @@ const DEBUG_SECTIONS = __DEV__ && false; // Toggle to see section bounds
  * - Uses adjustsFontSizeToFit for overflow handling (shrinks but doesn't grow)
  * - Clean orientation handling via simple transforms
  */
-import { getConfigForSize } from '../utils/spine/templates/spineTemplates';
+import { getConfigForSize } from '../utils/spine/templateAdapter';
 import type { AppliedTemplateConfig } from '../utils/spine/templateAdapter';
 
 interface TemplateSpineProps {
@@ -756,7 +756,7 @@ const DEFAULT_DURATION = 10 * 60 * 60; // 10 hours default (~45px width)
 // Layout: TITLE (dominant) → AUTHOR (supporting) → PROGRESS (minimal)
 const TITLE_PERCENT_BASE = 68;  // Title is primary - gets most space
 const AUTHOR_PERCENT_BASE = 26; // Author is secondary - compact
-const PROGRESS_PERCENT = 6;     // Progress/series number at bottom
+const PROGRESS_PERCENT = 6;     // Progress percentage at bottom
 
 // =============================================================================
 // HELPERS
@@ -928,16 +928,25 @@ export function BookSpineVertical({
   // Check if colored spines are enabled (currently disabled for stroke design)
   const useColoredSpines = useSpineCacheStore((state) => state.useColoredSpines);
 
-  // Get spine colors - theme-aware stroke design
+  // Get spine colors - use book colors if provided, otherwise fall back to theme defaults
   // Dark mode: dark background with white text/stroke
   // Light mode: light grey background with black text/stroke
   const { spineBgColor, spineTextColor, spineStrokeColor } = useMemo(() => {
+    // Use book-specific colors if provided (from cache enrichment)
+    if (book.backgroundColor && book.textColor) {
+      return {
+        spineBgColor: book.backgroundColor,
+        spineTextColor: book.textColor,
+        spineStrokeColor: book.textColor,
+      };
+    }
+    // Fall back to theme colors
     return {
       spineBgColor: colors.white,      // #F5F5F5 light, #1A1A1A dark
       spineTextColor: colors.black,        // #000000 light, #FFFFFF dark
       spineStrokeColor: colors.black,      // #000000 light, #FFFFFF dark
     };
-  }, [colors.grayLight, colors.black]);
+  }, [book.backgroundColor, book.textColor, colors.white, colors.black]);
 
   // Calculate dimensions using genre-based system (includes touch padding for 44px minimum target)
   const dimensions = useMemo(() => {
@@ -1116,6 +1125,9 @@ export function BookSpineVertical({
     }
 
     // Fallback to generative composition system
+    // Pass VISUAL width for smart layout constraints (horizontal only on wide spines)
+    // When isHorizontalDisplay is true, the visual width is actually the height prop
+    const visualWidth = isHorizontalDisplay ? height : width;
     const generatedComp = generateSpineComposition(
       book.id,
       book.title,
@@ -1123,20 +1135,23 @@ export function BookSpineVertical({
       genres,
       book.seriesName && book.seriesSequence
         ? { name: book.seriesName, number: book.seriesSequence }
-        : undefined
+        : undefined,
+      visualWidth  // Pass visual width for smart orientation constraints
     );
 
     // Log generated composition for debugging
     if (__DEV__ && generatedComp) {
       console.log(
         `[Composition] "${book.title?.substring(0, 25)}" ` +
-        `author: ${generatedComp.author?.orientation || 'unknown'}, ` +
+        `visualWidth: ${visualWidth}px (raw: ${width}x${height}, horiz: ${isHorizontalDisplay}), ` +
+        `titleOrient: ${generatedComp.title?.orientation || 'unknown'}, ` +
+        `authorOrient: ${generatedComp.author?.orientation || 'unknown'}, ` +
         `authorPos: ${generatedComp.layout?.authorPosition || 'unknown'}`
       );
     }
 
     return generatedComp;
-  }, [book.id, book.title, book.author, genres, book.seriesName, book.seriesSequence, templateConfig, width, typography.authorOrientationBias, isHorizontalDisplay]);
+  }, [book.id, book.title, book.author, genres, book.seriesName, book.seriesSequence, templateConfig, width, height, typography.authorOrientationBias, isHorizontalDisplay]);
 
   // HitSlop for touch target compliance (44px minimum)
   const hitSlop = useMemo(() => ({
@@ -1202,7 +1217,7 @@ export function BookSpineVertical({
   // This allows dramatic scaling to work (shout=2.5x gets more space, whisper=0.5x gets less)
   // CRITICAL FIX (v0.7.21): When templates active, calculate heights FROM fontSize, not from heightPercent
   const { authorPercent, titlePercent, progressSectionPercent } = useMemo(() => {
-    const hasProgressOrSeries = showProgress || book.seriesSequence;
+    const hasProgressSection = showProgress; // Series number no longer shown on spine
 
     // Template-driven heights: calculate FROM fontSize (FIXED - was using heightPercent directly)
     // The bug was: heightPercent was used as absolute allocation, which inverted small/large sizing
@@ -1219,7 +1234,7 @@ export function BookSpineVertical({
       // Min height = fontSize * lineHeight * maxLines + padding
       const titleMinHeight = titleLineHeight * 2 + (templateConfig.title.paddingVertical || 8) * 2;
       const authorMinHeight = authorLineHeight * 2 + (templateConfig.author.paddingVertical || 6) * 2;
-      const progressMinHeight = hasProgressOrSeries ? 30 : 0; // Fixed height for progress/series
+      const progressMinHeight = hasProgressSection ? 30 : 0; // Fixed height for progress/series
 
       // Total minimum height needed
       const totalMinHeight = titleMinHeight + authorMinHeight + progressMinHeight;
@@ -1256,16 +1271,16 @@ export function BookSpineVertical({
     }
 
     // Composition-driven heights: use scale multipliers
-    const baseTitlePercent = hasProgressOrSeries
+    const baseTitlePercent = hasProgressSection
       ? TITLE_PERCENT_BASE
       : TITLE_PERCENT_BASE + (PROGRESS_PERCENT / 2);
-    const baseAuthorPercent = hasProgressOrSeries
+    const baseAuthorPercent = hasProgressSection
       ? AUTHOR_PERCENT_BASE
       : AUTHOR_PERCENT_BASE + (PROGRESS_PERCENT / 2);
 
     const titleWeight = baseTitlePercent * titleScaleMultiplier;
     const authorWeight = baseAuthorPercent * authorScaleMultiplier;
-    const progressWeight = hasProgressOrSeries ? PROGRESS_PERCENT : 0;
+    const progressWeight = hasProgressSection ? PROGRESS_PERCENT : 0;
 
     // Normalize to 100% (redistribute space based on relative weights)
     const totalWeight = titleWeight + authorWeight + progressWeight;
@@ -1285,14 +1300,31 @@ export function BookSpineVertical({
     }
 
     return result;
-  }, [showProgress, book.seriesSequence, titleScaleMultiplier, authorScaleMultiplier, compositionTitleScale, compositionAuthorScale, book.title, templateConfig]);
+  }, [showProgress, titleScaleMultiplier, authorScaleMultiplier, compositionTitleScale, compositionAuthorScale, book.title, templateConfig]);
 
   // Calculate usable area (subtract gaps from total)
   const topOffset = (book.isDownloaded ? DOWNLOAD_INDICATOR_HEIGHT : 0) + TOP_PADDING;
   const numGaps = progressSectionPercent > 0 ? 2 : 1;  // Gaps between sections
   const totalGapHeight = SECTION_GAP * numGaps;
+
+  // CRITICAL: When displaying horizontally (rotated 90°), swap width/height for layout calculations
+  // because the spine's height becomes its visual width when lying flat
+  const effectiveWidth = isHorizontalDisplay ? height : width;
+  const effectiveHeight = isHorizontalDisplay ? width : height;
+
+  // DEBUG: Log dimension swapping
+  if (__DEV__) {
+    console.log(
+      `[DIMENSIONS] "${book.title?.substring(0, 25)}" ` +
+      `raw: ${width}x${height}, ` +
+      `effective: ${effectiveWidth}x${effectiveHeight}, ` +
+      `isHorizontalDisplay: ${isHorizontalDisplay}, ` +
+      `composition.title.orientation: ${composition?.title?.orientation || 'none'}`
+    );
+  }
+
   // Subtract ascender buffer from usable height to prevent text clipping at top
-  const usableHeight = height - topOffset - BOTTOM_PADDING - totalGapHeight - ASCENDER_BUFFER;
+  const usableHeight = effectiveHeight - topOffset - BOTTOM_PADDING - totalGapHeight - ASCENDER_BUFFER;
 
   // Calculate section heights from usable area (gaps already subtracted)
   const titleHeight = (usableHeight * titlePercent) / 100;
@@ -1370,11 +1402,12 @@ export function BookSpineVertical({
   }
 
   // Calculate centers for each section
-  const titleCenterX = width / 2;
+  // Use effectiveWidth for X centering since dimensions may be swapped when horizontal
+  const titleCenterX = effectiveWidth / 2;
   const titleCenterY = titleY + titleHeight / 2;
-  const authorCenterX = width / 2;
+  const authorCenterX = effectiveWidth / 2;
   const authorCenterY = authorY + authorHeight / 2;
-  const progressCenterX = width / 2;
+  const progressCenterX = effectiveWidth / 2;
   const progressCenterY = progressY + progressHeight / 2;
 
   // Text content with transforms
@@ -1434,18 +1467,18 @@ export function BookSpineVertical({
   // DEFAULT: Enable for all medium/large spines (width > 60px, ~10+ hour audiobooks)
   // EXCEPTION: Respect explicit horizontal orientation from genre profile
   const baseSplitNames = composition?.author.splitNames || false;
-  const isMediumOrLargeSpine = width > 60;
+  const isMediumOrLargeSpine = effectiveWidth > 60;
   const authorHasMultipleNames = book.author.split(' ').length >= 2;
   // Only disable stacking if genre explicitly requests horizontal author orientation
   const isExplicitlyHorizontal = typography.authorOrientationBias === 'horizontal';
   const authorSplitNames = baseSplitNames ||
     (isMediumOrLargeSpine && authorHasMultipleNames && !isExplicitlyHorizontal);
 
-  // Available width after edge padding and inner margin
-  const availableWidth = width - (EDGE_PADDING * 2);
+  // Available width after edge padding (uses effectiveWidth calculated earlier)
+  const availableWidth = effectiveWidth - (EDGE_PADDING * 2);
 
-  // Aspect ratio for layout decisions
-  const aspectRatio = useMemo(() => height / width, [height, width]);
+  // Aspect ratio for layout decisions (uses effective dimensions)
+  const aspectRatio = useMemo(() => effectiveHeight / effectiveWidth, [effectiveHeight, effectiveWidth]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // UNIFIED TITLE LAYOUT - Uses constraint satisfaction solver
@@ -1460,6 +1493,16 @@ export function BookSpineVertical({
       width: availableWidth - (INNER_MARGIN * 2),
       height: titleHeight - (INNER_MARGIN * 2),
     };
+
+    if (__DEV__) {
+      console.log(
+        `[TITLEBOX] "${book.title?.substring(0, 25)}" ` +
+        `box: ${titleBox.width.toFixed(0)}x${titleBox.height.toFixed(0)}, ` +
+        `available: ${availableWidth.toFixed(0)}, ` +
+        `titleHeight: ${titleHeight.toFixed(0)}, ` +
+        `effective: ${effectiveWidth}x${effectiveHeight}`
+      );
+    }
 
     // CRITICAL FIX (v0.7.21): When templates active, SKIP SOLVER and use template fontSize directly
     // The bug was: solver recalculated fontSize from section height, overriding template intent
@@ -1508,7 +1551,7 @@ export function BookSpineVertical({
       titleBox,
       typography.fontFamily,
       aspectRatio,
-      width,
+      effectiveWidth,  // Use effective width for correct layout decisions when horizontal
       scaledConstraints,
       titleLetterSpacing // pass letter spacing for accurate width calculation
     );
@@ -1523,7 +1566,7 @@ export function BookSpineVertical({
     }
 
     return result;
-  }, [titleContent, availableWidth, titleHeight, typography.fontFamily, aspectRatio, width, titleLetterSpacing, titleScaleMultiplier, templateConfig, compositionTitleScale]);
+  }, [titleContent, availableWidth, titleHeight, typography.fontFamily, aspectRatio, effectiveWidth, titleLetterSpacing, titleScaleMultiplier, templateConfig, compositionTitleScale]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // COMPOSITION ORIENTATION OVERRIDE
@@ -1535,16 +1578,27 @@ export function BookSpineVertical({
     const compositionOrientation = composition.title.orientation;
 
     // Map composition orientations to layout solver's 'vertical' or 'horizontal'
+    let result: string;
     if (compositionOrientation === 'vertical-up' || compositionOrientation === 'vertical-down') {
-      return 'vertical';
+      result = 'vertical';
     } else if (compositionOrientation === 'vertical-two-row') {
-      return 'vertical-two-row';
+      result = 'vertical-two-row';
     } else if (compositionOrientation === 'stacked-letters' || compositionOrientation === 'stacked-words') {
-      return 'stacked';
+      result = 'stacked';
     } else {
-      return 'horizontal';
+      result = 'horizontal';
     }
-  }, [composition, titleLayout.orientation]);
+
+    if (__DEV__) {
+      console.log(
+        `[ORIENTATION] "${book.title?.substring(0, 25)}" ` +
+        `composition: ${compositionOrientation}, final: ${result}, ` +
+        `titleLayout.fontSize: ${titleLayout.lines?.[0]?.fontSize || 'none'}pt`
+      );
+    }
+
+    return result;
+  }, [composition, titleLayout.orientation, book.title, titleLayout.lines]);
 
   const finalTitleRotation = useMemo(() => {
     if (!composition) return '-90deg'; // Default vertical-up
@@ -1636,7 +1690,7 @@ export function BookSpineVertical({
       authorBox,
       typography.fontFamily,
       aspectRatio,
-      width,
+      effectiveWidth,  // Use effective width for correct layout decisions when horizontal
       scaledConstraints,
       preferHorizontalAuthor,
       authorLetterSpacing // pass letter spacing for accurate width calculation
@@ -1652,7 +1706,7 @@ export function BookSpineVertical({
     }
 
     return result;
-  }, [authorContent, availableWidth, authorHeight, typography.fontFamily, aspectRatio, width, preferHorizontalAuthor, authorLetterSpacing, authorScaleMultiplier, compositionAuthorScale, templateConfig]);
+  }, [authorContent, availableWidth, authorHeight, typography.fontFamily, aspectRatio, effectiveWidth, preferHorizontalAuthor, authorLetterSpacing, authorScaleMultiplier, compositionAuthorScale, templateConfig]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // AUTHOR BOX - Optional box around author name (horizontal layouts only)
@@ -1730,18 +1784,18 @@ export function BookSpineVertical({
     };
   }, [isActive, leanAngle]);
 
-  // Progress font size - fits width with padding, slightly larger
-  const progressFontSize = Math.min(width * 0.45, 20);
+  // Progress font size - fits visual width with padding, slightly larger
+  const progressFontSize = Math.min(effectiveWidth * 0.45, 20);
 
   // Checkmark size for finished books
-  const checkmarkSize = Math.min(width * 0.5, 16);
+  const checkmarkSize = Math.min(effectiveWidth * 0.5, 16);
 
   // Series icon index (used for series consistency even though not displayed on spine)
   const iconIndex = seriesStyle?.iconIndex ?? 0;
 
   // Last played time (compact format) - larger font for visibility
   const lastPlayedText = formatTimeAgoCompact(book.lastPlayedAt);
-  const lastPlayedFontSize = Math.min(width * 0.32, 12);
+  const lastPlayedFontSize = Math.min(effectiveWidth * 0.32, 12);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER - Pure React Native (no SVG) for custom font support
@@ -1819,8 +1873,8 @@ export function BookSpineVertical({
             templateConfig={templateConfig}
             titleText={book.title}
             authorText={book.author}
-            spineWidth={width}
-            spineHeight={height}
+            spineWidth={effectiveWidth}
+            spineHeight={effectiveHeight}
             topOffset={topOffset}
             spineTextColor={spineTextColor}
             resolvedFontFamily={resolvedFontFamily}
@@ -1888,6 +1942,10 @@ export function BookSpineVertical({
                   maxLetterHeight * 0.96  // Use 96% of height per letter for dramatic stacking
                 );
 
+                // For stacked letters, lineHeight must be at least fontSize to prevent clipping
+                // Use Math.max to ensure minimum of 1.0x multiplier
+                const stackedLineHeight = letterFontSize * Math.max(1.0, tightLineHeightMultiplier);
+
                 return letters.map((letter, i) => (
                   <Text
                     key={i}
@@ -1896,7 +1954,7 @@ export function BookSpineVertical({
                       fontSize: letterFontSize,
                       fontWeight: titleFontWeight as any,
                       color: spineTextColor,
-                      lineHeight: letterFontSize * tightLineHeightMultiplier,  // Font-specific tight stacking
+                      lineHeight: stackedLineHeight,
                       textAlign: 'center',
                       includeFontPadding: false,
                     }}
@@ -2373,18 +2431,6 @@ export function BookSpineVertical({
                 {progressPercent}
               </Text>
             )
-          ) : book.seriesSequence ? (
-            // Series sequence number
-            <Text
-              style={{
-                fontFamily: resolvedFontFamily,
-                fontSize: progressFontSize,
-                fontWeight: '600',
-                color: spineTextColor,
-              }}
-            >
-              {book.seriesSequence}
-            </Text>
           ) : null}
         </View>
 
@@ -2557,4 +2603,23 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BookSpineVertical;
+// PERF: Memoize to prevent re-renders when parent list re-renders
+// Only re-render if book data, dimensions, or interactive state changes
+export default React.memo(BookSpineVertical, (prevProps, nextProps) => {
+  // Return true if props are equal (skip re-render)
+  return (
+    prevProps.book.id === nextProps.book.id &&
+    prevProps.book.progress === nextProps.book.progress &&
+    prevProps.book.isDownloaded === nextProps.book.isDownloaded &&
+    prevProps.book.backgroundColor === nextProps.book.backgroundColor &&
+    prevProps.book.textColor === nextProps.book.textColor &&
+    prevProps.width === nextProps.width &&
+    prevProps.height === nextProps.height &&
+    prevProps.leanAngle === nextProps.leanAngle &&
+    prevProps.isActive === nextProps.isActive &&
+    prevProps.isPushedLeft === nextProps.isPushedLeft &&
+    prevProps.isPushedRight === nextProps.isPushedRight &&
+    prevProps.showShadow === nextProps.showShadow &&
+    prevProps.isHorizontalDisplay === nextProps.isHorizontalDisplay
+  );
+});

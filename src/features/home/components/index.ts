@@ -6,9 +6,6 @@
 
 export { SectionHeader } from './SectionHeader';
 export { SeriesCard } from './SeriesCard';
-export { ContinueListeningSection } from './ContinueListeningSection';
-export { YourSeriesSection } from './YourSeriesSection';
-export { BooksList, TabbedHomeContent, SeriesList } from './TextListSection';
 export { HomeDiscSection } from './HomeDiscSection';
 export { CoverArtwork } from './CoverArtwork';
 export { EmptySection } from './EmptySection';

@@ -13,6 +13,9 @@ export {
 } from './useAutomotive';
 export {
   updateAndroidAutoBrowseData,
-  getAndroidAutoBrowseData,
   clearAndroidAutoBrowseData,
+  notifyBrowseDataUpdated,
+  updatePlaybackState,
+  updateMetadata,
+  isAndroidAutoConnected,
 } from './androidAutoBridge';

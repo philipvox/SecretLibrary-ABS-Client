@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation - Secret Library</title>
+  <meta name="description" content="Documentation for Secret Library">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --black: #000000;
+      --white: #ffffff;
+      --gray-400: #a3a3a3;
+      --gray-600: #525252;
+      --gray-800: #262626;
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    ::selection {
+      background: var(--white);
+      color: var(--black);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--black);
+      color: var(--white);
+      line-height: 1.6;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Typography */
+    h1, h2, h3 {
+      font-family: var(--serif);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+    }
+
+    /* Navigation - matches index.html exactly */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      background: var(--black);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-logo img {
+      height: 40px;
+      width: auto;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    .nav-links a {
+      font-size: 0.65rem;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+      opacity: 0.5;
+    }
+
+    /* Content */
+    .content {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 7rem 3rem 4rem;
+    }
+
+    .page-header {
+      margin-bottom: 3rem;
+      text-align: center;
+    }
+
+    .page-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      margin-bottom: 1rem;
+    }
+
+    h1 em {
+      font-style: italic;
+    }
+
+    .intro {
+      color: var(--gray-400);
+      font-size: 0.9375rem;
+      line-height: 1.8;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* Sections */
+    .section {
+      padding: 3rem 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    h2 {
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      margin-bottom: 1.5rem;
+    }
+
+    h2 em {
+      font-style: italic;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 2rem 0 1rem;
+    }
+
+    p {
+      color: var(--gray-400);
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      line-height: 1.8;
+    }
+
+    p strong {
+      color: var(--white);
+      font-weight: 500;
+    }
+
+    ul, ol {
+      color: var(--gray-400);
+      margin-left: 1.25rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+      line-height: 1.7;
+    }
+
+    a {
+      color: var(--white);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    a:hover {
+      opacity: 0.7;
+    }
+
+    code {
+      background: var(--gray-800);
+      padding: 0.15em 0.4em;
+      border-radius: 3px;
+      font-size: 0.85em;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    }
+
+    /* Steps */
+    .steps {
+      margin: 1.5rem 0;
+    }
+
+    .step {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .step-number {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: var(--gray-800);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--white);
+    }
+
+    .step-content h4 {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      margin-bottom: 0.35rem;
+      color: var(--white);
+    }
+
+    .step-content p {
+      margin-bottom: 0;
+    }
+
+    /* FAQ */
+    .faq-item {
+      margin-bottom: 2rem;
+    }
+
+    .faq-question {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--white);
+      margin-bottom: 0.5rem;
+    }
+
+    .faq-answer {
+      color: var(--gray-400);
+      font-size: 0.875rem;
+      line-height: 1.8;
+    }
+
+    /* Feature Grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .feature-item {
+      background: var(--gray-800);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+
+    .feature-item h4 {
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 0.35rem;
+      color: var(--white);
+    }
+
+    .feature-item p {
+      font-size: 0.8125rem;
+      margin-bottom: 0;
+      color: var(--gray-400);
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 3rem 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .footer-text {
+      font-size: 0.65rem;
+      color: var(--gray-600);
+      letter-spacing: 0.1em;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      nav {
+        padding: 1rem 1.5rem;
+      }
+
+      .nav-logo img {
+        height: 30px;
+      }
+
+      .nav-links {
+        gap: 1.25rem;
+      }
+
+      .nav-links a {
+        font-size: 0.55rem;
+      }
+
+      .content {
+        padding: 6rem 1.5rem 3rem;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+      }
+
+      h3 {
+        font-size: 0.9375rem;
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .step {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html" class="nav-logo"><img src="logo.svg" alt="Secret Library"></a>
+    <div class="nav-links">
+      <a href="index.html">App</a>
+      <a href="tagger.html">Tagger</a>
+      <a href="docs.html">Docs</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </nav>
+
+  <main class="content">
+    <header class="page-header">
+      <span class="page-label">Documentation</span>
+      <h1>Getting <em>Started</em></h1>
+      <p class="intro">Everything you need to know to set up and use Secret Library with your Audiobookshelf server.</p>
+    </header>
+
+    <!-- Getting Started -->
+    <section id="getting-started" class="section">
+      <h2>Getting <em>Started</em></h2>
+      <p>Secret Library connects to your personal Audiobookshelf server. Here's how to get up and running in minutes.</p>
+
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>An <a href="https://www.audiobookshelf.org/" target="_blank">Audiobookshelf</a> server (self-hosted or cloud)</li>
+        <li>Your server URL (e.g., <code>https://abs.yourdomain.com</code>)</li>
+        <li>Your login credentials</li>
+      </ul>
+
+      <h3>Setup Steps</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Download the App</h4>
+            <p>Download Secret Library from the home page. Android is available now, iOS coming soon.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>Enter Your Server URL</h4>
+            <p>On the login screen, enter your Audiobookshelf server address. Include <code>https://</code> if your server uses SSL.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>Sign In</h4>
+            <p>Enter your username and password. These are the same credentials you use to log into your Audiobookshelf web interface.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h4>Start Listening</h4>
+            <p>Your library will sync automatically. Browse your books, download for offline listening, and enjoy.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="section">
+      <h2>Features</h2>
+      <p>Secret Library is designed for the best possible audiobook listening experience.</p>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <h4>Offline Mode</h4>
+          <p>Download books to listen anywhere without an internet connection.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Sleep Timer</h4>
+          <p>Set a timer or let it stop at the end of the current chapter.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Variable Speed</h4>
+          <p>Adjust playback speed from 0.5x to 3x with fine-grained control.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Chapter Navigation</h4>
+          <p>Jump between chapters easily with the chapter list view.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Bookmarks</h4>
+          <p>Mark your favorite passages and return to them anytime.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Progress Sync</h4>
+          <p>Your listening progress syncs automatically with your server.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Queue Management</h4>
+          <p>Build a queue of books to listen to next.</p>
+        </div>
+        <div class="feature-item">
+          <h4>Car Mode</h4>
+          <p>Android Auto support for safe listening while driving.</p>
+        </div>
+      </div>
+
+      <h3>Playback Controls</h3>
+      <ul>
+        <li><strong>Skip Forward/Back:</strong> Tap to skip 30 seconds, or customize in settings</li>
+        <li><strong>Scrubbing:</strong> Drag the progress bar to seek to any position</li>
+        <li><strong>Per-Book Speed:</strong> Each book remembers its own playback speed</li>
+        <li><strong>Smart Rewind:</strong> Automatically rewinds a few seconds when you resume after a pause</li>
+      </ul>
+
+      <h3>Library Organization</h3>
+      <ul>
+        <li>Browse by author, narrator, series, or genre</li>
+        <li>Filter by in-progress, finished, or not started</li>
+        <li>Search across your entire library</li>
+        <li>View detailed book information and descriptions</li>
+      </ul>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="section">
+      <h2>FAQ</h2>
+
+      <div class="faq-item">
+        <p class="faq-question">What is Audiobookshelf?</p>
+        <p class="faq-answer">Audiobookshelf is a free, open-source audiobook and podcast server. You install it on your own hardware (or a cloud server) and it organizes and streams your personal audiobook collection. Secret Library is a mobile client that connects to your Audiobookshelf server.</p>
+      </div>
+
+      <div class="faq-item">
+        <p class="faq-question">Is Secret Library free?</p>
+        <p class="faq-answer">Yes, Secret Library is completely free with no ads, subscriptions, or in-app purchases.</p>
+      </div>
+
+      <div class="faq-item">
+        <p class="faq-question">Do you have access to my audiobooks?</p>
+        <p class="faq-answer">No. Secret Library connects directly to your personal server. We never see your server address, your library, or any of your data. Everything stays between your device and your server.</p>
+      </div>
+
+      <div class="faq-item">
+        <p class="faq-question">Can I use this without my own server?</p>
+        <p class="faq-answer">Secret Library requires an Audiobookshelf server to connect to. If you don't have one, you'll need to set one up first. Check out the <a href="https://www.audiobookshelf.org/docs" target="_blank">Audiobookshelf documentation</a> for setup guides.</p>
+      </div>
+
+      <div class="faq-item">
+        <p class="faq-question">When is iOS coming?</p>
+        <p class="faq-answer">iOS is in development and coming soon. Follow our updates for release announcements.</p>
+      </div>
+
+      <div class="faq-item">
+        <p class="faq-question">How do I download books for offline listening?</p>
+        <p class="faq-answer">Open any book and tap the download icon. The book will be saved to your device and available without an internet connection. You can manage downloads in Profile > Downloads.</p>
+      </div>
+
+      <div class="faq-item">
+        <p class="faq-question">Does my progress sync between devices?</p>
+        <p class="faq-answer">Yes. Your listening progress syncs to your Audiobookshelf server, so you can switch between devices and pick up where you left off.</p>
+      </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section id="troubleshooting" class="section">
+      <h2>Troubleshooting</h2>
+
+      <h3>Can't connect to server</h3>
+      <ul>
+        <li>Make sure your server URL is correct and includes <code>https://</code> or <code>http://</code></li>
+        <li>Check that your server is running and accessible from your network</li>
+        <li>If using a local IP address, ensure you're on the same network as your server</li>
+        <li>Try accessing your server URL in a web browser to verify it's working</li>
+      </ul>
+
+      <h3>Audio not playing</h3>
+      <ul>
+        <li>Check your device volume and make sure it's not muted</li>
+        <li>Try closing and reopening the app</li>
+        <li>If using Bluetooth, ensure your device is properly connected</li>
+        <li>Try a different audiobook to see if the issue is file-specific</li>
+      </ul>
+
+      <h3>Progress not syncing</h3>
+      <ul>
+        <li>Ensure you have an internet connection</li>
+        <li>Check that your server is accessible</li>
+        <li>Progress syncs automatically in the background; give it a moment</li>
+        <li>Try manually pulling down to refresh on the library screen</li>
+      </ul>
+
+      <h3>Downloads failing</h3>
+      <ul>
+        <li>Check that you have enough storage space on your device</li>
+        <li>Ensure you have a stable internet connection</li>
+        <li>Try downloading over WiFi instead of cellular data</li>
+        <li>Large audiobooks may take some time; check the Downloads screen for progress</li>
+      </ul>
+
+      <h3>App crashing</h3>
+      <ul>
+        <li>Make sure you're running the latest version of the app</li>
+        <li>Try clearing the app cache in your device settings</li>
+        <li>Restart your device</li>
+        <li>If problems persist, try uninstalling and reinstalling the app</li>
+      </ul>
+
+      <h3>Still need help?</h3>
+      <p>If you're still experiencing issues, please open an issue on our GitHub repository with details about your problem, device, and app version.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p class="footer-text">Secret Library</p>
+  </footer>
+</body>
+</html>

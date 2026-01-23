@@ -104,9 +104,13 @@ export {
 } from './typography/types';
 
 export {
+  // Backwards-compatible exports (use for migration)
   getGenreProfile,
+  getProfile,
+  getCompositionProfile,
   GENRE_PROFILES,
-} from './genre/profiles';
+  PROFILES_BY_ID,
+} from './profiles';
 
 // =============================================================================
 // MIGRATION HELPERS

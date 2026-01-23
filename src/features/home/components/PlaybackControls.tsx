@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator, StyleProp, ViewStyle } from 'react-native';
 import { SkipBackIcon, SkipForwardIcon, PlayIcon, PauseIcon } from '@/shared/components';
 import { haptics } from '@/core/native/haptics';
 import {
@@ -20,6 +20,7 @@ import {
 interface PlaybackControlsProps {
   isPlaying: boolean;
   isLoading?: boolean;
+  isBuffering?: boolean;
   onPlay: () => void;
   onPause: () => void;
   onSkipForward?: () => void;
@@ -34,6 +35,7 @@ interface PlaybackControlsProps {
 export function PlaybackControls({
   isPlaying,
   isLoading = false,
+  isBuffering = false,
   onPlay,
   onPause,
   onSkipForward,
@@ -114,18 +116,27 @@ export function PlaybackControls({
         <SkipForwardIcon size={iconSize} color={controlsDisabled ? colors.text.tertiary : colors.text.primary} />
       </TouchableOpacity>
 
-      {/* Play/Pause - shows spinner when loading */}
+      {/* Play/Pause - shows spinner when loading or buffering */}
       <TouchableOpacity
         onPress={handlePlayPause}
         disabled={controlsDisabled}
         activeOpacity={0.7}
         style={styles.playButton}
-        accessibilityLabel={isLoading ? 'Loading' : isPlaying ? 'Pause' : 'Play'}
+        accessibilityLabel={isLoading ? 'Loading' : isBuffering ? 'Buffering' : isPlaying ? 'Pause' : 'Play'}
         accessibilityRole="button"
         accessibilityState={{ disabled: controlsDisabled }}
       >
         {isLoading ? (
           <ActivityIndicator size={playIconSize} color={colors.accent.primary} />
+        ) : isBuffering ? (
+          <View style={styles.bufferingContainer}>
+            <ActivityIndicator size={playIconSize * 1.2} color={colors.accent.primary} style={styles.bufferingSpinner} />
+            {isPlaying ? (
+              <PauseIcon size={playIconSize * 0.6} color={colors.accent.primary} />
+            ) : (
+              <PlayIcon size={playIconSize * 0.6} color={colors.accent.primary} />
+            )}
+          </View>
         ) : isPlaying ? (
           <PauseIcon size={playIconSize} color={colors.accent.primary} />
         ) : (
@@ -158,5 +169,12 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  bufferingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bufferingSpinner: {
+    position: 'absolute',
   },
 });

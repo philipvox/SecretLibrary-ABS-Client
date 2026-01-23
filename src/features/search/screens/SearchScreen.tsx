@@ -48,6 +48,7 @@ import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { fuzzyMatch, findSuggestions, expandAbbreviations } from '../utils/fuzzySearch';
 import { wp, spacing, radius, scale, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
+import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { useIsDarkMode } from '@/shared/theme/themeStore';
 import { useKidModeStore } from '@/shared/stores/kidModeStore';
 import { filterForKidMode } from '@/shared/utils/kidModeFilter';
@@ -55,9 +56,9 @@ import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/hooks/useToast';
 import { useBrowseCounts } from '@/features/browse';
 import { SeriesCard } from '@/features/browse/components/SeriesCard';
-import { QuickBrowseGrid, type QuickBrowseCategory } from '../components/QuickBrowseGrid';
 import { BookSimpleRow } from '../components/BookSimpleRow';
-import { SearchFilterSheet, type SearchFilterState, type AvailableFilters } from '../components/SearchFilterSheet';
+import { SearchFilterSheet, type SearchFilterState, type AvailableFilters, type AgeRange } from '../components/SearchFilterSheet';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import { DURATION_RANGES, type DurationRangeId } from '@/features/browse/hooks/useBrowseCounts';
 
 const SCREEN_WIDTH = wp(100);
@@ -67,6 +68,7 @@ const PADDING = spacing.lg;
 
 const SEARCH_HISTORY_KEY = 'search_history_v1';
 const MAX_HISTORY = 10;
+const DISPLAY_HISTORY = 4; // Only show last 4 searches
 const DEBOUNCE_MS = 300; // Debounce delay for search
 
 // Custom debounce hook
@@ -91,6 +93,10 @@ type SortOption = 'title' | 'author' | 'dateAdded' | 'duration';
 
 type SearchScreenParams = {
   genre?: string;
+  /** Pre-filled search query (e.g., from ISBN lookup) */
+  initialQuery?: string;
+  /** ISBN that triggered the search (for context) */
+  scannedISBN?: string;
 };
 
 export function SearchScreen() {
@@ -132,16 +138,19 @@ export function SearchScreen() {
     isDarkMode,
   }), [BG_COLOR, CARD_COLOR, SURFACE_ELEVATED, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, TEXT_INVERSE, BORDER_DEFAULT, isDarkMode]);
 
-  // Search state
-  const [query, setQuery] = useState('');
+  // Search state - initialize with route params if present
+  const [query, setQuery] = useState(() => route.params?.initialQuery || '');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [scannedISBN, setScannedISBN] = useState<string | null>(() => route.params?.scannedISBN || null);
 
   // Debounced query for search (300ms delay per research)
   const debouncedQuery = useDebounce(query, DEBOUNCE_MS);
 
   // Show autocomplete when typing (but not for committed searches)
-  const [hasCommittedSearch, setHasCommittedSearch] = useState(false);
+  // Start committed if we have an initial query (e.g., from ISBN search)
+  const [hasCommittedSearch, setHasCommittedSearch] = useState(() => !!route.params?.initialQuery);
   const showAutocomplete = query.length > 0 && isInputFocused && !hasCommittedSearch;
 
   // Previous searches
@@ -155,6 +164,7 @@ export function SearchScreen() {
   const [selectedNarrators, setSelectedNarrators] = useState<string[]>([]);
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const [durationRangeId, setDurationRangeId] = useState<DurationRangeId | null>(null);
+  const [ageRange, setAgeRange] = useState<AgeRange>('all');
 
   // Compute duration filter from range ID
   const durationFilter = useMemo(() => {
@@ -267,7 +277,35 @@ export function SearchScreen() {
   // Check if we have any active search/filters (use debounced for results)
   const hasActiveSearch = debouncedQuery.trim().length > 0 || selectedGenres.length > 0 ||
     selectedAuthors.length > 0 || selectedNarrators.length > 0 || selectedSeries.length > 0 ||
-    durationFilter.min !== undefined || durationFilter.max !== undefined;
+    durationFilter.min !== undefined || durationFilter.max !== undefined || ageRange !== 'all';
+
+  // Helper to filter by age range based on genres
+  const filterByAgeRange = useCallback((items: LibraryItem[], range: AgeRange): LibraryItem[] => {
+    if (range === 'all') return items;
+
+    return items.filter(item => {
+      const metadata = getBookMetadata(item);
+      const genres = (metadata?.genres || []).map(g => g.toLowerCase());
+
+      const isKids = genres.some(g =>
+        g.includes('children') || g.includes('juvenile') || g.includes('kids') || g.includes('middle grade')
+      );
+      const isYA = genres.some(g =>
+        g.includes('young adult') || g.includes('ya ') || g.includes('teen')
+      );
+
+      switch (range) {
+        case 'kids':
+          return isKids;
+        case 'ya':
+          return isYA;
+        case 'adult':
+          return !isKids && !isYA;
+        default:
+          return true;
+      }
+    });
+  }, []);
 
   // Filter book results with fuzzy matching
   const bookResults = useMemo(() => {
@@ -294,8 +332,11 @@ export function SearchScreen() {
     // Apply Kid Mode filter
     results = filterForKidMode(results, kidModeEnabled);
 
+    // Apply age range filter
+    results = filterByAgeRange(results, ageRange);
+
     return results.slice(0, 100);
-  }, [filterItems, filters, hasActiveSearch, debouncedQuery, kidModeEnabled]);
+  }, [filterItems, filters, hasActiveSearch, debouncedQuery, kidModeEnabled, ageRange, filterByAgeRange]);
 
   // Filter authors matching query (with fuzzy matching)
   const authorResults = useMemo(() => {
@@ -404,8 +445,9 @@ export function SearchScreen() {
     if (selectedNarrators.length > 0) count++;
     if (selectedSeries.length > 0) count++;
     if (durationRangeId !== null) count++;
+    if (ageRange !== 'all') count++;
     return count;
-  }, [selectedGenres, selectedAuthors, selectedNarrators, selectedSeries, durationRangeId]);
+  }, [selectedGenres, selectedAuthors, selectedNarrators, selectedSeries, durationRangeId, ageRange]);
 
   // Build available filters for the filter sheet
   const availableFilters: AvailableFilters = useMemo(() => ({
@@ -422,9 +464,10 @@ export function SearchScreen() {
     narrators: selectedNarrators,
     series: selectedSeries,
     duration: durationRangeId,
+    ageRange,
     sortBy,
     sortOrder,
-  }), [selectedGenres, selectedAuthors, selectedNarrators, selectedSeries, durationRangeId, sortBy, sortOrder]);
+  }), [selectedGenres, selectedAuthors, selectedNarrators, selectedSeries, durationRangeId, ageRange, sortBy, sortOrder]);
 
   // Handle filter sheet apply
   const handleApplyFilters = useCallback((filters: SearchFilterState) => {
@@ -433,6 +476,7 @@ export function SearchScreen() {
     setSelectedNarrators(filters.narrators);
     setSelectedSeries(filters.series);
     setDurationRangeId(filters.duration);
+    setAgeRange(filters.ageRange || 'all');
     setSortBy(filters.sortBy);
     setSortOrder(filters.sortOrder);
   }, []);
@@ -440,6 +484,49 @@ export function SearchScreen() {
   const handleBack = () => {
     navigation.goBack();
   };
+
+  // Barcode scanner handlers
+  const handleBarcodeScannerOpen = useCallback(() => {
+    setShowBarcodeScanner(true);
+  }, []);
+
+  const handleBarcodeScannerClose = useCallback(() => {
+    setShowBarcodeScanner(false);
+  }, []);
+
+  const handleBarcodeBookFound = useCallback((book: LibraryItem) => {
+    setShowBarcodeScanner(false);
+    navigation.navigate('BookDetail', { id: book.id });
+  }, [navigation]);
+
+  const handleBarcodeISBNNotFound = useCallback((isbn: string) => {
+    // Set the ISBN as the search query so user can see it
+    setQuery(isbn);
+    setHasCommittedSearch(true);
+    showError(`ISBN ${isbn} not found in your library`);
+  }, [showError]);
+
+  // Handle search similar from barcode scanner
+  // Called when user chooses to search for similar titles after ISBN not found
+  const handleSearchSimilar = useCallback((searchQuery: string, isbn: string) => {
+    setShowBarcodeScanner(false);
+    setQuery(searchQuery);
+    setScannedISBN(isbn);
+    setHasCommittedSearch(true);
+    saveSearch(searchQuery);
+    Keyboard.dismiss();
+  }, []);
+
+  // Auto-open book if barcode search returns exactly one result
+  useEffect(() => {
+    if (scannedISBN && bookResults.length === 1 && hasCommittedSearch) {
+      const book = bookResults[0];
+      // Clear the scanned ISBN so we don't re-trigger
+      setScannedISBN(null);
+      // Navigate to book detail
+      navigation.navigate('BookDetail', { id: book.id });
+    }
+  }, [scannedISBN, bookResults, hasCommittedSearch, navigation]);
 
   const handleLogoPress = useCallback(() => {
     navigation.navigate('Main', { screen: 'HomeTab' });
@@ -452,6 +539,7 @@ export function SearchScreen() {
     setSelectedNarrators([]);
     setSelectedSeries([]);
     setDurationRangeId(null);
+    setAgeRange('all');
     setHasCommittedSearch(false);
     inputRef.current?.focus();
   };
@@ -627,23 +715,38 @@ export function SearchScreen() {
           autoFocus: true,
           inputRef: inputRef as React.RefObject<TextInput>,
           rightElement: (
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                { borderColor: headerBorderColor },
-                activeFilterCount > 0 && styles.filterButtonActive,
-              ]}
-              onPress={() => setShowFilterSheet(true)}
-              accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
-              accessibilityRole="button"
-            >
-              <Icon name="SlidersHorizontal" size={18} color={activeFilterCount > 0 ? (colors.isDark ? staticColors.black : staticColors.white) : headerIconColor} />
-              {activeFilterCount > 0 && (
-                <View style={styles.filterBadge}>
-                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {/* Barcode Scanner Button */}
+              <TouchableOpacity
+                style={[
+                  styles.filterButton,
+                  { borderColor: headerBorderColor },
+                ]}
+                onPress={handleBarcodeScannerOpen}
+                accessibilityLabel="Scan ISBN barcode"
+                accessibilityRole="button"
+              >
+                <Icon name="ScanBarcode" size={18} color={headerIconColor} />
+              </TouchableOpacity>
+              {/* Filter Button */}
+              <TouchableOpacity
+                style={[
+                  styles.filterButton,
+                  { borderColor: headerBorderColor },
+                  activeFilterCount > 0 && styles.filterButtonActive,
+                ]}
+                onPress={() => setShowFilterSheet(true)}
+                accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+                accessibilityRole="button"
+              >
+                <Icon name="SlidersHorizontal" size={18} color={activeFilterCount > 0 ? (colors.isDark ? staticColors.black : staticColors.white) : headerIconColor} />
+                {activeFilterCount > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -803,7 +906,7 @@ export function SearchScreen() {
                     <Text style={styles.clearHistoryText}>Clear</Text>
                   </TouchableOpacity>
                 </View>
-                {previousSearches.map((search, idx) => (
+                {previousSearches.slice(0, DISPLAY_HISTORY).map((search, idx) => (
                   <TouchableOpacity
                     key={idx}
                     style={styles.previousSearchItem}
@@ -828,11 +931,47 @@ export function SearchScreen() {
               </View>
             )}
 
-            {/* Quick browse grid */}
-            <QuickBrowseGrid
-              onCategoryPress={handleQuickBrowseCategory}
-              onBrowsePagePress={() => navigation.navigate('BrowsePage')}
-            />
+            {/* Browse categories */}
+            <View style={styles.browseRecovery}>
+              <View style={styles.browseRecoveryGrid}>
+                <TouchableOpacity
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
+                  onPress={() => navigation.navigate('GenresList')}
+                >
+                  <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
+                  onPress={() => navigation.navigate('AuthorsList')}
+                >
+                  <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
+                  onPress={() => navigation.navigate('SeriesList')}
+                >
+                  <Icon name="Library" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
+                  onPress={() => navigation.navigate('DurationFilter')}
+                >
+                  <Icon name="Timer" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
+                </TouchableOpacity>
+              </View>
+              {/* Big Browse Button */}
+              <TouchableOpacity
+                style={[styles.bigBrowseButton, { backgroundColor: colors.black }]}
+                onPress={() => { console.log('[SearchScreen] BROWSE ALL BOOKS pressed'); globalLoading.show(); setTimeout(() => { console.log('[SearchScreen] Navigating to BrowsePage...'); navigation.navigate('BrowsePage'); }, 150); }}
+              >
+                <Icon name="Globe" size={20} color={colors.white} strokeWidth={1.5} />
+                <Text style={[styles.bigBrowseButtonText, { color: colors.white }]}>Browse All Books</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -861,39 +1000,46 @@ export function SearchScreen() {
               </View>
             )}
 
-            {/* Browse categories recovery */}
+            {/* Browse categories */}
             <View style={styles.browseRecovery}>
-              <Text style={styles.browseRecoveryTitle}>Or browse popular categories</Text>
               <View style={styles.browseRecoveryGrid}>
                 <TouchableOpacity
-                  style={styles.browseRecoveryItem}
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
                   onPress={() => navigation.navigate('GenresList')}
                 >
-                  <Icon name="Layers" size={20} color={ACCENT} />
-                  <Text style={styles.browseRecoveryText}>Genres</Text>
+                  <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.browseRecoveryItem}
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
                   onPress={() => navigation.navigate('AuthorsList')}
                 >
-                  <Icon name="User" size={20} color={ACCENT} />
-                  <Text style={styles.browseRecoveryText}>Authors</Text>
+                  <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.browseRecoveryItem}
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
                   onPress={() => navigation.navigate('SeriesList')}
                 >
-                  <Icon name="Library" size={20} color={ACCENT} />
-                  <Text style={styles.browseRecoveryText}>Series</Text>
+                  <Icon name="Library" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.browseRecoveryItem}
+                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
                   onPress={() => navigation.navigate('DurationFilter')}
                 >
-                  <Icon name="Clock" size={20} color={ACCENT} />
-                  <Text style={styles.browseRecoveryText}>Duration</Text>
+                  <Icon name="Timer" size={24} color={colors.black} strokeWidth={1.5} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
                 </TouchableOpacity>
               </View>
+              {/* Big Browse Button */}
+              <TouchableOpacity
+                style={[styles.bigBrowseButton, { backgroundColor: colors.black }]}
+                onPress={() => { console.log('[SearchScreen] BROWSE ALL BOOKS pressed'); globalLoading.show(); setTimeout(() => { console.log('[SearchScreen] Navigating to BrowsePage...'); navigation.navigate('BrowsePage'); }, 150); }}
+              >
+                <Icon name="Globe" size={20} color={colors.white} strokeWidth={1.5} />
+                <Text style={[styles.bigBrowseButtonText, { color: colors.white }]}>Browse All Books</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Tips */}
@@ -1065,6 +1211,15 @@ export function SearchScreen() {
         onApply={handleApplyFilters}
         availableFilters={availableFilters}
         resultCount={bookResults.length}
+      />
+
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        visible={showBarcodeScanner}
+        onClose={handleBarcodeScannerClose}
+        onBookFound={handleBarcodeBookFound}
+        onISBNNotFound={handleBarcodeISBNNotFound}
+        onSearchSimilar={handleSearchSimilar}
       />
     </View>
   );
@@ -1313,6 +1468,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingTop: 60,
+    marginBottom: 24,
   },
   emptyTitle: {
     color: colors.TEXT_PRIMARY,
@@ -1668,18 +1824,35 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   browseRecoveryItem: {
     flex: 1,
+    aspectRatio: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.isDarkMode ? 'rgba(255,255,255,0.04)' : colors.CARD_COLOR,
     borderRadius: 12,
-    paddingVertical: 16,
-    gap: 6,
-    borderWidth: colors.isDarkMode ? 1 : 0,
-    borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.08)' : 'transparent',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
   },
   browseRecoveryText: {
     color: colors.TEXT_SECONDARY,
     fontSize: 13,
     fontWeight: '500',
+  },
+  bigBrowseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  bigBrowseButtonText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(12),
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 
   // Search tips

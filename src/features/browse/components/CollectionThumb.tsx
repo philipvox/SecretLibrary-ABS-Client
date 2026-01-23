@@ -30,7 +30,7 @@ function CollectionThumbComponent({
   onPress,
 }: CollectionThumbProps) {
   const number = String(index + 1).padStart(2, '0');
-  const coverUrl = apiClient.getItemCoverUrl(bookId);
+  const coverUrl = apiClient.getItemCoverUrl(bookId, { width: 400, height: 400 });
 
   // Get cached data for consistent hash
   const getSpineData = useSpineCacheStore((state) => state.getSpineData);

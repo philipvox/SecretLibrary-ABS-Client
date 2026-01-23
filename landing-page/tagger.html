@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audiobook Tagger - Secret Library</title>
+  <meta name="description" content="The ultimate metadata manager for audiobook enthusiasts and AudiobookShelf users.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --black: #000000;
+      --white: #ffffff;
+      --gray-400: #a3a3a3;
+      --gray-600: #525252;
+      --gray-800: #262626;
+      --green: #4ade80;
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--black);
+      color: var(--white);
+      line-height: 1.6;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      background: var(--black);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-logo img {
+      height: 40px;
+      width: auto;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    .nav-links a {
+      font-size: 0.65rem;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+      opacity: 0.5;
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 8rem 3rem 4rem;
+      text-align: center;
+    }
+
+    .hero-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(2.5rem, 6vw, 5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+    }
+
+    .hero-tagline {
+      font-size: 1.125rem;
+      color: var(--gray-400);
+      max-width: 550px;
+      margin-bottom: 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 1.75rem;
+      font-family: var(--sans);
+      font-size: 0.7rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid;
+    }
+
+    .btn-primary {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+    }
+
+    .btn-primary:hover {
+      background: transparent;
+      color: var(--white);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--gray-400);
+      border-color: var(--gray-800);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--gray-400);
+      color: var(--white);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Flow Sections */
+    .flow-section {
+      padding: 6rem 3rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .flow-section:nth-child(even) .flow-content {
+      order: 2;
+    }
+
+    .flow-section:nth-child(even) .flow-image {
+      order: 1;
+    }
+
+    .flow-content {
+      max-width: 500px;
+    }
+
+    .flow-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 1rem;
+    }
+
+    .flow-content h2 {
+      font-family: var(--serif);
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 400;
+      margin-bottom: 1.25rem;
+      color: var(--white);
+    }
+
+    .flow-content h2 em {
+      font-style: italic;
+    }
+
+    .flow-content p {
+      color: var(--gray-400);
+      font-size: 1rem;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+
+    .flow-content ul {
+      list-style: none;
+      margin-top: 1.5rem;
+    }
+
+    .flow-content li {
+      color: var(--gray-400);
+      font-size: 0.9rem;
+      padding: 0.5rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+
+    .flow-content li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--green);
+    }
+
+    .flow-image {
+      position: relative;
+    }
+
+    .flow-image img {
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--gray-800);
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--gray-800);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Download Section */
+    .download {
+      padding: 8rem 3rem;
+      text-align: center;
+    }
+
+    .download-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .download-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 1.5rem;
+    }
+
+    .download h2 {
+      font-family: var(--serif);
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 400;
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .download h2 em {
+      font-style: italic;
+    }
+
+    .download-description {
+      font-size: 1rem;
+      color: var(--gray-400);
+      line-height: 1.8;
+      margin-bottom: 2rem;
+    }
+
+    .download-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .download-note {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: var(--gray-600);
+    }
+
+    /* Footer */
+    footer {
+      padding: 3rem;
+      background: var(--black);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--gray-800);
+    }
+
+    footer p {
+      font-size: 0.75rem;
+      color: var(--gray-600);
+      letter-spacing: 0.1em;
+    }
+
+    footer a {
+      color: var(--gray-400);
+      text-decoration: none;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    footer a:hover {
+      color: var(--white);
+    }
+
+    /* Responsive */
+    @media (max-width: 968px) {
+      .flow-section {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        padding: 4rem 2rem;
+      }
+
+      .flow-section:nth-child(even) .flow-content,
+      .flow-section:nth-child(even) .flow-image {
+        order: unset;
+      }
+
+      .flow-content {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 768px) {
+      nav {
+        padding: 1rem 1.5rem;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero {
+        padding: 7rem 2rem 3rem;
+        min-height: auto;
+      }
+
+      .hero-buttons {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+        max-width: 280px;
+        justify-content: center;
+      }
+
+      .download {
+        padding: 5rem 2rem;
+      }
+
+      .download-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      footer {
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+        padding: 3rem 2rem;
+      }
+    }
+
+    /* Animations */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  transform 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html" class="nav-logo"><img src="logo.svg" alt="Secret Library"></a>
+    <div class="nav-links">
+      <a href="index.html">App</a>
+      <a href="tagger.html">Tagger</a>
+      <a href="docs.html">Docs</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <span class="hero-label">Desktop Tool</span>
+    <h1>Audiobook <em>Tagger</em></h1>
+    <p class="hero-tagline">The ultimate metadata manager for AudiobookShelf. Fix messy libraries with missing covers, inconsistent authors, and broken series info—automatically.</p>
+    <div class="hero-buttons">
+      <a href="#download" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-6 2h12v2H6v-2z"/>
+        </svg>
+        Download
+      </a>
+      <a href="#features" class="btn btn-secondary">Learn More</a>
+    </div>
+  </section>
+
+  <div id="features">
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">Library View</span>
+        <h2>See everything <em>at once.</em></h2>
+        <p>Scan your entire audiobook library instantly. View metadata quality scores, identify issues, and fix problems in bulk. The sidebar shows your collection while the detail panel reveals everything about the selected book.</p>
+        <ul>
+          <li>Instant library scanning</li>
+          <li>Metadata quality scoring</li>
+          <li>Batch selection and editing</li>
+        </ul>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-1.png" alt="Library view with metadata">
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">AI Tools</span>
+        <h2>One click <em>fixes.</em></h2>
+        <p>Clean genres, fix titles, resolve series info, and enrich descriptions—all powered by AI. Run individual tools or hit "Run All" to fix everything automatically.</p>
+        <ul>
+          <li>Clean Genres — standardize genre tags</li>
+          <li>AI Tags — intelligent metadata lookup</li>
+          <li>Fix Titles — normalize naming</li>
+          <li>Fix Series — detect and validate series</li>
+          <li>Generate DNA — create rich book tags</li>
+        </ul>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-2.png" alt="AI tools menu">
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">Rich Metadata</span>
+        <h2>Every detail, <em>perfect.</em></h2>
+        <p>Author, narrator, publisher, ISBN, ASIN—all fetched automatically from Google Books, Audible, and AI sources. Genres are cleaned and formatted exactly how AudiobookShelf expects.</p>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-3.png" alt="Book detail view">
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">Bulk Processing</span>
+        <h2>Fix hundreds <em>in minutes.</em></h2>
+        <p>Run enrichment across your entire library with parallel processing. Watch progress in real-time as titles get fixed, series get detected, and metadata gets perfected.</p>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-4.png" alt="Enrichment progress">
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">Smart Tags</span>
+        <h2>Beyond basic <em>metadata.</em></h2>
+        <p>Generate DNA tags that capture mood, pacing, themes, tropes, and comparable titles. Perfect for discovery and recommendations in your library.</p>
+        <ul>
+          <li>Mood and theme detection</li>
+          <li>Pacing and structure analysis</li>
+          <li>Comparable title suggestions</li>
+          <li>Age and content ratings</li>
+        </ul>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-6.png" alt="DNA tags view">
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">Direct Integration</span>
+        <h2>Push to <em>AudiobookShelf.</em></h2>
+        <p>Connect directly to your ABS server. Review changes before pushing, then update metadata and covers with one click. No manual file editing required.</p>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-7.png" alt="Push to AudiobookShelf">
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section class="flow-section fade-in">
+      <div class="flow-content">
+        <span class="flow-label">Configuration</span>
+        <h2>Your server, <em>your way.</em></h2>
+        <p>Connect to your AudiobookShelf instance, configure API keys for enhanced lookups, and tune performance settings. Backup tags before making changes for peace of mind.</p>
+      </div>
+      <div class="flow-image">
+        <img src="tagger-8.png" alt="Settings">
+      </div>
+    </section>
+  </div>
+
+  <section class="download" id="download">
+    <div class="download-container fade-in">
+      <span class="download-label">Get Started</span>
+      <h2>Download <em>Tagger</em></h2>
+      <p class="download-description">Native desktop app with parallel processing. Scans thousands of files in seconds. macOS only for now.</p>
+      <div class="download-buttons">
+        <a href="downloads/audiobook-tagger.dmg" class="btn btn-primary" download>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+          </svg>
+          macOS
+        </a>
+      </div>
+      <p class="download-note">Requires macOS 12.0 or later</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2026 Secret Library</p>
+    <a href="privacy.html">Privacy</a>
+  </footer>
+
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

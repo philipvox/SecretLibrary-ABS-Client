@@ -4,7 +4,7 @@
  * Screen for filtering books by duration range.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, StatusBar, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +14,7 @@ import { useDurationCounts } from '../hooks/useDurationBooks';
 import { DurationRangeCard } from '../components/DurationRangeCard';
 import { TopNav, TopNavCloseIcon } from '@/shared/components';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { globalLoading } from '@/shared/stores/globalLoadingStore';
 
 export function DurationFilterScreen() {
   const insets = useSafeAreaInsets();
@@ -24,6 +25,11 @@ export function DurationFilterScreen() {
   const isDarkMode = colors.isDark;
 
   const durationCounts = useDurationCounts();
+
+  // Hide global loading overlay on mount
+  useEffect(() => {
+    globalLoading.hide();
+  }, []);
 
   const handleRangePress = useCallback(
     (rangeId: string, minSeconds: number, maxSeconds: number) => {

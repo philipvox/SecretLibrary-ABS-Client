@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Import audioService for applying rate changes
 import { audioService } from '@/features/player/services/audioService';
+import { createLogger } from '@/shared/utils/logger';
 
 // =============================================================================
 // CONSTANTS
@@ -81,10 +82,7 @@ interface SpeedActions {
 // LOGGING
 // =============================================================================
 
-const DEBUG = __DEV__;
-const log = (msg: string, ...args: any[]) => {
-  if (DEBUG) console.log(`[SpeedStore] ${msg}`, ...args);
-};
+const log = createLogger('SpeedStore');
 
 // =============================================================================
 // STORE
@@ -108,7 +106,7 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
     setPlaybackRate: async (rate: number, bookId?: string) => {
       const { bookSpeedMap } = get();
 
-      log(`setPlaybackRate: rate=${rate}, bookId=${bookId || 'none'}`);
+      log.debug(`setPlaybackRate: rate=${rate}, bookId=${bookId || 'none'}`);
 
       // Apply rate to audio service
       await audioService.setPlaybackRate(rate);
@@ -123,15 +121,15 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
       if (bookId) {
         const updatedMap = { ...bookSpeedMap, [bookId]: rate };
         set({ bookSpeedMap: updatedMap });
-        log(`Saved per-book speed: ${bookId} → ${rate}x (map has ${Object.keys(updatedMap).length} entries)`);
+        log.debug(`Saved per-book speed: ${bookId} → ${rate}x (map has ${Object.keys(updatedMap).length} entries)`);
 
         try {
           await AsyncStorage.setItem(BOOK_SPEED_MAP_KEY, JSON.stringify(updatedMap));
         } catch (err) {
-          log('Error saving bookSpeedMap:', err);
+          log.warn('Error saving bookSpeedMap:', err);
         }
       } else {
-        log('No bookId provided - per-book speed NOT saved');
+        log.debug('No bookId provided - per-book speed NOT saved');
       }
     },
 
@@ -146,7 +144,7 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
       const { bookSpeedMap, globalDefaultRate } = get();
       const savedSpeed = bookSpeedMap[bookId];
       const resultSpeed = savedSpeed ?? globalDefaultRate;
-      log(`getBookSpeed: bookId=${bookId}, saved=${savedSpeed ?? 'none'}, default=${globalDefaultRate}, result=${resultSpeed}`);
+      log.debug(`getBookSpeed: bookId=${bookId}, saved=${savedSpeed ?? 'none'}, default=${globalDefaultRate}, result=${resultSpeed}`);
       return resultSpeed;
     },
 
@@ -183,12 +181,12 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
         let playbackRate = globalDefaultRate;
         if (activePlaybackRateStr) {
           playbackRate = parseFloat(activePlaybackRateStr);
-          log(`Restored active playback rate: ${playbackRate}x`);
+          log.debug(`Restored active playback rate: ${playbackRate}x`);
         }
 
         // Apply the restored rate to audioService immediately
         if (playbackRate !== 1.0) {
-          log(`Applying restored playback rate to audioService: ${playbackRate}x`);
+          log.debug(`Applying restored playback rate to audioService: ${playbackRate}x`);
           audioService.setPlaybackRate(playbackRate).catch(() => {
             // Audio service may not be loaded yet - rate will be applied when book loads
           });
@@ -201,7 +199,7 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
           speedPresets,
         });
       } catch (error) {
-        log('Error loading speed settings:', error);
+        log.warn('Error loading speed settings:', error);
         // Use defaults
       }
     },
@@ -213,7 +211,7 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
 
       // Don't add duplicates
       if (speedPresets.some(p => Math.abs(p - roundedSpeed) < 0.01)) {
-        log(`Preset ${roundedSpeed}x already exists`);
+        log.debug(`Preset ${roundedSpeed}x already exists`);
         return;
       }
 
@@ -223,9 +221,9 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
 
       try {
         await AsyncStorage.setItem(SPEED_PRESETS_KEY, JSON.stringify(updatedPresets));
-        log(`Saved preset: ${roundedSpeed}x`);
+        log.debug(`Saved preset: ${roundedSpeed}x`);
       } catch (error) {
-        log('Error saving preset:', error);
+        log.warn('Error saving preset:', error);
       }
     },
 
@@ -236,9 +234,9 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
 
       try {
         await AsyncStorage.setItem(SPEED_PRESETS_KEY, JSON.stringify(updatedPresets));
-        log(`Removed preset: ${speed}x`);
+        log.debug(`Removed preset: ${speed}x`);
       } catch (error) {
-        log('Error removing preset:', error);
+        log.warn('Error removing preset:', error);
       }
     },
   }))

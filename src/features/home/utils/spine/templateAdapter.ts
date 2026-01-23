@@ -1,30 +1,36 @@
 /**
  * src/features/home/utils/spine/templateAdapter.ts
  *
- * Adapter layer between spine templates and BookSpineVertical rendering.
- * Converts template configurations into the format expected by the existing rendering system.
+ * Adapter layer between unified profiles and BookSpineVertical rendering.
+ * Converts profile configurations into the format expected by the existing rendering system.
+ *
+ * MIGRATION NOTE: This adapter now uses the unified profiles system in ./profiles/
+ * instead of the old ./templates/spineTemplates.ts. The API remains backwards-compatible.
  */
 
 import {
-  SPINE_TEMPLATES,
-  getBestTemplateForGenre,
-  getConfigForSize,
+  getProfile,
+  getBestProfileForGenre,
+  GENRE_PROFILES,
+} from './profiles';
+
+import {
+  GenreProfile,
+  applySpineSizeOverrides,
   selectFontForBook,
-  SpineTemplate,
-  BaseTitleConfig,
-  BaseAuthorConfig,
-} from './templates/spineTemplates';
+  hashString,
+  FontWeight,
+} from './profiles/types';
 
 // =============================================================================
 // TYPE CONVERSIONS
 // =============================================================================
 
 /**
- * Convert template orientation to composition orientation format.
- * Template uses more specific names, composition uses simplified format.
+ * Convert profile orientation to simplified composition orientation format.
  */
-function convertTitleOrientation(templateOrientation: string): string {
-  switch (templateOrientation) {
+function convertTitleOrientation(profileOrientation: string): string {
+  switch (profileOrientation) {
     case 'vertical-up':
     case 'vertical-down':
       return 'vertical';
@@ -44,8 +50,8 @@ function convertTitleOrientation(templateOrientation: string): string {
 /**
  * Convert author orientation (similar to title)
  */
-function convertAuthorOrientation(templateOrientation: string): string {
-  switch (templateOrientation) {
+function convertAuthorOrientation(profileOrientation: string): string {
+  switch (profileOrientation) {
     case 'vertical-up':
     case 'vertical-down':
       return 'vertical';
@@ -64,27 +70,25 @@ function convertAuthorOrientation(templateOrientation: string): string {
 }
 
 /**
- * Convert template text case to composition format
+ * Convert profile text case to composition format
  */
-function convertTextCase(templateCase: string): string {
-  switch (templateCase) {
+function convertTextCase(profileCase: string): string {
+  switch (profileCase) {
     case 'uppercase':
       return 'uppercase';
     case 'lowercase':
       return 'lowercase';
     case 'capitalize':
-      return 'mixed'; // Template's capitalize maps to composition's mixed
+      return 'mixed'; // Profile's capitalize maps to composition's mixed
     default:
       return 'mixed';
   }
 }
 
 /**
- * Convert weight string to numeric value
+ * Convert weight string to descriptive value
  */
 function convertWeightToNumber(weight: string): string {
-  // Template uses numeric strings ('300', '400', etc.)
-  // Composition expects descriptive strings ('light', 'regular', etc.)
   switch (weight) {
     case '300': return 'light';
     case '400': return 'regular';
@@ -98,37 +102,43 @@ function convertWeightToNumber(weight: string): string {
 }
 
 // =============================================================================
-// TEMPLATE MATCHING
+// PROFILE MATCHING
 // =============================================================================
 
 /**
- * Match book genres to best template.
+ * Match book genres to best profile.
  * Tries each genre in order, returns first match.
- * Falls back to literary-fiction template if no match found.
+ * Falls back to default profile if no match found.
  */
-export function matchBookToTemplate(genres: string[]): SpineTemplate {
+export function matchBookToTemplate(genres: string[]): GenreProfile {
   if (!genres || genres.length === 0) {
-    return SPINE_TEMPLATES[0]; // Default to first template (literary-fiction)
+    return getProfile('default');
   }
 
   // Try each genre, looking for preferred matches first
   for (const genre of genres) {
-    const template = SPINE_TEMPLATES.find(t => t.preferredFor?.includes(genre.toLowerCase()));
-    if (template) return template;
+    const normalizedGenre = genre.toLowerCase().trim();
+    const profile = GENRE_PROFILES.find(p =>
+      p.preferredFor?.includes(normalizedGenre)
+    );
+    if (profile) return profile;
   }
 
   // Try again for usedFor matches
   for (const genre of genres) {
-    const template = SPINE_TEMPLATES.find(t => t.usedFor.includes(genre.toLowerCase()));
-    if (template) return template;
+    const normalizedGenre = genre.toLowerCase().trim();
+    const profile = GENRE_PROFILES.find(p =>
+      p.usedFor.includes(normalizedGenre)
+    );
+    if (profile) return profile;
   }
 
   // Use helper function as final fallback
-  return getBestTemplateForGenre(genres[0]?.toLowerCase() || 'fiction');
+  return getBestProfileForGenre(genres[0]?.toLowerCase() || 'fiction');
 }
 
 // =============================================================================
-// TEMPLATE APPLICATION
+// PROFILE APPLICATION
 // =============================================================================
 
 export interface AppliedTemplateConfig {
@@ -137,10 +147,14 @@ export interface AppliedTemplateConfig {
     orientation: string;
     fontSize: number;
     fontFamily: string;
-    weight: string; // Composition format (light, regular, bold, etc.)
+    weight: FontWeight;
     case: string;
     letterSpacing: number;
     lineHeight?: number;
+    lineHeightScale?: number;
+    maxLines?: number;
+    wordsPerLine?: number;
+    textSplitPercent?: number;
     placement: string;
     align: string;
     heightPercent: number;
@@ -153,10 +167,12 @@ export interface AppliedTemplateConfig {
     orientation: string;
     fontSize: number;
     fontFamily: string;
-    weight: string;
+    weight: FontWeight;
     case: string;
     letterSpacing: number;
     lineHeight?: number;
+    lineHeightScale?: number;
+    textSplitPercent?: number;
     placement: string;
     align: string;
     heightPercent: number;
@@ -177,10 +193,10 @@ export interface AppliedTemplateConfig {
 }
 
 /**
- * Apply template configuration for a given spine width.
- * Retrieves template, applies size-based overrides, and converts to rendering format.
+ * Apply profile configuration for a given spine width.
+ * Retrieves profile, applies size-based overrides, and converts to rendering format.
  *
- * @param genres - Book genres for template matching
+ * @param genres - Book genres for profile matching
  * @param spineWidth - Width of the spine for size-based config
  * @param bookTitle - Book title for deterministic font selection (if fontFamilies defined)
  */
@@ -189,27 +205,39 @@ export function applyTemplateConfig(
   spineWidth: number,
   bookTitle: string = ''
 ): AppliedTemplateConfig {
-  // Match template
-  const template = matchBookToTemplate(genres);
+  // Match profile
+  const profile = matchBookToTemplate(genres);
 
-  // Get size-appropriate configs
-  const titleConfig = getConfigForSize(template.title, spineWidth);
-  const authorConfig = getConfigForSize(template.author, spineWidth);
+  // Get size-appropriate configs by applying overrides
+  const titleConfig = applySpineSizeOverrides(profile.title, spineWidth);
+  const authorConfig = applySpineSizeOverrides(profile.author, spineWidth);
 
   // Select fonts (if fontFamilies is defined, picks one based on book title hash)
-  const titleFont = selectFontForBook(titleConfig, bookTitle);
-  const authorFont = selectFontForBook(authorConfig, bookTitle);
+  const titleFont = selectFontForBook(
+    titleConfig.fontFamily,
+    titleConfig.fontFamilies,
+    bookTitle
+  );
+  const authorFont = selectFontForBook(
+    authorConfig.fontFamily,
+    authorConfig.fontFamilies,
+    bookTitle
+  );
 
   // Convert to rendering format
   return {
     title: {
       orientation: convertTitleOrientation(titleConfig.orientation),
       fontSize: titleConfig.fontSize,
-      fontFamily: titleFont, // Uses selected font from fontFamilies if available
+      fontFamily: titleFont,
       weight: convertWeightToNumber(titleConfig.weight),
       case: convertTextCase(titleConfig.case),
       letterSpacing: titleConfig.letterSpacing || 0,
       lineHeight: titleConfig.lineHeight,
+      lineHeightScale: titleConfig.lineHeightScale,
+      maxLines: titleConfig.maxLines,
+      wordsPerLine: titleConfig.wordsPerLine,
+      textSplitPercent: titleConfig.textSplitPercent,
       placement: titleConfig.placement,
       align: titleConfig.align || 'center',
       heightPercent: titleConfig.heightPercent,
@@ -219,11 +247,13 @@ export function applyTemplateConfig(
     author: {
       orientation: convertAuthorOrientation(authorConfig.orientation),
       fontSize: authorConfig.fontSize,
-      fontFamily: authorFont, // Uses selected font from fontFamilies if available
+      fontFamily: authorFont,
       weight: convertWeightToNumber(authorConfig.weight),
       case: convertTextCase(authorConfig.case),
       letterSpacing: authorConfig.letterSpacing || 0,
       lineHeight: authorConfig.lineHeight,
+      lineHeightScale: authorConfig.lineHeightScale,
+      textSplitPercent: authorConfig.textSplitPercent,
       placement: authorConfig.placement,
       align: authorConfig.align || 'center',
       heightPercent: authorConfig.heightPercent,
@@ -231,26 +261,27 @@ export function applyTemplateConfig(
       paddingHorizontal: authorConfig.paddingHorizontal || 8,
       paddingVertical: authorConfig.paddingVertical || 6,
     },
-    decoration: template.decoration || { element: 'none', lineStyle: 'none' },
-    templateId: template.id,
-    templateName: template.name,
+    decoration: profile.decoration,
+    templateId: profile.id,
+    templateName: profile.name,
   };
 }
 
 /**
  * Check if a book should use template-driven rendering.
- * Returns true if the book has genres that match our template system.
+ * Returns true if the book has genres that match our profile system.
  */
 export function shouldUseTemplates(genres: string[]): boolean {
   if (!genres || genres.length === 0) return false;
 
-  // Try to find a matching template
-  const hasMatch = genres.some(genre =>
-    SPINE_TEMPLATES.some(t =>
-      t.usedFor.includes(genre.toLowerCase()) ||
-      t.preferredFor?.includes(genre.toLowerCase())
-    )
-  );
+  // Try to find a matching profile
+  const hasMatch = genres.some(genre => {
+    const normalizedGenre = genre.toLowerCase().trim();
+    return GENRE_PROFILES.some(p =>
+      p.usedFor.includes(normalizedGenre) ||
+      p.preferredFor?.includes(normalizedGenre)
+    );
+  });
 
   return hasMatch;
 }
@@ -259,12 +290,37 @@ export function shouldUseTemplates(genres: string[]): boolean {
  * Get template info for debugging
  */
 export function getTemplateInfo(genres: string[], spineWidth: number): string {
-  const template = matchBookToTemplate(genres);
-  const titleConfig = getConfigForSize(template.title, spineWidth);
+  const profile = matchBookToTemplate(genres);
+  const titleConfig = applySpineSizeOverrides(profile.title, spineWidth);
 
   let sizeCategory = 'medium';
   if (spineWidth < 60) sizeCategory = 'small';
   else if (spineWidth > 90) sizeCategory = 'large';
 
-  return `${template.name} (${sizeCategory}, ${titleConfig.orientation})`;
+  return `${profile.name} (${sizeCategory}, ${titleConfig.orientation})`;
+}
+
+// =============================================================================
+// BACKWARDS COMPATIBILITY EXPORTS
+// =============================================================================
+
+// Re-export for backwards compatibility with code expecting old template types
+export type SpineTemplate = GenreProfile;
+export const SPINE_TEMPLATES = GENRE_PROFILES;
+
+/**
+ * @deprecated Use getProfile or getBestProfileForGenre instead
+ */
+export function getBestTemplateForGenre(genre: string): GenreProfile {
+  return getBestProfileForGenre(genre);
+}
+
+/**
+ * @deprecated Use applySpineSizeOverrides from profiles/types instead
+ */
+export function getConfigForSize<T extends { sizes?: Record<string, Partial<T>> }>(
+  config: T,
+  spineWidth: number
+): T {
+  return applySpineSizeOverrides(config as any, spineWidth);
 }

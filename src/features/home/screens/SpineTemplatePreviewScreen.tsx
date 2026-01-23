@@ -16,7 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { colors, spacing, scale } from '@/shared/theme';
-import { SPINE_TEMPLATES, SpineTemplate, getConfigForSize } from '../utils/spine/templates/spineTemplates';
+import { SPINE_TEMPLATES, SpineTemplate, getConfigForSize } from '../utils/spine/templateAdapter';
 import { X } from 'lucide-react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;

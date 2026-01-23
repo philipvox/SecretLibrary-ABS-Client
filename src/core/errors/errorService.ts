@@ -16,6 +16,7 @@ import {
   ErrorHandler,
   ErrorFilter,
   CreateErrorOptions,
+  ErrorContext,
   isAppError,
   NetworkErrorCode,
   AuthErrorCode,
@@ -133,8 +134,11 @@ class ErrorService {
 
   /**
    * Handle an error - log, notify handlers, and optionally show to user
+   * @param error - The error to handle
+   * @param options.silent - If true, don't notify handlers
+   * @param options.context - Error context (string for backwards compat, or structured ErrorContext)
    */
-  handle(error: unknown, options?: { silent?: boolean; context?: string }): AppError {
+  handle(error: unknown, options?: { silent?: boolean; context?: string | ErrorContext }): AppError {
     const appError = isAppError(error) ? error : this.wrap(error, { context: options?.context });
 
     // Update context if provided
@@ -358,10 +362,24 @@ class ErrorService {
 
   private logError(error: AppError): void {
     const prefix = `[Error:${error.category}]`;
-    const context = error.context ? ` (${error.context})` : '';
+
+    // Format context - supports both string and structured ErrorContext
+    let contextStr = '';
+    if (error.context) {
+      if (typeof error.context === 'string') {
+        contextStr = ` (${error.context})`;
+      } else {
+        // Structured context: format as "source:action@screen"
+        const ctx = error.context as ErrorContext;
+        const parts = [ctx.source];
+        if (ctx.action) parts.push(ctx.action);
+        if (ctx.screen) parts.push(`@${ctx.screen}`);
+        contextStr = ` (${parts.join(':')})`;
+      }
+    }
 
     if (__DEV__) {
-      logger.error(`${prefix}${context} ${error.code}: ${error.message}`);
+      logger.error(`${prefix}${contextStr} ${error.code}: ${error.message}`);
       if (error.details) {
         logger.error('Details:', error.details);
       }
@@ -370,17 +388,32 @@ class ErrorService {
       }
     }
 
+    // Build Sentry details including structured context
+    const sentryDetails: Record<string, unknown> = {
+      ...error.details,
+    };
+    if (error.context && typeof error.context === 'object') {
+      sentryDetails.errorContext = error.context;
+    }
+
     // Send to Sentry in production (gracefully degrades if not configured)
     captureError(error.cause instanceof Error ? error.cause : new Error(error.message), {
       category: error.category,
       code: error.code,
-      details: error.details as Record<string, unknown>,
+      details: sentryDetails,
       level: error.severity === 'critical' ? 'fatal' : error.severity === 'high' ? 'error' : 'warning',
     });
   }
 
+  private getContextKey(context: string | ErrorContext | undefined): string {
+    if (!context) return '';
+    if (typeof context === 'string') return context;
+    // Structured context: use source as primary key component
+    return context.source + (context.action ? `:${context.action}` : '');
+  }
+
   private isDuplicate(error: AppError): boolean {
-    const key = `${error.code}:${error.context || ''}`;
+    const key = `${error.code}:${this.getContextKey(error.context)}`;
     const entry = this.errorHistory.get(key);
 
     if (!entry) return false;
@@ -390,7 +423,7 @@ class ErrorService {
   }
 
   private recordError(error: AppError): void {
-    const key = `${error.code}:${error.context || ''}`;
+    const key = `${error.code}:${this.getContextKey(error.context)}`;
     const existing = this.errorHistory.get(key);
 
     if (existing) {

@@ -1,27 +1,16 @@
 /**
- * Accessibility module exports.
+ * src/shared/accessibility/index.ts
  *
- * Provides utilities and hooks for building accessible React Native components.
+ * Accessibility utilities exports
  */
 
-// Constants
 export {
+  // Constants
   MIN_TOUCH_TARGET,
   HIT_SLOP,
-  LARGE_TEXT_THRESHOLD,
-} from './accessibilityUtils';
-
-// Types
-export type {
-  AccessibilityProps,
-  ButtonAccessibilityOptions,
-  SliderAccessibilityOptions,
-  ProgressAccessibilityOptions,
-} from './accessibilityUtils';
-
-// Utility Functions
-export {
+  // Hit slop
   calculateHitSlop,
+  // Accessibility props builders
   buildButtonAccessibility,
   buildSliderAccessibility,
   buildProgressAccessibility,
@@ -31,20 +20,10 @@ export {
   buildToggleAccessibility,
   buildTabAccessibility,
   buildListItemAccessibility,
+  // Formatters
   formatTimeForAccessibility,
   formatProgressForAccessibility,
   buildBookDescription,
+  // Color contrast
   checkColorContrast,
 } from './accessibilityUtils';
-
-// Hooks
-export {
-  useAccessibilityState,
-  useScreenReader,
-  useReduceMotion,
-  useAnnounce,
-  useAccessibilityFocus,
-  useAnnounceScreen,
-} from './useAccessibility';
-
-export type { AccessibilityState } from './useAccessibility';

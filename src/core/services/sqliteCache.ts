@@ -80,6 +80,7 @@ interface DownloadRecord {
   downloadedAt: string | null;
   error: string | null;
   userPaused: boolean; // True when user explicitly paused (don't auto-resume)
+  resumableState?: string | null; // JSON state for byte-level download resume (optional)
 }
 
 interface SyncLogEntry {
@@ -588,6 +589,14 @@ class SQLiteCache {
         // Column already exists, ignore
       }
 
+      // Migration: Add resumable_state column to downloads (for byte-level resume)
+      try {
+        await this.db.execAsync(`ALTER TABLE downloads ADD COLUMN resumable_state TEXT`);
+        log.info('Added resumable_state column to downloads');
+      } catch {
+        // Column already exists, ignore
+      }
+
       this.isInitialized = true;
       log.info('Database initialized successfully');
     } catch (err) {
@@ -603,6 +612,42 @@ class SQLiteCache {
     await this.init();
     if (!this.db) throw new Error('Database not initialized');
     return this.db;
+  }
+
+  /**
+   * Get raw database instance for direct access.
+   * Used by databaseRecoveryService for integrity checks.
+   */
+  getDatabase(): SQLite.SQLiteDatabase | null {
+    return this.db;
+  }
+
+  /**
+   * Close database connection.
+   * Used by databaseRecoveryService during recovery.
+   */
+  async close(): Promise<void> {
+    if (this.db) {
+      try {
+        await this.db.closeAsync();
+        log.info('Database closed');
+      } catch (error) {
+        log.warn('Error closing database:', error);
+      }
+      this.db = null;
+      this.isInitialized = false;
+      this.initPromise = null;
+    }
+  }
+
+  /**
+   * Reinitialize database (after recovery).
+   * Alias for init() that ensures fresh initialization.
+   */
+  async initialize(): Promise<void> {
+    this.isInitialized = false;
+    this.initPromise = null;
+    await this.init();
   }
 
   // ============================================================================
@@ -1613,6 +1658,7 @@ class SQLiteCache {
         downloaded_at: string | null;
         error: string | null;
         user_paused: number | null;
+        resumable_state: string | null;
       }>('SELECT * FROM downloads WHERE item_id = ?', [itemId]);
 
       if (!row) return null;
@@ -1625,6 +1671,7 @@ class SQLiteCache {
         downloadedAt: row.downloaded_at,
         error: row.error,
         userPaused: row.user_paused === 1,
+        resumableState: row.resumable_state,
       };
     } catch (err) {
       return null;
@@ -1643,6 +1690,7 @@ class SQLiteCache {
         downloaded_at: string | null;
         error: string | null;
         user_paused: number | null;
+        resumable_state: string | null;
       }>('SELECT * FROM downloads ORDER BY downloaded_at DESC');
 
       return rows.map((row) => ({
@@ -1654,6 +1702,7 @@ class SQLiteCache {
         downloadedAt: row.downloaded_at,
         error: row.error,
         userPaused: row.user_paused === 1,
+        resumableState: row.resumable_state,
       }));
     } catch (err) {
       return [];
@@ -1672,6 +1721,7 @@ class SQLiteCache {
         downloaded_at: string | null;
         error: string | null;
         user_paused: number | null;
+        resumable_state: string | null;
       }>('SELECT * FROM downloads WHERE status = ?', [status]);
 
       return rows.map((row) => ({
@@ -1683,6 +1733,7 @@ class SQLiteCache {
         downloadedAt: row.downloaded_at,
         error: row.error,
         userPaused: row.user_paused === 1,
+        resumableState: row.resumable_state,
       }));
     } catch (err) {
       return [];
@@ -1693,8 +1744,8 @@ class SQLiteCache {
     const db = await this.ensureReady();
     try {
       await db.runAsync(
-        `INSERT OR REPLACE INTO downloads (item_id, status, progress, file_path, file_size, downloaded_at, error, user_paused)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO downloads (item_id, status, progress, file_path, file_size, downloaded_at, error, user_paused, resumable_state)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           record.itemId,
           record.status,
@@ -1704,10 +1755,26 @@ class SQLiteCache {
           record.downloadedAt,
           record.error,
           record.userPaused ? 1 : 0,
+          record.resumableState ?? null,
         ]
       );
     } catch (err) {
       log.warn('setDownload error:', err);
+    }
+  }
+
+  /**
+   * Update the resumable state for a download (for byte-level resume)
+   */
+  async updateDownloadResumableState(itemId: string, resumableState: string | null): Promise<void> {
+    const db = await this.ensureReady();
+    try {
+      await db.runAsync(
+        'UPDATE downloads SET resumable_state = ? WHERE item_id = ?',
+        [resumableState, itemId]
+      );
+    } catch (err) {
+      log.warn('updateDownloadResumableState error:', err);
     }
   }
 
@@ -1729,7 +1796,7 @@ class SQLiteCache {
     const db = await this.ensureReady();
     try {
       await db.runAsync(
-        `UPDATE downloads SET status = 'complete', progress = 1, file_path = ?, file_size = ?, downloaded_at = ?, error = NULL
+        `UPDATE downloads SET status = 'complete', progress = 1, file_path = ?, file_size = ?, downloaded_at = ?, error = NULL, resumable_state = NULL
          WHERE item_id = ?`,
         [filePath, fileSize, new Date().toISOString(), itemId]
       );

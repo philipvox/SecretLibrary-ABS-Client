@@ -38,6 +38,10 @@ export interface TopNavPill {
   icon?: ReactNode;
   /** Called when pill is pressed */
   onPress?: () => void;
+  /** Show outline style (white border, transparent bg) when not active */
+  outline?: boolean;
+  /** Show close X indicator (for cancelable pills) */
+  showClose?: boolean;
 }
 
 export interface TopNavCircleButton {
@@ -285,21 +289,27 @@ export function TopNav({
           {/* Pills */}
           {pills.map((pill) => {
             const hasLabel = pill.label && pill.label.length > 0;
+            // Determine pill styling
+            const isOutline = pill.outline && !pill.active;
+            const pillBgColor = pill.active ? pillActiveBg : 'transparent';
+            const pillBorder = pill.active ? pillActiveBorder : (isOutline ? colors.white : pillBorderColor);
+            const pillTextColor = pill.active ? pillActiveText : textColor;
+
             return (
               <Pressable
                 key={pill.key}
                 style={[
                   styles.pill,
-                  !hasLabel && styles.pillIconOnly,
+                  !hasLabel && !pill.showClose && styles.pillIconOnly,
                   {
-                    borderColor: pill.active ? pillActiveBorder : pillBorderColor,
-                    backgroundColor: pill.active ? pillActiveBg : 'transparent',
+                    borderColor: pillBorder,
+                    backgroundColor: pillBgColor,
                   },
                 ]}
                 onPress={pill.onPress}
               >
                 {pill.icon && (
-                  <View style={hasLabel ? styles.pillIcon : undefined}>
+                  <View style={hasLabel || pill.showClose ? styles.pillIcon : undefined}>
                     {pill.icon}
                   </View>
                 )}
@@ -307,11 +317,16 @@ export function TopNav({
                   <Text
                     style={[
                       styles.pillText,
-                      { color: pill.active ? pillActiveText : textColor },
+                      { color: pillTextColor },
                     ]}
                   >
                     {pill.label}
                   </Text>
+                )}
+                {pill.showClose && (
+                  <View style={styles.pillCloseIcon}>
+                    <CloseIcon color={pillTextColor} size={10} />
+                  </View>
                 )}
               </Pressable>
             );
@@ -387,6 +402,9 @@ const styles = StyleSheet.create({
   },
   pillIcon: {
     marginRight: 6,
+  },
+  pillCloseIcon: {
+    marginLeft: 6,
   },
   pillText: {
     fontFamily: fonts.jetbrainsMono.regular,

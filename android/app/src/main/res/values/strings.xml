@@ -3,4 +3,6 @@
   <string name="expo_runtime_version">1.0.0</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+  <!-- Android Auto configuration -->
+  <string name="media_root_id" translatable="false">secret_library_media_root</string>
 </resources>

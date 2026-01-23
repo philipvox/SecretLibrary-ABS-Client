@@ -6,8 +6,7 @@
  */
 
 import { hashString, pickFromHash, hashToPercent } from '../core/hashing';
-import { getCompositionProfile } from './profiles';
-import { getGenreProfile } from '../genre/profiles';
+import { getCompositionProfile, getGenreProfile } from '../profiles';
 import {
   SpineComposition,
   CompositionTitleOrientation,
@@ -69,27 +68,34 @@ export function generateComposition(
   // ═══════════════════════════════════════════════════════════════════════════
   // SMART TITLE ORIENTATION CONSTRAINTS
   // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Rules:
+  // 1. Small spines (< 60px): ALWAYS vertical - no exceptions
+  // 2. Medium spines (60-90px): ALWAYS vertical - no exceptions
+  // 3. Large spines (> 90px): Horizontal ONLY if single word ≤ 8 chars
+  // 4. Stacked orientations only for very short titles (≤ 8 chars)
 
-  if (title && titleOrientation !== 'horizontal') {
-    const shouldBeVertical = shouldTitleBeVertical(title);
+  if (title) {
+    const canUseHorizontal = canTitleBeHorizontal(title, spineWidth);
 
     if (__DEV__) {
-      console.log(`[Composition] "${title}" (${title.length} chars) - Picked: ${titleOrientation}, ShouldBeVertical: ${shouldBeVertical}`);
+      console.log(`[Composition] "${title}" (${title.length} chars, width: ${spineWidth || 'unknown'}) - Picked: ${titleOrientation}, CanBeHorizontal: ${canUseHorizontal}`);
     }
 
-    if (!shouldBeVertical) {
-      // Override: Force horizontal for tiny titles
-      titleOrientation = 'horizontal';
+    // If horizontal was picked but not allowed, force vertical
+    if (titleOrientation === 'horizontal' && !canUseHorizontal) {
+      titleOrientation = 'vertical-up';
       if (__DEV__) {
-        console.log(`[Composition] ✋ BLOCKED rotation for "${title}" - forcing horizontal`);
+        console.log(`[Composition] ✋ BLOCKED horizontal for "${title}" - forcing vertical-up`);
       }
-    } else if (titleOrientation === 'stacked-letters' || titleOrientation === 'stacked-words') {
-      // Override: Convert stacked to regular vertical for longer titles
-      // Stacked is only appropriate for very short titles
+    }
+
+    // If stacked was picked but title too long, convert to regular vertical
+    if (titleOrientation === 'stacked-letters' || titleOrientation === 'stacked-words') {
       const isTooLongForStacking = title.trim().length > 8;
       if (isTooLongForStacking) {
         const oldOrientation = titleOrientation;
-        titleOrientation = 'vertical-up';  // Convert to regular vertical rotation
+        titleOrientation = 'vertical-up';
         if (__DEV__) {
           console.log(`[Composition] 🔄 Converted ${oldOrientation} → vertical-up for "${title}" (too long for stacking)`);
         }
@@ -176,50 +182,69 @@ export function generateComposition(
 // SMART CONSTRAINT LOGIC
 // =============================================================================
 
+// Spine width breakpoints
+const SPINE_WIDTH_SMALL = 60;   // < 60px: narrow spines
+const SPINE_WIDTH_LARGE = 90;   // > 90px: wide spines
+
 /**
- * Determine if a title should be vertical based on length and word structure.
+ * Determine if a title CAN be displayed horizontally.
  *
- * DEFAULT: Titles should be VERTICAL (rotated)
- * EXCEPTION: Force HORIZONTAL only for:
- * 1. Very short titles (≤3 characters) - e.g., "WAR", "IT", "SHE"
- * 2. Multi-word titles where ALL words are ≤3 characters - e.g., "YES WE CAN", "DO NO HARM"
+ * STRICT RULES:
+ * 1. Small spines (< 60px): NEVER horizontal - always vertical
+ * 2. Medium spines (60-90px): NEVER horizontal - always vertical
+ * 3. Large spines (> 90px): Horizontal ONLY if:
+ *    - Single word (no spaces)
+ *    - Word is ≤ 8 characters (e.g., "VOYAGER" = 7 chars is OK)
+ * 4. If spine width is unknown, default to vertical (safe choice)
  *
- * This means most regular titles like "OATHBRINGER", "THE FELLOWSHIP OF THE RING" will rotate.
+ * Examples:
+ * - "VOYAGER" on 120px spine → horizontal OK (7 chars, single word)
+ * - "THE GOOD MOTHER" on 100px spine → NO (3 words)
+ * - "OATHBRINGER" on 100px spine → NO (11 chars, too long)
+ * - "SHE" on 100px spine → horizontal OK (3 chars, single word)
+ * - Anything on < 90px spine → NO
  *
  * @param title - Book title
- * @returns true if title should be vertical (rotated), false for horizontal
+ * @param spineWidth - Spine width in pixels (optional)
+ * @returns true if title can be horizontal, false if must be vertical
  */
-function shouldTitleBeVertical(title: string): boolean {
+function canTitleBeHorizontal(title: string, spineWidth?: number): boolean {
   const cleaned = title.trim();
-
-  // Case 1: Very short title (≤3 chars) → FORCE HORIZONTAL (exception)
-  if (cleaned.length <= 3) {
-    return false;  // Don't rotate "WAR", "IT", "SHE"
-  }
-
-  // Case 2: Multi-word where ALL words are ≤3 chars → FORCE HORIZONTAL (exception)
   const words = cleaned.split(/\s+/);
 
-  if (words.length >= 2) {
-    // Check if ALL words are 3 characters or less
-    const allWordsVeryShort = words.every(word => word.length <= 3);
-
-    // If all words are tiny, keep horizontal for readability
-    // Examples: "YES WE CAN", "DO NO HARM", "GO FOR IT"
-    if (allWordsVeryShort) {
-      return false;  // Don't rotate multi-word short titles
-    }
+  // Rule 1: If spine width unknown, default to vertical (safe choice)
+  if (spineWidth === undefined) {
+    return false;
   }
 
-  // Default: VERTICAL (rotate) - this includes "OATHBRINGER", "THIS INEVITABLE RUIN", etc.
+  // Rule 2: Small and medium spines (< 90px) → NEVER horizontal
+  if (spineWidth < SPINE_WIDTH_LARGE) {
+    return false;
+  }
+
+  // Rule 3: Large spines (≥ 90px) → Only horizontal if single short word
+  // Must be single word
+  if (words.length !== 1) {
+    return false;
+  }
+
+  // Single word must be ≤ 8 characters
+  const singleWord = words[0];
+  if (singleWord.length > 8) {
+    return false;
+  }
+
+  // All checks passed - horizontal is allowed
   return true;
 }
 
 /**
- * Check if author name is too long for horizontal layout on thin spine.
+ * Check if author name is too long for horizontal layout.
  *
- * Long names on thin spines cause overflow and look cramped.
- * Better to rotate them vertical.
+ * STRICT RULES (matching title constraints):
+ * 1. Small spines (< 60px): Author ALWAYS too long for horizontal
+ * 2. Medium spines (60-90px): Author ALWAYS too long for horizontal
+ * 3. Large spines (≥ 90px): Horizontal OK if name ≤ 15 characters
  *
  * @param author - Author name
  * @param spineWidth - Spine width in pixels
@@ -228,18 +253,14 @@ function shouldTitleBeVertical(title: string): boolean {
 function isAuthorTooLongForHorizontal(author: string, spineWidth: number): boolean {
   const authorLength = author.trim().length;
 
-  // Thin spine (< 40px): Long names (>15 chars) should be vertical
-  if (spineWidth < 40 && authorLength > 15) {
+  // Small and medium spines: Always too long (force vertical)
+  if (spineWidth < SPINE_WIDTH_LARGE) {
     return true;
   }
 
-  // Medium spine (40-60px): Very long names (>20 chars) should be vertical
-  if (spineWidth < 60 && authorLength > 20) {
-    return true;
-  }
-
-  // Narrow spine (60-80px): Extremely long names (>25 chars) should be vertical
-  if (spineWidth < 80 && authorLength > 25) {
+  // Large spines: Allow horizontal if name is reasonably short
+  // Max 15 chars for horizontal author on wide spine
+  if (authorLength > 15) {
     return true;
   }
 

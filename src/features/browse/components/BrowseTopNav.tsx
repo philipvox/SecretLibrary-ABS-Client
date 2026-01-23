@@ -6,11 +6,10 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { TopNav, TopNavCloseIcon, SmileIcon, Icon } from '@/shared/components';
-import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryColors as staticColors } from '@/shared/theme/secretLibrary';
+import { TopNav, TopNavCloseIcon, Icon } from '@/shared/components';
 import {
   useActiveSession,
   useHasActiveSession,
@@ -26,9 +25,6 @@ interface BrowseTopNavProps {
 }
 
 export function BrowseTopNav({ onMoodPress, onClose, onLogoPress, onLogoLongPress }: BrowseTopNavProps) {
-  // Theme-aware colors
-  const colors = useSecretLibraryColors();
-
   // Mood session hooks
   const hasActiveSession = useHasActiveSession();
   const session = useActiveSession();
@@ -45,6 +41,48 @@ export function BrowseTopNav({ onMoodPress, onClose, onLogoPress, onLogoLongPres
     clearSession();
   }, [clearSession]);
 
+  // Build pills array - always show mood pill, different style when active
+  const pills = useMemo(() => {
+    if (hasActiveSession && activeMoodConfig) {
+      // Active mood: filled pill with label and X to cancel
+      return [
+        {
+          key: 'mood',
+          label: activeMoodConfig.label,
+          icon: (
+            <Icon
+              name={activeMoodConfig.icon}
+              size={12}
+              color={staticColors.black}
+              set={activeMoodConfig.iconSet as any}
+            />
+          ),
+          active: true,
+          onPress: handleClearMood, // Tap to cancel
+          showClose: true, // Show X indicator
+        },
+      ];
+    }
+    // No active mood: outline white pill with filled icon
+    return [
+      {
+        key: 'mood',
+        label: 'Mood',
+        icon: (
+          <Icon
+            name="Sparkles"
+            size={12}
+            color={staticColors.white}
+            fill={staticColors.white}
+          />
+        ),
+        active: false,
+        outline: true, // White outline style
+        onPress: onMoodPress,
+      },
+    ];
+  }, [hasActiveSession, activeMoodConfig, onMoodPress, handleClearMood]);
+
   return (
     <View style={[styles.container, { backgroundColor: staticColors.black }]}>
       <TopNav
@@ -54,12 +92,8 @@ export function BrowseTopNav({ onMoodPress, onClose, onLogoPress, onLogoLongPres
         onLogoLongPress={onLogoLongPress}
         style={{ backgroundColor: 'transparent' }}
         includeSafeArea={false}
+        pills={pills}
         circleButtons={[
-          {
-            key: 'mood',
-            icon: <SmileIcon color={staticColors.cream} size={14} />,
-            onPress: onMoodPress,
-          },
           {
             key: 'close',
             icon: <TopNavCloseIcon color={staticColors.cream} size={14} />,
@@ -67,26 +101,6 @@ export function BrowseTopNav({ onMoodPress, onClose, onLogoPress, onLogoLongPres
           },
         ]}
       />
-
-      {/* Title row - with mood indicator on right when active */}
-      <View style={styles.titleRow}>
-        {hasActiveSession && activeMoodConfig && (
-          <View style={styles.moodIndicator}>
-            <Pressable onPress={onMoodPress} style={styles.moodPill}>
-              <Icon
-                name={activeMoodConfig.icon}
-                size={14}
-                color={staticColors.white}
-                set={activeMoodConfig.iconSet as any}
-              />
-              <Text style={[styles.moodLabel, { color: staticColors.white }]}>{activeMoodConfig.label}</Text>
-            </Pressable>
-            <Pressable onPress={handleClearMood} style={styles.clearButton} hitSlop={8}>
-              <Icon name="X" size={12} color={staticColors.gray} />
-            </Pressable>
-          </View>
-        )}
-      </View>
     </View>
   );
 }
@@ -94,49 +108,5 @@ export function BrowseTopNav({ onMoodPress, onClose, onLogoPress, onLogoLongPres
 const styles = StyleSheet.create({
   container: {
     backgroundColor: staticColors.black,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  browseTitle: {
-    fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(32),
-    fontWeight: '400',
-    color: staticColors.cream,
-  },
-  moodIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  moodPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  moodLabel: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(10),
-    color: staticColors.white,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  clearButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

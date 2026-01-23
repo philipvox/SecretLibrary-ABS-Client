@@ -200,6 +200,12 @@ class AuthService {
       // 5. Reset Zustand stores (in-memory app state)
       useLibraryCache.getState().clearCache();
 
+      // 6. Reset network optimizer cache (prevents stale API responses/covers)
+      apiClient.resetNetwork();
+
+      // 7. Reset cover cache version (prevents old cover URLs being reused)
+      apiClient.resetCoverCacheVersion();
+
       log.info('All user data cleared successfully');
     } catch (error) {
       log.error('Failed to clear storage:', error);

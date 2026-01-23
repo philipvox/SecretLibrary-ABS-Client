@@ -3,3 +3,4 @@
  */
 
 export * from './tagScoring';
+export * from './parseBookDNA';

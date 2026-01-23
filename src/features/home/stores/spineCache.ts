@@ -14,17 +14,17 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { getColors } from 'react-native-image-colors';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
-import { apiClient } from '@/core/api';
 import { sqliteCache } from '@/core/services/sqliteCache';
+import { createLogger } from '@/shared/utils/logger';
+
+const log = createLogger('SpineCache');
 // MIGRATED: Now using new spine system via adapter
-import { calculateBookDimensions, hashString, getSpineColorForGenres, isLightColor, darkenColorForDisplay, generateSpineComposition, SpineComposition, getTypographyForGenres } from '../utils/spine/adapter';
+import { calculateBookDimensions, hashString, getSpineColorForGenres, generateSpineComposition, SpineComposition, getTypographyForGenres } from '../utils/spine/adapter';
 // Template system - spines use this when available, so cache must too
 import { shouldUseTemplates, applyTemplateConfig } from '../utils/spine/templateAdapter';
 // getPlatformFont resolves custom fonts to available fonts (same as BookSpineVertical)
 import { getPlatformFont } from '../utils/spineCalculations';
-import { getErrorMessage } from '@/shared/utils/errorUtils';
 
 // =============================================================================
 // TYPE GUARDS
@@ -44,28 +44,6 @@ function getBookDuration(item: LibraryItem | null | undefined): number {
   return item.media.duration || 0;
 }
 
-// Platform-specific color result types
-interface IOSImageColors {
-  platform: 'ios';
-  background: string;
-  primary: string;
-  secondary: string;
-  detail: string;
-}
-
-interface AndroidImageColors {
-  platform: 'android';
-  dominant?: string;
-  average?: string;
-  vibrant?: string;
-  darkVibrant?: string;
-  lightVibrant?: string;
-  darkMuted?: string;
-  lightMuted?: string;
-  muted?: string;
-}
-
-type ImageColorsResult = IOSImageColors | AndroidImageColors;
 
 // =============================================================================
 // TYPES
@@ -94,14 +72,10 @@ export interface CachedSpineData {
   author: string;
   /** User progress (0-1) */
   progress: number;
-  /** Background color for spine (from cover or genre-based fallback) */
+  /** Background color for spine (genre-based) */
   backgroundColor: string;
   /** Text color for spine (contrast-based) */
   textColor: string;
-  /** Cover URL for color extraction */
-  coverUrl?: string;
-  /** Whether colors were extracted from cover image */
-  colorsFromCover?: boolean;
   /** Pre-computed spine composition (title orientation, author treatment, etc.) */
   composition?: SpineComposition;
   /** Pre-computed typography (font family, weight, transform, etc.) - ensures consistency across all screens */
@@ -133,8 +107,6 @@ export interface SpineCacheState {
   lastPopulatedAt: number | null;
   /** Whether to use genre-based colored spines (default: true) */
   useColoredSpines: boolean;
-  /** Version counter that increments when colors are updated (triggers re-renders) */
-  colorVersion: number;
 }
 
 export interface SpineCacheActions {
@@ -152,10 +124,6 @@ export interface SpineCacheActions {
   clearCache: () => void;
   /** Toggle colored spines on/off */
   setUseColoredSpines: (enabled: boolean) => void;
-  /** Extract colors from cover images (async, call after populateFromLibrary) */
-  extractCoverColors: () => Promise<void>;
-  /** Update a single book's colors */
-  updateBookColors: (bookId: string, backgroundColor: string, textColor: string) => void;
   /** Save current cache to SQLite for persistence */
   saveToSQLite: (libraryId: string) => Promise<void>;
 }
@@ -175,8 +143,8 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
   const duration = getBookDuration(item) || 6 * 60 * 60; // Default 6 hours
 
   // DEBUG: Log tags to verify they're loading
-  if (__DEV__ && (tags.length > 0 || genres.length > 0)) {
-    console.log(`[SpineCache] ${metadata?.title?.substring(0, 20) || item.id}:`, {
+  if (tags.length > 0 || genres.length > 0) {
+    log.debug(`${metadata?.title?.substring(0, 20) || item.id}:`, {
       genres: genres.slice(0, 3),
       tags: tags.slice(0, 3),
     });
@@ -194,17 +162,15 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
     seriesName,
   });
 
-  // Calculate spine colors based on genres (fallback until cover colors are extracted)
+  // Calculate spine colors based on genres
   const colors = getSpineColorForGenres(genres, item.id);
-
-  // Get cover URL for color extraction
-  const coverUrl = apiClient.getItemCoverUrl(item.id);
 
   // Pre-compute spine composition (title orientation, author treatment, etc.)
   // This ensures consistent styling across home, book detail, and player screens
   const title = metadata?.title || 'Unknown';
   const author = metadata?.authorName || 'Unknown Author';
-  const composition = generateSpineComposition(item.id, title, author, genres, seriesName ? { name: seriesName, number: 1 } : undefined);
+  // Pass spine width for smart layout constraints (horizontal only on wide spines)
+  const composition = generateSpineComposition(item.id, title, author, genres, seriesName ? { name: seriesName, number: 1 } : undefined, calculated.width);
 
   // Pre-compute typography (font family, weight, transforms, etc.)
   // CRITICAL: Must match EXACTLY what BookSpineVertical uses!
@@ -245,9 +211,7 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
       _rawTitleFont: templateConfig.title.fontFamily,
     };
 
-    if (__DEV__) {
-      console.log(`[SpineCache] "${title?.substring(0, 20)}" TEMPLATE: ${templateConfig.templateName}, raw: ${templateConfig.title.fontFamily} → resolved: ${resolvedTitleFont}`);
-    }
+    log.debug(`"${title?.substring(0, 20)}" TEMPLATE: ${templateConfig.templateName}, raw: ${templateConfig.title.fontFamily} → resolved: ${resolvedTitleFont}`);
   } else {
     // No template - use genre-based typography
     const genreTypo = getTypographyForGenres(genres, item.id);
@@ -260,9 +224,7 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
       fontFamily: resolvedFont,
     };
 
-    if (__DEV__) {
-      console.log(`[SpineCache] "${title?.substring(0, 20)}" GENRE: raw: ${genreTypo.fontFamily} → resolved: ${resolvedFont}`);
-    }
+    log.debug(`"${title?.substring(0, 20)}" GENRE: raw: ${genreTypo.fontFamily} → resolved: ${resolvedFont}`);
   }
 
   return {
@@ -279,8 +241,6 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
     progress,
     backgroundColor: colors.backgroundColor,
     textColor: colors.textColor,
-    coverUrl,
-    colorsFromCover: false,
     composition,
     typography,
   };
@@ -298,7 +258,6 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
       isPopulated: false,
       lastPopulatedAt: null,
       useColoredSpines: true, // Default to colored spines enabled
-      colorVersion: 0, // Increments when colors are updated
 
       // Actions
 
@@ -312,9 +271,7 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
 
         // Skip if already populated (avoid duplicate work)
         if (get().isPopulated && get().cache.size > 0) {
-          if (__DEV__) {
-            console.log('[SpineCache] Already populated, skipping hydration');
-          }
+          log.debug('Already populated, skipping hydration');
           return get().cache.size;
         }
 
@@ -331,15 +288,11 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
             });
 
             const elapsed = Date.now() - startTime;
-            if (__DEV__) {
-              console.log(`[SpineCache] Hydrated ${sqliteData.size} items from SQLite in ${elapsed}ms`);
-            }
+            log.debug(`Hydrated ${sqliteData.size} items from SQLite in ${elapsed}ms`);
             return sqliteData.size;
           }
         } catch (error) {
-          if (__DEV__) {
-            console.warn('[SpineCache] Hydration from SQLite failed:', error);
-          }
+          log.warn('Hydration from SQLite failed:', error);
         }
 
         return 0;
@@ -365,13 +318,11 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
               }
             }
 
-            if (__DEV__ && loadedFromSQLite > 0) {
-              console.log(`[SpineCache] Loaded ${loadedFromSQLite} items from SQLite`);
+            if (loadedFromSQLite > 0) {
+              log.debug(`Loaded ${loadedFromSQLite} items from SQLite`);
             }
           } catch (error) {
-            if (__DEV__) {
-              console.warn('[SpineCache] Failed to load from SQLite:', error);
-            }
+            log.warn('Failed to load from SQLite:', error);
           }
         }
 
@@ -384,9 +335,7 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
               computed++;
             } catch (error) {
               // Skip items that fail to process
-              if (__DEV__) {
-                console.warn(`[SpineCache] Failed to process item ${item.id}:`, error);
-              }
+              log.warn(`Failed to process item ${item.id}:`, error);
             }
           }
         }
@@ -398,17 +347,13 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
         });
 
         const elapsed = Date.now() - startTime;
-        if (__DEV__) {
-          console.log(`[SpineCache] Populated ${newCache.size} items (${loadedFromSQLite} from SQLite, ${computed} computed) in ${elapsed}ms`);
-        }
+        log.debug(`Populated ${newCache.size} items (${loadedFromSQLite} from SQLite, ${computed} computed) in ${elapsed}ms`);
 
         // Save back to SQLite if we computed new items
         if (libraryId && computed > 0) {
           // Run in background, don't block
           sqliteCache.setSpineCache(libraryId, newCache).catch(err => {
-            if (__DEV__) {
-              console.warn('[SpineCache] Failed to save to SQLite:', err);
-            }
+            log.warn('Failed to save to SQLite:', err);
           });
         }
       },
@@ -454,106 +399,18 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
       set({ useColoredSpines: enabled });
     },
 
-    updateBookColors: (bookId: string, backgroundColor: string, textColor: string) => {
-      const { cache } = get();
-      const existing = cache.get(bookId);
-
-      if (existing) {
-        const newCache = new Map(cache);
-        newCache.set(bookId, {
-          ...existing,
-          backgroundColor,
-          textColor,
-          colorsFromCover: true,
-        });
-        set({ cache: newCache });
-      }
-    },
-
     saveToSQLite: async (libraryId: string) => {
       const { cache } = get();
       if (cache.size === 0) return;
 
       try {
         await sqliteCache.setSpineCache(libraryId, cache);
-        if (__DEV__) {
-          console.log(`[SpineCache] Saved ${cache.size} items to SQLite`);
-        }
+        log.debug(`Saved ${cache.size} items to SQLite`);
       } catch (error) {
-        if (__DEV__) {
-          console.warn('[SpineCache] Failed to save to SQLite:', error);
-        }
+        log.warn('Failed to save to SQLite:', error);
       }
     },
 
-    extractCoverColors: async () => {
-      const { cache } = get();
-      const books = Array.from(cache.values()).filter(book => !book.colorsFromCover && book.coverUrl);
-
-      // Process in batches to avoid overwhelming the system
-      const BATCH_SIZE = 5;
-      const BATCH_DELAY = 100; // ms between batches
-      let successCount = 0;
-      let failCount = 0;
-
-      for (let i = 0; i < books.length; i += BATCH_SIZE) {
-        const batch = books.slice(i, i + BATCH_SIZE);
-
-        await Promise.all(batch.map(async (book) => {
-          try {
-            if (!book.coverUrl) {
-              return;
-            }
-
-            const result = await getColors(book.coverUrl, {
-              fallback: book.backgroundColor, // Keep genre color as fallback
-              cache: true,
-              key: book.id,
-            }) as ImageColorsResult;
-
-            // Extract dominant color based on platform
-            let dominantColor: string | undefined;
-            if (result.platform === 'ios') {
-              dominantColor = result.primary || result.background;
-            } else {
-              dominantColor = result.dominant || result.vibrant;
-            }
-
-            if (dominantColor) {
-              // Darken light colors for better contrast on grey background
-              let bgColor = dominantColor;
-              if (isLightColor(bgColor)) {
-                bgColor = darkenColorForDisplay(bgColor);
-              }
-
-              // Calculate text color based on background luminance
-              const textColor = isLightColor(bgColor, 0.5) ? '#000000' : '#FFFFFF';
-
-              // Update the cache
-              get().updateBookColors(book.id, bgColor, textColor);
-              successCount++;
-            } else {
-              failCount++;
-            }
-          } catch (error) {
-            failCount++;
-            if (__DEV__) {
-              console.error(`[SpineCache] Failed to extract color for ${book.id} (${book.title}):`, getErrorMessage(error));
-            }
-          }
-        }));
-
-        // Small delay between batches
-        if (i + BATCH_SIZE < books.length) {
-          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
-        }
-      }
-
-      // Increment colorVersion to trigger UI re-renders
-      if (successCount > 0) {
-        set({ colorVersion: get().colorVersion + 1 });
-      }
-    },
   }),
     {
       name: 'spine-settings',

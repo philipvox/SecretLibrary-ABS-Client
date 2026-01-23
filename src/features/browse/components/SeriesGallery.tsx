@@ -5,13 +5,13 @@
  * Shows top series in a 2x2 grid with white cards.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { useSeries } from '@/features/series/hooks/useSeries';
 import { useLibraryCache } from '@/core/cache';
 import { SeriesCard, SeriesCardVariant, SeriesCardLayout } from './SeriesCard';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { logger } from '@/shared/utils/logger';
 
 interface SeriesGalleryProps {
   /** Called when a series card is pressed */
@@ -46,19 +46,38 @@ export function SeriesGallery({
   variant = 'light',
   layout = 'list',
 }: SeriesGalleryProps) {
+  const renderStart = useRef(Date.now());
+
   // Theme-aware colors
   const colors = useSecretLibraryColors();
 
-  // Get current library ID
-  const currentLibraryId = useLibraryCache((s) => s.currentLibraryId);
+  // Get series data from library cache (already built, no API call needed)
+  const cacheStart = Date.now();
+  const seriesMap = useLibraryCache((s) => s.series);
+  const isLoaded = useLibraryCache((s) => s.isLoaded);
+  const cacheTime = Date.now() - cacheStart;
 
-  // Get series data
-  const { series, isLoading } = useSeries(currentLibraryId || '', {
-    sortBy: 'bookCount-desc',
-  });
+  // Get top series sorted by book count (computed once from cache)
+  const memoStart = Date.now();
+  const displaySeries = useMemo(() => {
+    if (!seriesMap || seriesMap.size === 0) return [];
+    return Array.from(seriesMap.values())
+      .sort((a, b) => b.bookCount - a.bookCount)
+      .slice(0, maxSeries)
+      .map(s => ({
+        id: s.name, // Use name as ID for cache-based series
+        name: s.name,
+        bookCount: s.bookCount,
+        books: s.books,
+      }));
+  }, [seriesMap, maxSeries]);
+  const memoTime = Date.now() - memoStart;
 
-  // Get top series
-  const displaySeries = series.slice(0, maxSeries);
+  // Log component timing
+  useEffect(() => {
+    const totalTime = Date.now() - renderStart.current;
+    logger.debug(`[Browse Perf] SeriesGallery mounted in ${totalTime}ms (cache: ${cacheTime}ms, memo: ${memoTime}ms, series: ${displaySeries.length})`);
+  }, []);
 
   const handleSeriesPress = useCallback(
     (seriesName: string) => {
@@ -67,7 +86,7 @@ export function SeriesGallery({
     [onSeriesPress]
   );
 
-  if (isLoading || displaySeries.length === 0) {
+  if (!isLoaded || displaySeries.length === 0) {
     return null;
   }
 

@@ -13,7 +13,7 @@
  */
 
 import React, { memo } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { scale, colors } from '@/shared/theme';
 
 interface ThumbnailProgressBarProps {
@@ -32,8 +32,9 @@ export const ThumbnailProgressBar = memo(function ThumbnailProgressBar({
   height = 3,
 }: ThumbnailProgressBarProps) {
   // Don't show if no progress, completed, or invalid
+  // Return empty View on Android to prevent SafeAreaProvider crash
   if (!progress || progress <= 0 || progress >= 0.95) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   const fillPercent = Math.min(Math.max(progress * 100, 0), 100);

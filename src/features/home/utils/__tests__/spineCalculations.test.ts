@@ -210,12 +210,12 @@ describe('spineCalculations', () => {
   describe('calculateSpineWidth', () => {
     it('returns median width for undefined duration', () => {
       const width = calculateSpineWidth(undefined);
-      expect(width).toBe(42); // MEDIAN_WIDTH
+      expect(width).toBe(60); // MEDIAN_WIDTH
     });
 
     it('returns minimum width for very short durations', () => {
       const width = calculateSpineWidth(60); // 1 minute
-      expect(width).toBeGreaterThanOrEqual(28); // MIN_WIDTH
+      expect(width).toBeGreaterThanOrEqual(44); // MIN_WIDTH
     });
 
     it('increases width with duration', () => {
@@ -226,8 +226,8 @@ describe('spineCalculations', () => {
 
     it('stays within bounds', () => {
       const veryLong = calculateSpineWidth(360000); // 100 hours
-      expect(veryLong).toBeGreaterThanOrEqual(28);  // MIN_WIDTH
-      expect(veryLong).toBeLessThanOrEqual(85);     // MAX_WIDTH
+      expect(veryLong).toBeGreaterThanOrEqual(44);  // MIN_WIDTH
+      expect(veryLong).toBeLessThanOrEqual(380);    // MAX_WIDTH
     });
   });
 

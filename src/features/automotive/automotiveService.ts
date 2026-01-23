@@ -42,6 +42,60 @@ function getBookMetadata(item: LibraryItem | null | undefined): ExtendedBookMeta
   return item.media.metadata as ExtendedBookMetadata;
 }
 
+// Helper to get book duration in seconds
+function getBookDuration(item: LibraryItem | null | undefined): number {
+  if (!item?.media) return 0;
+  return (item.media as BookMedia).duration || 0;
+}
+
+// Format duration as "Xh Ym" for display
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return '';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  return `${minutes}m`;
+}
+
+// Format time remaining as "Xh Ym left"
+function formatTimeRemaining(durationSeconds: number, progress: number): string {
+  if (!durationSeconds || durationSeconds <= 0 || progress >= 1) return '';
+  const remaining = durationSeconds * (1 - progress);
+  const hours = Math.floor(remaining / 3600);
+  const minutes = Math.floor((remaining % 3600) / 60);
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m left` : `${hours}h left`;
+  }
+  return `${minutes}m left`;
+}
+
+// Format subtitle with author and time info
+// For in-progress: "Author • 45% • 3h 21m left"
+// For not started: "Author • 12h 30m"
+function formatSubtitle(author: string, durationSeconds: number, progress?: number): string {
+  const parts: string[] = [author];
+
+  if (progress !== undefined && progress > 0 && progress < 1) {
+    // In-progress: show percentage and time remaining
+    parts.push(`${Math.round(progress * 100)}%`);
+    const remaining = formatTimeRemaining(durationSeconds, progress);
+    if (remaining) {
+      parts.push(remaining);
+    }
+  } else if (progress === undefined || progress === 0) {
+    // Not started: show total duration
+    const durationStr = formatDuration(durationSeconds);
+    if (durationStr) {
+      parts.push(durationStr);
+    }
+  }
+  // For finished (progress >= 1), just show author
+
+  return parts.join(' • ');
+}
+
 const log = (...args: any[]) => audioLog.audio('[Automotive]', ...args);
 
 /**
@@ -70,6 +124,10 @@ class AutomotiveService {
 
   // Player state subscription for Android Auto sync
   private playerStoreUnsubscribe: (() => void) | null = null;
+
+  // Command execution lock to prevent concurrent commands from racing
+  private isCommandExecuting: boolean = false;
+  private commandQueue: Array<{ command: string; param?: string }> = [];
 
   /**
    * Initialize the automotive service
@@ -202,14 +260,10 @@ class AutomotiveService {
     }
 
     try {
-      // Start listening for commands from native MediaPlaybackService
-      await AndroidAutoModule.startListening();
-      log('Started listening for Android Auto commands');
-
-      // Set up event listener for commands from native
+      // Set up event listener for commands from native MediaBrowserService
       const eventEmitter = new NativeEventEmitter(AndroidAutoModule);
       this.androidAutoSubscription = eventEmitter.addListener(
-        'onAndroidAutoCommand',
+        AndroidAutoModule.EVENT_NAME || 'AndroidAutoCommand',
         this.handleAndroidAutoCommand.bind(this)
       );
       log('Android Auto event listener set up');
@@ -235,10 +289,46 @@ class AutomotiveService {
 
   /**
    * Handle commands received from native Android Auto
+   * Uses a lock to prevent concurrent commands from racing
    */
   private async handleAndroidAutoCommand(event: { command: string; param?: string }): Promise<void> {
     log('Received Android Auto command:', event);
 
+    // If a command is already executing, queue this one (except for duplicate play/pause)
+    if (this.isCommandExecuting) {
+      // Don't queue duplicate consecutive commands
+      const lastQueued = this.commandQueue[this.commandQueue.length - 1];
+      if (lastQueued?.command === event.command) {
+        log('Ignoring duplicate queued command:', event.command);
+        return;
+      }
+      log('Command queued (another in progress):', event.command);
+      this.commandQueue.push(event);
+      return;
+    }
+
+    this.isCommandExecuting = true;
+
+    try {
+      await this.executeCommand(event);
+    } finally {
+      this.isCommandExecuting = false;
+
+      // Process any queued commands
+      if (this.commandQueue.length > 0) {
+        const nextCommand = this.commandQueue.shift();
+        if (nextCommand) {
+          // Small delay to let state settle
+          setTimeout(() => this.handleAndroidAutoCommand(nextCommand), 50);
+        }
+      }
+    }
+  }
+
+  /**
+   * Execute a single Android Auto command
+   */
+  private async executeCommand(event: { command: string; param?: string }): Promise<void> {
     switch (event.command) {
       case 'playFromMediaId':
         if (event.param) {
@@ -263,6 +353,7 @@ class AutomotiveService {
         break;
 
       case 'skipNext':
+      case 'skipToNext':
         {
           const { usePlayerStore } = await import('@/features/player/stores/playerStore');
           await usePlayerStore.getState().nextChapter();
@@ -271,10 +362,19 @@ class AutomotiveService {
         break;
 
       case 'skipPrevious':
+      case 'skipToPrevious':
         {
           const { usePlayerStore } = await import('@/features/player/stores/playerStore');
           await usePlayerStore.getState().prevChapter();
           log('Skip previous (previous chapter) executed');
+        }
+        break;
+
+      case 'stop':
+        {
+          const { usePlayerStore } = await import('@/features/player/stores/playerStore');
+          await usePlayerStore.getState().pause();
+          log('Stop command executed (paused)');
         }
         break;
 
@@ -307,9 +407,14 @@ class AutomotiveService {
         break;
 
       case 'search':
+      case 'playFromSearch':
         if (event.param) {
           await this.handleSearch(event.param);
         }
+        break;
+
+      case 'customAction':
+        log('Custom action received:', event.param);
         break;
 
       default:
@@ -320,9 +425,10 @@ class AutomotiveService {
   /**
    * Handle voice search from Android Auto
    * Searches library for matching book and plays it
+   * Empty query = play most recently listened book
    */
   private async handleSearch(query: string): Promise<void> {
-    log('Handling search:', query);
+    log('Handling search:', query || '(empty - resume recent)');
 
     try {
       const { useLibraryCache } = await import('@/core/cache/libraryCache');
@@ -331,19 +437,55 @@ class AutomotiveService {
       const libraryItems = useLibraryCache.getState().items;
       const queryLower = query.toLowerCase().trim();
 
-      // Search for matching book by title or author
-      const match = libraryItems.find(item => {
-        const metadata = getBookMetadata(item);
-        const title = (metadata?.title || '').toLowerCase();
-        const author = (metadata?.authorName || metadata?.authors?.[0]?.name || '').toLowerCase();
-        const series = (metadata?.seriesName || '').toLowerCase();
+      let match: typeof libraryItems[0] | undefined;
 
-        return (
-          title.includes(queryLower) ||
-          author.includes(queryLower) ||
-          series.includes(queryLower)
-        );
-      });
+      if (!queryLower) {
+        // Empty query - find most recently listened book with progress
+        match = libraryItems
+          .filter(item => {
+            const progress = item.userMediaProgress?.progress || 0;
+            return progress > 0 && progress < 1;
+          })
+          .sort((a, b) => {
+            const aTime = a.userMediaProgress?.lastUpdate || 0;
+            const bTime = b.userMediaProgress?.lastUpdate || 0;
+            return bTime - aTime;
+          })[0];
+
+        if (!match) {
+          // No in-progress books, try most recently added
+          match = [...libraryItems].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))[0];
+        }
+
+        log('Empty search - resuming:', getBookMetadata(match)?.title);
+      } else {
+        // Search for matching book by title, author, series, or narrator
+        match = libraryItems.find(item => {
+          const metadata = getBookMetadata(item);
+          const title = (metadata?.title || '').toLowerCase();
+          const author = (metadata?.authorName || metadata?.authors?.[0]?.name || '').toLowerCase();
+          const series = (metadata?.seriesName || '').toLowerCase();
+          const narrator = (metadata?.narratorName || '').toLowerCase();
+
+          return (
+            title.includes(queryLower) ||
+            author.includes(queryLower) ||
+            series.includes(queryLower) ||
+            narrator.includes(queryLower)
+          );
+        });
+
+        // If no exact match, try fuzzy matching on title
+        if (!match) {
+          match = libraryItems.find(item => {
+            const metadata = getBookMetadata(item);
+            const title = (metadata?.title || '').toLowerCase();
+            // Check if query words appear in title
+            const queryWords = queryLower.split(/\s+/);
+            return queryWords.every(word => title.includes(word));
+          });
+        }
+      }
 
       if (match) {
         log('Found match for search:', getBookMetadata(match)?.title);
@@ -400,11 +542,20 @@ class AutomotiveService {
           prevPosition = position;
 
           // Convert to milliseconds for native
-          AndroidAutoModule.updatePlaybackState(
-            isPlaying,
-            position * 1000, // Convert to ms
-            speed
-          ).catch((err: any) => log('Failed to update playback state:', err));
+          // Wrap in try-catch since native module may not return a Promise
+          try {
+            const result = AndroidAutoModule.updatePlaybackState(
+              isPlaying,
+              position * 1000, // Convert to ms
+              speed
+            );
+            // Handle both Promise and non-Promise returns
+            if (result && typeof result.catch === 'function') {
+              result.catch((err: any) => log('Failed to update playback state:', err));
+            }
+          } catch (err) {
+            log('Failed to update playback state:', err);
+          }
         }
 
         // Sync metadata when book changes
@@ -418,12 +569,21 @@ class AutomotiveService {
           const { apiClient } = require('@/core/api');
           const coverUrl = apiClient.getItemCoverUrl(book.id);
 
-          AndroidAutoModule.updateMetadata(
-            title,
-            author,
-            duration * 1000, // Convert to ms
-            coverUrl
-          ).catch((err: any) => log('Failed to update metadata:', err));
+          // Wrap in try-catch since native module may not return a Promise
+          try {
+            const result = AndroidAutoModule.updateMetadata(
+              title,
+              author,
+              duration * 1000, // Convert to ms
+              coverUrl
+            );
+            // Handle both Promise and non-Promise returns
+            if (result && typeof result.catch === 'function') {
+              result.catch((err: any) => log('Failed to update metadata:', err));
+            }
+          } catch (err) {
+            log('Failed to update metadata:', err);
+          }
 
           log('Synced metadata to Android Auto:', { title, author, duration });
         }
@@ -645,6 +805,23 @@ class AutomotiveService {
   }
 
   /**
+   * Set only the action handler without overwriting connection callbacks.
+   * This allows updating the action handler independently.
+   */
+  setActionHandler(handler: AutomotiveCallbacks['onAction']): void {
+    if (this.callbacks) {
+      this.callbacks.onAction = handler;
+    } else {
+      // If no callbacks set yet, create with defaults
+      this.callbacks = {
+        onConnect: () => {},
+        onDisconnect: () => {},
+        onAction: handler,
+      };
+    }
+  }
+
+  /**
    * Update now playing information for automotive displays
    */
   async updateNowPlaying(nowPlaying: AutomotiveNowPlaying): Promise<void> {
@@ -659,19 +836,53 @@ class AutomotiveService {
   }
 
   /**
+   * Helper to create a BrowseItem from a LibraryItem
+   */
+  private createBrowseItem(
+    item: LibraryItem,
+    apiClient: any,
+    options?: {
+      showProgress?: boolean;
+      localCoverPath?: string;
+      sequence?: number;
+    }
+  ): BrowseItem {
+    const metadata = getBookMetadata(item);
+    const duration = getBookDuration(item);
+    const progress = item.userMediaProgress?.progress || 0;
+    const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
+
+    return {
+      id: item.id,
+      title: metadata?.title || 'Unknown Title',
+      subtitle: formatSubtitle(author, duration, options?.showProgress ? progress : undefined),
+      imageUrl: options?.localCoverPath || apiClient.getItemCoverUrl(item.id),
+      isPlayable: true,
+      isBrowsable: false,
+      progress: options?.showProgress ? progress : undefined,
+      durationMs: Math.round(duration * 1000),
+      sequence: options?.sequence,
+    };
+  }
+
+  /**
    * Get browse sections for library display
+   * Includes hierarchical sections for Authors, Series, Genres, and Narrators
    */
   async getBrowseSections(): Promise<BrowseSection[]> {
     const sections: BrowseSection[] = [];
 
     try {
-      // Get continue listening items
       const { useLibraryCache } = await import('@/core/cache/libraryCache');
       const { apiClient } = await import('@/core/api');
+      const { useMyLibraryStore } = await import('@/shared/stores/myLibraryStore');
 
       const libraryItems = useLibraryCache.getState().items;
+      const favoriteBookIds = useMyLibraryStore.getState().bookIds || [];
 
-      // Filter for items with progress
+      // =================================================================
+      // 1. CONTINUE LISTENING - Books with progress
+      // =================================================================
       const continueItems = libraryItems
         .filter(item => {
           const progress = item.userMediaProgress?.progress || 0;
@@ -683,18 +894,7 @@ class AutomotiveService {
           return bTime - aTime;
         })
         .slice(0, this.config.maxListItems)
-        .map((item): BrowseItem => {
-          const metadata = getBookMetadata(item);
-          return {
-            id: item.id,
-            title: metadata?.title || 'Unknown Title',
-            subtitle: metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author',
-            imageUrl: apiClient.getItemCoverUrl(item.id),
-            isPlayable: true,
-            isBrowsable: false,
-            progress: item.userMediaProgress?.progress || 0,
-          };
-        });
+        .map(item => this.createBrowseItem(item, apiClient, { showProgress: true }));
 
       if (continueItems.length > 0) {
         sections.push({
@@ -704,28 +904,41 @@ class AutomotiveService {
         });
       }
 
-      // Get downloaded items
+      // =================================================================
+      // 2. FAVORITES - User's favorite books
+      // =================================================================
+      const favoriteItems = libraryItems
+        .filter(item => favoriteBookIds.includes(item.id))
+        .sort((a, b) => {
+          const aTitle = getBookMetadata(a)?.title || '';
+          const bTitle = getBookMetadata(b)?.title || '';
+          return aTitle.localeCompare(bTitle);
+        })
+        .slice(0, this.config.maxListItems)
+        .map(item => this.createBrowseItem(item, apiClient));
+
+      if (favoriteItems.length > 0) {
+        sections.push({
+          id: 'favorites',
+          title: 'Favorites',
+          items: favoriteItems,
+        });
+      }
+
+      // =================================================================
+      // 3. DOWNLOADS - Offline books
+      // =================================================================
       const { downloadManager } = await import('@/core/services/downloadManager');
       const FileSystem = await import('expo-file-system/legacy');
       const allDownloads = await downloadManager.getAllDownloads();
       const completedDownloads = allDownloads.filter(d => d.status === 'complete');
 
-      // Cross-reference with library items to get metadata
       const downloadedItems: BrowseItem[] = [];
       for (const download of completedDownloads.slice(0, this.config.maxListItems)) {
         const item = libraryItems.find(i => i.id === download.itemId);
         if (item) {
-          const metadata = getBookMetadata(item);
-          // Use local cover path for downloaded items (works better with Android Auto)
           const localCoverPath = `${FileSystem.documentDirectory}audiobooks/${item.id}/cover.jpg`;
-          downloadedItems.push({
-            id: item.id,
-            title: metadata?.title || 'Unknown Title',
-            subtitle: metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author',
-            imageUrl: localCoverPath, // Local file URI for downloaded items
-            isPlayable: true,
-            isBrowsable: false,
-          });
+          downloadedItems.push(this.createBrowseItem(item, apiClient, { localCoverPath }));
         }
       }
 
@@ -737,25 +950,13 @@ class AutomotiveService {
         });
       }
 
-      // Recently Added section - books sorted by addedAt
+      // =================================================================
+      // 4. RECENTLY ADDED - Newest books
+      // =================================================================
       const recentlyAddedItems = [...libraryItems]
-        .sort((a, b) => {
-          const aAdded = a.addedAt || 0;
-          const bAdded = b.addedAt || 0;
-          return bAdded - aAdded;
-        })
+        .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
         .slice(0, this.config.maxListItems)
-        .map((item): BrowseItem => {
-          const metadata = getBookMetadata(item);
-          return {
-            id: item.id,
-            title: metadata?.title || 'Unknown Title',
-            subtitle: metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author',
-            imageUrl: apiClient.getItemCoverUrl(item.id),
-            isPlayable: true,
-            isBrowsable: false,
-          };
-        });
+        .map(item => this.createBrowseItem(item, apiClient));
 
       if (recentlyAddedItems.length > 0) {
         sections.push({
@@ -765,7 +966,206 @@ class AutomotiveService {
         });
       }
 
-      // Library section - all books alphabetically
+      // =================================================================
+      // 5. AUTHORS - Hierarchical: Authors → Books
+      // =================================================================
+      const authorMap = new Map<string, LibraryItem[]>();
+      for (const item of libraryItems) {
+        const metadata = getBookMetadata(item);
+        const authorName = metadata?.authorName || metadata?.authors?.[0]?.name;
+        if (authorName) {
+          const existing = authorMap.get(authorName) || [];
+          existing.push(item);
+          authorMap.set(authorName, existing);
+        }
+      }
+
+      // Sort authors by name and create browse items
+      const authorFolders = Array.from(authorMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(0, this.config.maxListItems)
+        .map(([authorName, books]): BrowseItem => {
+          // Sort books by title within author
+          const sortedBooks = books.sort((a, b) => {
+            const aTitle = getBookMetadata(a)?.title || '';
+            const bTitle = getBookMetadata(b)?.title || '';
+            return aTitle.localeCompare(bTitle);
+          });
+
+          return {
+            id: `author:${authorName}`,
+            title: authorName,
+            subtitle: `${books.length} book${books.length !== 1 ? 's' : ''}`,
+            isPlayable: false,
+            isBrowsable: true,
+            itemCount: books.length,
+            children: sortedBooks.map(item => this.createBrowseItem(item, apiClient)),
+          };
+        });
+
+      if (authorFolders.length > 0) {
+        sections.push({
+          id: 'authors',
+          title: 'Authors',
+          items: authorFolders,
+          isBrowsableSection: true,
+        });
+      }
+
+      // =================================================================
+      // 6. SERIES - Hierarchical: Series → Books (in order)
+      // =================================================================
+      const seriesMap = new Map<string, Array<{ item: LibraryItem; sequence: number }>>();
+      for (const item of libraryItems) {
+        const metadata = getBookMetadata(item);
+        // Check for series info in either format
+        const seriesName = metadata?.seriesName || metadata?.series?.[0]?.name;
+        const seriesSequence = metadata?.series?.[0]?.sequence || 1;
+
+        if (seriesName) {
+          const existing = seriesMap.get(seriesName) || [];
+          existing.push({ item, sequence: typeof seriesSequence === 'string' ? parseFloat(seriesSequence) : seriesSequence });
+          seriesMap.set(seriesName, existing);
+        }
+      }
+
+      // Sort series by name and create browse items
+      const seriesFolders = Array.from(seriesMap.entries())
+        .filter(([_, books]) => books.length > 1) // Only show series with multiple books
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(0, this.config.maxListItems)
+        .map(([seriesName, books]): BrowseItem => {
+          // Sort books by sequence within series
+          const sortedBooks = books.sort((a, b) => a.sequence - b.sequence);
+
+          return {
+            id: `series:${seriesName}`,
+            title: seriesName,
+            subtitle: `${books.length} book${books.length !== 1 ? 's' : ''}`,
+            isPlayable: false,
+            isBrowsable: true,
+            itemCount: books.length,
+            children: sortedBooks.map(({ item, sequence }) => {
+              const browseItem = this.createBrowseItem(item, apiClient, { sequence });
+              // Override subtitle to show sequence
+              const metadata = getBookMetadata(item);
+              browseItem.subtitle = `Book ${sequence}${metadata?.authorName ? ` • ${metadata.authorName}` : ''}`;
+              return browseItem;
+            }),
+          };
+        });
+
+      if (seriesFolders.length > 0) {
+        sections.push({
+          id: 'series',
+          title: 'Series',
+          items: seriesFolders,
+          isBrowsableSection: true,
+        });
+      }
+
+      // =================================================================
+      // 7. GENRES - Hierarchical: Genres → Books
+      // =================================================================
+      const genreMap = new Map<string, LibraryItem[]>();
+      for (const item of libraryItems) {
+        const metadata = getBookMetadata(item);
+        const genres = metadata?.genres || [];
+        for (const genre of genres) {
+          const existing = genreMap.get(genre) || [];
+          existing.push(item);
+          genreMap.set(genre, existing);
+        }
+      }
+
+      // Sort genres by popularity (most books first), then name
+      const genreFolders = Array.from(genreMap.entries())
+        .sort(([a, aBooks], [b, bBooks]) => {
+          // Sort by count descending, then name ascending
+          if (bBooks.length !== aBooks.length) return bBooks.length - aBooks.length;
+          return a.localeCompare(b);
+        })
+        .slice(0, this.config.maxListItems)
+        .map(([genreName, books]): BrowseItem => {
+          // Sort books by title within genre
+          const sortedBooks = [...books].sort((a, b) => {
+            const aTitle = getBookMetadata(a)?.title || '';
+            const bTitle = getBookMetadata(b)?.title || '';
+            return aTitle.localeCompare(bTitle);
+          });
+
+          return {
+            id: `genre:${genreName}`,
+            title: genreName,
+            subtitle: `${books.length} book${books.length !== 1 ? 's' : ''}`,
+            isPlayable: false,
+            isBrowsable: true,
+            itemCount: books.length,
+            children: sortedBooks.slice(0, this.config.maxListItems).map(item =>
+              this.createBrowseItem(item, apiClient)
+            ),
+          };
+        });
+
+      if (genreFolders.length > 0) {
+        sections.push({
+          id: 'genres',
+          title: 'Genres',
+          items: genreFolders,
+          isBrowsableSection: true,
+        });
+      }
+
+      // =================================================================
+      // 8. NARRATORS - Hierarchical: Narrators → Books
+      // =================================================================
+      const narratorMap = new Map<string, LibraryItem[]>();
+      for (const item of libraryItems) {
+        const metadata = getBookMetadata(item);
+        const narratorName = metadata?.narratorName || (metadata as any)?.narrators?.[0]?.name;
+        if (narratorName) {
+          const existing = narratorMap.get(narratorName) || [];
+          existing.push(item);
+          narratorMap.set(narratorName, existing);
+        }
+      }
+
+      // Sort narrators by name
+      const narratorFolders = Array.from(narratorMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(0, this.config.maxListItems)
+        .map(([narratorName, books]): BrowseItem => {
+          const sortedBooks = [...books].sort((a, b) => {
+            const aTitle = getBookMetadata(a)?.title || '';
+            const bTitle = getBookMetadata(b)?.title || '';
+            return aTitle.localeCompare(bTitle);
+          });
+
+          return {
+            id: `narrator:${narratorName}`,
+            title: narratorName,
+            subtitle: `${books.length} book${books.length !== 1 ? 's' : ''}`,
+            isPlayable: false,
+            isBrowsable: true,
+            itemCount: books.length,
+            children: sortedBooks.slice(0, this.config.maxListItems).map(item =>
+              this.createBrowseItem(item, apiClient)
+            ),
+          };
+        });
+
+      if (narratorFolders.length > 0) {
+        sections.push({
+          id: 'narrators',
+          title: 'Narrators',
+          items: narratorFolders,
+          isBrowsableSection: true,
+        });
+      }
+
+      // =================================================================
+      // 9. LIBRARY A-Z - All books alphabetically
+      // =================================================================
       const libraryBookItems = [...libraryItems]
         .sort((a, b) => {
           const aTitle = getBookMetadata(a)?.title || '';
@@ -773,22 +1173,12 @@ class AutomotiveService {
           return aTitle.localeCompare(bTitle);
         })
         .slice(0, this.config.maxListItems)
-        .map((item): BrowseItem => {
-          const metadata = getBookMetadata(item);
-          return {
-            id: item.id,
-            title: metadata?.title || 'Unknown Title',
-            subtitle: metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author',
-            imageUrl: apiClient.getItemCoverUrl(item.id),
-            isPlayable: true,
-            isBrowsable: false,
-          };
-        });
+        .map(item => this.createBrowseItem(item, apiClient));
 
       if (libraryBookItems.length > 0) {
         sections.push({
           id: 'library',
-          title: 'Library',
+          title: 'Library A-Z',
           items: libraryBookItems,
         });
       }

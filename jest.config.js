@@ -15,6 +15,8 @@ module.exports = {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@modules/(.*)$': '<rootDir>/modules/$1',
+    '^@assets/(.*)$': '<rootDir>/assets/$1',
     // Mock image imports
     '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/__mocks__/fileMock.js',
   },
@@ -38,10 +40,12 @@ module.exports = {
   ],
   coverageThreshold: {
     global: {
-      branches: 0,
-      functions: 0,
-      lines: 0,
-      statements: 0,
+      // Set minimum thresholds to prevent coverage regression
+      // Start conservative and increase as more tests are added
+      branches: 20,
+      functions: 25,
+      lines: 30,
+      statements: 30,
     },
   },
   // Increase timeout for component tests

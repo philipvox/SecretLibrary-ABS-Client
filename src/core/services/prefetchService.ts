@@ -63,8 +63,8 @@ class PrefetchService {
         const elapsed = Date.now() - startTime;
         logger.debug(`[Prefetch] Hydrated ${cachedItems.length} items from SQLite in ${elapsed}ms`);
 
-        // Prefetch covers for cached items
-        this.prefetchCovers(cachedItems.slice(0, 50));
+        // Prefetch covers for most recently added items
+        this.prefetchCovers(cachedItems, 50);
       }
 
       return cachedItems;
@@ -145,8 +145,8 @@ class PrefetchService {
       const elapsed = Date.now() - startTime;
       logger.debug(`[Prefetch] Loaded ${allItems.length} items in ${elapsed}ms (saved to SQLite)`);
 
-      // Prefetch cover images (first 100) - expo-image handles this efficiently
-      this.prefetchCovers(allItems.slice(0, 100));
+      // Prefetch cover images for 100 most recently added - expo-image handles this efficiently
+      this.prefetchCovers(allItems, 100);
 
       return allItems;
 
@@ -167,10 +167,54 @@ class PrefetchService {
     }
   }
 
-  private async prefetchCovers(items: LibraryItem[]) {
+  /**
+   * Get items sorted by most recently added to ABS
+   */
+  private getRecentlyAdded(items: LibraryItem[], count: number): LibraryItem[] {
+    return [...items]
+      .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+      .slice(0, count);
+  }
+
+  /**
+   * Get items sorted by most recently listened (has progress, sorted by lastUpdate)
+   */
+  private getRecentlyListened(items: LibraryItem[], count: number): LibraryItem[] {
+    return [...items]
+      .filter(item => item.userMediaProgress?.lastUpdate)
+      .sort((a, b) => (b.userMediaProgress?.lastUpdate || 0) - (a.userMediaProgress?.lastUpdate || 0))
+      .slice(0, count);
+  }
+
+  /**
+   * Get priority items for prefetching: recently listened + recently added (deduplicated)
+   */
+  private getPriorityItems(items: LibraryItem[], recentlyListenedCount: number, recentlyAddedCount: number): LibraryItem[] {
+    const recentlyListened = this.getRecentlyListened(items, recentlyListenedCount);
+    const recentlyAdded = this.getRecentlyAdded(items, recentlyAddedCount);
+
+    // Combine and deduplicate (recently listened takes priority)
+    const seenIds = new Set(recentlyListened.map(i => i.id));
+    const combined = [...recentlyListened];
+
+    for (const item of recentlyAdded) {
+      if (!seenIds.has(item.id)) {
+        combined.push(item);
+        seenIds.add(item.id);
+      }
+    }
+
+    return combined;
+  }
+
+  private async prefetchCovers(items: LibraryItem[], recentlyAddedCount: number = 100) {
+    // Get priority items: 50 recently listened + N recently added (deduplicated)
+    const priorityItems = this.getPriorityItems(items, 50, recentlyAddedCount);
+
     // Prefetch cover images using expo-image's native caching
-    const coverUrls = items
-      .map(item => apiClient.getItemCoverUrl(item.id))
+    // Use 400x400 for optimized file size while maintaining quality
+    const coverUrls = priorityItems
+      .map(item => apiClient.getItemCoverUrl(item.id, { width: 400, height: 400 }))
       .filter((url): url is string => !!url);
 
     if (coverUrls.length === 0) return;
@@ -178,7 +222,7 @@ class PrefetchService {
     try {
       // expo-image prefetch uses native caching (disk + memory LRU)
       await Image.prefetch(coverUrls);
-      logger.debug(`[Prefetch] Cached ${coverUrls.length} cover images`);
+      logger.debug(`[Prefetch] Cached ${coverUrls.length} covers (recently listened + recently added)`);
     } catch (err) {
       logger.warn('[Prefetch] Cover prefetch error:', err);
     }
@@ -190,10 +234,11 @@ class PrefetchService {
    * Priority: current book, recently listened, first visible items.
    */
   async prefetchCriticalCovers(items: LibraryItem[]): Promise<void> {
-    // Only prefetch first 20 covers - these are immediately visible
-    const criticalUrls = items
-      .slice(0, 20)
-      .map(item => apiClient.getItemCoverUrl(item.id))
+    // Prefetch 20 most recently added covers - these are most likely to be viewed
+    // Use 400x400 for optimized file size while maintaining quality
+    const recentItems = this.getRecentlyAdded(items, 20);
+    const criticalUrls = recentItems
+      .map(item => apiClient.getItemCoverUrl(item.id, { width: 400, height: 400 }))
       .filter((url): url is string => !!url);
 
     if (criticalUrls.length === 0) return;

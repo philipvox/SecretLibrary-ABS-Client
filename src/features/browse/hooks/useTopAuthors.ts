@@ -14,41 +14,27 @@ export interface TopAuthor {
 
 /**
  * Get top authors sorted by book count
+ * Uses pre-built authors map from library cache (no iteration needed)
  */
 export function useTopAuthors(limit: number = 10): TopAuthor[] {
-  const { items, isLoaded } = useLibraryCache();
+  const authors = useLibraryCache((s) => s.authors);
+  const isLoaded = useLibraryCache((s) => s.isLoaded);
 
   return useMemo(() => {
-    if (!isLoaded || !items.length) {
+    if (!isLoaded || authors.size === 0) {
       return [];
     }
 
-    const authorCounts = new Map<string, number>();
-
-    items.forEach((item) => {
-      const metadata = item.media?.metadata as any;
-      const authorName = metadata?.authorName;
-
-      if (authorName && typeof authorName === 'string') {
-        const normalizedName = authorName.trim();
-        if (normalizedName) {
-          authorCounts.set(normalizedName, (authorCounts.get(normalizedName) || 0) + 1);
-        }
-      }
-    });
-
-    // Sort by count descending, then by name ascending
-    const sorted = [...authorCounts.entries()]
+    // Use pre-built authors map from cache (already indexed with book counts)
+    return Array.from(authors.values())
       .sort((a, b) => {
-        const countDiff = b[1] - a[1];
+        const countDiff = b.bookCount - a.bookCount;
         if (countDiff !== 0) return countDiff;
-        return a[0].localeCompare(b[0]);
+        return a.name.localeCompare(b.name);
       })
       .slice(0, limit)
-      .map(([name, count]) => ({ name, count }));
-
-    return sorted;
-  }, [items, isLoaded, limit]);
+      .map(author => ({ name: author.name, count: author.bookCount }));
+  }, [authors, isLoaded, limit]);
 }
 
 /**

@@ -88,6 +88,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     paddingVertical: 4,
+    textAlignVertical: 'center', // Fix Android placeholder alignment
   },
   clearButton: {
     padding: 4,

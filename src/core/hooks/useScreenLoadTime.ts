@@ -45,8 +45,11 @@ export function useScreenLoadTime(
     hasLogged.current = true;
 
     const duration = performance.now() - startTime.current;
-    const warnThreshold = options?.warnThreshold ?? PERFORMANCE_BUDGETS.screenLoad.warn;
-    const errorThreshold = options?.errorThreshold ?? PERFORMANCE_BUDGETS.screenLoad.error;
+
+    // Use per-screen budget if available, otherwise fall back to defaults
+    const screenBudget = PERFORMANCE_BUDGETS.screens[screenName];
+    const warnThreshold = options?.warnThreshold ?? screenBudget?.warn ?? PERFORMANCE_BUDGETS.screenLoad.warn;
+    const errorThreshold = options?.errorThreshold ?? screenBudget?.error ?? PERFORMANCE_BUDGETS.screenLoad.error;
 
     if (duration >= errorThreshold) {
       logger.warn(

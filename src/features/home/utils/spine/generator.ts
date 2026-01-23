@@ -8,7 +8,7 @@
 import { SpineConfig } from './config';
 import { CompleteDimensions, calculateCompleteDimensions } from './core/dimensions';
 import { matchBestGenre, matchComboGenres } from './genre/matcher';
-import { getGenreProfile } from './genre/profiles';
+import { getGenreProfile } from './profiles';
 import { SpineTypography } from './typography/types';
 import { hashToBool } from './core/hashing';
 

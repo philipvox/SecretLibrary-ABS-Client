@@ -4,12 +4,22 @@
  * Central initialization orchestrator for app startup.
  * Runs all critical initialization tasks in parallel to minimize launch time.
  * Controls native splash screen visibility.
+ *
+ * Safety features:
+ * - Global timeout prevents infinite splash screen
+ * - Individual step timeouts for non-critical operations
+ * - Error logging and fallback behavior
  */
 
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { User } from '@/core/types';
 import { createLogger } from '@/shared/utils/logger';
+import { logInitTimings } from '@/shared/utils/loadingDebug';
+import {
+  INIT_GLOBAL_TIMEOUT_MS,
+  INIT_STEP_TIMEOUT_MS,
+} from '@/constants/loading';
 
 const log = createLogger('AppInit');
 
@@ -20,65 +30,199 @@ export interface InitResult {
   user: User | null;
   serverUrl: string | null;
   fontsLoaded: boolean;
+  /** Set to true if init completed with errors/timeouts */
+  hadErrors?: boolean;
+  /** List of steps that failed during initialization */
+  failedSteps?: string[];
+  /** Per-step timing data for profiling */
+  stepTimings?: StepTiming[];
+  /** Total initialization time in ms */
+  totalTime?: number;
+}
+
+/**
+ * Timing data for a single initialization step.
+ */
+export interface StepTiming {
+  step: string;
+  duration: number;
+  status: 'success' | 'timeout' | 'error';
+}
+
+/**
+ * Wraps a promise with a timeout.
+ * Returns the result or undefined if timeout exceeded.
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  stepName: string
+): Promise<T | undefined> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const timeoutPromise = new Promise<undefined>((resolve) => {
+    timeoutId = setTimeout(() => {
+      log.warn(`${stepName} timed out after ${timeoutMs}ms`);
+      resolve(undefined);
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutId!);
+    return result;
+  } catch (err) {
+    clearTimeout(timeoutId!);
+    throw err;
+  }
 }
 
 class AppInitializer {
   private initPromise: Promise<InitResult> | null = null;
   private isReady = false;
+  private failedSteps: string[] = [];
+  private stepTimings: Map<string, StepTiming> = new Map();
 
   /**
    * Initialize all critical resources in parallel.
    * Returns when app is ready to render content.
+   *
+   * Safety: Has global timeout to prevent infinite splash screen.
    */
   async initialize(): Promise<InitResult> {
     if (this.initPromise) return this.initPromise;
 
-    this.initPromise = this._initialize();
+    // Wrap initialization with global timeout
+    const initWithTimeout = Promise.race([
+      this._initialize(),
+      new Promise<InitResult>((resolve) => {
+        setTimeout(() => {
+          log.error(`CRITICAL: Init timed out after ${INIT_GLOBAL_TIMEOUT_MS}ms`);
+          log.error('Failed steps:', this.failedSteps);
+          resolve({
+            user: null,
+            serverUrl: null,
+            fontsLoaded: false,
+            hadErrors: true,
+            failedSteps: [...this.failedSteps, 'global_timeout'],
+          });
+        }, INIT_GLOBAL_TIMEOUT_MS);
+      }),
+    ]);
+
+    this.initPromise = initWithTimeout;
     return this.initPromise;
+  }
+
+  /**
+   * Track a failed initialization step.
+   */
+  private trackFailure(stepName: string, error?: unknown): void {
+    this.failedSteps.push(stepName);
+    log.error(`Init step failed: ${stepName}`, error instanceof Error ? error.message : error);
+  }
+
+  /**
+   * Execute an initialization step with timing measurement.
+   * Wraps with timeout and records duration regardless of outcome.
+   */
+  private async timedStep<T>(
+    stepName: string,
+    task: () => Promise<T>,
+    timeoutMs: number
+  ): Promise<T | undefined> {
+    const startTime = Date.now();
+
+    try {
+      const result = await withTimeout(task(), timeoutMs, stepName);
+      const duration = Date.now() - startTime;
+
+      // Determine status: undefined result means timeout
+      const status = result !== undefined ? 'success' : 'timeout';
+      this.stepTimings.set(stepName, { step: stepName, duration, status });
+
+      if (status === 'timeout') {
+        this.failedSteps.push(stepName);
+      }
+
+      return result;
+    } catch (err) {
+      const duration = Date.now() - startTime;
+      this.stepTimings.set(stepName, { step: stepName, duration, status: 'error' });
+      this.trackFailure(stepName, err);
+      return undefined;
+    }
+  }
+
+  /**
+   * Get formatted timing log for all steps.
+   */
+  private getTimingLog(): string {
+    const lines: string[] = [];
+    for (const [, timing] of this.stepTimings) {
+      const icon = timing.status === 'success' ? '✓' : timing.status === 'timeout' ? '⏱' : '✗';
+      lines.push(`  ${timing.step}: ${timing.duration}ms ${icon}`);
+    }
+    return lines.join('\n');
   }
 
   private async _initialize(): Promise<InitResult> {
     const startTime = Date.now();
     log.info('Starting parallel initialization...');
+    this.failedSteps = []; // Reset for fresh init
+    this.stepTimings.clear(); // Reset timings
 
     // Import auth service lazily to avoid circular dependencies
     const { authService } = await import('@/core/auth/authService');
 
-    // PARALLEL: Run all initialization tasks concurrently
+    // PARALLEL: Run all initialization tasks concurrently with timing
+    // Critical tasks (fonts, auth) use longer timeout
+    // Non-critical tasks use shorter timeout and can fail gracefully
     const [fontResult, authResult] = await Promise.all([
-      // Font loading
-      this.loadFonts(),
+      // Font loading (critical)
+      this.timedStep('fonts', () => this.loadFonts(), INIT_STEP_TIMEOUT_MS),
 
-      // Session restoration (optimized parallel reads)
-      this.restoreSession(authService),
+      // Session restoration (critical)
+      this.timedStep('auth', () => this.restoreSession(authService), INIT_STEP_TIMEOUT_MS),
 
-      // Hydrate completion store from SQLite
-      this.hydrateCompletionStore(),
+      // Hydrate completion store from SQLite (non-critical)
+      this.timedStep('completion', () => this.hydrateCompletionStore(), INIT_STEP_TIMEOUT_MS),
 
-      // Run user_books migration (merges legacy tables, runs once)
-      this.migrateUserBooks(),
+      // Run user_books migration (non-critical - only runs once)
+      this.timedStep('migration', () => this.migrateUserBooks(), INIT_STEP_TIMEOUT_MS),
 
-      // Load progress store (unified progress source of truth)
-      this.loadProgressStore(),
+      // Load progress store (non-critical)
+      this.timedStep('progress', () => this.loadProgressStore(), INIT_STEP_TIMEOUT_MS),
 
-      // FAST: Sync recent progress (just top 5 recently played books)
-      // This ensures player can resume immediately without loading delay
-      this.syncRecentProgress(),
+      // FAST: Sync recent progress (non-critical)
+      this.timedStep('recentSync', () => this.syncRecentProgress(), INIT_STEP_TIMEOUT_MS),
 
-      // Pre-initialize audio system so playback starts instantly
-      this.preInitAudio(),
+      // Pre-initialize audio system (non-critical)
+      this.timedStep('audio', () => this.preInitAudio(), INIT_STEP_TIMEOUT_MS),
     ]);
+
+    const elapsed = Date.now() - startTime;
+
+    // Collect step timings for result
+    const stepTimingsArray = Array.from(this.stepTimings.values());
 
     const result: InitResult = {
       user: authResult?.user || null,
       serverUrl: authResult?.serverUrl || null,
-      fontsLoaded: fontResult,
+      fontsLoaded: fontResult ?? false,
+      hadErrors: this.failedSteps.length > 0,
+      failedSteps: this.failedSteps.length > 0 ? [...this.failedSteps] : undefined,
+      stepTimings: stepTimingsArray,
+      totalTime: elapsed,
     };
 
-    const elapsed = Date.now() - startTime;
-    log.info(`Ready in ${elapsed}ms`, {
+    // Log detailed timing breakdown
+    log.info(`Init complete: ${elapsed}ms total`);
+    logInitTimings(stepTimingsArray, elapsed);
+    log.info('Init result', {
       fontsLoaded: result.fontsLoaded,
       hasUser: !!result.user,
+      failedSteps: result.failedSteps,
     });
 
     this.isReady = true;
@@ -97,6 +241,8 @@ class AppInitializer {
       this.connectWebSocket();
       // Sync finished books with server
       this.syncFinishedBooks();
+      // Preload recommendations cache (speeds up Browse screen)
+      this.preloadRecommendationsCache();
     }
 
     return result;
@@ -328,9 +474,84 @@ class AppInitializer {
       const { initializeAppStateListener } = await import('@/core/lifecycle');
       initializeAppStateListener();
 
+      // Initialize memory pressure monitoring
+      await this.initMemoryPressureMonitoring();
+
+      // Initialize background task completion service
+      await this.initBackgroundTaskService();
+
       log.debug('Event system initialized');
     } catch (err) {
       log.warn('Event system initialization failed:', err);
+    }
+  }
+
+  /**
+   * Initialize background task completion service.
+   * Ensures critical tasks complete when app goes to background.
+   */
+  private async initBackgroundTaskService(): Promise<void> {
+    try {
+      const { backgroundTaskService, TaskPriority } = await import('@/core/services/backgroundTaskService');
+      const { useProgressStore } = await import('@/core/stores/progressStore');
+
+      // Start the background task service
+      backgroundTaskService.start();
+
+      // Register critical task: sync unsynced progress to server
+      backgroundTaskService.registerTask({
+        id: 'sync-progress',
+        name: 'Sync Progress',
+        priority: TaskPriority.CRITICAL,
+        timeoutMs: 3000,
+        execute: async () => {
+          const progressStore = useProgressStore.getState();
+          const unsyncedBooks = progressStore.getUnsyncedBooks();
+
+          if (unsyncedBooks.length === 0) return;
+
+          // Import sync service and sync unsynced progress
+          const { finishedBooksSync } = await import('@/core/services/finishedBooksSync');
+          await finishedBooksSync.syncUnsyncedProgress();
+        },
+      });
+
+      // Note: Download state is already persisted in SQLite via downloadManager
+      // No additional background task needed for downloads
+
+      log.debug('Background task service initialized');
+    } catch (err) {
+      log.warn('Background task service initialization failed:', err);
+    }
+  }
+
+  /**
+   * Initialize memory pressure monitoring service.
+   * Registers cleanup callbacks to free memory when system is under pressure.
+   *
+   * NOTE: We do NOT clear the library cache on memory pressure because:
+   * 1. Library item data (titles, metadata) is essential for the app to function
+   * 2. The data is relatively small compared to images
+   * 3. Clearing it causes the Browse screen to show 0 books
+   */
+  private async initMemoryPressureMonitoring(): Promise<void> {
+    try {
+      const { memoryPressureService } = await import('@/core/services/memoryPressureService');
+      const { networkOptimizer } = await import('@/core/api/networkOptimizer');
+
+      // Register cleanup callback for network cache only
+      // Library cache is NOT cleared - it's essential for app functionality
+      memoryPressureService.registerCleanupCallback(async () => {
+        log.debug('Memory pressure: clearing network cache');
+        networkOptimizer.cache.clear();
+      });
+
+      // Start memory monitoring
+      memoryPressureService.start();
+
+      log.debug('Memory pressure monitoring initialized');
+    } catch (err) {
+      log.warn('Memory pressure monitoring failed to initialize:', err);
     }
   }
 
@@ -349,9 +570,11 @@ class AppInitializer {
   }
 
   /**
-   * Sync finished books with server and pre-fetch sessions.
+   * Sync finished books with server.
    * Note: Recent progress sync happens during initialization (syncRecentProgress).
-   * This runs full sync in background after app is ready.
+   *
+   * OPTIMIZED: Only syncs recent books (items in progress) instead of full library.
+   * Full sync was causing slowness by fetching and processing all 200+ items.
    */
   async syncFinishedBooks(): Promise<void> {
     try {
@@ -360,19 +583,44 @@ class AppInitializer {
       // Preload most recent book into player store (shows correct progress on UI)
       await finishedBooksSync.preloadMostRecentBook();
 
-      // Pre-fetch sessions for top 5 recently played books (instant playback)
-      const prefetched = await finishedBooksSync.prefetchSessions();
-      if (prefetched > 0) {
-        log.info(`Pre-fetched ${prefetched} sessions for instant playback`);
+      // Quick sync: only import progress for recently played books
+      // This is much faster than fullSync which processes all library items
+      const imported = await finishedBooksSync.importRecentProgress();
+      if (imported > 0) {
+        log.info(`Quick sync: ${imported} recent books synced`);
       }
 
-      // Full sync in background (all library items - slower)
-      const result = await finishedBooksSync.fullSync();
-      if (result.imported > 0 || result.synced > 0) {
-        log.info(`Finished books sync: ${result.imported} imported, ${result.synced} synced`);
+      // Sync any unsynced local changes to server (also fast - only unsynced items)
+      const { synced, failed } = await finishedBooksSync.syncToServer();
+      if (synced > 0 || failed > 0) {
+        log.info(`Synced ${synced} local changes to server (${failed} failed)`);
       }
+
+      // BACKGROUND: Full import from server (includes finished books)
+      // This runs after quick sync so UI is responsive, but finished books show up soon
+      finishedBooksSync.importFromServer().then((finishedImported) => {
+        if (finishedImported > 0) {
+          log.info(`Background sync: ${finishedImported} finished books imported from server`);
+        }
+      }).catch((err) => {
+        log.warn('Background finished books sync failed:', err);
+      });
     } catch (err) {
       log.warn('Finished books sync failed:', err);
+    }
+  }
+
+  /**
+   * Preload recommendations cache in background.
+   * This speeds up the Browse screen by loading SQLite data early.
+   */
+  async preloadRecommendationsCache(): Promise<void> {
+    try {
+      const { useRecommendationsCacheStore } = await import('@/features/recommendations');
+      await useRecommendationsCacheStore.getState().loadCache();
+      log.debug('Recommendations cache preloaded');
+    } catch (err) {
+      log.warn('Recommendations cache preload failed:', err);
     }
   }
 

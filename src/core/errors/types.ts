@@ -67,8 +67,8 @@ export interface AppError extends Error {
   /** Number of retry attempts made */
   retryCount?: number;
 
-  /** Context where error occurred */
-  context?: string;
+  /** Context where error occurred (supports both string and structured) */
+  context?: string | ErrorContext;
 }
 
 /**
@@ -163,6 +163,31 @@ export interface ErrorFilter {
 }
 
 /**
+ * Standardized error context structure
+ * Ensures consistent context across all error handling
+ */
+export interface ErrorContext {
+  /** Required: component/service/store name where error originated */
+  source: string;
+  /** Optional: current screen name for UI errors */
+  screen?: string;
+  /** Optional: what action was being attempted */
+  action?: string;
+  /** Optional: additional context-specific data */
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Helper to create error context consistently
+ */
+export function createErrorContext(
+  source: string,
+  options?: Omit<ErrorContext, 'source'>
+): ErrorContext {
+  return { source, ...options };
+}
+
+/**
  * Options for creating an AppError
  */
 export interface CreateErrorOptions {
@@ -174,7 +199,8 @@ export interface CreateErrorOptions {
   userMessage?: string;
   details?: Record<string, unknown>;
   cause?: Error;
-  context?: string;
+  /** @deprecated Use ErrorContext object instead of string */
+  context?: string | ErrorContext;
 }
 
 /**

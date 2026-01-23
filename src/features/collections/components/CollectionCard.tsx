@@ -31,7 +31,7 @@ export const CollectionCard = memo(function CollectionCard({ collection }: Colle
 
   // Get first book cover
   const coverUrl = useMemo(() => {
-    return books[0] ? apiClient.getItemCoverUrl(books[0].id) : undefined;
+    return books[0] ? apiClient.getItemCoverUrl(books[0].id, { width: 400, height: 400 }) : undefined;
   }, [books]);
 
   return (

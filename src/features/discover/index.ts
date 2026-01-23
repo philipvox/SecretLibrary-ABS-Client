@@ -2,21 +2,11 @@
  * src/features/discover/index.ts
  *
  * Discover feature exports
+ * Note: Many components removed in orphan cleanup (2026-01-21)
  */
 
 // Types
 export * from './types';
 
-// Components
-export { ContentRowCarousel } from './components/ContentRowCarousel';
-export { HeroSection } from './components/HeroSection';
-export { QuickFilterChips } from './components/QuickFilterChips';
-export { BrowsePills } from './components/BrowsePills';
-export { MoodFilterPills } from './components/MoodFilterPills';
-export { CategoryGrid } from './components/CategoryGrid';
-export { PopularSeriesSection } from './components/PopularSeriesSection';
-export { TopAuthorsSection } from './components/TopAuthorsSection';
-export { PreferencesPromoCard } from './components/PreferencesPromoCard';
-
-// Hooks
-export { useDiscoverData } from './hooks/useDiscoverData';
+// Remaining hooks (usePersonalizedContent is still used by TasteTextList)
+// export { useDiscoverData } from './hooks/useDiscoverData';  // REMOVED

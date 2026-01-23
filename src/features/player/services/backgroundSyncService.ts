@@ -17,9 +17,10 @@ import { audioLog, formatDuration, logSection } from '@/shared/utils/audioDebug'
 import { trackEvent } from '@/core/monitoring';
 import { eventBus } from '@/core/events';
 import { networkMonitor } from '@/core/services/networkMonitor';
-import { usePlayerStore } from '../stores/playerStore';
+// NOTE: usePlayerStore is imported lazily in syncToServer() to break circular dependency
 import { getErrorMessage } from '@/shared/utils/errorUtils';
 import { useToastStore } from '@/shared/hooks/useToast';
+import { validatePositionForSync } from '../utils/progressCalculator';
 
 const DEBUG = __DEV__;
 const log = (...args: any[]) => audioLog.sync(args.join(' '));
@@ -42,6 +43,7 @@ class BackgroundSyncService {
   private lastSyncTime = 0;
   private processScheduleTimeout: NodeJS.Timeout | null = null;
   private firstUnprocessedTime: number = 0; // Track when first unsynced item was added
+  private backgroundSyncInProgress = false; // FIX: Prevent concurrent background sync operations
 
   // Sync configuration
   private readonly SYNC_INTERVAL = 10000; // Check every 10 seconds
@@ -100,12 +102,20 @@ class BackgroundSyncService {
    * Progress will be synced to server at key moments (pause, background, finish).
    *
    * UNIFIED PROGRESS: Also updates progressStore for instant UI reactivity.
+   * FIX: Added position validation to prevent corrupted data from being saved.
    */
   async saveProgressLocal(
     itemId: string,
     position: number,
     duration: number
   ): Promise<void> {
+    // VALIDATION: Reject clearly corrupted position data
+    const validationError = validatePositionForSync(position, duration);
+    if (validationError) {
+      audioLog.warn(`saveProgressLocal: Rejecting ${itemId} - ${validationError}`);
+      return;
+    }
+
     // SQLite write only - no network, no queue processing
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
 
@@ -126,6 +136,7 @@ class BackgroundSyncService {
    * This triggers server sync to ensure data durability.
    *
    * UNIFIED PROGRESS: Also updates progressStore for instant UI reactivity.
+   * FIX: Added position validation to prevent corrupted data from being saved/synced.
    */
   async saveProgress(
     itemId: string,
@@ -133,6 +144,14 @@ class BackgroundSyncService {
     duration: number,
     sessionId?: string
   ): Promise<void> {
+    // VALIDATION: Reject clearly corrupted position data
+    // This prevents cross-book position contamination
+    const validationError = validatePositionForSync(position, duration);
+    if (validationError) {
+      audioLog.warn(`saveProgress: Rejecting ${itemId} - ${validationError}`);
+      return;
+    }
+
     log(`saveProgress: ${itemId} @ ${formatDuration(position)}`);
 
     // STEP 1: Write to SQLite immediately (fast, offline-capable)
@@ -312,8 +331,18 @@ class BackgroundSyncService {
    * - Conflict detection requires an extra network round-trip
    * - Server uses timestamps for conflict resolution
    * - Sync only happens at key moments when user isn't actively interacting
+   *
+   * FIX: Added position validation to prevent corrupted data from being synced.
    */
   private async syncToServer(item: SyncQueueItem): Promise<boolean> {
+    // VALIDATION: Reject clearly corrupted position data before syncing
+    const validationError = validatePositionForSync(item.position, item.duration);
+    if (validationError) {
+      audioLog.warn(`syncToServer: Rejecting ${item.itemId} - ${validationError}`);
+      this.syncQueue.delete(item.itemId);
+      return false;
+    }
+
     log(`syncToServer: ${item.itemId} @ ${formatDuration(item.position)}`);
 
     // Skip if offline - don't increment retry count
@@ -323,6 +352,8 @@ class BackgroundSyncService {
     }
 
     // Skip sync if user is actively playing this book (they'll sync on pause)
+    // Lazy import to break circular dependency with playerStore
+    const { usePlayerStore } = require('../stores/playerStore');
     const playerState = usePlayerStore.getState();
     const isActivelyPlaying = playerState.isPlaying && playerState.currentBook?.id === item.itemId;
     const isInTransition = audioService.isInTransition();
@@ -477,13 +508,27 @@ class BackgroundSyncService {
    * FIX 1: Await forceSyncAll with timeout before app suspension
    * iOS gives ~5 seconds before suspension, so we use 4s timeout
    */
+  /**
+   * Handle app state changes for background/foreground sync
+   *
+   * FIX: Added flag to prevent concurrent background sync operations,
+   * preventing race conditions when app state changes rapidly.
+   */
   private handleAppStateChange(nextState: AppStateStatus): void {
     log(`App state change: ${nextState}`);
 
     if (nextState === 'background' || nextState === 'inactive') {
       // App going to background - force sync with timeout
       logSection('APP BACKGROUNDING');
+
+      // Prevent concurrent background sync operations
+      if (this.backgroundSyncInProgress) {
+        log('Background sync already in progress, skipping');
+        return;
+      }
+
       log('Forcing sync before background...');
+      this.backgroundSyncInProgress = true;
 
       // Use IIFE to handle async in callback
       (async () => {
@@ -509,13 +554,19 @@ class BackgroundSyncService {
           }
         } catch (error) {
           audioLog.error('Background sync failed:', getErrorMessage(error));
+        } finally {
+          this.backgroundSyncInProgress = false;
         }
       })();
     } else if (nextState === 'active') {
       // App coming to foreground - check for unsynced
       logSection('APP FOREGROUNDING');
       log('Checking for unsynced progress...');
-      this.syncUnsyncedFromStorage();
+
+      // FIX: Handle async properly with error logging
+      this.syncUnsyncedFromStorage().catch((error) => {
+        audioLog.error('Foreground sync failed:', getErrorMessage(error));
+      });
     }
   }
 

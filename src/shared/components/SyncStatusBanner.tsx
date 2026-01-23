@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Cloud, CloudOff, RefreshCw, AlertCircle } from 'lucide-react-native';
 import { useSyncStatus, useSyncStatusStore } from '@/core/stores/syncStatusStore';
@@ -40,8 +41,9 @@ export function SyncStatusBanner({ alwaysShow = false }: SyncStatusBannerProps) 
   // Determine if we should show the banner
   const hasIssues = !isOnline || lastError || pendingCount > 0;
 
+  // Return empty View on Android to prevent SafeAreaProvider crash
   if (!hasIssues && !alwaysShow) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   // Determine banner content based on state

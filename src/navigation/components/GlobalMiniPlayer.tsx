@@ -6,7 +6,7 @@
  * Positioned at the bottom of the screen above the tab bar.
  */
 
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,30 +15,33 @@ import {
   Pressable,
   Dimensions,
   Platform,
-  DimensionValue,
+  ActivityIndicator,
 } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   runOnJS,
-  SlideInDown,
-  SlideOutDown,
-  interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { scale, hp, useSecretLibraryColors } from '@/shared/theme';
+import { useShallow } from 'zustand/react/shallow';
 import { usePlayerStore, useCurrentChapterIndex } from '@/features/player/stores/playerStore';
+import { useSeekingStore } from '@/features/player/stores/seekingStore';
 import { useNormalizedChapters } from '@/shared/hooks';
 import { getTitle } from '@/shared/utils/metadata';
 import { haptics } from '@/core/native/haptics';
 import {
   secretLibraryColors as staticColors,
 } from '@/shared/theme/secretLibrary';
+import {
+  RewindIcon,
+  FastForwardIcon,
+  PlayIcon,
+  PauseIcon,
+} from '@/features/player/components/PlayerIcons';
 
 // =============================================================================
 // CONSTANTS
@@ -50,106 +53,6 @@ const SWIPE_THRESHOLD = -50;
 const SCRUBBER_HEIGHT = 20;
 const HANDLE_SIZE = 16;
 const TRACK_HEIGHT = 3;
-
-// =============================================================================
-// ICONS
-// =============================================================================
-
-interface IconProps {
-  color?: string;
-  size?: number;
-}
-
-// Rewind icon (<<)
-const RewindIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M12.5 8L7 12l5.5 4V8z" />
-    <Path d="M18 8l-5.5 4 5.5 4V8z" />
-  </Svg>
-);
-
-// Fast Forward icon (>>)
-const FastForwardIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M11.5 16l5.5-4-5.5-4v8z" />
-    <Path d="M6 16l5.5-4L6 8v8z" />
-  </Svg>
-);
-
-// Play icon
-const PlayIcon = ({ color = staticColors.white, size = 14 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M8 5v14l11-7z" />
-  </Svg>
-);
-
-// Pause icon
-const PauseIcon = ({ color = staticColors.white, size = 14 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Rect x={6} y={5} width={4} height={14} />
-    <Rect x={14} y={5} width={4} height={14} />
-  </Svg>
-);
-
-// =============================================================================
-// SCRUBBER COMPONENT
-// =============================================================================
-
-interface ScrubberProps {
-  position: number;
-  duration: number;
-  onSeek: (position: number) => void;
-}
-
-const Scrubber = React.memo(({ position, duration, onSeek }: ScrubberProps) => {
-  const progress = useMemo(() => {
-    if (duration <= 0) return 0;
-    return Math.min(1, Math.max(0, position / duration));
-  }, [position, duration]);
-
-  const handleSeek = useCallback((normalizedProgress: number) => {
-    const clampedProgress = Math.max(0, Math.min(1, normalizedProgress));
-    const newPosition = clampedProgress * duration;
-    onSeek(newPosition);
-  }, [duration, onSeek]);
-
-  // Tap gesture for seeking
-  const tapGesture = Gesture.Tap()
-    .onEnd((event) => {
-      'worklet';
-      const trackWidth = SCREEN_WIDTH - 32; // Account for padding
-      const newProgress = Math.max(0, Math.min(1, event.x / trackWidth));
-      runOnJS(handleSeek)(newProgress);
-    });
-
-  // Pan gesture for scrubbing
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      'worklet';
-      const trackWidth = SCREEN_WIDTH - 32;
-      const newProgress = Math.max(0, Math.min(1, event.x / trackWidth));
-      runOnJS(handleSeek)(newProgress);
-    });
-
-  const combinedGesture = Gesture.Race(panGesture, tapGesture);
-
-  const progressPercent: DimensionValue = `${progress * 100}%`;
-  const handleLeft: DimensionValue = `${progress * 100}%`;
-
-  return (
-    <GestureDetector gesture={combinedGesture}>
-      <View style={styles.scrubberContainer}>
-        {/* Track */}
-        <View style={styles.scrubberTrack}>
-          {/* Fill */}
-          <Animated.View style={[styles.scrubberFill, { width: progressPercent }]} />
-        </View>
-        {/* Handle */}
-        <Animated.View style={[styles.scrubberHandle, { left: handleLeft }]} />
-      </View>
-    </GestureDetector>
-  );
-});
 
 // =============================================================================
 // MAIN COMPONENT
@@ -175,18 +78,35 @@ export function GlobalMiniPlayer() {
     return unsubscribe;
   }, [navigation]);
 
-  // Player state
-  const currentBook = usePlayerStore((s) => s.currentBook);
-  const isPlaying = usePlayerStore((s) => s.isPlaying);
-  const isLoading = usePlayerStore((s) => s.isLoading);
-  const isPlayerVisible = usePlayerStore((s) => s.isPlayerVisible);
-  const position = usePlayerStore((s) => s.position);
-  const duration = usePlayerStore((s) => s.duration);
-  const chapters = usePlayerStore((s) => s.chapters);
-  const play = usePlayerStore((s) => s.play);
-  const pause = usePlayerStore((s) => s.pause);
-  const seekTo = usePlayerStore((s) => s.seekTo);
-  const togglePlayer = usePlayerStore((s) => s.togglePlayer);
+  // Player state - PERF: batch subscriptions with useShallow to reduce re-renders
+  // Note: seekTo is handled via useSeekingStore directly for proper position tracking
+  const {
+    currentBook,
+    isPlaying,
+    isLoading,
+    isBuffering,
+    isPlayerVisible,
+    position,
+    duration,
+    chapters,
+    play,
+    pause,
+    togglePlayer,
+  } = usePlayerStore(
+    useShallow((s) => ({
+      currentBook: s.currentBook,
+      isPlaying: s.isPlaying,
+      isLoading: s.isLoading,
+      isBuffering: s.isBuffering,
+      isPlayerVisible: s.isPlayerVisible,
+      position: s.position,
+      duration: s.duration,
+      chapters: s.chapters,
+      play: s.play,
+      pause: s.pause,
+      togglePlayer: s.togglePlayer,
+    }))
+  );
 
   // Current chapter
   const currentChapterIndex = useCurrentChapterIndex();
@@ -209,26 +129,27 @@ export function GlobalMiniPlayer() {
     }
   }, [isPlaying, pause, play]);
 
+  // Get bookId for progress saving
+  const bookId = currentBook?.id;
+
   const handleSkipBack = useCallback(() => {
     haptics.selection();
     const newPosition = Math.max(0, position - 15);
-    seekTo?.(newPosition);
-  }, [position, seekTo]);
+    // Use seeking store for proper position tracking
+    useSeekingStore.getState().seekTo(newPosition, duration, bookId);
+  }, [position, duration, bookId]);
 
   const handleSkipForward = useCallback(() => {
     haptics.selection();
     const newPosition = Math.min(duration, position + 30);
-    seekTo?.(newPosition);
-  }, [position, duration, seekTo]);
+    // Use seeking store for proper position tracking
+    useSeekingStore.getState().seekTo(newPosition, duration, bookId);
+  }, [position, duration, bookId]);
 
   const handleOpenPlayer = useCallback(() => {
     haptics.selection();
     togglePlayer?.();
   }, [togglePlayer]);
-
-  const handleSeek = useCallback((newPosition: number) => {
-    seekTo?.(newPosition);
-  }, [seekTo]);
 
   // Swipe up gesture to open full player
   const panGesture = Gesture.Pan()
@@ -250,29 +171,33 @@ export function GlobalMiniPlayer() {
     transform: [{ translateY: Math.min(0, translateY.value * 0.3) }],
   }));
 
-  // Don't render if no book or full player is open
+  // Determine if mini player should be hidden
+  // Note: We ALWAYS render the full structure to prevent Android SafeAreaProvider crash
+  // Just hide it visually when needed using opacity and pointerEvents
   const hiddenRoutes = ['ReadingHistoryWizard', 'MoodDiscovery', 'MoodResults', 'PreferencesOnboarding'];
-  if (!currentBook || isPlayerVisible || hiddenRoutes.includes(currentRouteName)) {
-    return null;
-  }
+  const shouldHide = !currentBook || isPlayerVisible || hiddenRoutes.includes(currentRouteName);
 
-  const title = getTitle(currentBook);
+  const title = currentBook ? getTitle(currentBook) : '';
 
+  // Always render full structure to prevent Android SafeAreaProvider crash
+  // Hide visually when shouldHide is true
   return (
-    <GestureDetector gesture={panGesture}>
-      <Animated.View
-        style={[
-          styles.container,
-          {
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
-            backgroundColor: colors.white,
-            borderTopColor: colors.grayLine,
-          },
-          animatedStyle,
-        ]}
-        entering={SlideInDown.duration(250).springify()}
-        exiting={SlideOutDown.duration(200)}
-      >
+    <View
+      style={[styles.wrapper, shouldHide && styles.hidden]}
+      pointerEvents={shouldHide ? 'none' : 'auto'}
+    >
+      <GestureDetector gesture={panGesture}>
+        <Animated.View
+          style={[
+            styles.container,
+            {
+              paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+              backgroundColor: colors.white,
+              borderTopColor: colors.grayLine,
+            },
+            animatedStyle,
+          ]}
+        >
         {/* Scrubber */}
         <View style={styles.scrubberContainer}>
           {/* Track */}
@@ -326,7 +251,19 @@ export function GlobalMiniPlayer() {
               onPress={handlePlayPause}
               disabled={isLoading}
             >
-              {isPlaying ? (
+              {isLoading ? (
+                <ActivityIndicator size={14} color={colors.white} />
+              ) : isBuffering ? (
+                // Buffering: show spinner with small icon
+                <View style={styles.bufferingContainer}>
+                  <ActivityIndicator size={28} color={colors.white} style={styles.bufferingSpinner} />
+                  {isPlaying ? (
+                    <PauseIcon color={colors.white} size={10} />
+                  ) : (
+                    <PlayIcon color={colors.white} size={10} />
+                  )}
+                </View>
+              ) : isPlaying ? (
                 <PauseIcon color={colors.white} size={14} />
               ) : (
                 <PlayIcon color={colors.white} size={14} />
@@ -336,6 +273,7 @@ export function GlobalMiniPlayer() {
         </View>
       </Animated.View>
     </GestureDetector>
+    </View>
   );
 }
 
@@ -347,12 +285,19 @@ export const GLOBAL_MINI_PLAYER_HEIGHT = scale(130);
 // =============================================================================
 
 const styles = StyleSheet.create({
-  container: {
+  // Wrapper - always rendered to prevent Android SafeAreaProvider crash
+  wrapper: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     zIndex: 9998,
+  },
+  // Hidden state - visually hide without removing from view tree
+  hidden: {
+    opacity: 0,
+  },
+  container: {
     backgroundColor: staticColors.grayLight,
     borderTopWidth: 1,
     borderTopColor: staticColors.grayLine,
@@ -439,6 +384,13 @@ const styles = StyleSheet.create({
     backgroundColor: staticColors.black,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bufferingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bufferingSpinner: {
+    position: 'absolute',
   },
 });
 

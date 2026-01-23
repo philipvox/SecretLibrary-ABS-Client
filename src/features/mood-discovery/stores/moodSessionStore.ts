@@ -5,12 +5,11 @@
  * Sessions expire after 24 hours - this is "What do you want RIGHT NOW?"
  * not permanent profile data.
  *
- * Supports the 5-step discovery quiz:
+ * Supports the 2-step branching quiz (Tier 2.1):
  * 1. Mood (required) - What emotional experience
- * 2. Energy/Pace (optional) - How fast it moves
- * 3. Tone/Weight (optional) - How emotionally demanding
- * 4. World (optional) - Setting type
- * 5. Length (optional) - How much time you have
+ * 2. Follow-up (optional) - Mood-dependent refinement
+ *
+ * Tier 2.2: No pre-selection - users actively choose or get "Surprise me" behavior
  */
 
 import { create } from 'zustand';
@@ -26,10 +25,17 @@ import {
   MoodSession,
   QuizStep,
   QuizDraft,
+  SessionState,
   INITIAL_QUIZ_DRAFT,
   SESSION_DURATION_MS,
+  SESSION_SOFT_EXPIRY_MS,
+  SESSION_HARD_EXPIRY_MS,
   TOTAL_QUIZ_STEPS,
 } from '../types';
+import { useMoodScoringCacheStore } from './moodScoringCacheStore';
+
+// Helper to invalidate cache from outside React components
+const invalidateMoodCache = () => useMoodScoringCacheStore.getState().invalidateCache();
 
 // ============================================================================
 // TYPES
@@ -45,6 +51,10 @@ interface MoodSessionState {
   // Quiz Navigation Actions
   /** Set the mood selection */
   setMood: (mood: Mood) => void;
+  /** Set the flavor/sub-category selection (Step 2) */
+  setFlavor: (flavor: string | null) => void;
+  /** Set the seed book ID (Step 3) */
+  setSeedBook: (bookId: string | null) => void;
   /** Set the pace selection */
   setPace: (pace: Pace) => void;
   /** Set the weight selection */
@@ -53,6 +63,8 @@ interface MoodSessionState {
   setWorld: (world: World) => void;
   /** Set the length selection in draft */
   setDraftLength: (length: LengthPreference) => void;
+  /** Set whether to exclude children's books */
+  setExcludeChildrens: (value: boolean) => void;
   /** Go to next step */
   nextStep: () => void;
   /** Go to previous step */
@@ -93,6 +105,16 @@ export const useMoodSessionStore = create<MoodSessionState>()(
         set({ draft: { ...draft, mood } });
       },
 
+      setFlavor: (flavor) => {
+        const { draft } = get();
+        set({ draft: { ...draft, flavor } });
+      },
+
+      setSeedBook: (seedBookId) => {
+        const { draft } = get();
+        set({ draft: { ...draft, seedBookId } });
+      },
+
       setPace: (pace) => {
         const { draft } = get();
         set({ draft: { ...draft, pace } });
@@ -111,6 +133,11 @@ export const useMoodSessionStore = create<MoodSessionState>()(
       setDraftLength: (length) => {
         const { draft } = get();
         set({ draft: { ...draft, length } });
+      },
+
+      setExcludeChildrens: (excludeChildrens) => {
+        const { draft } = get();
+        set({ draft: { ...draft, excludeChildrens } });
       },
 
       nextStep: () => {
@@ -141,20 +168,30 @@ export const useMoodSessionStore = create<MoodSessionState>()(
         const { draft } = get();
         if (!draft.mood) return; // Mood is required
 
+        // Clear any cached recommendations from previous session
+        invalidateMoodCache();
+
         const now = Date.now();
+        // Tier 2.2: Convert null selections to 'any' (Surprise me behavior)
+        // Tier 2.4: Set soft and hard expiry times
         const session: MoodSession = {
           mood: draft.mood,
-          pace: draft.pace,
-          weight: draft.weight,
-          world: draft.world,
-          length: draft.length,
+          flavor: draft.flavor,           // Step 2: flavor drill-down
+          seedBookId: draft.seedBookId,   // Step 3: seed book
+          pace: draft.pace ?? 'any',
+          weight: draft.weight ?? 'any',
+          world: draft.world ?? 'any',
+          length: draft.length ?? 'any',
+          excludeChildrens: draft.excludeChildrens,
           createdAt: now,
-          expiresAt: now + SESSION_DURATION_MS,
+          softExpiresAt: now + SESSION_SOFT_EXPIRY_MS,
+          expiresAt: now + SESSION_HARD_EXPIRY_MS,
         };
         set({ session, draft: { ...INITIAL_QUIZ_DRAFT } });
       },
 
       clearSession: () => {
+        invalidateMoodCache();
         set({ session: null });
       },
 
@@ -164,6 +201,7 @@ export const useMoodSessionStore = create<MoodSessionState>()(
 
         const now = Date.now();
         if (now >= session.expiresAt) {
+          invalidateMoodCache();
           set({ session: null });
           return false;
         }
@@ -182,13 +220,17 @@ export const useMoodSessionStore = create<MoodSessionState>()(
         const { session } = get();
         if (!session) return;
 
-        // Quick tune extends the session by resetting expiry
+        // Clear cached recommendations when preferences change
+        invalidateMoodCache();
+
+        // Quick tune extends the session by resetting both expiry times (Tier 2.4)
         const now = Date.now();
         set({
           session: {
             ...session,
             ...updates,
-            expiresAt: now + SESSION_DURATION_MS,
+            softExpiresAt: now + SESSION_SOFT_EXPIRY_MS,
+            expiresAt: now + SESSION_HARD_EXPIRY_MS,
           },
         });
       },
@@ -196,6 +238,8 @@ export const useMoodSessionStore = create<MoodSessionState>()(
       setLength: (length) => {
         const { session } = get();
         if (session) {
+          // Clear cached recommendations when length changes
+          invalidateMoodCache();
           set({ session: { ...session, length } });
         }
       },
@@ -226,12 +270,28 @@ export const useHasActiveSession = () =>
     return Date.now() < state.session.expiresAt;
   });
 
-/** Get the active session (returns null if expired) */
+/** Get the active session (returns null if hard expired) */
 export const useActiveSession = () =>
   useMoodSessionStore((state) => {
     if (!state.session) return null;
     if (Date.now() >= state.session.expiresAt) return null;
     return state.session;
+  });
+
+/**
+ * Get the current session state (Tier 2.4)
+ * - 'active': Session is fresh (< 24hr)
+ * - 'soft': Session is stale but accessible (24-48hr), shows refresh prompt
+ * - 'expired': Session is gone (> 48hr or no session)
+ */
+export const useSessionState = (): SessionState =>
+  useMoodSessionStore((state) => {
+    if (!state.session) return 'expired';
+
+    const now = Date.now();
+    if (now >= state.session.expiresAt) return 'expired';
+    if (now >= state.session.softExpiresAt) return 'soft';
+    return 'active';
   });
 
 /** Get draft state for the discovery UI */
@@ -245,10 +305,13 @@ export const useQuizActions = () =>
   useMoodSessionStore(
     useShallow((state) => ({
       setMood: state.setMood,
+      setFlavor: state.setFlavor,
+      setSeedBook: state.setSeedBook,
       setPace: state.setPace,
       setWeight: state.setWeight,
       setWorld: state.setWorld,
       setDraftLength: state.setDraftLength,
+      setExcludeChildrens: state.setExcludeChildrens,
       nextStep: state.nextStep,
       prevStep: state.prevStep,
       goToStep: state.goToStep,
@@ -269,15 +332,33 @@ export const useMoodDraftActions = () =>
     }))
   );
 
-/** Get session info for display */
+/** Get session info for display (Tier 2.4: includes session state) */
 export const useSessionInfo = () =>
   useMoodSessionStore(
-    useShallow((state) => ({
-      hasSession: state.session !== null && Date.now() < (state.session?.expiresAt ?? 0),
-      expiresAt: state.session?.expiresAt ?? 0,
-      clearSession: state.clearSession,
-      quickTune: state.quickTune,
-    }))
+    useShallow((state) => {
+      const now = Date.now();
+      const session = state.session;
+
+      let sessionState: SessionState = 'expired';
+      if (session) {
+        if (now >= session.expiresAt) {
+          sessionState = 'expired';
+        } else if (now >= session.softExpiresAt) {
+          sessionState = 'soft';
+        } else {
+          sessionState = 'active';
+        }
+      }
+
+      return {
+        hasSession: session !== null && now < (session?.expiresAt ?? 0),
+        sessionState,
+        expiresAt: session?.expiresAt ?? 0,
+        softExpiresAt: session?.softExpiresAt ?? 0,
+        clearSession: state.clearSession,
+        quickTune: state.quickTune,
+      };
+    })
   );
 
 /** Calculate time remaining from expiresAt - use this in components */

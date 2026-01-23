@@ -13,7 +13,7 @@
  */
 
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -171,8 +171,9 @@ export function Snackbar({
   }, [onAction, onDismiss]);
 
   // Don't render when fully hidden (using React state, not shared value)
+  // Return empty View on Android to prevent SafeAreaProvider crash
   if (!visible && isHidden) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   return (

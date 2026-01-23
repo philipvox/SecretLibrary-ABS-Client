@@ -309,6 +309,9 @@ export const finishedBooksSync = {
    * Pre-fetch sessions for recently played books.
    * Caches audio track URLs and chapters so playback starts instantly.
    * Called during app startup.
+   *
+   * IMPORTANT: Sessions are closed immediately after caching to prevent
+   * multiple open sessions on the server (which causes progress corruption).
    */
   async prefetchSessions(): Promise<number> {
     let prefetched = 0;
@@ -320,8 +323,9 @@ export const finishedBooksSync = {
 
       log.info(`Pre-fetching sessions for ${recentItems.length} recent books...`);
 
-      // Fetch sessions in parallel for speed
-      const sessionPromises = recentItems.map(async (item) => {
+      // Fetch sessions sequentially to avoid overwhelming server with sessions
+      // and ensure each session is closed before starting the next
+      for (const item of recentItems) {
         try {
           // Start a session to get audio tracks and chapters
           const session = await apiClient.post<any>(
@@ -348,7 +352,7 @@ export const finishedBooksSync = {
             }
           );
 
-          // Cache the session
+          // Cache the session data (audio tracks, chapters, etc.)
           playbackCache.setSession(item.id, {
             id: session.id,
             libraryItemId: session.libraryItemId,
@@ -360,19 +364,29 @@ export const finishedBooksSync = {
             mediaMetadata: session.mediaMetadata,
           });
 
-          log.info(`Pre-fetched session for ${item.id}`);
-          return true;
+          // CRITICAL FIX: Close the session immediately after caching
+          // This prevents multiple open sessions which causes progress corruption
+          // (position from one book being applied to another)
+          try {
+            await apiClient.post(`/api/session/${session.id}/close`, {
+              currentTime: session.currentTime, // Keep current position
+              timeListened: 0,
+            });
+            log.debug(`Closed prefetch session ${session.id} for ${item.id}`);
+          } catch (closeErr) {
+            // Non-fatal - session will eventually timeout on server
+            log.warn(`Failed to close prefetch session for ${item.id}:`, closeErr);
+          }
+
+          log.info(`Pre-fetched and cached session for ${item.id}`);
+          prefetched++;
         } catch (err) {
           log.warn(`Failed to prefetch session for ${item.id}:`, err);
-          return false;
         }
-      });
-
-      const results = await Promise.all(sessionPromises);
-      prefetched = results.filter(Boolean).length;
+      }
 
       if (prefetched > 0) {
-        log.info(`Pre-fetched ${prefetched} sessions`);
+        log.info(`Pre-fetched ${prefetched} sessions (all closed)`);
       }
     } catch (err) {
       log.warn('prefetchSessions error:', err);

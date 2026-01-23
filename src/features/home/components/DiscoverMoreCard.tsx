@@ -20,7 +20,8 @@ import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
 import { BookSpineVertical, BookSpineVerticalData } from './BookSpineVertical';
 // MIGRATED: Now using new spine system via adapter
-import { calculateBookDimensions, getSpineDimensions } from '../utils/spine/adapter';
+import { calculateBookDimensions, getSpineDimensions, isLightColor, darkenColorForDisplay } from '../utils/spine/adapter';
+import { useSpineCacheStore } from '../stores/spineCache';
 
 // =============================================================================
 // TYPES
@@ -50,13 +51,20 @@ interface DiscoverMoreCardProps {
 // CONSTANTS
 // =============================================================================
 
-// Scale factor for horizontal spines (relative to vertical shelf spines)
-const HORIZONTAL_SCALE = 0.85; // Slightly smaller than shelf spines
-const SPINE_GAP = 6;
+// Scale factors for horizontal spines (relative to vertical shelf spines)
+// WIDTH_SCALE controls spine thickness (how "thick" the book appears)
+// HEIGHT_SCALE controls spine length (how "tall" the book appears when lying flat)
+const WIDTH_SCALE = 0.6;   // Thickness scale
+const HEIGHT_SCALE = .9;  // Length scale
+const SPINE_GAP = 0;
+
+// Spine height range (before scaling) - allows variety while ensuring titles fit
+const MIN_SPINE_HEIGHT = 150;  // Minimum height for shorter books
+const MAX_SPINE_HEIGHT = 550;  // Maximum height for longer books
 
 // Card dimensions - wide enough for the largest rotated spines
-const MAX_SPINE_HEIGHT = 400; // Tallest possible spine
-const CARD_WIDTH = Math.round(MAX_SPINE_HEIGHT * HORIZONTAL_SCALE) + 24;
+// Spine height becomes visual width after 90° rotation
+const CARD_WIDTH = Math.round(MAX_SPINE_HEIGHT-MIN_SPINE_HEIGHT-35);
 
 // =============================================================================
 // HORIZONTAL SPINE WRAPPER
@@ -68,15 +76,53 @@ interface HorizontalSpineWrapperProps {
 }
 
 function HorizontalSpineWrapper({ book, onPress }: HorizontalSpineWrapperProps) {
-  // Convert RecommendedBook to BookSpineVerticalData
-  const spineData: BookSpineVerticalData = useMemo(() => ({
-    id: book.id,
-    title: book.title,
-    author: book.author,
-    genres: book.genres,
-    tags: book.tags,
-    duration: book.duration,
-  }), [book]);
+  // Get spine cache for consistent styling with shelf view
+  const getSpineData = useSpineCacheStore((state) => state.getSpineData);
+  // Subscribe to colorVersion to trigger re-render when colors are extracted
+  const colorVersion = useSpineCacheStore((state) => state.colorVersion);
+
+  // Convert RecommendedBook to BookSpineVerticalData, enriched with cached colors/typography
+  const spineData: BookSpineVerticalData = useMemo(() => {
+    const cached = getSpineData(book.id);
+
+    if (cached) {
+      // Use cached data for consistent styling with shelf view
+      // Apply same darkening logic as BookshelfView
+      let bgColor = cached.backgroundColor;
+      let txtColor = cached.textColor;
+
+      if (isLightColor(bgColor)) {
+        bgColor = darkenColorForDisplay(bgColor);
+        txtColor = staticColors.white;
+      }
+
+      return {
+        id: book.id,
+        title: cached.title || book.title,
+        author: cached.author || book.author,
+        genres: cached.genres || book.genres,
+        tags: cached.tags || book.tags,
+        duration: cached.duration || book.duration,
+        seriesName: cached.seriesName,
+        backgroundColor: bgColor,
+        textColor: txtColor,
+      };
+    }
+
+    // Fallback: use Secret Library default styling (dark background with light text/stroke)
+    // This ensures consistent appearance even when spine colors haven't been extracted yet
+    // Matches the dark spine aesthetic with white borders seen in the main bookshelf
+    return {
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      genres: book.genres,
+      tags: book.tags,
+      duration: book.duration,
+      backgroundColor: '#1a1a1a',  // Dark background (matches shelf spines)
+      textColor: '#FFFFFF',        // White text and border
+    };
+  }, [book, getSpineData, colorVersion]);
 
   // Calculate dimensions based on book's metadata (genre, duration)
   // Same logic as BookSpineVertical uses for shelf display
@@ -93,17 +139,20 @@ function HorizontalSpineWrapper({ book, onPress }: HorizontalSpineWrapperProps) 
         tags,
         duration,
       });
+      // Clamp height to range before scaling
+      const clampedHeight = Math.min(MAX_SPINE_HEIGHT, Math.max(MIN_SPINE_HEIGHT, calculated.height));
       return {
-        width: Math.round(calculated.width * HORIZONTAL_SCALE),
-        height: Math.round(calculated.height * HORIZONTAL_SCALE),
+        width: Math.round(calculated.width * WIDTH_SCALE),
+        height: Math.round(clampedHeight * HEIGHT_SCALE),
       };
     }
 
     // Fallback to simple calculation
     const baseDims = getSpineDimensions(book.id, genres, duration);
+    const clampedHeight = Math.min(MAX_SPINE_HEIGHT, Math.max(MIN_SPINE_HEIGHT, baseDims.height));
     return {
-      width: Math.round(baseDims.width * HORIZONTAL_SCALE),
-      height: Math.round(baseDims.height * HORIZONTAL_SCALE),
+      width: Math.round(baseDims.width * WIDTH_SCALE),
+      height: Math.round(clampedHeight * HEIGHT_SCALE),
     };
   }, [book.id, book.genres, book.tags, book.duration]);
 
@@ -119,13 +168,18 @@ function HorizontalSpineWrapper({ book, onPress }: HorizontalSpineWrapperProps) 
 
   return (
     <View style={[styles.spineWrapper, { width: containerWidth, height: containerHeight }]}>
-      <View style={[styles.spineRotator, {
-        width: spineDimensions.width,
-        height: spineDimensions.height,
-        // Center the rotated element
-        marginLeft: (containerWidth - spineDimensions.width) / 2,
-        marginTop: (containerHeight - spineDimensions.height) / 2,
-      }]}>
+      <View
+        style={[
+          styles.spineRotator,
+          {
+            width: spineDimensions.width,
+            height: spineDimensions.height,
+            // Center the rotated element within the container
+            marginLeft: (containerWidth - spineDimensions.width) / 2,
+            marginTop: (containerHeight - spineDimensions.height) / 2,
+          },
+        ]}
+      >
         <BookSpineVertical
           book={spineData}
           width={spineDimensions.width}
@@ -134,6 +188,7 @@ function HorizontalSpineWrapper({ book, onPress }: HorizontalSpineWrapperProps) 
           isActive={false}
           showShadow={false}
           onPress={handlePress}
+          isHorizontalDisplay={false}
         />
       </View>
     </View>

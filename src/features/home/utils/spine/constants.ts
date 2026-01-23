@@ -6,17 +6,29 @@
  */
 
 // =============================================================================
+// MASTER HEIGHT SCALE - CHANGE THIS TO MAKE ALL BOOKS TALLER/SHORTER
+// =============================================================================
+
+/**
+ * Master scale for all book heights.
+ * - 1.0 = default height
+ * - 1.2 = 20% taller
+ * - 0.8 = 20% shorter
+ */
+export const HEIGHT_SCALE = 1.3;
+
+// =============================================================================
 // DIMENSION CONSTANTS
 // =============================================================================
 
-/** Base spine dimensions (pre-scaling) */
+/** Base spine dimensions (scaled by HEIGHT_SCALE) */
 export const BASE_DIMENSIONS = {
   /** Default height for unknown genres (in pixels) */
-  HEIGHT: 350,
+  HEIGHT: Math.round(250 * HEIGHT_SCALE),
   /** Minimum allowed height (lowered to accommodate children's books) */
-  MIN_HEIGHT: 160,
+  MIN_HEIGHT: Math.round(160 * HEIGHT_SCALE),
   /** Maximum allowed height */
-  MAX_HEIGHT: 450,
+  MAX_HEIGHT: Math.round(550),
 } as const;
 
 /** Spine width calculation (duration-based) */
@@ -26,7 +38,7 @@ export const WIDTH_CALCULATION = {
   /** Maximum width for epic audiobooks (>50hr) */
   MAX: 280,
   /** Median fallback when duration is unknown */
-  MEDIAN: 60,
+  MEDIAN: 44,
   /** Minimum duration in hours (books under this get MIN width) */
   MIN_DURATION_HOURS: 1,
   /** Maximum duration in hours (books over this get MAX width) */
@@ -45,11 +57,11 @@ export const SPINE_LAYOUT = {
   /** Section height percentages (must sum to 100%) */
   SECTIONS: {
     /** Title section - dominant visual element */
-    TITLE: 68,
+    TITLE: 90,
     /** Author section - supporting element */
-    AUTHOR: 26,
+    AUTHOR: 9,
     /** Progress/series number section - minimal space at bottom */
-    PROGRESS: 6,
+    PROGRESS: 1,
   },
 
   /** Internal spacing between elements (in pixels) */
@@ -72,7 +84,7 @@ export const SPINE_LAYOUT = {
   CORNER_RADIUS: 5,
 
   /** Download indicator bar height at top */
-  DOWNLOAD_INDICATOR_HEIGHT: 1,
+  DOWNLOAD_INDICATOR_HEIGHT: 3,
 } as const;
 
 // =============================================================================
@@ -100,7 +112,7 @@ export const TOUCH_TARGETS = {
  */
 export const SPINE_SCALES = {
   /** Main library shelf view - large, prominent */
-  shelf: 0.95,
+  shelf: 1,
   /** Horizontal stack view - medium size */
   stack: 0.45,
   /** Small preview cards (series, recommendations) */

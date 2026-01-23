@@ -229,6 +229,28 @@ export interface AuthorsResponse {
 }
 
 /**
+ * External book metadata search result (from /api/search/books)
+ * Used when searching external providers (Hardcover, Audible, Google, etc.) by ISBN or title
+ */
+export interface ExternalBookMatch {
+  title: string;
+  subtitle?: string;
+  author?: string;
+  narrator?: string;
+  publisher?: string;
+  publishedYear?: string;
+  description?: string;
+  cover?: string;
+  isbn?: string;
+  asin?: string;
+  genres?: string[];
+  tags?: string[];
+  series?: { series: string; sequence?: string }[];
+  language?: string;
+  duration?: number;
+}
+
+/**
  * HTTP method types
  */
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';

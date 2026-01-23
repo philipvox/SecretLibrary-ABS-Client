@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
+import { PlayIcon, PauseIcon } from '@/features/player/components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 
@@ -69,6 +70,7 @@ import { BookSpineVertical, BookSpineVerticalData } from '@/features/home/compon
 import { useBookRowLayout } from '@/features/home/hooks/useBookRowLayout';
 // MIGRATED: Now using new spine system via adapter
 import { getTypographyForGenres, getSeriesStyle } from '@/features/home/utils/spine/adapter';
+import { SeriesSwipeContainer, SeriesNavigationArrows } from '../components/SeriesSwipeContainer';
 
 // =============================================================================
 // TYPES
@@ -86,18 +88,6 @@ interface IconProps {
   color?: string;
   size?: number;
 }
-
-const PlayIcon = ({ color = '#fff', size = 14 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M8 5v14l11-7z" />
-  </Svg>
-);
-
-const PauseIcon = ({ color = '#fff', size = 14 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M6 4h4v16H6zM14 4h4v16h-4z" />
-  </Svg>
-);
 
 const QueueIcon = ({ color = '#000', size = 16 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5}>
@@ -167,8 +157,9 @@ function formatChapterDuration(seconds: number): string {
 
 function splitTitle(title: string): { line1: string; line2: string } {
   const words = title.split(' ');
-  if (words.length <= 2) {
-    return { line1: words[0] || '', line2: words.slice(1).join(' ') || '' };
+  // Only split if more than 3 words
+  if (words.length <= 3) {
+    return { line1: title, line2: '' };
   }
   const midPoint = Math.ceil(words.length / 2);
   return {
@@ -930,13 +921,14 @@ export function SecretLibraryBookDetailScreen() {
         ]}
       />
 
-      <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={{ paddingBottom: insets.bottom + scale(40) }}
-          showsVerticalScrollIndicator={false}
-        >
+      <SeriesSwipeContainer book={book!}>
+        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingBottom: insets.bottom + scale(40) }}
+            showsVerticalScrollIndicator={false}
+          >
 
         {/* Hero Section - Centered Cover */}
         <View style={styles.hero}>
@@ -953,8 +945,9 @@ export function SecretLibraryBookDetailScreen() {
             )}
           </View>
 
-          {/* Split Title */}
+          {/* Split Title with Series Navigation Arrows */}
           <View style={styles.titleContainer}>
+            <SeriesNavigationArrows />
             <Text style={[
               styles.titleLine1,
               {
@@ -1026,22 +1019,6 @@ export function SecretLibraryBookDetailScreen() {
               </Text>
             </TouchableOpacity>
           )}
-
-          {/* Genre Pills */}
-          {(metadata?.genres || []).length > 0 && (
-            <View style={styles.genreRow}>
-              {(metadata?.genres || []).map((genre: string, idx: number) => (
-                <TouchableOpacity
-                  key={`genre-${idx}`}
-                  style={[styles.genrePill, { borderColor: colors.grayLine }]}
-                  onPress={() => handleGenrePress(genre)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.genrePillText, { color: colors.gray }]}>{genre}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
         </View>
 
         {/* Meta Grid: Duration | Chapters (clickable) | Year */}
@@ -1058,6 +1035,46 @@ export function SecretLibraryBookDetailScreen() {
             <Text style={[styles.metaLabel, { color: colors.gray }]}>Published</Text>
             <Text style={[styles.metaValue, { color: colors.black }]}>{publishedYear || '—'}</Text>
           </View>
+        </View>
+
+        {/* Action Buttons: Play + Download */}
+        <View style={styles.actionRow}>
+          {/* Play Button - 30% width */}
+          <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black }]} onPress={handlePlay}>
+            <PlayIcon color={colors.white} size={16} />
+            <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>
+              {isThisBookPlaying ? 'Pause' : 'Play'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Download Button - 70% width - supports pause/resume */}
+          <TouchableOpacity
+            style={[
+              styles.btnDownload,
+              { borderColor: colors.black },
+              (isDownloaded || isDownloading || isPaused) && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }],
+            ]}
+            onPress={handleDownload}
+            disabled={isDownloaded}
+          >
+            {isDownloaded ? (
+              <>
+                <CheckIcon color={colors.white} size={16} />
+                <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text>
+              </>
+            ) : isPaused ? (
+              <Text style={[styles.btnText, { color: colors.white }]}>Paused - {Math.round(downloadProgress * 100)}%</Text>
+            ) : isDownloading ? (
+              <Text style={[styles.btnText, { color: colors.white }]}>{Math.round(downloadProgress * 100)}% - Tap to pause</Text>
+            ) : isPending ? (
+              <Text style={[styles.btnText, { color: colors.black }]}>Queued - Tap to cancel</Text>
+            ) : (
+              <>
+                <DownloadIcon color={colors.black} size={16} />
+                <Text style={[styles.btnText, { color: colors.black }]}>Download</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Progress Section - Compact */}
@@ -1101,46 +1118,6 @@ export function SecretLibraryBookDetailScreen() {
           </View>
         </View>
 
-        {/* Action Buttons: Download + Play */}
-        <View style={styles.actionRow}>
-          {/* Download Button - 70% width - supports pause/resume */}
-          <TouchableOpacity
-            style={[
-              styles.btnDownload,
-              { borderColor: colors.black },
-              (isDownloaded || isDownloading || isPaused) && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }],
-            ]}
-            onPress={handleDownload}
-            disabled={isDownloaded}
-          >
-            {isDownloaded ? (
-              <>
-                <CheckIcon color={colors.white} size={16} />
-                <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text>
-              </>
-            ) : isPaused ? (
-              <Text style={[styles.btnText, { color: colors.white }]}>Paused - {Math.round(downloadProgress * 100)}%</Text>
-            ) : isDownloading ? (
-              <Text style={[styles.btnText, { color: colors.white }]}>{Math.round(downloadProgress * 100)}% - Tap to pause</Text>
-            ) : isPending ? (
-              <Text style={[styles.btnText, { color: colors.black }]}>Queued - Tap to cancel</Text>
-            ) : (
-              <>
-                <DownloadIcon color={colors.black} size={16} />
-                <Text style={[styles.btnText, { color: colors.black }]}>Download</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Play Button - 30% width */}
-          <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black }]} onPress={handlePlay}>
-            <PlayIcon color={colors.white} size={16} />
-            <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>
-              {isThisBookPlaying ? 'Pause' : 'Play'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* About Section - with Drop Cap (3-box layout) */}
         {description ? (
           <DropCapParagraph
@@ -1150,6 +1127,22 @@ export function SecretLibraryBookDetailScreen() {
             colors={colors}
           />
         ) : null}
+
+        {/* Genre Pills - Under About Section */}
+        {(metadata?.genres || []).length > 0 && (
+          <View style={styles.genreRow}>
+            {(metadata?.genres || []).map((genre: string, idx: number) => (
+              <TouchableOpacity
+                key={`genre-${idx}`}
+                style={[styles.genrePill, { borderColor: colors.grayLine }]}
+                onPress={() => handleGenrePress(genre)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.genrePillText, { color: colors.gray }]}>{genre}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Chapters/Series Section */}
         <View
@@ -1387,8 +1380,9 @@ export function SecretLibraryBookDetailScreen() {
             </ScrollView>
           )}
         </View>
-        </ScrollView>
-      </SkullRefreshControl>
+          </ScrollView>
+        </SkullRefreshControl>
+      </SeriesSwipeContainer>
     </View>
   );
 }
@@ -1414,8 +1408,8 @@ const styles = StyleSheet.create({
     paddingBottom: scale(20),
   },
   heroCover: {
-    width: scale(160),
-    height: scale(160),
+    width: scale(320),
+    height: scale(320),
     marginBottom: scale(20),
     shadowColor: staticColors.black,
     shadowOffset: { width: 0, height: 4 },
@@ -1442,6 +1436,7 @@ const styles = StyleSheet.create({
   // Title - Split headline
   titleContainer: {
     alignItems: 'center',
+    alignSelf: 'stretch',
     marginBottom: scale(12),
   },
   titleLine1: {
@@ -1457,7 +1452,6 @@ const styles = StyleSheet.create({
     color: staticColors.black,
     textAlign: 'center',
     lineHeight: scale(32),
-    fontStyle: 'italic',
   },
 
   // Byline
@@ -1502,6 +1496,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: scale(8),
     marginTop: scale(12),
+    paddingHorizontal: scale(24),
+    justifyContent: 'flex-start',
   },
   genrePill: {
     paddingHorizontal: scale(12),

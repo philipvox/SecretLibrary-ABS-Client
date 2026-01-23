@@ -21,9 +21,11 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { PlayIcon, PauseIcon } from '../components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
 import Slider from '@react-native-community/slider';
@@ -103,19 +105,6 @@ const BookmarkIcon = ({ color = staticColors.black, size = 13 }: IconProps) => (
 const PrevIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
-  </Svg>
-);
-
-const PlayIcon = ({ color = staticColors.white, size = 18 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M8 5v14l11-7z" />
-  </Svg>
-);
-
-const PauseIcon = ({ color = staticColors.white, size = 18 }: IconProps) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Rect x={6} y={4} width={4} height={16} />
-    <Rect x={14} y={4} width={4} height={16} />
   </Svg>
 );
 
@@ -262,11 +251,11 @@ export function SecretLibraryPlayerScreen() {
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
 
-  // Sheet state - default to chapters view open
-  const [activeSheet, setActiveSheet] = useState<ActiveSheet>('chapters');
-  const [sheetVisible, setSheetVisible] = useState(true);
-  const overlayOpacity = useRef(new Animated.Value(1)).current;  // Start visible
-  const sheetTranslateY = useRef(new Animated.Value(0)).current;  // Start at open position
+  // Sheet state - no sheet open by default
+  const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;  // Start hidden
+  const sheetTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;  // Start at closed position
 
   // Progress mode: 'book' shows full book progress, 'chapter' shows current chapter progress
   const [progressMode, setProgressMode] = useState<'book' | 'chapter'>('book');
@@ -528,6 +517,21 @@ export function SecretLibraryPlayerScreen() {
       setSliderValue(currentProgress);
     }
   }, [bookProgress, chapterProgress, progressMode, isScrubbing]);
+
+  // Reset sheet state when book changes to prevent stale UI
+  const bookId = currentBook?.id;
+  useEffect(() => {
+    // Close any open sheets when switching books
+    if (activeSheet) {
+      setActiveSheet(null);
+      setSheetVisible(false);
+      overlayOpacity.setValue(0);
+      sheetTranslateY.setValue(SCREEN_HEIGHT);
+    }
+    // Also reset bookmark edit state
+    setBookmarkModalMode(null);
+    setEditingBookmark(null);
+  }, [bookId]); // Only depend on bookId to avoid closing on other state changes
 
   // Delta popup helpers
   const animateDeltaFontSize = useCallback((delta: number) => {
@@ -875,8 +879,9 @@ export function SecretLibraryPlayerScreen() {
   }, [duration]);
 
   // Don't render if not visible
+  // Return empty View on Android to prevent SafeAreaProvider crash
   if (!isPlayerVisible || !currentBook) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   // Chapter number formatted (01, 02, etc.)
@@ -1212,7 +1217,18 @@ export function SecretLibraryPlayerScreen() {
                 style={[styles.ctrlPill, styles.ctrlPillFilled, { backgroundColor: colors.black }]}
                 onPress={handlePlayPause}
               >
-                {isPlaying ? (
+                {isLoading ? (
+                  <ActivityIndicator size={16} color={colors.white} />
+                ) : isBuffering ? (
+                  <View style={styles.bufferingContainer}>
+                    <ActivityIndicator size={28} color={colors.white} style={styles.bufferingSpinner} />
+                    {isPlaying ? (
+                      <PauseIcon color={colors.white} size={12} />
+                    ) : (
+                      <PlayIcon color={colors.white} size={12} />
+                    )}
+                  </View>
+                ) : isPlaying ? (
                   <PauseIcon color={colors.white} size={16} />
                 ) : (
                   <PlayIcon color={colors.white} size={16} />
@@ -1698,6 +1714,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
     color: staticColors.black,
+  },
+  bufferingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bufferingSpinner: {
+    position: 'absolute',
   },
 
   // Sheet Overlay

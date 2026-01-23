@@ -112,7 +112,11 @@ export function ErrorSheet({
               {error.context && (
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: colors.text.tertiary }]}>Context:</Text>
-                  <Text style={[styles.detailValue, { color: colors.text.secondary }]}>{error.context}</Text>
+                  <Text style={[styles.detailValue, { color: colors.text.secondary }]}>
+                    {typeof error.context === 'string'
+                      ? error.context
+                      : `${error.context.source}${error.context.action ? `:${error.context.action}` : ''}${error.context.screen ? `@${error.context.screen}` : ''}`}
+                  </Text>
                 </View>
               )}
               <Text style={[styles.technicalMessage, { color: colors.text.tertiary }]} numberOfLines={3}>

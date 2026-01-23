@@ -8,25 +8,25 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		3ACE8189EFFF7E50410723F0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 11E877073BFC7597DE15AC39 /* PrivacyInfo.xcprivacy */; };
+		1B6AC844EB2AD8902E64BBC4 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD63A222E5FF632480B47D8 /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		7BF01B42CBF0EE09CE3878B5 /* Pods_SecretLibrary.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DEF8C35871B0C63B21C25806 /* Pods_SecretLibrary.framework */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		D03261E3AE08410AAF38510D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA1D7C84966AF284B386185 /* ExpoModulesProvider.swift */; };
+		BCB71DD210A0E8619AE85BA8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BE4836A1D2C8B79ECB6A695E /* PrivacyInfo.xcprivacy */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		F2F5ECB32B33479C706E8CF1 /* Pods_SecretLibrary.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 99DC000B86BC6C7B7515560D /* Pods_SecretLibrary.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		11E877073BFC7597DE15AC39 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = SecretLibrary/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* SecretLibrary.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SecretLibrary.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = SecretLibrary/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = SecretLibrary/Info.plist; sourceTree = "<group>"; };
-		37BED494439B874E33310310 /* Pods-SecretLibrary.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SecretLibrary.release.xcconfig"; path = "Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary.release.xcconfig"; sourceTree = "<group>"; };
-		835BDA55B4FE816E73E96520 /* Pods-SecretLibrary.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SecretLibrary.debug.xcconfig"; path = "Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary.debug.xcconfig"; sourceTree = "<group>"; };
+		3B6A2563592B2E2066EFA70F /* Pods-SecretLibrary.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SecretLibrary.release.xcconfig"; path = "Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary.release.xcconfig"; sourceTree = "<group>"; };
+		5DA3428AFAB54EF58AF713DC /* Pods-SecretLibrary.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SecretLibrary.debug.xcconfig"; path = "Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary.debug.xcconfig"; sourceTree = "<group>"; };
+		99DC000B86BC6C7B7515560D /* Pods_SecretLibrary.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SecretLibrary.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SecretLibrary/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		DEA1D7C84966AF284B386185 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SecretLibrary/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		DEF8C35871B0C63B21C25806 /* Pods_SecretLibrary.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SecretLibrary.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		BDD63A222E5FF632480B47D8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SecretLibrary/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		BE4836A1D2C8B79ECB6A695E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = SecretLibrary/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = SecretLibrary/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* SecretLibrary-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "SecretLibrary-Bridging-Header.h"; path = "SecretLibrary/SecretLibrary-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7BF01B42CBF0EE09CE3878B5 /* Pods_SecretLibrary.framework in Frameworks */,
+				F2F5ECB32B33479C706E8CF1 /* Pods_SecretLibrary.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,7 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				11E877073BFC7597DE15AC39 /* PrivacyInfo.xcprivacy */,
+				BE4836A1D2C8B79ECB6A695E /* PrivacyInfo.xcprivacy */,
 			);
 			name = SecretLibrary;
 			sourceTree = "<group>";
@@ -62,9 +62,18 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				DEF8C35871B0C63B21C25806 /* Pods_SecretLibrary.framework */,
+				99DC000B86BC6C7B7515560D /* Pods_SecretLibrary.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		43CC29197F3345CF3B64375E /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				5DA3428AFAB54EF58AF713DC /* Pods-SecretLibrary.debug.xcconfig */,
+				3B6A2563592B2E2066EFA70F /* Pods-SecretLibrary.release.xcconfig */,
+			);
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -81,8 +90,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				BE0D3677D07730A88092F365 /* Pods */,
-				8CA0BDD39C325A208F013B69 /* ExpoModulesProviders */,
+				43CC29197F3345CF3B64375E /* Pods */,
+				EBFB20E8F675CD733AE06123 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -97,12 +106,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		8CA0BDD39C325A208F013B69 /* ExpoModulesProviders */ = {
+		945CE6D626365B0FA6FD0E45 /* SecretLibrary */ = {
 			isa = PBXGroup;
 			children = (
-				E85BE17951BEDD917CA9CA11 /* SecretLibrary */,
+				BDD63A222E5FF632480B47D8 /* ExpoModulesProvider.swift */,
 			);
-			name = ExpoModulesProviders;
+			name = SecretLibrary;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -114,22 +123,12 @@
 			path = SecretLibrary/Supporting;
 			sourceTree = "<group>";
 		};
-		BE0D3677D07730A88092F365 /* Pods */ = {
+		EBFB20E8F675CD733AE06123 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				835BDA55B4FE816E73E96520 /* Pods-SecretLibrary.debug.xcconfig */,
-				37BED494439B874E33310310 /* Pods-SecretLibrary.release.xcconfig */,
+				945CE6D626365B0FA6FD0E45 /* SecretLibrary */,
 			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
-		E85BE17951BEDD917CA9CA11 /* SecretLibrary */ = {
-			isa = PBXGroup;
-			children = (
-				DEA1D7C84966AF284B386185 /* ExpoModulesProvider.swift */,
-			);
-			name = SecretLibrary;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -140,13 +139,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "SecretLibrary" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				1F090D6DB51D87200700DAEF /* [Expo] Configure project */,
+				0FDFADF9F7A9B267D07E90AB /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				A44B1A9C5DB07C8356E9F0F7 /* [CP] Embed Pods Frameworks */,
+				E41E6E1C87F957154E3AA7AE /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +195,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				3ACE8189EFFF7E50410723F0 /* PrivacyInfo.xcprivacy in Resources */,
+				BCB71DD210A0E8619AE85BA8 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,7 +241,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		1F090D6DB51D87200700DAEF /* [Expo] Configure project */ = {
+		0FDFADF9F7A9B267D07E90AB /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -306,7 +305,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		A44B1A9C5DB07C8356E9F0F7 /* [CP] Embed Pods Frameworks */ = {
+		E41E6E1C87F957154E3AA7AE /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -336,7 +335,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				D03261E3AE08410AAF38510D /* ExpoModulesProvider.swift in Sources */,
+				1B6AC844EB2AD8902E64BBC4 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,12 +344,13 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 835BDA55B4FE816E73E96520 /* Pods-SecretLibrary.debug.xcconfig */;
+			baseConfigurationReference = 5DA3428AFAB54EF58AF713DC /* Pods-SecretLibrary.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SecretLibrary/SecretLibrary.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 870;
+				DEVELOPMENT_TEAM = DX7MCA54J8;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -369,7 +369,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.secretlibrary.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.secretlibrary.audiobooks;
 				PRODUCT_NAME = SecretLibrary;
 				SWIFT_OBJC_BRIDGING_HEADER = "SecretLibrary/SecretLibrary-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -381,12 +381,13 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 37BED494439B874E33310310 /* Pods-SecretLibrary.release.xcconfig */;
+			baseConfigurationReference = 3B6A2563592B2E2066EFA70F /* Pods-SecretLibrary.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = SecretLibrary/SecretLibrary.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 870;
+				DEVELOPMENT_TEAM = DX7MCA54J8;
 				INFOPLIST_FILE = SecretLibrary/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -400,7 +401,7 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.secretlibrary.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.secretlibrary.audiobooks;
 				PRODUCT_NAME = SecretLibrary;
 				SWIFT_OBJC_BRIDGING_HEADER = "SecretLibrary/SecretLibrary-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

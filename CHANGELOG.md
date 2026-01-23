@@ -9,6 +9,1769 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.7.169] - 2026-01-22
+
+### Fix: Playback Position Reset to Chapter Start
+
+Fixed critical bugs where playback position could reset to chapter start or wrong position when:
+- Returning from Android Auto
+- Pressing play when audio wasn't loaded
+- Session URL expired and needed refresh
+
+**Root Cause:**
+Two places in `playerStore.ts` were calling `loadBook()` with incorrect argument syntax:
+
+1. **In `play()` function** (line 1485):
+   - Old: `loadBook(bookToPlay, true)` - passed boolean instead of options object
+   - `startPosition` was undefined, causing position to be fetched from server (potentially stale)
+
+2. **In `handleAudioError()` for URL expiration** (line 2101):
+   - Old: `loadBook(currentBook, resumePosition, false)` - passed wrong argument types
+   - `resumePosition` (number) was interpreted as options object, `false` was ignored
+   - Result: `startPosition` undefined, book loaded with wrong position
+
+**Fix:**
+- Changed both calls to use proper options object syntax
+- `play()`: `loadBook(bookToPlay, { autoPlay: true })`
+- `handleAudioError()`: `loadBook(currentBook, { startPosition: resumePosition, autoPlay: false })`
+
+**Symptoms Fixed:**
+- Playback jumping to chapter start when resuming after Android Auto
+- Position not preserved when session refreshes after URL expiration
+- Unexpected position resets when pressing play after app backgrounded
+
+**Files Modified:**
+- `src/features/player/stores/playerStore.ts` - Fixed loadBook calls with correct options syntax
+
+---
+
+## [0.7.168] - 2026-01-22
+
+### Fix: Library Cache Not Restored After Background/Android Auto
+
+Fixed critical issue where authors, series, and genres would show as empty after returning from background (especially after using Android Auto).
+
+**Root Cause:**
+- Memory pressure service clears library cache when memory exceeds 450MB
+- `appStateListener` only refreshed React Query caches, NOT the Zustand library cache
+- Library cache holds all author/series/genre indexes
+- Player store retained current book, but library indexes were empty
+
+**Fix:**
+- `appStateListener.ts` now checks if library cache is empty on foreground return
+- If empty but has a current library ID, reloads from SQLite/server
+- Also handles partial load state (isLoaded = false)
+
+**Symptoms Fixed:**
+- "No author found" when clicking on author after returning from Android Auto
+- "No series" when navigating to series after background
+- Missing genre lists after app was in background
+- Book visible in player but library navigation broken
+
+**Files Modified:**
+- `src/core/lifecycle/appStateListener.ts` - Add library cache reload on foreground
+
+---
+
+## [0.7.167] - 2026-01-22
+
+### Fix: Cache Not Cleared on Logout
+
+Fixed critical cache leak where network optimizer cache and cover URLs persisted after logout, potentially showing previous user's data to new user.
+
+**Issues Fixed:**
+1. **NetworkOptimizer cache not cleared** - API responses were cached in memory and not cleared on logout
+2. **Cover cache version not reset** - Cover URL version parameter persisted across sessions
+
+**Changes:**
+- Added `apiClient.resetNetwork()` call in `authService.clearStorage()`
+- Added `apiClient.resetCoverCacheVersion()` method and call on logout
+- Now properly clears: secure storage, AsyncStorage, SQLite, React Query, LibraryCache, NetworkOptimizer, and cover cache version
+
+**Files Modified:**
+- `src/core/api/apiClient.ts` - Added `resetCoverCacheVersion()` method
+- `src/core/auth/authService.ts` - Added network and cover cache reset on logout
+
+---
+
+## [0.7.166] - 2026-01-22
+
+### Android Auto Sprint 2: Progress Indicators & Enhanced Search
+
+Added visual progress indicators, content style hints, and improved voice search for Android Auto.
+
+**Progress Indicators:**
+- Added Android Auto completion status extras (`PLAYBACK_STATUS`)
+- Books now show progress bar overlay (not started / in progress / finished)
+- Progress percentage passed via `MEDIA_PROGRESS` extra
+
+**Content Style Hints:**
+- Root now returns `CONTENT_STYLE_SUPPORTED` bundle
+- Browsable items (Authors, Series) display as list
+- Playable items (Books) display as grid with cover art
+
+**Enhanced Subtitles:**
+- In-progress books: "Author • 45% • 3h 21m left"
+- Not started: "Author • 12h 30m"
+- Finished books: "Author" (clean)
+
+**Improved Voice Search:**
+- Empty "OK Google, play" command resumes most recent book
+- Added narrator to search fields
+- Added fuzzy word matching for multi-word titles
+- Falls back to most recently added if no in-progress books
+
+**Files Modified:**
+- `android/.../AndroidAutoMediaBrowserService.kt` - Content styles, progress extras
+- `src/features/automotive/automotiveService.ts` - Time remaining format, enhanced search
+
+---
+
+## [0.7.165] - 2026-01-22
+
+### Android Auto Sprint 1: Hierarchical Browsing
+
+Added hierarchical browsing support to Android Auto, enabling YouTube Music-quality organization.
+
+**New Browse Sections:**
+- **Favorites** - Quick access to user's favorite books
+- **Authors** - Browse by author → see their books
+- **Series** - Browse by series → books in sequence order
+- **Genres** - Browse by genre → books sorted by popularity
+- **Narrators** - Browse by narrator → their narrated books
+- **Library A-Z** - Full library alphabetically sorted
+
+**Kotlin MediaBrowserService Updates:**
+- Added `PREFIX_FOLDER` for hierarchical navigation
+- New `loadChildrenAsync` cases for folder browsing
+- `createFolderItem()` for browsable folder MediaItems
+- Updated `notifyBrowseDataChanged()` to refresh folder children
+
+**TypeScript Data Generation:**
+- Enhanced `getBrowseSections()` with 9 sections (up from 4)
+- Added `children` arrays for hierarchical items
+- Series books sorted by sequence number
+- Genres sorted by popularity (most books first)
+
+**Files Modified:**
+- `android/.../AndroidAutoMediaBrowserService.kt` - Multi-level browsing support
+- `src/features/automotive/automotiveService.ts` - Hierarchical section generation
+- `src/features/automotive/types.ts` - Added children, itemCount, sequence fields
+
+---
+
+## [0.7.164] - 2026-01-22
+
+### Sprint 2 Completion: Testing and Code Quality
+
+Completed remaining Sprint 2 items with centralized position validation and comprehensive test coverage.
+
+**Position Validation Centralization:**
+- Added `validatePositionForSync()` function to progressCalculator.ts for data integrity checks
+- Updated seekingStore.ts, playerStore.ts, and backgroundSyncService.ts to use shared validation utilities
+- Eliminates duplicate position clamping logic across 3 files
+
+**Error Logging Improvements:**
+- Added error logging to previously swallowed catches in playerStore.pause() and seekTo()
+- Improves debugging by capturing audio service errors
+
+**New Test Suites:**
+- Added `src/core/api/__tests__/apiClient.test.ts` (36 tests)
+  - Configuration, URL generation, cover cache versioning
+  - Endpoints structure and buildQueryString function
+- Added `src/core/auth/__tests__/authService.test.ts` (16 tests)
+  - Token storage, server URL storage, user storage
+  - Session restoration, clearStorage, verifyToken
+
+**Total Tests:** 667 passing
+
+**Files Modified:**
+- `src/features/player/utils/progressCalculator.ts` - Add validatePositionForSync
+- `src/features/player/stores/seekingStore.ts` - Use clampPosition
+- `src/features/player/stores/playerStore.ts` - Use clampPosition, add error logging
+- `src/features/player/services/backgroundSyncService.ts` - Use validatePositionForSync
+- `src/core/api/__tests__/apiClient.test.ts` - NEW (36 tests)
+- `src/core/auth/__tests__/authService.test.ts` - NEW (16 tests)
+
+---
+
+## [0.7.163] - 2026-01-22
+
+### Audit Sprint 1 & 2: Bug Fixes and Code Quality
+
+Completed review and fixes for Sprint 1 (High Priority) and Sprint 2 (Medium Priority) audit items.
+
+**Sprint 1 Status (Complete):**
+- ✅ totalFiles count in download progress - Already fixed with fallback
+- ✅ Orphan directory cleanup - Already implemented on startup
+- ✅ VERBOSE flag = __DEV__ - Already done
+- ✅ Logger level based on __DEV__ - Already done
+- ✅ Test coverage thresholds - Already enabled (20-30%)
+- ✅ WiFi-only download setting persistence - Already using AsyncStorage
+- ✅ console.log in apiClient - Already using apiLogger
+
+**Sprint 2 Status (Complete):**
+- ✅ Seeking store in mini player - Already implemented
+- ✅ Sentry setUser on auth events - Already implemented
+- ✅ ErrorProvider at app root - Already implemented
+- ✅ Genre popularity calculation - Already optimized
+- ✅ Seeking state reset in loadBook error - Already implemented
+
+**New Fix:**
+- Fixed player sheet state not resetting on book switch (caused stale UI when switching books with sheet open)
+
+**Files Modified:**
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` - Add sheet state reset on book change
+
+---
+
+## [0.7.162] - 2026-01-22
+
+### Performance: Fix Animation Freezing During Heavy JS Operations
+
+Converted splash screen and loading animations to use Reanimated for UI thread execution.
+
+**Problem:**
+- The skull candle animation would freeze/lag during app initialization
+- Loading indicators would stop animating when JS thread was busy with heavy operations
+
+**Solution:**
+- Replaced setInterval/useState pattern with Reanimated (withRepeat, withTiming, useAnimatedProps)
+- Animations now run entirely on UI thread, unaffected by JS thread blocking
+- Used AnimatedPath component for smooth SVG path animation
+
+**Files Modified:**
+- `src/shared/components/AnimatedSplash.tsx` - Convert SkullCandle to Reanimated
+- `src/shared/components/Loading.tsx` - Convert animations to Reanimated
+
+---
+
+## [0.7.161] - 2026-01-22
+
+### TypeScript Fixes
+
+Fixed multiple TypeScript errors related to type definitions.
+
+**FontWeight Type Fix:**
+- Changed `weight` property in `AppliedTemplateConfig` from `string` to `FontWeight`
+- Eliminates 6 TypeScript errors in BookSpineVertical.tsx
+
+**Mood Type Alignment:**
+- Removed deprecated mood values ('laughs', 'thinking') from tagMoodMap.ts
+- Updated discoverUtils.ts to match current Mood type (comfort, thrills, escape, feels)
+- Eliminates 84 TypeScript errors
+
+**Total TypeScript errors reduced:** 242 → 158
+
+**Files Modified:**
+- `src/features/home/utils/spine/templateAdapter.ts` - Use FontWeight type
+- `src/features/mood-discovery/constants/tagMoodMap.ts` - Remove deprecated moods
+- `src/features/discover/hooks/discoverUtils.ts` - Remove deprecated mood cases
+
+---
+
+## [0.7.160] - 2026-01-22
+
+### Code Quality: Consolidate Player Icons
+
+Refactored player icon components to reduce code duplication across the codebase.
+
+**Changes:**
+- Centralized PlayIcon, PauseIcon, RewindIcon, FastForwardIcon in `PlayerIcons.tsx`
+- Updated 5 files to import from shared module instead of defining local copies
+- Reduced ~120 lines of duplicate SVG icon code
+- All 615 tests passing
+
+**Files Modified:**
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Import shared icons
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx` - Import shared icons
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` - Import shared icons
+- `src/features/browse/components/TopPickHero.tsx` - Import shared icons
+- `src/features/book-detail/components/SeriesSwipeContainer.tsx` - Import shared icons
+
+---
+
+## [0.7.159] - 2026-01-20
+
+### Bug Fixes
+
+**Fix: Large audiobooks (100+ tracks) showing only 2 tracks**
+- Root cause: axios was truncating large JSON responses (~600KB+)
+- Solution: Switched to native `fetch` API for session requests
+- Affected file: `src/features/player/services/sessionService.ts`
+
+**Fix: Finished books not syncing from server (0 finished books)**
+- Added `finishedBooksSync.importFromServer()` call during app initialization
+- Now properly imports all finished books from server on startup
+- Affected file: `src/core/services/appInitializer.ts`
+
+### Improvements
+
+**Global loading overlay for browse screens**
+- Added `GlobalLoadingOverlay` component triggered BEFORE navigation (not after)
+- Shows animated candle loading immediately when user taps navigation buttons
+- Applies to: All Books, Series, Authors, Genres, Narrators, Duration screens
+- Much smoother perceived transition to heavy list screens
+
+**Files Modified:**
+- `App.tsx` - Added GlobalLoadingOverlay component
+- `src/shared/stores/globalLoadingStore.ts` - New Zustand store
+- `src/shared/components/GlobalLoadingOverlay.tsx` - New component
+- `src/shared/components/index.ts` - Export new component
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` - Trigger loading on navigation
+- `src/features/browse/screens/DurationFilterScreen.tsx` - Hide loading on mount
+- `src/features/library/screens/AllBooksScreen.tsx` - Hide loading on mount
+- `src/features/library/screens/SeriesListScreen.tsx` - Hide loading on mount
+- `src/features/library/screens/AuthorsListScreen.tsx` - Hide loading on mount
+- `src/features/library/screens/GenresListScreen.tsx` - Hide loading on mount
+- `src/features/library/screens/NarratorsListScreen.tsx` - Hide loading on mount
+
+---
+
+## [0.7.155] - 2026-01-20
+
+### Critical Fix: Progress Corruption from Session Cycling
+
+Fixed a critical bug causing playback progress to be lost or incorrectly applied to wrong books.
+
+**Root Cause Analysis:**
+Server logs revealed multiple simultaneous sessions cycling for 3-4 books every 30 seconds to 2 minutes. The position from a long audiobook (e.g., Voyager at ~72000s / 20 hours) was being applied to shorter books, causing the server to incorrectly mark them as "finished".
+
+**Fix 1: Session Prefetch Now Closes Sessions**
+The `prefetchSessions()` function was creating real playback sessions on the server for 5 books simultaneously but never closing them. These orphaned sessions interfered with actual playback.
+
+- Sessions are now closed immediately after caching audio track and chapter data
+- Changed from parallel to sequential fetching to prevent session overlap
+- Each session is opened, data cached, then closed before the next
+
+**Fix 2: Position Validation (Defense in Depth)**
+Added position validation throughout the sync pipeline to reject corrupted data:
+
+- `sessionService.syncProgress()` - Rejects negative or beyond-duration positions
+- `sessionService.syncProgressAsync()` - Same validation
+- `sessionService.closeSessionAsync()` - Clamps invalid positions
+- `sessionService.closeSession()` - Clamps invalid positions
+- `backgroundSyncService.saveProgressLocal()` - Rejects invalid positions
+- `backgroundSyncService.saveProgress()` - Rejects invalid positions
+- `backgroundSyncService.syncToServer()` - Rejects and removes corrupted queue items
+
+**Validation Rules:**
+- Position < 0: Reject (or clamp to 0 on close)
+- Position > duration + 60s: Reject (or clamp to duration on close)
+- 60 second buffer allows for edge cases near end of book
+
+**Files Modified:**
+- `src/core/services/finishedBooksSync.ts` - Close sessions after prefetch caching
+- `src/features/player/services/sessionService.ts` - Position validation
+- `src/features/player/services/backgroundSyncService.ts` - Position validation
+- `src/constants/version.ts`
+
+---
+
+## [0.7.153] - 2026-01-20
+
+### Redesign: Mood Discovery Quiz
+
+Comprehensive redesign of the mood discovery questionnaire flow with improved UX.
+
+**Screen 1 - Mood Selection:**
+- Added "Surprise me — any mood" full-width outlined button at top
+- Reduced moods from 6 to 4: Comfort, Thrills, Escape, Feels (removed Laughs and Think)
+- 2x2 grid layout for mood cards
+- Added divider above "Adults only" toggle
+- Card tap inverts colors (white background, black text) and auto-advances after 400ms
+
+**Screen 2 - Flavor Selection:**
+- Added pill-shaped mood chip header showing selected mood with × to clear
+- "Surprise me — any flavor" button with auto-advance
+- Same card inversion and auto-advance behavior
+
+**Screen 3 - Seed Book Selection:**
+- Square book covers (1:1 aspect ratio) in 3x2 grid layout
+- Search input at top
+- "FIND BOOKS" primary button (enabled only when book selected)
+- "Skip — surprise me" text link below button
+- Back button at bottom
+
+**Typography:**
+- Italic serif font (Playfair Display Italic) for question titles
+- Gray subtitle text below titles
+
+**Technical Changes:**
+- Reduced `Mood` type to 4 values
+- Updated `MOODS`, `MOOD_FLAVORS`, `MOOD_FOLLOWUP_MAP` constants
+- Absorbed 'laughs' genres into 'comfort', 'thinking' genres into 'feels'
+- Updated `THEME_MOOD_MAP` and `TROPE_MOOD_MAP` for 4-mood system
+- Added `MoodChip` component for header display
+- Added auto-advance with `AUTO_ADVANCE_DELAY` constant
+
+**Files Modified:**
+- `src/features/mood-discovery/types.ts` - Reduced to 4 moods, updated mappings
+- `src/features/mood-discovery/screens/MoodDiscoveryScreen.tsx` - Complete redesign
+- `src/features/mood-discovery/components/SeedBookPicker.tsx` - Square covers, 3-column grid
+- `src/constants/version.ts`
+
+---
+
+## [0.7.152] - 2026-01-20
+
+### Feature: Series Swipe Carousel Navigation
+
+Added horizontal swipe gestures to navigate between books in a series from the book detail screen.
+
+**How it works:**
+- Swipe left to navigate to the next book in the series
+- Swipe right to navigate to the previous book in the series
+- Subtle chevron arrows appear on screen edges indicating navigation is available
+- Arrows animate and brighten as swipe threshold is approached
+- Rubber-band effect at series boundaries (first/last book)
+- Fast swipe (velocity > 500) triggers navigation even if under threshold
+- Vertical scroll still works normally (failOffsetY prevents gesture conflict)
+
+**Technical Details:**
+- Uses existing `getSeriesNavigationInfo()` from libraryCache.ts
+- Navigation uses `navigation.replace()` for clean screen transition
+- Swipe threshold: 25% of screen width or velocity > 500
+- Only activates for multi-book series (single books show no swipe UI)
+
+**New Components:**
+- `SeriesSwipeContainer.tsx`: Wrapper with pan gesture handling and edge arrows
+
+**Files Modified:**
+- `src/features/book-detail/components/SeriesSwipeContainer.tsx` (new)
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.151] - 2026-01-20
+
+### UX: Loading Overlays on All List Screens
+
+Extended loading overlays to all browse list screens for consistent UX.
+
+**Screens Updated:**
+- `GenresListScreen` - Shows skull candle loader on initial load
+- `AuthorsListScreen` - Shows skull candle loader on initial load
+- `SeriesListScreen` - Shows skull candle loader on initial load
+- `NarratorsListScreen` - Shows skull candle loader on initial load
+
+This ensures smooth transitions when tapping Genres/Authors/Series/Duration buttons in the search screen.
+
+**Files Modified:**
+- `src/features/library/screens/GenresListScreen.tsx`
+- `src/features/library/screens/AuthorsListScreen.tsx`
+- `src/features/library/screens/SeriesListScreen.tsx`
+- `src/features/library/screens/NarratorsListScreen.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.150] - 2026-01-20
+
+### Fix: VirtualizedList Nesting & Loading Overlays
+
+Fixed VirtualizedList nesting warning and added loading overlays for smoother screen transitions.
+
+**Bug Fixes:**
+
+- **VirtualizedList Warning:** Fixed "VirtualizedLists should never be nested inside plain ScrollViews" error in MoodDiscoveryScreen
+  - Step 3 (SeedBookPicker with FlatList) now renders outside the ScrollView wrapper
+  - Steps 1-2 continue to use ScrollView for their content
+
+**UX Improvements:**
+
+- **Screen Loading Overlays:** Added initial load overlays to hide layout jank:
+  - `SecretLibraryBrowseScreen`: Shows skull candle animation until mounted
+  - `MoodDiscoveryScreen`: Shows loading overlay during initial render
+  - Smooth fade-out transition when content is ready
+
+**New Components:**
+- `ScreenLoadingOverlay.tsx`: Reusable full-screen loading overlay with skull candle animation
+
+**Files Modified:**
+- `src/features/mood-discovery/screens/MoodDiscoveryScreen.tsx` - Fixed nesting, added overlay
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` - Added loading overlay
+- `src/shared/components/ScreenLoadingOverlay.tsx` (new)
+- `src/shared/components/index.ts` - Export new component
+- `src/constants/version.ts`
+
+---
+
+## [0.7.149] - 2026-01-20
+
+### Feature: 3-Step Mood Quiz with Seed Book Selection
+
+Redesigned the mood discovery quiz to a 3-step flow with seed book selection for personalized recommendations:
+
+**New Quiz Flow:**
+
+1. **Step 1 - Mood:** "What are you in the mood for?" (Thrills, Laughs, Comfort, etc.)
+2. **Step 2 - Flavor:** Mood-dependent sub-categories with skip option:
+   - Thrills: Heists, Suspense, Action, Psychological, Military
+   - Laughs: Dry wit, Slapstick, Satire, Romantic comedy, Absurd
+   - Comfort: Cozy, Slow romance, Found family, Slice of life, Nostalgic
+   - Feels: Emotional journey, Bittersweet, Grief/healing, Love story, Inspiring
+   - Escape: Epic worlds, Time travel, Mystery, Swashbuckling, Portal
+   - Thinking: Philosophical, Puzzles, Historical, Science deep-dive, Moral dilemmas
+3. **Step 3 - Seed Book:** "Which book do you wish you could read for the first time again?"
+
+**Seed Book Similarity Scoring:**
+- Same author: +25 points (big boost for author fans)
+- Same series: +30 points (recommends other books in series they love)
+- Matching genres: +8 points each
+- Matching tags: +5 points each
+- Maximum boost capped at +40 to maintain mood relevance
+- Seed book itself is excluded from recommendations
+- "Surprise me" option skips seed selection
+
+**New Components:**
+- `SeedBookPicker.tsx`: Book picker grid with search and skip option
+  - Searchable grid of user's library (limited to 100 for performance)
+  - "Surprise me — skip this step" option
+  - Visual selection state with checkmark overlay
+
+**Type Updates:**
+- `MoodSession.flavor`: Optional flavor sub-category from Step 2
+- `MoodSession.seedBookId`: Optional seed book ID from Step 3
+- `QuizDraft` updated with flavor/seedBookId fields
+- `MOOD_FLAVORS` constant with flavor options per mood
+- `TOTAL_QUIZ_STEPS` now 3
+
+**Store Updates:**
+- `setFlavor(flavor)`: Set flavor selection
+- `setSeedBook(bookId)`: Set seed book selection
+- `commitSession()` includes flavor and seedBookId
+
+**Modified Files:**
+- `src/features/mood-discovery/types.ts` - Flavor types and constants
+- `src/features/mood-discovery/stores/moodSessionStore.ts` - New actions
+- `src/features/mood-discovery/components/SeedBookPicker.tsx` (new)
+- `src/features/mood-discovery/screens/MoodDiscoveryScreen.tsx` - 3-step flow
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts` - Seed scoring
+- `src/constants/version.ts`
+
+---
+
+## [0.7.148] - 2026-01-20
+
+### Feature: BookDNA Integration for Mood Recommendations
+
+Integrated BookDNA tag parsing for more accurate mood-based recommendations. Books with `dna:*` tags now get precise, multi-dimensional scoring instead of genre inference.
+
+**New Features:**
+
+- **BookDNA Parser:** New `parseBookDNA.ts` utility parses structured DNA tags:
+  - `dna:mood:thrills:8` → mood scores (0-10 scale)
+  - `dna:spectrum:dark-light:-5` → spectrum values (-10 to +10)
+  - `dna:pacing:fast` → structural attributes
+  - `dna:trope:found-family` → categorical arrays
+
+- **DNA-Aware Scoring:**
+  - Books with DNA mood scores get weighted scoring (DNA weight: 50 vs genre: 40)
+  - Spectrum alignment scoring (e.g., "thrills" prefers slightly serious tone)
+  - DNA pacing and narrator style bonuses
+  - Confidence boost for books with quality DNA tags
+
+- **DNA Filter Modes:**
+  - `dna-only`: Only show books WITH BookDNA tags (strictest)
+  - `dna-preferred`: Show DNA books first, then non-DNA (default)
+  - `mixed`: Mix all books by score only
+
+- **DNA Stats:** Hook now returns `dnaStats` with coverage info:
+  - `totalWithDNA`: Number of results with DNA
+  - `totalWithoutDNA`: Number of results without DNA
+  - `dnaPercentage`: Percentage of results with DNA
+
+**Types Added:**
+- `BookDNA` interface with full DNA structure
+- `DNAFilterMode` type for filtering options
+- Extended `ScoredBook` with `hasDNA`, `dnaTagCount`, `matchReasons`
+
+**Files Modified:**
+- `src/features/mood-discovery/utils/parseBookDNA.ts` (new)
+- `src/features/mood-discovery/utils/index.ts`
+- `src/features/mood-discovery/types.ts`
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.147] - 2026-01-19
+
+### UX: Mood Quiz Scoring Overlay
+
+Added animated loading overlay when submitting mood quiz ("Find Books" or "Skip"):
+
+**Features:**
+- Skull candle animation (same as app splash screen) with flickering flame
+- Animated progress bar fills over ~1.5 seconds
+- "Finding your perfect reads..." status text
+- Full-screen overlay covers quiz while processing
+
+**Implementation:**
+- New `MoodScoringOverlay` component with memoized SkullCandle animation
+- Loading state in MoodDiscoveryScreen triggered on final step submit
+- Progress animation runs for 1.5s before navigating to results
+- Prevents user confusion about app "hanging" on large libraries
+
+**Modified Files:**
+- `src/features/mood-discovery/components/MoodScoringOverlay.tsx` (new)
+- `src/features/mood-discovery/screens/MoodDiscoveryScreen.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.146] - 2026-01-19
+
+### Performance: Mood Recommendations Scoring
+
+Fixed redundant metadata lookups in mood scoring that was causing lag:
+
+**Problem:**
+- `getMetadata()` and `getItemTags()` were being called 3 times per book
+- Once in main loop, once in `calculateMoodScore`, once in `calculateMetadataRichness`
+
+**Solution:**
+- Pre-compute metadata and tags once per book in main loop
+- Pass pre-computed data to scoring functions via `BookScoringData` interface
+- Renamed `calculateMetadataRichness` to `calculateMetadataRichnessFromData`
+
+**Impact:**
+- ~66% reduction in metadata/tag lookups during scoring
+- Faster mood recommendations computation, especially for large libraries
+
+**Modified Files:**
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.145] - 2026-01-19
+
+### Mood Discovery: Tier 2 Foundation Changes
+
+Implemented all Tier 2 improvements from the mood discovery roadmap:
+
+**2.1 Branching Quiz Logic**
+- Reduced quiz from 5 steps to 2 steps with mood-dependent follow-up
+- Each mood now leads to its most relevant follow-up question:
+  - Thrills/Laughs → Pace (fast vs slow-burn)
+  - Comfort/Feels → Weight (cozy vs bittersweet)
+  - Escape → World (fantasy vs scifi vs historical)
+  - Thinking → Length (quick read vs deep-dive)
+- Faster quiz completion while maintaining recommendation quality
+
+**2.2 Remove "Any" as Default**
+- Optional dimensions (pace, weight, world, length) now start unselected
+- "Any" option renamed to "Surprise me" with "Mix it up" description
+- Users must actively choose or proceed without selection (defaults to any)
+- No pre-selected visual state on follow-up step
+
+**2.3 Metadata Richness Normalization**
+- Added confidence scoring based on book metadata richness
+- Confidence levels: high (>5 metadata signals), medium (3-5), low (1-2)
+- "Limited info" badge shown on low-confidence matches (40%+ score)
+- Tooltip now shows confidence note for sparse-metadata books
+- Richness calculated from: tags, genres, description, narrator, publisher
+
+**2.4 Event-Based Session Expiry**
+- Sessions now have soft (24hr) and hard (48hr) expiry states
+- Session states: active, soft, expired
+- Soft state: Results accessible but prompts "Refresh your mood?"
+- Quick tune extends session by resetting both expiry times
+- `useSessionState()` selector for checking current state
+
+**Modified Files:**
+- `src/features/mood-discovery/types.ts` - New types for branching quiz, confidence, session states
+- `src/features/mood-discovery/screens/MoodDiscoveryScreen.tsx` - 2-step branching quiz
+- `src/features/mood-discovery/stores/moodSessionStore.ts` - Session state management
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts` - Metadata richness scoring
+- `src/features/mood-discovery/components/MoodBookCard.tsx` - Confidence badge
+- `src/constants/version.ts`
+
+---
+
+## [0.7.144] - 2026-01-19
+
+### Mood Discovery: Tier 1 Quick Wins
+
+Implemented all Tier 1 improvements from the mood discovery roadmap:
+
+**1.1 Hard Mismatch Penalties**
+- Wrong tone now hurts more than soft matches help
+- Heavy book when user wants light = 50% penalty
+- Fast-paced when user wants slow = 65% penalty
+- Opposite direction mismatches also penalized
+
+**1.2 Weighted Randomization**
+- Books within same percentage tier now have varied ordering
+- Session-based seeded random factor (up to 3%) prevents stale results
+- Recently added books get slight recency boost (up to 2%)
+- Each new session produces fresh ordering
+
+**1.3 Match Explanation Tooltips**
+- Long-press any book card to see "Why this matches" modal
+- Shows match percentage badge and explanation text
+- Lists matched dimensions with icons and detailed descriptions
+- Dimensions: Mood, Pace, Tone, World, Length, Themes
+
+**1.4 Improved Empty/Sparse Messaging**
+- Context-aware empty states based on library size and filter strictness
+- Small library (< 20 books): "Your library is focused" with genre suggestions
+- Strict filters (3+ non-any): "Nothing quite fits — try relaxing filters"
+- Sparse results banner when < 3 perfect matches: "Showing best available"
+
+**Modified Files:**
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts` - Penalties, randomization
+- `src/features/mood-discovery/components/MoodBookCard.tsx` - Long-press tooltip
+- `src/features/mood-discovery/screens/MoodResultsScreen.tsx` - Empty/sparse messaging
+- `src/constants/version.ts`
+
+---
+
+## [0.7.143] - 2026-01-19
+
+### Fix: Book Spine Scaling in Carousels
+
+Fixed book spines scaling too large on carousel pages (e.g., "Your Taste" shelf view):
+
+**Problem:**
+- TasteTextList was using `scaleFactor: 1.0` which resulted in ~325px tall spines
+- This caused spines to take up nearly the full screen height in carousel contexts
+
+**Solution:**
+- Reduced `scaleFactor` to `0.5` for TasteTextList (~160px height)
+- Now matches proportions appropriate for horizontal scroll carousels
+- Other detail screens already use 0.75, SeriesSpineCard uses 0.35
+
+**Modified Files:**
+- `src/features/browse/components/TasteTextList.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.142] - 2026-01-19
+
+### UI: FilteredBooksScreen Redesign
+
+Updated FilteredBooksScreen (duration sub-pages like Quick Listens) to match AllBooksScreen design:
+
+**Changes:**
+- TopNav with skull logo, pill label, back button, and integrated search bar
+- Sort bar with compact buttons: Length, Recent, Title, Author
+- Default sort by duration (shortest first) for duration filter pages
+- AlphabetScrubber appears when sorting by title or author
+- Removed SHELF/LIST view toggles in favor of unified list view
+- Theme-aware styling using useTheme()
+
+**Modified Files:**
+- `src/features/library/screens/FilteredBooksScreen.tsx` - Complete redesign
+- `src/constants/version.ts`
+
+---
+
+## [0.7.139] - 2026-01-19
+
+### Feature: Recently Added Section & All Books Screen
+
+Added "Recently Added" section to Browse page and new All Books screen with sorting tabs:
+
+**Browse Page Updates:**
+- New "Recently Added" section with 2-column grid showing 6 most recently added books
+- Positioned above the Authors section
+- "View All" button navigates to All Books screen
+
+**All Books Screen:**
+- New screen showing all books with sorting tabs: Recent, Title, Author, Duration
+- List view with cover thumbnails, titles, and metadata
+- Alphabet scrubber for Title and Author sort modes
+- Pull-to-refresh support
+
+**Mood Pill Enhancement:**
+- Mood pill now always visible on Browse page (not hidden when inactive)
+- When inactive: white outline with filled sparkles icon, tap to open mood selection
+- When active: filled with mood label and X icon, tap to cancel/clear mood
+
+**New Files:**
+- `src/features/browse/components/RecentlyAddedSection.tsx`
+- `src/features/library/screens/AllBooksScreen.tsx`
+
+**Modified Files:**
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` - Added RecentlyAddedSection
+- `src/features/browse/components/BrowseTopNav.tsx` - Updated mood pill behavior
+- `src/shared/components/TopNav.tsx` - Added outline and showClose props for pills
+- `src/navigation/AppNavigator.tsx` - Added AllBooks route
+- `src/constants/version.ts`
+
+---
+
+## [0.7.138] - 2026-01-18
+
+### Feature: Fuzzy ISBN Search with External Metadata Lookup
+
+Enhanced barcode scanner to search for similar titles when scanned ISBN is not found in library:
+
+**New Flow:**
+1. Scan ISBN barcode
+2. If not found in library, show prompt: "Search for similar titles?"
+3. User taps "Yes, search"
+4. App queries external metadata providers (Hardcover, Audible, Google, etc.) to get book title/author
+5. Uses that metadata to fuzzy search local library
+6. Results display in SearchScreen
+
+**Why This Helps:**
+- Same book may have different ISBN in your library (different edition)
+- External lookup provides title/author for better fuzzy matching
+- User isn't left at a dead-end when ISBN doesn't match exactly
+
+**New API Method:**
+- `apiClient.searchExternalBooks(title, author?, provider?)` - Queries ABS server's configured metadata providers
+
+**UI Changes:**
+- BarcodeScannerModal: Added "Search for similar titles?" prompt with Yes/No buttons
+- Shows loading state while looking up book info from external providers
+- SearchScreen now accepts `initialQuery` and `scannedISBN` route params
+
+**Modified Files:**
+- `src/core/api/apiClient.ts` - Added `searchExternalBooks` method
+- `src/core/types/api.ts` - Added `ExternalBookMatch` interface
+- `src/features/search/components/BarcodeScannerModal.tsx` - Added prompt UI and external lookup
+- `src/features/search/screens/SearchScreen.tsx` - Added `onSearchSimilar` handler and initial query support
+- `src/constants/version.ts`
+
+---
+
+## [0.7.137] - 2026-01-18
+
+### Bug Fix: Session & Sync Reliability Improvements
+
+Fixed multiple issues with fire-and-forget operations that could cause silent failures:
+
+**Session Service (`sessionService.ts`):**
+- **syncProgress retry logic**: Progress sync now retries up to 3 times with exponential backoff if network request fails (previously fire-and-forget with no retry)
+- **closeSession retry logic** (from 0.7.136): Session close now retries to prevent orphaned sessions
+
+**Background Sync Service (`backgroundSyncService.ts`):**
+- **Concurrent sync prevention**: Added flag to prevent overlapping background sync operations when app state changes rapidly
+- **Foreground sync error handling**: Added proper error handling for foreground sync to prevent unhandled rejections
+
+**Root Cause:** These issues caused the "session accumulation" bug where playing multiple books would eventually break playback. The server would have many orphaned sessions, and sync failures were silently swallowed.
+
+**Modified Files:**
+- `src/features/player/services/sessionService.ts` - Added `syncProgressWithRetry` helper
+- `src/features/player/services/backgroundSyncService.ts` - Added `backgroundSyncInProgress` flag and error handling
+- `src/constants/version.ts`
+
+---
+
+## [0.7.136] - 2026-01-18
+
+### Bug Fix: Session Accumulation Bug
+
+Fixed session accumulation bug that caused playback to break after switching between books multiple times.
+
+**Session Service (`sessionService.ts`):**
+- **Added retry logic to session close**: `closeSessionWithRetry` method with 3 retries and exponential backoff
+- Previously, failed session close requests were fire-and-forget, leaving orphaned sessions on server
+
+**Player Store (`playerStore.ts`):**
+- **Fixed background session race condition**: Added check to verify user hasn't switched books before starting auto-sync
+- Orphaned background sessions are now properly closed
+
+**Root Cause:** Server logs showed 5-6 orphaned sessions being closed whenever a new session started. Failed close requests were never retried.
+
+**Modified Files:**
+- `src/features/player/services/sessionService.ts`
+- `src/features/player/stores/playerStore.ts`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.135] - 2026-01-18
+
+### Feature: ISBN Barcode Scanner & Android Search Fix
+
+Added barcode scanning to search for books by ISBN:
+
+- **ISBN Barcode Scanner**: Scan ISBN barcodes (EAN-13, ISBN-10) to find books in library
+- **Automatic ISBN matching**: Scanned ISBN is matched against library cache
+- **Book navigation**: Found books navigate directly to book detail
+- **Not found handling**: If ISBN not in library, displays message and shows ISBN in search
+
+**Android Fix:**
+- **Search placeholder alignment**: Fixed text vertical alignment on Android with `textAlignVertical: 'center'`
+
+**New Components:**
+- `BarcodeScannerModal` - Full-screen camera scanner with ISBN detection
+- Uses expo-camera with barcode scanning capabilities
+
+**Search Screen Updates:**
+- Added barcode scan button to TopNav (Scan icon)
+- Integrated BarcodeScannerModal with search flow
+- ISBN not found sets query for manual search
+
+**Modified Files:**
+- `src/features/search/components/BarcodeScannerModal.tsx` - NEW
+- `src/features/search/components/SearchBar.tsx` - Android alignment fix
+- `src/features/search/screens/SearchScreen.tsx` - Barcode scanner integration
+- `src/constants/version.ts`
+- `package.json` - Added expo-camera dependency
+
+---
+
+## [0.7.134] - 2026-01-18
+
+### Enhancement: Visual Buffering Indicator on Play Buttons
+
+Added visual feedback when audio is buffering to improve user experience:
+
+- **Play buttons now show buffering state**: When streaming audio is buffering, play buttons display a spinner around a smaller play/pause icon
+- **Affects all play buttons**:
+  - Mini player (GlobalMiniPlayer)
+  - Full player screen (SecretLibraryPlayerScreen)
+  - Playback controls (PlaybackControls component)
+  - Shared PlayPauseButton component (via `isBuffering` prop)
+
+**User Experience:**
+- Users can see at a glance when audio is buffering vs loading vs playing
+- Buffering state shows spinner around current play/pause icon (user can still tap to toggle)
+- Loading state shows only spinner (initial audio load)
+- Normal state shows full-size play/pause icon
+
+**Technical:**
+- Added `isBuffering` prop to `PlayPauseButton` component
+- Added `isBuffering` prop to `PlaybackControls` component
+- Added `isBuffering` prop to `PlayerModule` component
+- Subscribed to `isBuffering` from playerStore in mini player and full player
+
+**Modified Files:**
+- `src/shared/components/PlayPauseButton.tsx` - Added `isBuffering` prop with spinner overlay
+- `src/features/home/components/PlaybackControls.tsx` - Added `isBuffering` support
+- `src/features/player/components/PlayerModule.tsx` - Pass through `isBuffering`
+- `src/navigation/components/GlobalMiniPlayer.tsx` - Subscribe to and display buffering state
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` - Display buffering state
+- `src/constants/version.ts`
+
+---
+
+## [0.7.133] - 2026-01-18
+
+### Feature: App Reliability & Data Protection (Items #13-15)
+
+Final batch of the playback resilience audit, implementing critical reliability improvements:
+
+**13. Background Task Completion Guarantee**
+- Created `backgroundTaskService` with priority-based task execution
+- Tasks sorted by priority: CRITICAL (100), HIGH (75), NORMAL (50), LOW (25)
+- Registered critical tasks:
+  - Progress sync (CRITICAL) - ensures unsynced progress is saved
+  - Download state save (HIGH) - preserves download progress
+- Tasks execute when app goes to background with timeout protection
+- Graceful degradation: runs what it can in available time
+
+**14. Database Corruption Recovery**
+- Created `databaseRecoveryService` for SQLite corruption detection/recovery
+- `checkIntegrity()` runs PRAGMA integrity_check on database
+- `quickHealthCheck()` for fast database accessibility verification
+- `attemptRecovery()` implements multi-step recovery:
+  1. Backup critical data to AsyncStorage
+  2. Salvage readable data from corrupted tables
+  3. Delete corrupted database file (backup for debugging)
+  4. Reinitialize with fresh schema
+  5. Restore salvaged data
+  6. Restore from AsyncStorage backup if needed
+- Added `getDatabase()`, `close()`, `initialize()` methods to `sqliteCache`
+
+**15. Streaming Buffer Underrun Recovery**
+- Created `bufferRecoveryService` for detecting and recovering from buffer stalls
+- Monitors buffering state via progress update loop
+- Detection: 5 seconds of continuous buffering = stall detected
+- Recovery strategies:
+  1. Retry play with exponential backoff (1s, 2s, 4s)
+  2. Rewind recovery - seek back 2s to refill buffer
+- Max 3 recovery attempts before notifying user
+- Network quality tracking based on recent buffer events
+- Integrated into `audioService` with automatic start/stop
+
+**New Files:**
+- `src/core/services/backgroundTaskService.ts` - Background task management
+- `src/core/services/databaseRecoveryService.ts` - Database corruption recovery
+- `src/features/player/services/bufferRecoveryService.ts` - Buffer underrun recovery
+
+**Modified Files:**
+- `src/core/services/appInitializer.ts` - Background task integration
+- `src/core/services/sqliteCache.ts` - Added recovery-related methods
+- `src/features/player/services/audioService.ts` - Buffer recovery integration
+- `src/constants/version.ts`
+
+---
+
+## [0.7.132] - 2026-01-18
+
+### Feature: System Resilience & Monitoring (Items #9-12)
+
+Continuing the playback resilience audit, implemented 4 additional system-level improvements:
+
+**9. API Version Mismatch Detection**
+- Added `serverVersionService` to check server version on login/restore
+- Compares server version against minimum supported (2.7.0) and critical (2.5.0) thresholds
+- Shows warning in UI when server is outdated via `versionCheck` in auth context
+- Non-blocking check that doesn't prevent login on older servers
+
+**10. Android Headphone Unplug Handling**
+- Created new `audio-noisy-module` Expo native module for Android
+- Listens for `ACTION_AUDIO_BECOMING_NOISY` broadcast (headphone disconnect)
+- Automatically pauses playback when headphones are unplugged
+- iOS already handles this natively via expo-audio's route change notification
+
+**11. Token Health Monitoring**
+- Added `tokenHealthService` for proactive token validity checking
+- Checks token every 5 minutes during active use
+- Extended background check (30 min threshold) when returning to foreground
+- Tracks consecutive failures and notifies for re-auth after 3 failures
+
+**12. Memory Pressure Handling**
+- Added `memoryPressureService` to monitor app memory usage
+- Uses existing `MemoryModule` for native memory info
+- Warning at 300MB, critical cleanup at 450MB
+- Registers cleanup callbacks for library cache and network cache
+- Triggers garbage collection hint when under pressure
+
+**New Files:**
+- `modules/audio-noisy-module/` - Android native module for headphone detection
+- `src/core/services/serverVersionService.ts` - Server version compatibility
+- `src/core/services/tokenHealthService.ts` - Token validity monitoring
+- `src/core/services/memoryPressureService.ts` - Memory pressure response
+- `src/core/api/endpoints.ts` - Added server status endpoint
+
+**Modified Files:**
+- `src/core/auth/authContext.tsx` - Integrated version check, token health
+- `src/core/services/appInitializer.ts` - Memory pressure initialization
+- `src/features/player/services/audioService.ts` - Audio noisy listener
+- `src/constants/version.ts`
+
+---
+
+## [0.7.131] - 2026-01-18
+
+### Feature: Network Resilience & Session Recovery (Items #5-8)
+
+Continuing the playback resilience audit, implemented 4 additional improvements:
+
+**5. Phone Call Detection (via Audio Focus)**
+- Already covered by v0.7.130's audio focus implementation
+- `interruptionMode: 'doNotMix'` handles phone calls automatically
+- Both iOS and Android properly pause during calls
+
+**6. 429 Rate Limit Handling with Backoff**
+- Enhanced `networkOptimizer.ts` with intelligent rate limit handling
+- Parses `Retry-After` header (supports both seconds and HTTP date formats)
+- Falls back to aggressive exponential backoff (5s, 10s, 20s) when no header
+- Increased max retries from 2 to 3 for better resilience
+- Increased max delay from 3s to 10s for rate limit scenarios
+
+**7. Streaming URL Expiration Refresh**
+- Added error callback system to audioService for error reporting
+- Detects 403/401 errors during streaming (indicating session/URL expiration)
+- Automatically refreshes session and reloads audio at same position
+- Shows "Session expired - refreshing..." message during recovery
+- New types: `AudioErrorType`, `AudioError` interface
+
+**8. CDN/Server Failover (Network Retry)**
+- Added `loadUrlWithRetry()` method for audio URL loading
+- Retries up to 3 times with exponential backoff (1s, 2s, 4s)
+- Skips retry on 403/401 (auth errors need session refresh, not retries)
+- Reports `NETWORK_ERROR` to error callback after all retries exhausted
+- Applied to both single-track and multi-track loading
+
+**Technical Details:**
+- Rate limit: `parseRetryAfter()` handles both numeric and date formats
+- Session refresh: `playbackCache.clearSession()` + `loadBook()` at same position
+- Network retry: `MAX_LOAD_RETRIES = 3`, `INITIAL_RETRY_DELAY_MS = 1000`
+- Error types: `URL_EXPIRED | NETWORK_ERROR | LOAD_FAILED`
+
+**Files Modified:**
+- `src/core/api/networkOptimizer.ts` - 429 rate limit handling
+- `src/features/player/services/audioService.ts` - Error callback, retry logic
+- `src/features/player/stores/playerStore.ts` - Session refresh on URL expiration
+- `src/constants/version.ts`
+
+---
+
+## [0.7.130] - 2026-01-18
+
+### Feature: Critical Playback Resilience Improvements
+
+Added 4 critical fallbacks and detection systems to improve playback reliability:
+
+**1. Audio Focus Handling (iOS/Android)**
+- Set `interruptionMode: 'doNotMix'` for iOS and Android
+- Playback now properly pauses when:
+  - Phone calls come in
+  - Siri/Google Assistant activates
+  - Other apps play audio
+  - Navigation voice guidance starts
+- Playback resumes automatically when focus is regained
+
+**2. Bluetooth/Headphone Disconnect Detection**
+- iOS: expo-audio handles `oldDeviceUnavailable` - auto-pauses when headphones disconnect
+- Android: Audio focus handling provides coverage for most disconnect scenarios
+- Stuck detection catches remaining edge cases (5-second threshold)
+
+**3. Disk Space Check Before Downloads**
+- Added pre-download validation to ensure sufficient storage
+- Checks for required space + 20% buffer for file system overhead
+- Shows clear error message if disk space is insufficient
+- Prevents mid-download failures due to storage exhaustion
+
+**4. Ghost Paused Detection**
+- After pause(), verifies audio actually stopped within 500ms
+- If audio still playing, retries pause command
+- Logs warning and notifies UI if pause fails after 2 attempts
+- Prevents UI/audio desync where UI shows paused but audio continues
+
+**Technical Details:**
+- Audio focus: `setAudioModeAsync({ interruptionMode: 'doNotMix', interruptionModeAndroid: 'doNotMix' })`
+- Disk check: `FileSystem.getFreeDiskStorageAsync()` with 1.2x buffer
+- Ghost detection: 500ms verification timeout with retry
+
+**Files Modified:**
+- `src/features/player/services/audioService.ts` - Audio focus and ghost paused detection
+- `src/core/services/downloadManager.ts` - Disk space validation
+- `src/constants/version.ts`
+
+---
+
+## [0.7.129] - 2026-01-18
+
+### Feature: Download Integrity Verification
+
+Integrated the `downloadIntegrity` service into the download manager to verify file integrity after each download completes.
+
+**How it works:**
+1. **Per-file verification** - After each audio file downloads, verify size matches expected (with 1% tolerance)
+2. **Auto-retry on failure** - If verification fails, delete corrupted file and retry (up to 2 times)
+3. **Final batch validation** - Quick check of all files before marking download complete
+4. **Failure tracking** - Analytics events track integrity failures for monitoring
+
+**Benefits:**
+- Detects corrupted downloads caused by network glitches or disk issues
+- Automatically retries corrupted files instead of failing silently
+- Prevents playback issues from corrupted audio files
+- Final validation ensures all files are present and valid before completing
+
+**Technical details:**
+- Uses `verifyFileIntegrity()` for full validation (size check with tolerance)
+- Uses `quickValidate()` for fast final batch check
+- Maximum 2 integrity retries per file to avoid infinite loops
+- Tracks `download_integrity_failed` and `download_final_validation_failed` events
+
+**Files Modified:**
+- `src/core/services/downloadManager.ts` - Added integrity verification integration
+- `src/constants/version.ts`
+
+---
+
+## [0.7.128] - 2026-01-18
+
+### Feature: Byte-Level Download Resume
+
+Added intelligent download resume support that saves partial download progress and resumes from the exact byte position after app crash, restart, or network interruption.
+
+**How it works:**
+1. **Periodic state saving** - Every 10 seconds during download, the current byte position and download state are saved to SQLite
+2. **Crash recovery** - On app restart, stuck downloads check for saved resume state instead of restarting from scratch
+3. **File-level resume** - Already completed files are detected and skipped; partial files resume from saved position
+4. **State cleanup** - Resume state is cleared on successful completion
+
+**Benefits:**
+- A 500MB audiobook that failed at 400MB will resume from 400MB, not restart
+- App crashes or network drops don't lose partial progress
+- Saves bandwidth and time on large downloads
+
+**Technical implementation:**
+- Added `resumable_state TEXT` column to SQLite downloads table
+- Uses Expo FileSystem's `DownloadResumable.savable()` and `resumeAsync()` APIs
+- State includes URL, destination path, and bytes written
+- Checks file existence and size to skip already-completed files
+
+**Files Modified:**
+- `src/core/services/sqliteCache.ts` - Added resumable_state column, migration, and update method
+- `src/core/services/downloadManager.ts` - Implemented resume logic in downloadFileWithRetry and startDownload
+- `src/constants/version.ts`
+
+---
+
+## [0.7.127] - 2026-01-18
+
+### Feature: Redesigned FilteredBooksScreen with Secret Library Style
+
+Completely redesigned the `FilteredBooksScreen` to match the Secret Library design language.
+
+**New Features:**
+- **TopNav with skull logo** - Consistent branding
+- **Duration filter support** - Properly handles `filterType: 'duration'` with min/max duration params
+- **Dynamic title** - Shows duration category name (e.g., "Quick Listens", "Epic") instead of generic "Books"
+- **Subtitle** - Shows duration range description (e.g., "Under 4 hours")
+- **SHELF / LIST toggle** - Switch between 3-column grid and list view
+- **List view with duration** - Shows book title and duration in list mode
+- **Secret Library typography** - Playfair Display titles, JetBrains Mono metadata
+- **Dark theme** - Consistent with rest of Secret Library
+
+**Duration Filter Flow:**
+1. Duration Filter Screen → tap category (e.g., "Quick Listens")
+2. FilteredBooksScreen opens with:
+   - Title: "Quick Listens" (from DURATION_RANGES)
+   - Subtitle: "Under 4 hours"
+   - Books filtered by duration range
+   - SHELF / LIST toggle
+
+**Files Modified:**
+- `src/features/library/screens/FilteredBooksScreen.tsx` - Complete rewrite
+- `src/constants/version.ts`
+
+---
+
+## [0.7.126] - 2026-01-18
+
+### Enhancement: Grid View Metadata Display
+
+Added additional metadata to grid view cards to match the design of other list screens:
+
+**Grid cards now show:**
+- Title (2 lines)
+- Author
+- Series name & number (if applicable)
+- Narrator (if available)
+- Duration (compact format, e.g., "10h")
+
+All metadata uses consistent JetBrains Mono styling.
+
+**Files Modified:**
+- `src/features/home/screens/LibraryScreen.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.125] - 2026-01-18
+
+### Feature: 2-Column Grid View for Library
+
+Added a new grid view option to the Secret Library screen, showing books as 2-column cards with large square covers.
+
+**View modes now available:**
+1. **Shelf** - Upright book spines (default)
+2. **Grid** - 2-column cards with square covers, title, author, and series info
+3. **List** - Compact vertical list with small thumbnails
+
+**UI:**
+- New grid icon (2x2 squares) added to TopNav between shelf and list buttons
+- Grid cards show: cover image, title (2 lines), author, series info
+
+**Files Modified:**
+- `src/features/home/screens/LibraryScreen.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.124] - 2026-01-18
+
+### Fix: Top Pick Hero Title Truncation
+
+Long titles like "The Very Secret Society of Irregular Witches" were being truncated with ellipsis.
+
+**Changes:**
+- Reduced title font size from 24 to 22 scaled
+- Increased `numberOfLines` from 2 to 3
+- Added `adjustsFontSizeToFit` with `minimumFontScale={0.8}` for iOS auto-scaling
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.123] - 2026-01-18
+
+### Performance: Mood Recommendations Caching
+
+**Problem:**
+`useMoodRecommendations` was scoring all library books (~2.6 seconds) every render, running 3+ times on browse page load due to React re-renders, causing 8+ second delays.
+
+**Solution:**
+Added global module-level cache for mood recommendations:
+- Cache keyed by session parameters (mood, pace, weight, world, length, excludeChildrens, createdAt)
+- Cache returns instantly on subsequent renders (cache HIT)
+- Cache automatically cleared when session changes:
+  - `commitSession()` - New quiz completed
+  - `clearSession()` - Manual clear
+  - `validateSession()` - Session expired
+  - `quickTune()` - Parameters adjusted
+  - `setLength()` - Length preference changed
+
+**Result:**
+Browse page with mood session now loads in ~100ms instead of 8+ seconds.
+
+**Files Modified:**
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts` - Added cache
+- `src/features/mood-discovery/stores/moodSessionStore.ts` - Clear cache on changes
+- `src/constants/version.ts`
+
+---
+
+## [0.7.122] - 2026-01-18
+
+### Debug: Browse Page Performance Logging
+
+Added comprehensive timing logs to identify performance bottlenecks:
+
+**Screen Level:**
+- `SecretLibraryBrowseScreen` - Total mount time and hook execution
+
+**Component Level:**
+- `TopPickHero` - Cache access, mood recommendations timing
+- `TasteTextList` - Cache access, personalized content timing
+- `SeriesGallery` - Cache access, useMemo computation
+- `AuthorsTextList` - Authors hook timing
+
+**Hook Level:**
+- `useRecommendations` - Individual SQLite query timing:
+  - `getReadHistoryStats()`
+  - `getFinishedUserBooks()`
+  - `getInProgressUserBooks()`
+  - `getAbandonedBooks()`
+- `useMoodRecommendations` - Scoring loop timing
+
+All logs use `[Browse Perf]` tag for easy filtering.
+
+**Files Modified:**
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx`
+- `src/features/browse/components/TopPickHero.tsx`
+- `src/features/browse/components/TasteTextList.tsx`
+- `src/features/browse/components/SeriesGallery.tsx`
+- `src/features/browse/components/AuthorsTextList.tsx`
+- `src/features/recommendations/hooks/useRecommendations.ts`
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts`
+- `src/constants/version.ts`
+
+---
+
+## [0.7.121] - 2026-01-18
+
+### Performance: List Screens Speed Optimization
+
+**Problem:**
+List screens (Genres, Authors, Narrators) were calling `filterItems()` in loops, causing O(n × m) iterations (e.g., 200 authors × 2500 books = 500,000 iterations).
+
+**Solution:**
+Use pre-indexed `books` arrays from library cache instead of filtering:
+- `GenresListScreen` - Now reads `genresWithBooks` map directly
+- `AuthorsListScreen` - Now reads `authors` map with `author.books`
+- `NarratorsListScreen` - Now reads `narrators` map with `narrator.books`
+
+All data is indexed once during cache load, then accessed O(1) per entity.
+
+**Files Modified:**
+- `src/features/library/screens/GenresListScreen.tsx`
+- `src/features/library/screens/AuthorsListScreen.tsx`
+- `src/features/library/screens/NarratorsListScreen.tsx`
+- `src/features/library/components/PersonSections.tsx` (added books to type)
+- `src/constants/version.ts`
+
+---
+
+## [0.7.120] - 2026-01-18
+
+### Performance: Browse Page Speed Optimization
+
+**SeriesGallery:**
+- Now uses pre-built series map from library cache instead of API call
+- Eliminates network request that was blocking browse page render
+- Series data computed once at cache load, reused across views
+
+**useTopAuthors:**
+- Now reads from pre-built authors map in library cache
+- Eliminates iteration over all 2500 library items on each render
+- Authors indexed with book counts at cache load time
+
+**Files Modified:**
+- `src/features/browse/components/SeriesGallery.tsx` - Use library cache
+- `src/features/browse/hooks/useTopAuthors.ts` - Use pre-built index
+- `src/constants/version.ts`
+
+---
+
+## [0.7.119] - 2026-01-18
+
+### Performance: Smarter Cover Prefetch Priority
+
+**Prefetch Service:**
+- Now prefetches covers for 50 most recently listened books (by lastUpdate)
+- Plus 50-100 most recently added books to the library
+- Combined and deduplicated so recently listened takes priority
+- Ensures covers are cached for books users are most likely to see
+
+**New Helper Methods:**
+- `getRecentlyAdded()` - Sorts items by addedAt timestamp
+- `getRecentlyListened()` - Filters items with progress, sorts by lastUpdate
+- `getPriorityItems()` - Combines both lists with deduplication
+
+**Files Modified:**
+- `src/core/services/prefetchService.ts` - Priority-based prefetch logic
+- `src/constants/version.ts`
+
+---
+
+## [0.7.118] - 2026-01-18
+
+### Performance: Cover Image Size Optimization
+
+**Prefetch Service:**
+- Now prefetches covers at 400×400 instead of full size
+- Significantly reduces bandwidth and memory usage during app init
+
+**All Components:**
+- Standardized cover sizes across the app:
+  - 400×400 for main displays (heroes, cards, series) - matches prefetch cache
+  - 80×80 for small list thumbnails
+  - 120×120 for search results
+- Components now hit the prefetch cache instead of loading separate full-size images
+
+**Dead Code Removal:**
+- Deleted unused `HomeScreen.tsx` (LibraryScreen is the actual home)
+- Deleted unused `ContinueListeningSection.tsx`
+- Deleted unused `YourSeriesSection.tsx`
+- Deleted unused `TextListSection.tsx`
+- Deleted unused `HorizontalBookItem.tsx`
+
+**SpineCache Cleanup:**
+- Removed cover URL storage (not needed for spines)
+- Removed color extraction from covers (using genre-based colors only)
+- Removed `extractCoverColors()` and `updateBookColors()` methods
+- Removed unused imports (`getColors`, `apiClient`, `getErrorMessage`)
+
+**Files Modified:**
+- `src/core/services/prefetchService.ts` - 400×400 prefetch
+- `src/features/home/stores/spineCache.ts` - Removed cover/color extraction
+- Multiple component files updated with optimized cover sizes
+- Index files cleaned up to remove dead exports
+- `src/navigation/AppNavigator.tsx` - Removed HomeScreen references
+
+---
+
+## [0.7.117] - 2026-01-18
+
+### Search Screen: Browse Buttons with Globe Icon
+
+- Updated browse button icons to larger size (24px with strokeWidth 1.5)
+- Changed Series icon from "Library" to "BarChart2" for better visual clarity
+- Added big "Browse All Books" button with Globe icon at bottom
+- Button navigates to BrowsePage for full library exploration
+- Both empty state and no-results state have consistent browse UI
+
+**Files Modified:**
+- `src/features/search/screens/SearchScreen.tsx` - Larger icons, Globe browse button
+- `src/constants/version.ts`
+
+---
+
+## [0.7.116] - 2026-01-18
+
+### Search Screen: Simplified Browse Buttons
+
+- Replaced QuickBrowseGrid with simple square browse buttons
+- Fixed dark mode styling for browse buttons (proper backgrounds and borders)
+- Square aspect ratio buttons for Genres, Authors, Series, Duration
+- Same button style used for both empty state and no-results state
+
+**Files Modified:**
+- `src/features/search/screens/SearchScreen.tsx` - Square browse buttons with dark mode support
+- `src/constants/version.ts`
+
+---
+
+## [0.7.114] - 2026-01-18
+
+### Search Screen Improvements
+
+**Recent Searches:**
+- Now shows only last 4 searches (was showing all 10)
+
+**Filter Popup:**
+- Simplified from complex bottom sheet to centered popup
+- Now includes just 3 filter categories:
+  - Genre (top 8 genres)
+  - Duration (existing ranges)
+  - Age Range (All Ages, Kids, Young Adult, Adult)
+- Age range filters books by genre keywords (children's, juvenile, young adult, teen, etc.)
+
+**Files Modified:**
+- `src/features/search/screens/SearchScreen.tsx` - Limited history display, added age range filter
+- `src/features/search/components/SearchFilterSheet.tsx` - Complete rewrite to simple popup
+- `src/constants/version.ts`
+
+---
+
+## [0.7.113] - 2026-01-17
+
+### UI/Perf: Browse Page Styling + Performance Fix
+
+**TopPickHero:**
+- Header now matches "Your Taste" styling (italic, scale(32) Playfair font)
+- Simplified layout without large overlapping text
+
+**Book Detail Page:**
+- Genre pills moved under About section
+- Genre pills now left-aligned with About text
+
+**Performance:**
+- Removed expensive `usePersonalizedContent` hook from TopPickHero
+- Simple fallback uses first unfinished book from library
+- Browse page loads significantly faster
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx` - Simplified styling and hooks
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx` - Genre pills positioning
+- `src/constants/version.ts`
+
+---
+
+## [0.7.112] - 2026-01-17
+
+### UI: TopPickHero Section Label Styled Like Player Title
+
+- "Top Pick For You" label now styled large (~32pt) with Playfair font
+- "Top Pick" on first line, "For You" in italic on second line
+- Book title/author remain centered like book detail page
+- Cover size back to 240x240
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx` - Large section label
+- `src/constants/version.ts`
+
+---
+
+## [0.7.110] - 2026-01-17
+
+### UI: Dynamic Title Typography in Browse Hero
+
+TopPickHero now uses the same spine-based typography system as the book detail page:
+- Title font family dynamically matches book's genre/series style
+- Uses cached spine typography for consistency with home screen book spines
+- Text transform (uppercase) applied when appropriate for genre
+- Falls back to genre-based typography if not in cache
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx` - Added spine typography integration
+- `src/constants/version.ts`
+
+---
+
+## [0.7.109] - 2026-01-17
+
+### UI: Enhanced Hero Sections with Full Book Metadata
+
+**TopPickHero (Browse Page):**
+- Centered "TOP PICK FOR YOU" label
+- Added narrator info: "By Author · Narrated by Narrator" with tappable links
+- Added genre pills (up to 4 genres, tappable)
+- Added stats row: Duration | Chapters | Published
+- Dark mode styling throughout
+
+**Book Detail Page:**
+- Increased cover size from 160px to 240px to match browse hero
+- Consistent sizing across browse and detail views
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx` - Added narrator, genres, stats row
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx` - Larger cover
+- `src/constants/version.ts`
+
+---
+
+## [0.7.108] - 2026-01-17
+
+### Feature: Working Add to Library & Improved Filtering
+
+**TasteTextList (Based on Your Taste):**
+- "Add" button now actually adds books to user's library
+- Shows "Added" with checkmark after successful add
+- Excludes books already in library, with listening history, or downloaded
+- Does not navigate to book details when adding
+
+**Title Display Changes:**
+- Titles only split into two lines if more than 3 words
+- Removed italic styling from second line of titles
+- Applied to both TopPickHero and SecretLibraryBookDetailScreen
+
+**Files Modified:**
+- `src/features/browse/components/TasteTextList.tsx` - Add to library functionality
+- `src/features/browse/components/TopPickHero.tsx` - Title display changes
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx` - Title display changes
+- `src/constants/version.ts`
+
+---
+
+## [0.7.107] - 2026-01-17
+
+### UI: TopPickHero Matches Book Detail Design
+
+Redesigned TopPickHero to match the centered editorial style of SecretLibraryBookDetailScreen.
+
+**Design:**
+- Centered 160x160 square cover with shadow
+- Split title (first line normal, second line italic)
+- Byline: "By Author · Duration" with tappable author link
+- Series link (italic, underlined) when applicable
+- Match percentage badge for mood session results
+- Action buttons: Download (70%) + Play (30%) matching book detail style
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx` - Complete redesign
+- `src/constants/version.ts`
+
+---
+
+## [0.7.106] - 2026-01-17
+
+### UI: Enhanced Browse Page Hero & List Items
+
+**Top Pick Hero Changes:**
+- Square cover image (180x180) instead of portrait - about twice as large
+- Duration now displays inline with title (e.g., "Book Title · 12h")
+- Added Download button next to Play button (shows check when downloaded)
+- Added "Add to Library" pill button below action buttons
+- Increased spacing and padding for better visual impact
+
+**Based on Your Taste List Changes:**
+- Duration now displays inline with title instead of on the right
+- Added "Add" pill button to each list item for quick library actions
+- Updated layout to accommodate new pill button
+
+**Files Modified:**
+- `src/features/browse/components/TopPickHero.tsx` - Enhanced hero layout
+- `src/features/browse/components/TasteTextList.tsx` - Updated list items
+- `src/constants/version.ts`
+
+---
+
+## [0.7.105] - 2026-01-17
+
+### Feature: Top Pick Hero & Exclude Children's Toggle
+
+Added two new browse/discovery features:
+
+**1. Top Pick Hero (Browse Page)**
+- New hero section at top of Browse page showing #1 recommended book
+- Displays cover, title, author, match percentage (if mood session active), and duration
+- Shows progress bar if book is in progress
+- "Start Listening" / "Continue" button for quick playback
+- Falls back to personalized recommendations when no mood session active
+
+**2. Exclude Children's Books Toggle (Mood Discovery)**
+- New "Adults only" toggle on Step 1 of mood discovery quiz
+- When enabled, filters out books with children's/juvenile/kids genres
+- Persisted in mood session for the 24-hour session duration
+- Helps adults find age-appropriate content quickly
+
+**Files Created:**
+- `src/features/browse/components/TopPickHero.tsx` - Top pick hero component
+
+**Files Modified:**
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` - Added TopPickHero
+- `src/features/mood-discovery/types.ts` - Added excludeChildrens to MoodSession and QuizDraft
+- `src/features/mood-discovery/stores/moodSessionStore.ts` - Added setExcludeChildrens action
+- `src/features/mood-discovery/hooks/useMoodRecommendations.ts` - Added children's genre filter
+- `src/features/mood-discovery/screens/MoodDiscoveryScreen.tsx` - Added toggle UI
+- `src/constants/version.ts`
+
+---
+
+## [0.7.104] - 2026-01-16
+
+### UI: Remove Stack View from Library
+
+Removed the "Stack" view mode from the Library screen, leaving only:
+- **Shelf** - Upright book spines (primary view)
+- **List** - Vertical list with covers
+
+**Rationale:**
+- Stack view was a rotated pile layout that added complexity
+- Users primarily use Shelf view for browsing their library
+- Simplifies the UI with fewer view mode options
+
+**Files Modified:**
+- `src/features/home/screens/LibraryScreen.tsx` - Removed stack view mode and related UI
+
+---
+
+## [0.7.103] - 2026-01-16
+
+### UI: Remove Blue Accents and Improve Series Card Layout
+
+**View Toggle/Sort Button Changes:**
+- Removed blue accent color from view toggle buttons (Authors, Narrators, Genres pages)
+- Removed blue accent color from sort buttons (Series page)
+- Now uses neutral gray colors that work in both light and dark modes
+- Active state uses slightly brighter neutral instead of accent color
+
+**Series Card Heart Button:**
+- Moved heart button to far right of series cards (now its own column)
+- Increased heart size from 10 to 18 for better tap target
+- Cleaner visual hierarchy: [Content] [Color Dots] [Heart]
+
+**Files Modified:**
+- `src/features/library/screens/AuthorsListScreen.tsx` - View toggle neutral colors
+- `src/features/library/screens/NarratorsListScreen.tsx` - View toggle neutral colors
+- `src/features/library/screens/GenresListScreen.tsx` - View toggle neutral colors
+- `src/features/library/screens/SeriesListScreen.tsx` - Sort buttons neutral colors + heart layout
+- `src/constants/version.ts`
+
+---
+
+## [0.7.102] - 2026-01-16
+
+### Feature: Redesign Authors & Narrators Pages (Genres Pattern)
+
+Redesigned the All Authors and All Narrators browse pages to match the hierarchical design pattern used in the Genres page.
+
+**New Design:**
+- **View mode toggle**: Grid (grouped) vs List (flat A-Z) icons in header
+- **Your Authors/Narrators section**: Personalized list based on listening history (max 5)
+- **Popular Authors/Narrators section**: Top 6 by book count
+- **Browse by Category**: Collapsible meta-categories (Fiction Authors, Non-Fiction Authors, etc.)
+- Authors/narrators grouped by their primary genre (most common genre across their books)
+
+**Layout (Grouped View):**
+```
+┌─ Your Authors (if listening to books) ─┐
+│  [Avatar] Author Name - X books        │
+└────────────────────────────────────────┘
+┌─ Popular Authors ──────────────────────┐
+│  [Avatar] Author Name - X books        │
+└────────────────────────────────────────┘
+┌─ Browse by Category ───────────────────┐
+│  Fiction Authors (X authors · Y books) ▼│
+│  Non-Fiction Authors ▼                  │
+│  Children & YA Authors ▼                │
+│  ...                                    │
+└────────────────────────────────────────┘
+```
+
+**Flat View (A-Z):**
+- Same as before: SectionList with sticky letter headers + alphabet scrubber
+
+**Files Created:**
+- `src/features/library/components/PersonSections.tsx` - Reusable section components
+
+**Files Modified:**
+- `src/features/library/screens/AuthorsListScreen.tsx` - Complete redesign
+- `src/features/library/screens/NarratorsListScreen.tsx` - Complete redesign
+- `src/constants/version.ts`
+
+---
+
 ## [0.7.101] - 2026-01-16
 
 ### Fix: Library Loading Flash (Secret Library)

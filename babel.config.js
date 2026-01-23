@@ -13,12 +13,14 @@ module.exports = function (api) {
     presets: ['babel-preset-expo'],
 
     plugins: [
-      // Path aliasing (@/ -> ./src)
+      // Path aliasing (@/ -> ./src, @modules/ -> ./modules, @assets/ -> ./assets)
       [
         'module-resolver',
         {
           alias: {
             '@': './src',
+            '@modules': './modules',
+            '@assets': './assets',
           },
         },
       ],

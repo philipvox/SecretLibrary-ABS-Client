@@ -1,107 +1,54 @@
 /**
  * src/shared/accessibility/accessibilityUtils.ts
  *
- * Accessibility utilities for building accessible components.
- * Based on WCAG 2.1 AA, Apple HIG, and Material Design guidelines.
- *
- * Key requirements:
- * - Minimum touch target: 44x44 points
- * - Sufficient color contrast: 4.5:1 for normal text, 3:1 for large text
- * - Meaningful labels for screen readers
- * - Support for Reduce Motion preference
+ * Accessibility utilities for building accessible React Native components.
+ * Provides helpers for common accessibility patterns following WCAG 2.1 guidelines.
  */
 
-import { AccessibilityRole, AccessibilityState, AccessibilityValue } from 'react-native';
-import { scale } from '../theme';
+import { AccessibilityRole, AccessibilityState } from 'react-native';
 
 // =============================================================================
-// Constants
+// CONSTANTS
 // =============================================================================
 
 /**
- * Minimum touch target size per platform guidelines.
- * Apple HIG and Material Design both recommend 44pt minimum.
+ * Minimum touch target size (44pt) per Apple HIG and Material Design guidelines
  */
 export const MIN_TOUCH_TARGET = 44;
 
 /**
- * Hit slop values to expand touch area for small elements.
- * Use these to ensure elements smaller than 44pt still meet touch target requirements.
+ * Predefined hit slop values for common element sizes
  */
 export const HIT_SLOP = {
-  /** For elements 32pt - adds 6pt padding each side */
+  /** For 32pt elements (44 - 32 = 12, split = 6) */
   small: { top: 6, bottom: 6, left: 6, right: 6 },
-  /** For elements 24pt - adds 10pt padding each side */
+  /** For 24pt elements (44 - 24 = 20, split = 10) */
   xsmall: { top: 10, bottom: 10, left: 10, right: 10 },
-  /** For elements 16pt - adds 14pt padding each side */
+  /** For 16pt elements (44 - 16 = 28, split = 14) */
   xxsmall: { top: 14, bottom: 14, left: 14, right: 14 },
-};
-
-/**
- * Font size thresholds for WCAG contrast requirements.
- * Large text (18pt+ or 14pt+ bold) has relaxed contrast requirements.
- */
-export const LARGE_TEXT_THRESHOLD = {
-  normal: 18,
-  bold: 14,
-};
+} as const;
 
 // =============================================================================
-// Types
+// HIT SLOP CALCULATION
 // =============================================================================
 
-export interface AccessibilityProps {
-  accessibilityLabel?: string;
-  accessibilityHint?: string;
-  accessibilityRole?: AccessibilityRole;
-  accessibilityState?: AccessibilityState;
-  accessibilityValue?: AccessibilityValue;
-  accessible?: boolean;
-}
-
-export interface ButtonAccessibilityOptions {
-  label: string;
-  hint?: string;
-  disabled?: boolean;
-  selected?: boolean;
-  busy?: boolean;
-  expanded?: boolean;
-}
-
-export interface SliderAccessibilityOptions {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  unit?: string;
-}
-
-export interface ProgressAccessibilityOptions {
-  label: string;
-  progress: number;
-  total?: number;
-  unit?: string;
-}
-
-// =============================================================================
-// Utility Functions
-// =============================================================================
-
-/**
- * Calculate hit slop to ensure minimum touch target size.
- * Returns hit slop values that expand the touch area to at least 44pt.
- *
- * @param width - Current element width
- * @param height - Current element height
- */
-export function calculateHitSlop(width: number, height: number): {
+interface HitSlop {
   top: number;
   bottom: number;
   left: number;
   right: number;
-} {
-  const horizontalPadding = Math.max(0, (MIN_TOUCH_TARGET - width) / 2);
-  const verticalPadding = Math.max(0, (MIN_TOUCH_TARGET - height) / 2);
+}
+
+/**
+ * Calculate hit slop needed to meet minimum touch target size
+ *
+ * @param width - Current width of the element
+ * @param height - Current height of the element
+ * @returns HitSlop object with padding values
+ */
+export function calculateHitSlop(width: number, height: number): HitSlop {
+  const horizontalPadding = Math.max(0, Math.ceil((MIN_TOUCH_TARGET - width) / 2));
+  const verticalPadding = Math.max(0, Math.ceil((MIN_TOUCH_TARGET - height) / 2));
 
   return {
     top: verticalPadding,
@@ -111,145 +58,184 @@ export function calculateHitSlop(width: number, height: number): {
   };
 }
 
-/**
- * Build accessibility props for a button element.
- * Includes label, hint, role, and state.
- *
- * @example
- * ```tsx
- * <TouchableOpacity {...buildButtonAccessibility({
- *   label: 'Play',
- *   hint: 'Plays the current audiobook',
- *   disabled: false,
- * })} />
- * ```
- */
-export function buildButtonAccessibility(options: ButtonAccessibilityOptions): AccessibilityProps {
-  const state: AccessibilityState = {};
+// =============================================================================
+// ACCESSIBILITY PROPS BUILDERS
+// =============================================================================
 
-  if (options.disabled !== undefined) state.disabled = options.disabled;
-  if (options.selected !== undefined) state.selected = options.selected;
-  if (options.busy !== undefined) state.busy = options.busy;
-  if (options.expanded !== undefined) state.expanded = options.expanded;
+interface ButtonAccessibilityOptions {
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+  selected?: boolean;
+  busy?: boolean;
+}
+
+interface ButtonAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityHint: string | undefined;
+  accessibilityRole: 'button';
+  accessibilityState: AccessibilityState | undefined;
+}
+
+/**
+ * Build accessibility props for a button
+ */
+export function buildButtonAccessibility(
+  options: ButtonAccessibilityOptions
+): ButtonAccessibilityProps {
+  const { label, hint, disabled, selected, busy } = options;
+
+  // Only include state if any state values are provided
+  let accessibilityState: AccessibilityState | undefined;
+  if (disabled !== undefined || selected !== undefined || busy !== undefined) {
+    accessibilityState = {};
+    if (disabled !== undefined) accessibilityState.disabled = disabled;
+    if (selected !== undefined) accessibilityState.selected = selected;
+    if (busy !== undefined) accessibilityState.busy = busy;
+  }
 
   return {
     accessible: true,
-    accessibilityLabel: options.label,
-    accessibilityHint: options.hint,
+    accessibilityLabel: label,
+    accessibilityHint: hint,
     accessibilityRole: 'button',
-    accessibilityState: Object.keys(state).length > 0 ? state : undefined,
+    accessibilityState,
+  };
+}
+
+interface SliderAccessibilityOptions {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit?: string;
+}
+
+interface SliderAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityRole: 'adjustable';
+  accessibilityValue: {
+    min: number;
+    max: number;
+    now: number;
+    text: string;
   };
 }
 
 /**
- * Build accessibility props for a slider/adjustable element.
- * Includes label, value, min, max, and optional unit.
- *
- * @example
- * ```tsx
- * <Slider {...buildSliderAccessibility({
- *   label: 'Playback speed',
- *   value: 1.5,
- *   min: 0.5,
- *   max: 3.0,
- *   unit: 'x',
- * })} />
- * ```
+ * Build accessibility props for a slider
  */
-export function buildSliderAccessibility(options: SliderAccessibilityOptions): AccessibilityProps {
-  const valueText = options.unit
-    ? `${options.value}${options.unit}`
-    : options.value.toString();
+export function buildSliderAccessibility(
+  options: SliderAccessibilityOptions
+): SliderAccessibilityProps {
+  const { label, value, min, max, unit = '' } = options;
 
   return {
     accessible: true,
-    accessibilityLabel: options.label,
+    accessibilityLabel: label,
     accessibilityRole: 'adjustable',
     accessibilityValue: {
-      min: options.min,
-      max: options.max,
-      now: options.value,
-      text: valueText,
+      min,
+      max,
+      now: value,
+      text: `${value}${unit}`,
     },
   };
 }
 
+interface ProgressAccessibilityOptions {
+  label: string;
+  progress: number;
+  total?: number;
+  unit?: string;
+}
+
+interface ProgressAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityRole: 'progressbar';
+  accessibilityValue: {
+    min: number;
+    max: number;
+    now: number;
+    text: string;
+  };
+}
+
 /**
- * Build accessibility props for a progress indicator.
- * Includes label, current progress, and total.
- *
- * @example
- * ```tsx
- * <ProgressBar {...buildProgressAccessibility({
- *   label: 'Download progress',
- *   progress: 45,
- *   total: 100,
- *   unit: '%',
- * })} />
- * ```
+ * Build accessibility props for a progress indicator
  */
-export function buildProgressAccessibility(options: ProgressAccessibilityOptions): AccessibilityProps {
-  const total = options.total ?? 100;
-  const percentage = Math.round((options.progress / total) * 100);
-  const valueText = options.unit
-    ? `${options.progress}${options.unit}`
-    : `${percentage}%`;
+export function buildProgressAccessibility(
+  options: ProgressAccessibilityOptions
+): ProgressAccessibilityProps {
+  const { label, progress, total = 100, unit } = options;
+
+  // If unit is provided, use the progress value directly
+  // Otherwise calculate percentage
+  const percentage = unit ? progress : Math.round((progress / total) * 100);
+  const text = unit ? `${progress}${unit}` : `${percentage}%`;
+  const displayLabel = unit ? `${label}: ${progress}${unit}` : `${label}: ${percentage}%`;
 
   return {
     accessible: true,
-    accessibilityLabel: `${options.label}: ${valueText}`,
+    accessibilityLabel: displayLabel,
     accessibilityRole: 'progressbar',
     accessibilityValue: {
       min: 0,
       max: total,
-      now: options.progress,
-      text: valueText,
+      now: progress,
+      text,
     },
   };
 }
 
+interface ImageAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityRole: 'image';
+}
+
 /**
- * Build accessibility props for an image.
- * Use this for meaningful images (not decorative).
- *
- * @example
- * ```tsx
- * <Image {...buildImageAccessibility('Cover art for Harry Potter')} />
- * ```
+ * Build accessibility props for an image
  */
-export function buildImageAccessibility(description: string): AccessibilityProps {
+export function buildImageAccessibility(label: string): ImageAccessibilityProps {
   return {
     accessible: true,
-    accessibilityLabel: description,
+    accessibilityLabel: label,
     accessibilityRole: 'image',
   };
 }
 
+interface HeadingAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityRole: 'header';
+}
+
 /**
- * Build accessibility props for a heading/header.
- *
- * @example
- * ```tsx
- * <Text {...buildHeadingAccessibility('Chapter 5: The Journey Begins')} />
- * ```
+ * Build accessibility props for a heading
  */
-export function buildHeadingAccessibility(text: string): AccessibilityProps {
+export function buildHeadingAccessibility(label: string): HeadingAccessibilityProps {
   return {
     accessible: true,
-    accessibilityLabel: text,
+    accessibilityLabel: label,
     accessibilityRole: 'header',
   };
 }
 
+interface LinkAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityHint: string | undefined;
+  accessibilityRole: 'link';
+}
+
 /**
- * Build accessibility props for a link.
- *
- * @example
- * ```tsx
- * <TouchableOpacity {...buildLinkAccessibility('View author profile', 'Opens author details')} />
- * ```
+ * Build accessibility props for a link
  */
-export function buildLinkAccessibility(label: string, hint?: string): AccessibilityProps {
+export function buildLinkAccessibility(label: string, hint?: string): LinkAccessibilityProps {
   return {
     accessible: true,
     accessibilityLabel: label,
@@ -258,15 +244,22 @@ export function buildLinkAccessibility(label: string, hint?: string): Accessibil
   };
 }
 
+interface ToggleAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityHint: string | undefined;
+  accessibilityRole: 'switch';
+  accessibilityState: { checked: boolean };
+}
+
 /**
- * Build accessibility props for a toggle/switch.
- *
- * @example
- * ```tsx
- * <Switch {...buildToggleAccessibility('Dark mode', true)} />
- * ```
+ * Build accessibility props for a toggle/switch
  */
-export function buildToggleAccessibility(label: string, isOn: boolean, hint?: string): AccessibilityProps {
+export function buildToggleAccessibility(
+  label: string,
+  isOn: boolean,
+  hint?: string
+): ToggleAccessibilityProps {
   return {
     accessible: true,
     accessibilityLabel: label,
@@ -276,15 +269,17 @@ export function buildToggleAccessibility(label: string, isOn: boolean, hint?: st
   };
 }
 
+interface TabAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityRole: 'tab';
+  accessibilityState: { selected: boolean };
+}
+
 /**
- * Build accessibility props for a tab button.
- *
- * @example
- * ```tsx
- * <TouchableOpacity {...buildTabAccessibility('Home', true)} />
- * ```
+ * Build accessibility props for a tab
  */
-export function buildTabAccessibility(label: string, isSelected: boolean): AccessibilityProps {
+export function buildTabAccessibility(label: string, isSelected: boolean): TabAccessibilityProps {
   return {
     accessible: true,
     accessibilityLabel: label,
@@ -293,28 +288,35 @@ export function buildTabAccessibility(label: string, isSelected: boolean): Acces
   };
 }
 
+interface ListItemAccessibilityProps {
+  accessible: true;
+  accessibilityLabel: string;
+  accessibilityHint: string | undefined;
+}
+
 /**
- * Build accessibility props for a list item.
- *
- * @example
- * ```tsx
- * <View {...buildListItemAccessibility('Harry Potter, by J.K. Rowling, 12 hours')} />
- * ```
+ * Build accessibility props for a list item
  */
-export function buildListItemAccessibility(description: string, hint?: string): AccessibilityProps {
+export function buildListItemAccessibility(
+  label: string,
+  hint?: string
+): ListItemAccessibilityProps {
   return {
     accessible: true,
-    accessibilityLabel: description,
+    accessibilityLabel: label,
     accessibilityHint: hint,
   };
 }
 
+// =============================================================================
+// TIME AND PROGRESS FORMATTERS
+// =============================================================================
+
 /**
- * Format time duration for accessibility announcement.
- * Converts seconds to a readable format.
+ * Format seconds into human-readable time for screen readers
  *
- * @example
- * formatTimeForAccessibility(3665) // "1 hour, 1 minute, 5 seconds"
+ * @param seconds - Total seconds
+ * @returns Human-readable string like "1 hour, 30 minutes, 15 seconds"
  */
 export function formatTimeForAccessibility(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -326,92 +328,129 @@ export function formatTimeForAccessibility(seconds: number): string {
   if (hours > 0) {
     parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
   }
+
   if (minutes > 0) {
     parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
   }
+
   if (secs > 0 || parts.length === 0) {
-    parts.push(`${secs} ${secs === 1 ? 'second' : 'seconds'}`);
+    // Always include seconds if nothing else, or if there are remaining seconds
+    if (hours === 0 || secs > 0) {
+      parts.push(`${secs} ${secs === 1 ? 'second' : 'seconds'}`);
+    }
   }
 
   return parts.join(', ');
 }
 
 /**
- * Format progress percentage for accessibility announcement.
+ * Format progress as a percentage for screen readers
  *
- * @example
- * formatProgressForAccessibility(0.456) // "46 percent complete"
+ * @param progress - Progress value between 0 and 1
+ * @returns String like "50 percent complete"
  */
 export function formatProgressForAccessibility(progress: number): string {
-  const percentage = Math.round(progress * 100);
-  return `${percentage} percent complete`;
+  const percent = Math.round(progress * 100);
+  return `${percent} percent complete`;
 }
 
-/**
- * Build an accessible description for a book item.
- *
- * @example
- * buildBookDescription({ title: 'Harry Potter', author: 'J.K. Rowling', duration: 36000, progress: 0.5 })
- * // "Harry Potter by J.K. Rowling, 10 hours, 50 percent complete"
- */
-export function buildBookDescription(options: {
+// =============================================================================
+// BOOK DESCRIPTION BUILDER
+// =============================================================================
+
+interface BookDescriptionOptions {
   title: string;
   author?: string;
   narrator?: string;
   duration?: number;
   progress?: number;
-}): string {
-  const parts: string[] = [options.title];
+}
 
-  if (options.author) {
-    parts.push(`by ${options.author}`);
+/**
+ * Build a comprehensive accessibility description for a book
+ */
+export function buildBookDescription(options: BookDescriptionOptions): string {
+  const { title, author, narrator, duration, progress } = options;
+
+  const parts: string[] = [title];
+
+  if (author) {
+    parts.push(`by ${author}`);
   }
 
-  if (options.narrator) {
-    parts.push(`narrated by ${options.narrator}`);
+  if (narrator) {
+    parts.push(`narrated by ${narrator}`);
   }
 
-  if (options.duration) {
-    parts.push(formatTimeForAccessibility(options.duration));
+  if (duration) {
+    const hours = Math.round(duration / 3600);
+    parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`);
   }
 
-  if (options.progress !== undefined && options.progress > 0) {
-    parts.push(formatProgressForAccessibility(options.progress));
+  if (progress && progress > 0) {
+    const percent = Math.round(progress * 100);
+    parts.push(`${percent} percent complete`);
   }
 
   return parts.join(', ');
 }
 
-/**
- * Check if a color combination meets WCAG AA contrast requirements.
- * Returns the contrast ratio (4.5:1 required for normal text, 3:1 for large text).
- *
- * Note: This is a simplified check. For production, use a proper color contrast library.
- */
-export function checkColorContrast(foreground: string, background: string): {
+// =============================================================================
+// COLOR CONTRAST CHECKER
+// =============================================================================
+
+interface ColorContrastResult {
   ratio: number;
   passesNormal: boolean;
   passesLarge: boolean;
-} {
-  // Simplified luminance calculation (use a proper library for production)
-  const getLuminance = (hex: string): number => {
-    const rgb = hex.replace('#', '').match(/.{2}/g);
-    if (!rgb) return 0;
+}
 
-    const [r, g, b] = rgb.map((c) => {
-      const value = parseInt(c, 16) / 255;
-      return value <= 0.03928
-        ? value / 12.92
-        : Math.pow((value + 0.055) / 1.055, 2.4);
-    });
+/**
+ * Calculate relative luminance of a color
+ * @see https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+ */
+function getRelativeLuminance(hex: string): number {
+  // Remove # if present
+  const cleanHex = hex.replace('#', '');
 
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
+  // Parse RGB values
+  const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+  const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+  const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
 
-  const l1 = getLuminance(foreground);
-  const l2 = getLuminance(background);
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
+  // Apply gamma correction
+  const gammaCorrect = (value: number) =>
+    value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+
+  const R = gammaCorrect(r);
+  const G = gammaCorrect(g);
+  const B = gammaCorrect(b);
+
+  // Calculate luminance
+  return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+}
+
+/**
+ * Check color contrast ratio between foreground and background
+ * WCAG 2.1 requirements:
+ * - Normal text: 4.5:1 minimum
+ * - Large text (18pt or 14pt bold): 3:1 minimum
+ *
+ * @param foreground - Foreground color in hex format (#RRGGBB)
+ * @param background - Background color in hex format (#RRGGBB)
+ * @returns Contrast ratio and pass/fail status
+ */
+export function checkColorContrast(
+  foreground: string,
+  background: string
+): ColorContrastResult {
+  const L1 = getRelativeLuminance(foreground);
+  const L2 = getRelativeLuminance(background);
+
+  // Contrast ratio formula: (L1 + 0.05) / (L2 + 0.05)
+  // Where L1 is the lighter color
+  const lighter = Math.max(L1, L2);
+  const darker = Math.min(L1, L2);
   const ratio = (lighter + 0.05) / (darker + 0.05);
 
   return {

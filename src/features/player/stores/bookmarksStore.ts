@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { haptics } from '@/core/native/haptics';
+import { createLogger } from '@/shared/utils/logger';
 
 // =============================================================================
 // TYPES
@@ -69,13 +70,7 @@ interface BookmarksActions {
 // LOGGING
 // =============================================================================
 
-const DEBUG = __DEV__;
-const log = (msg: string, ...args: any[]) => {
-  if (DEBUG) console.log(`[BookmarksStore] ${msg}`, ...args);
-};
-const logError = (msg: string, ...args: any[]) => {
-  console.error(`[BookmarksStore] ${msg}`, ...args);
-};
+const log = createLogger('BookmarksStore');
 
 // =============================================================================
 // STORE
@@ -131,9 +126,9 @@ export const useBookmarksStore = create<BookmarksState & BookmarksActions>()(
           chapterTitle: bookmark.chapterTitle,
           createdAt: bookmark.createdAt,
         });
-        log('Bookmark added:', bookmark.title);
+        log.debug('Bookmark added:', bookmark.title);
       } catch (err) {
-        logError('Failed to save bookmark:', err);
+        log.error('Failed to save bookmark:', err);
       }
     },
 
@@ -151,9 +146,9 @@ export const useBookmarksStore = create<BookmarksState & BookmarksActions>()(
       // Persist to SQLite
       try {
         await sqliteCache.updateBookmark(bookmarkId, updates);
-        log('Bookmark updated:', bookmarkId);
+        log.debug('Bookmark updated:', bookmarkId);
       } catch (err) {
-        logError('Failed to update bookmark:', err);
+        log.error('Failed to update bookmark:', err);
       }
     },
 
@@ -170,9 +165,9 @@ export const useBookmarksStore = create<BookmarksState & BookmarksActions>()(
       // Persist to SQLite
       try {
         await sqliteCache.removeBookmark(bookmarkId);
-        log('Bookmark removed:', bookmarkId);
+        log.debug('Bookmark removed:', bookmarkId);
       } catch (err) {
-        logError('Failed to remove bookmark:', err);
+        log.error('Failed to remove bookmark:', err);
       }
     },
 
@@ -188,9 +183,9 @@ export const useBookmarksStore = create<BookmarksState & BookmarksActions>()(
           createdAt: r.createdAt,
         }));
         set({ bookmarks, currentBookId: bookId });
-        log('Loaded', bookmarks.length, 'bookmarks for book:', bookId);
+        log.debug('Loaded', bookmarks.length, 'bookmarks for book:', bookId);
       } catch (err) {
-        logError('Failed to load bookmarks:', err);
+        log.error('Failed to load bookmarks:', err);
         set({ bookmarks: [] });
       }
     },

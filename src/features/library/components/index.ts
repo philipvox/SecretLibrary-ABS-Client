@@ -4,7 +4,6 @@
  * Library components exports.
  */
 
-export { HorizontalBookItem } from './HorizontalBookItem';
 export { FilterChips } from './FilterChips';
 export type { FilterOption } from './FilterChips';
 export { SortPicker } from './SortPicker';

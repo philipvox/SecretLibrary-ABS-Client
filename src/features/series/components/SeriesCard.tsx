@@ -102,10 +102,10 @@ function SeriesCardComponent({ series, showProgress = true, downloadedIds }: Ser
   // Get cover URLs from books for stacked display
   const coverUrls = useMemo(() => {
     if (series.books && series.books.length > 0) {
-      return series.books.slice(0, 3).map(book => apiClient.getItemCoverUrl(book.id));
+      return series.books.slice(0, 3).map(book => apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 }));
     }
     // Fallback to series cover
-    return series.coverUrl ? [apiClient.getItemCoverUrl(series.coverUrl)] : [];
+    return series.coverUrl ? [apiClient.getItemCoverUrl(series.coverUrl, { width: 400, height: 400 })] : [];
   }, [series.books, series.coverUrl]);
 
   // Calculate progress stats from books

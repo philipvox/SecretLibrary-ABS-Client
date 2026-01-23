@@ -21,27 +21,19 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
-  Server,
   Download,
-  BarChart3,
   PlayCircle,
   Folder,
   Type,
   LogOut,
   ChevronRight,
-  Palette,
   Library,
-  EyeOff,
-  Baby,
   Vibrate,
-  BookOpen,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useAuth } from '@/core/auth';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
-import { useKidModeStore } from '@/shared/stores/kidModeStore';
-import { useDismissedCount } from '@/features/recommendations/stores/dismissedItemsStore';
 import { haptics } from '@/core/native/haptics';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { APP_VERSION, BUILD_NUMBER, VERSION_DATE } from '@/constants/version';
@@ -189,12 +181,6 @@ export function ProfileScreen() {
   // Library preferences
   const { hideSingleBookSeries, setHideSingleBookSeries } = useMyLibraryStore();
 
-  // Kid Mode
-  const kidModeEnabled = useKidModeStore((s) => s.enabled);
-
-  // Hidden items count
-  const hiddenItemsCount = useDismissedCount();
-
   const handleLogout = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -274,12 +260,6 @@ export function ProfileScreen() {
             subtitle={`${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}`}
             onPress={() => navigation.navigate('Downloads')}
           />
-          <ProfileLink
-            Icon={BarChart3}
-            label="Listening Stats"
-            subtitle="Track your listening activity"
-            onPress={() => navigation.navigate('Stats')}
-          />
         </SectionGroup>
 
         {/* Playback Section */}
@@ -295,12 +275,6 @@ export function ProfileScreen() {
             label="Haptics"
             subtitle="Vibration feedback settings"
             onPress={() => navigation.navigate('HapticSettings')}
-          />
-          <ProfileLink
-            Icon={Palette}
-            label="Appearance"
-            subtitle="Dark mode, accent colors"
-            onPress={() => navigation.navigate('AppearanceSettings')}
           />
         </SectionGroup>
 
@@ -324,35 +298,6 @@ export function ProfileScreen() {
             subtitle="Hide series with only 1 book"
             value={hideSingleBookSeries}
             onValueChange={setHideSingleBookSeries}
-          />
-          <ProfileLink
-            Icon={EyeOff}
-            label="Hidden Books"
-            subtitle={hiddenItemsCount > 0 ? `${hiddenItemsCount} hidden` : 'No hidden books'}
-            badge={hiddenItemsCount > 0 ? String(hiddenItemsCount) : undefined}
-            onPress={() => navigation.navigate('HiddenItems')}
-          />
-        </SectionGroup>
-
-        {/* Parental Section */}
-        <SectionGroup title="Parental">
-          <ProfileLink
-            Icon={Baby}
-            label="Kid Mode"
-            subtitle={kidModeEnabled ? 'Active - filtering content' : 'Off'}
-            badge={kidModeEnabled ? 'ON' : undefined}
-            badgeColor={kidModeEnabled ? '#34C759' : undefined}
-            onPress={() => navigation.navigate('KidModeSettings' as never)}
-          />
-        </SectionGroup>
-
-        {/* Design Tools Section */}
-        <SectionGroup title="Design Tools">
-          <ProfileLink
-            Icon={BookOpen}
-            label="Spine Templates"
-            subtitle="Review 26 professional spine designs"
-            onPress={() => navigation.navigate('SpineTemplatePreview' as never)}
           />
         </SectionGroup>
 

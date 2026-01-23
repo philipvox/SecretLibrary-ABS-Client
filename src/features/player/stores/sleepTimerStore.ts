@@ -15,6 +15,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptics } from '@/core/native/haptics';
+import { createLogger } from '@/shared/utils/logger';
 
 // =============================================================================
 // CONSTANTS
@@ -68,13 +69,7 @@ interface SleepTimerActions {
 // LOGGING
 // =============================================================================
 
-const DEBUG = __DEV__;
-const log = (msg: string, ...args: any[]) => {
-  if (DEBUG) console.log(`[SleepTimerStore] ${msg}`, ...args);
-};
-const logError = (msg: string, ...args: any[]) => {
-  console.error(`[SleepTimerStore] ${msg}`, ...args);
-};
+const log = createLogger('SleepTimerStore');
 
 // =============================================================================
 // STORE
@@ -132,7 +127,7 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
         if (remaining <= 0) {
           clearInterval(interval);
 
-          log('Sleep timer expired - calling onExpire callback');
+          log.debug('Sleep timer expired - calling onExpire callback');
 
           // Haptic feedback for timer expiration
           haptics.sleepTimerExpired();
@@ -166,9 +161,9 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
                 get().extendSleepTimer(SLEEP_TIMER_EXTEND_MINUTES);
               });
               set({ isShakeDetectionActive: true });
-              log('Shake detection started - timer low');
+              log.debug('Shake detection started - timer low');
             } catch (err) {
-              logError('Failed to start shake detection:', err);
+              log.error('Failed to start shake detection:', err);
             }
           }
         }
@@ -181,13 +176,13 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
       const { sleepTimer, sleepTimerInterval } = get();
 
       if (!sleepTimer || !sleepTimerInterval) {
-        log('extendSleepTimer: No active timer');
+        log.debug('extendSleepTimer: No active timer');
         return;
       }
 
       // Add time to current remaining
       const newRemaining = sleepTimer + (minutes * 60);
-      log(`Sleep timer extended by ${minutes} minutes. New remaining: ${newRemaining}s`);
+      log.debug(`Sleep timer extended by ${minutes} minutes. New remaining: ${newRemaining}s`);
 
       // Haptic feedback for extension
       haptics.sleepTimerWarning();

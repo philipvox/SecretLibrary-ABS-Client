@@ -8,6 +8,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useShallow } from 'zustand/react/shallow';
 import { apiClient } from '@/core/api';
 import { queryKeys } from '@/core/queryClient';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
@@ -69,12 +70,10 @@ export function useHomeData(): UseHomeDataReturn {
     setViewMode((prev) => (prev === 'discover' ? 'lastPlayed' : 'discover'));
   }, []);
 
-  // Get player state for current book
-  const {
-    currentBook: playerCurrentBook,
-    position,
-    duration,
-  } = usePlayerStore();
+  // Get player state for current book - PERF: only subscribe to currentBook, not position
+  // Position updates 10x/second during playback and would cause constant re-renders
+  // Home screen doesn't need real-time position - stored progress is sufficient
+  const playerCurrentBook = usePlayerStore((s) => s.currentBook);
 
   // Get library IDs and favorite series from store (reactive)
   const libraryIds = useMyLibraryStore((state) => state.libraryIds);
@@ -83,8 +82,15 @@ export function useHomeData(): UseHomeDataReturn {
   // Kid Mode filter state
   const kidModeEnabled = useKidModeStore((state) => state.enabled);
 
-  // Get series data and all items from library cache
-  const { getSeries, getItem, isLoaded: isCacheLoaded, items: allLibraryItems } = useLibraryCache();
+  // Get series data and all items from library cache - PERF: use selector to avoid re-renders
+  const { getSeries, getItem, isLoaded: isCacheLoaded, items: allLibraryItems } = useLibraryCache(
+    useShallow((state) => ({
+      getSeries: state.getSeries,
+      getItem: state.getItem,
+      isLoaded: state.isLoaded,
+      items: state.items,
+    }))
+  );
 
   // Get downloaded books
   const { downloads } = useDownloads();
@@ -279,22 +285,11 @@ export function useHomeData(): UseHomeDataReturn {
     }
   }, [currentBook?.id]); // Only re-run when book changes
 
-  // Current progress
+  // Current progress - uses stored progress (not real-time position to avoid re-renders)
   const currentProgress: PlaybackProgress | null = useMemo(() => {
     if (!currentBook) return null;
 
-    // If we have player state, use that
-    if (playerCurrentBook && playerCurrentBook.id === currentBook.id) {
-      return {
-        currentTime: position,
-        duration: duration,
-        progress: duration > 0 ? position / duration : 0,
-        isFinished: false,
-        lastUpdate: Date.now(),
-      };
-    }
-
-    // Otherwise use stored progress (mediaProgress from getItemsInProgress, or legacy userMediaProgress)
+    // Use stored progress (mediaProgress from getItemsInProgress, or legacy userMediaProgress)
     const userProgress = currentBook.mediaProgress || currentBook.userMediaProgress;
     if (userProgress) {
       return {
@@ -307,7 +302,7 @@ export function useHomeData(): UseHomeDataReturn {
     }
 
     return null;
-  }, [currentBook, playerCurrentBook, position, duration]);
+  }, [currentBook]);
 
   // Recently listened - includes BOTH in-progress AND library-added books
   // Uses continueListeningItems from progressStore (local) as primary source for instant updates
@@ -488,6 +483,7 @@ export function useHomeData(): UseHomeDataReturn {
   /**
    * Hero Book - Primary resume target with enhanced chapter info
    * Prefers player's current book (if playing), otherwise most recent from server
+   * PERF: Uses stored progress, not real-time position (avoids 10Hz re-renders)
    */
   const heroBook: HeroBookData | null = useMemo(() => {
     // Prefer player's current book when loaded (instant update on book switch)
@@ -498,14 +494,9 @@ export function useHomeData(): UseHomeDataReturn {
     const userProgress = book.mediaProgress || book.userMediaProgress;
     const bookDuration = getBookDuration(book);
 
-    // Get progress - use player state if this is the current book
-    let progress = userProgress?.progress || 0;
-    let currentPosition = userProgress?.currentTime || 0;
-
-    if (playerCurrentBook?.id === book.id) {
-      currentPosition = position;
-      progress = bookDuration > 0 ? position / bookDuration : 0;
-    }
+    // Use stored progress (not real-time position to avoid re-renders)
+    const progress = userProgress?.progress || 0;
+    const currentPosition = userProgress?.currentTime || 0;
 
     // Calculate chapter info using existing utility
     const bookChapters = isBookMedia(book.media) ? book.media.chapters : [];
@@ -552,7 +543,7 @@ export function useHomeData(): UseHomeDataReturn {
       narratorName,
       state,
     };
-  }, [recentlyListened, playerCurrentBook, position]);
+  }, [recentlyListened, playerCurrentBook]);
 
   /**
    * Continue Listening Grid - Other in-progress books excluding hero book

@@ -6,7 +6,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Chapter } from '../stores/playerStore';
+import { Chapter } from '../types';
 
 // =============================================================================
 // CONSTANTS
@@ -24,6 +24,10 @@ const SMART_REWIND_PAUSE_POSITION_KEY = 'smartRewindPausePosition';
 let smartRewindPauseTimestamp: number | null = null;
 let smartRewindPauseBookId: string | null = null;
 let smartRewindPausePosition: number | null = null;
+
+// Flag to prevent re-application of smart rewind in same session
+// Even if AsyncStorage clear fails, this prevents double-rewind
+let smartRewindAppliedThisSession: string | null = null;
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -58,6 +62,8 @@ export async function persistSmartRewindState(
   smartRewindPauseTimestamp = now;
   smartRewindPauseBookId = bookId;
   smartRewindPausePosition = position;
+  // Reset the applied flag - new pause means smart rewind can apply on next resume
+  smartRewindAppliedThisSession = null;
 
   try {
     await Promise.all([
@@ -80,6 +86,13 @@ export async function restoreSmartRewindState(
   timestamp: number | null;
   position: number | null;
 }> {
+  // Check if smart rewind was already applied this session for this book
+  // This prevents re-application even if AsyncStorage clear failed
+  if (smartRewindAppliedThisSession === currentBookId) {
+    log('[SmartRewind] Already applied this session, skipping');
+    return { timestamp: null, position: null };
+  }
+
   // First check in-memory state
   if (smartRewindPauseTimestamp && smartRewindPauseBookId === currentBookId) {
     return {
@@ -110,12 +123,22 @@ export async function restoreSmartRewindState(
 }
 
 /**
+ * Mark smart rewind as applied for this book in current session.
+ * Prevents re-application even if AsyncStorage clear fails.
+ */
+export function markSmartRewindApplied(bookId: string): void {
+  smartRewindAppliedThisSession = bookId;
+}
+
+/**
  * Clear smart rewind state
  */
 export async function clearSmartRewindState(): Promise<void> {
   smartRewindPauseTimestamp = null;
   smartRewindPauseBookId = null;
   smartRewindPausePosition = null;
+  // Note: Don't clear smartRewindAppliedThisSession here - it should persist
+  // until a new pause event happens, preventing any re-application
 
   try {
     await Promise.all([
@@ -124,7 +147,7 @@ export async function clearSmartRewindState(): Promise<void> {
       AsyncStorage.removeItem(SMART_REWIND_PAUSE_POSITION_KEY),
     ]);
   } catch {
-    // Ignore cleanup errors
+    // Ignore cleanup errors - in-memory flag prevents re-application anyway
   }
 }
 

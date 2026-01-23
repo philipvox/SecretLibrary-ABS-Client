@@ -87,7 +87,7 @@ export function InProgressTab({
             activeOpacity={0.9}
           >
             <Image
-              source={apiClient.getItemCoverUrl(heroItem.id)}
+              source={apiClient.getItemCoverUrl(heroItem.id, { width: 400, height: 400 })}
               style={styles.heroCover}
               contentFit="cover"
             />

@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import { usePlayerStore } from '@/features/player';
 import { useShallow } from 'zustand/react/shallow';
 import { spacing, useTheme } from '@/shared/theme';
 import { darkColors } from '@/shared/theme/colors';
+import { useNavigationWithLoading } from '@/shared/hooks';
 
 // =============================================================================
 // THEME COLORS - Uses theme tokens from colors.ts
@@ -142,7 +143,7 @@ const TABS: TabConfig[] = [
 
 function FloatingTabBarInner() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
+  const { navigateWithLoading, navigation } = useNavigationWithLoading();
   const themeColors = useNavColors();
 
   // Use useShallow to prevent infinite re-renders
@@ -194,21 +195,34 @@ function FloatingTabBarInner() {
 
   const handleTabPress = useCallback((tab: TabConfig) => {
     if (isPlayerVisible) closePlayer();
+
+    // Show loading overlay for heavy screens (browse tab)
+    if (tab.key === 'browse') {
+      if (tab.screen) {
+        navigateWithLoading(tab.route, { screen: tab.screen });
+      } else {
+        navigateWithLoading(tab.route);
+      }
+      return;
+    }
+
+    // Direct navigation for other tabs
     if (tab.screen) {
       navigation.navigate(tab.route, { screen: tab.screen });
     } else {
       navigation.navigate(tab.route);
     }
-  }, [isPlayerVisible, closePlayer, navigation]);
+  }, [isPlayerVisible, closePlayer, navigation, navigateWithLoading]);
 
   const activeTab = getActiveTab();
   const bottomPadding = Math.max(insets.bottom, 16) + BAR_BOTTOM_PADDING;
   const totalBarHeight = BAR_HEIGHT + bottomPadding;
 
   // Hide tab bar on full-screen modal routes or when player is open
+  // Return empty View on Android to prevent SafeAreaProvider crash
   const hiddenRoutes = ['ReadingHistoryWizard', 'MoodDiscovery', 'MoodResults', 'PreferencesOnboarding'];
   if (hiddenRoutes.includes(currentRouteName) || isPlayerVisible) {
-    return null;
+    return Platform.OS === 'android' ? <View /> : null;
   }
 
   return (
@@ -269,7 +283,9 @@ class FloatingTabBarErrorBoundary extends React.Component<
   }
 
   render() {
-    if (this.state.hasError) return null;
+    if (this.state.hasError) {
+      return Platform.OS === 'android' ? <View /> : null;
+    }
     return this.props.children;
   }
 }

@@ -10,7 +10,7 @@
  * - Sparse genre handling
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,10 +23,11 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLibraryCache, getAllGenres } from '@/core/cache';
+import { useLibraryCache } from '@/core/cache';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { Icon } from '@/shared/components/Icon';
-import { SkullRefreshControl, TopNav, TopNavBackIcon, TagIcon } from '@/shared/components';
+import { SkullRefreshControl, TopNav, TopNavBackIcon, TagIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { secretLibraryColors } from '@/shared/theme/secretLibrary';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import {
@@ -56,26 +57,37 @@ export function GenresListScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('grouped');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const { refreshCache, isLoaded, filterItems } = useLibraryCache();
+  // Mark as mounted after first render and hide global loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+      globalLoading.hide();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const { refreshCache, isLoaded, getGenre } = useLibraryCache();
+  const genresWithBooks = useLibraryCache((s) => s.genresWithBooks);
   const { items: inProgressItems } = useContinueListening();
 
-  const allGenres = useMemo(() => getAllGenres(), [isLoaded]);
-
-  // Get genres with data (book count, covers, meta-category)
+  // Get genres with data directly from pre-indexed cache (no filterItems loop needed)
   const genresWithData = useMemo((): GenreWithData[] => {
-    return allGenres.map((genre) => {
-      const books = filterItems({ genres: [genre] });
-      const coverIds = books.slice(0, 4).map(b => b.id);
-      const metaCategory = getMetaCategoryForGenre(genre);
-      return {
-        name: genre,
-        bookCount: books.length,
-        coverIds,
-        metaCategoryId: metaCategory?.id || null,
-      };
-    }).filter(g => g.bookCount >= MIN_BOOKS_TO_SHOW); // Filter sparse genres
-  }, [allGenres, filterItems]);
+    if (!genresWithBooks || genresWithBooks.size === 0) return [];
+
+    return Array.from(genresWithBooks.values())
+      .filter(g => g.bookCount >= MIN_BOOKS_TO_SHOW) // Filter sparse genres
+      .map((genreInfo) => {
+        const metaCategory = getMetaCategoryForGenre(genreInfo.name);
+        return {
+          name: genreInfo.name,
+          bookCount: genreInfo.bookCount,
+          coverIds: genreInfo.books.slice(0, 4).map(b => b.id),
+          metaCategoryId: metaCategory?.id || null,
+        };
+      });
+  }, [genresWithBooks]);
 
   // Filter genres by search query
   const filteredGenres = useMemo(() => {
@@ -91,12 +103,13 @@ export function GenresListScreen() {
 
     if (listenedBookIds.size === 0) return [];
 
-    // Count genre occurrences in listened books
+    // Count genre occurrences in listened books (using pre-indexed books)
     const genreCounts = new Map<string, number>();
 
     genresWithData.forEach(genre => {
-      const books = filterItems({ genres: [genre.name] });
-      const listenedCount = books.filter(b => listenedBookIds.has(b.id)).length;
+      const genreInfo = getGenre(genre.name);
+      if (!genreInfo) return;
+      const listenedCount = genreInfo.books.filter(b => listenedBookIds.has(b.id)).length;
       if (listenedCount > 0) {
         genreCounts.set(genre.name, listenedCount);
       }
@@ -107,7 +120,7 @@ export function GenresListScreen() {
       .filter(g => genreCounts.has(g.name))
       .sort((a, b) => (genreCounts.get(b.name) || 0) - (genreCounts.get(a.name) || 0))
       .slice(0, 5);
-  }, [genresWithData, filterItems, inProgressItems]);
+  }, [genresWithData, getGenre, inProgressItems]);
 
   // Get popular genres (top 6 by book count)
   const popularGenres = useMemo((): GenreWithData[] => {
@@ -353,6 +366,9 @@ export function GenresListScreen() {
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
 
+      {/* Loading overlay for initial load */}
+      <ScreenLoadingOverlay visible={!mounted} />
+
       {/* TopNav with skull logo and integrated search bar */}
       <TopNav
         variant={isDark ? 'dark' : 'light'}
@@ -386,29 +402,27 @@ export function GenresListScreen() {
         <View style={[
           styles.viewToggle,
           {
-            backgroundColor: 'transparent',
-            borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
           }
         ]}>
           <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'grouped' && [styles.toggleButtonActive, { backgroundColor: accent }]]}
+            style={[styles.toggleButton, viewMode === 'grouped' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
             onPress={() => setViewMode('grouped')}
           >
             <Icon
               name="LayoutGrid"
               size={16}
-              color={viewMode === 'grouped' ? colors.text.inverse : colors.text.tertiary}
+              color={viewMode === 'grouped' ? colors.text.primary : colors.text.tertiary}
             />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'flat' && [styles.toggleButtonActive, { backgroundColor: accent }]]}
+            style={[styles.toggleButton, viewMode === 'flat' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
             onPress={() => setViewMode('flat')}
           >
             <Icon
               name="List"
               size={16}
-              color={viewMode === 'flat' ? colors.text.inverse : colors.text.tertiary}
+              color={viewMode === 'flat' ? colors.text.primary : colors.text.tertiary}
             />
           </TouchableOpacity>
         </View>

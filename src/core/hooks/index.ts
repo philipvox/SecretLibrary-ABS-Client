@@ -1,14 +1,9 @@
-export { useAppBootstrap } from './useAppBootstrap';
-export { useLibraryPrefetch } from './useLibraryPrefetch';
-export {
-  useOptimisticMutation,
-  useOptimisticProgress,
-  useOptimisticCollection,
-} from './useOptimisticMutation';
+// Removed hooks in orphan cleanup (2026-01-21):
+// - useAppBootstrap
+// - useLibraryPrefetch
+// - useOptimisticMutation
+// - useSyncStatus
 
-// Offline-first hooks
-export { useSyncStatus } from './useSyncStatus';
-export type { SyncStatus } from './useSyncStatus';
 export {
   useDownloads,
   useDownloadStatus,

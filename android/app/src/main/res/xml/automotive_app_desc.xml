@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Auto configuration for Secret Library audiobook app.
+  This file declares the app's Android Auto capabilities.
+-->
+<automotiveApp>
+    <!-- Enable media browsing capabilities -->
+    <uses name="media"/>
+</automotiveApp>

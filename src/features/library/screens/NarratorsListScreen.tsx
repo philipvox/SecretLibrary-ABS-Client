@@ -1,14 +1,17 @@
 /**
  * src/features/library/screens/NarratorsListScreen.tsx
  *
- * Browse all narrators with:
- * - A-Z scrubber (iOS Contacts pattern)
- * - "Your Narrators" section (based on listening history)
- * - Search functionality
- * - Sort by name, book count, recently added
+ * Redesigned Narrator Browse page matching GenresListScreen pattern:
+ * - View mode toggle (grouped vs flat A-Z)
+ * - Your Narrators section (personalized from listening history)
+ * - Popular Narrators section (top by book count)
+ * - Browse by Category (grouped by primary genre)
+ * - Collapsible meta-category sections
+ *
+ * Note: Narrators don't have images, always display initials.
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,25 +20,30 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLibraryCache, getAllNarrators } from '@/core/cache';
+import { useLibraryCache } from '@/core/cache';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { Icon } from '@/shared/components/Icon';
-import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, MicIcon } from '@/shared/components';
+import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, MicIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { useTheme } from '@/shared/theme';
+import { useTheme, scale } from '@/shared/theme';
+import {
+  META_CATEGORIES,
+  MetaCategory,
+  getMetaCategoryForGenre,
+} from '../constants/genreCategories';
+import {
+  PersonWithData,
+  YourPersonsSection,
+  PopularPersonsSection,
+  MetaCategoryPersonSection,
+} from '../components/PersonSections';
+import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 
-type SortType = 'name' | 'bookCount' | 'recent';
-
-interface NarratorWithGenres {
-  name: string;
-  bookCount: number;
-  topGenres: string[];
-  addedAt?: number;
-}
+type ViewMode = 'grouped' | 'flat';
 
 // Avatar color generator based on name
 const AVATAR_COLORS = [
@@ -59,112 +67,171 @@ export function NarratorsListScreen() {
   const accent = colors.accent.primary;
   const sectionListRef = useRef<SectionList>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortType>('name');
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const { refreshCache, isLoaded, filterItems } = useLibraryCache();
+  // Mark as mounted after first render and hide global loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+      globalLoading.hide();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const { refreshCache, isLoaded } = useLibraryCache();
+  const narratorsMap = useLibraryCache((s) => s.narrators);
   const { items: inProgressItems } = useContinueListening();
 
-  // Get all narrators with genre info
-  const narratorsWithGenres = useMemo((): NarratorWithGenres[] => {
-    const allNarrators = getAllNarrators();
-    return allNarrators.map(narrator => {
-      // Get top genres from this narrator's books
+  // Get all narrators with genre info and meta-category (from pre-indexed cache)
+  const narratorsWithData = useMemo((): PersonWithData[] => {
+    if (!narratorsMap || narratorsMap.size === 0) return [];
+
+    return Array.from(narratorsMap.values()).map(narrator => {
+      // Count genres across all books (books already indexed in cache)
       const genreCounts = new Map<string, number>();
-      let latestAddedAt = 0;
+      const sampleBookIds: string[] = [];
+
       narrator.books?.forEach(book => {
+        if (sampleBookIds.length < 3) {
+          sampleBookIds.push(book.id);
+        }
         const genres = (book.media?.metadata as any)?.genres || [];
         genres.forEach((genre: string) => {
           genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
         });
-        if (book.addedAt && book.addedAt > latestAddedAt) {
-          latestAddedAt = book.addedAt;
-        }
       });
-      const topGenres = [...genreCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 2)
-        .map(([genre]) => genre);
+
+      // Find primary genre (most common)
+      const primaryGenre = [...genreCounts.entries()]
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+      // Map to meta-category
+      const metaCategory = primaryGenre ? getMetaCategoryForGenre(primaryGenre) : null;
 
       return {
         name: narrator.name,
         bookCount: narrator.bookCount,
-        topGenres,
-        addedAt: latestAddedAt || undefined,
+        primaryGenre,
+        metaCategoryId: metaCategory?.id || null,
+        sampleBookIds,
+        books: narrator.books, // Keep reference for yourNarrators lookup
+        // Narrators don't have images
       };
     });
-  }, [isLoaded]);
+  }, [narratorsMap]);
 
   // Filter by search query
   const filteredNarrators = useMemo(() => {
-    if (!searchQuery.trim()) return narratorsWithGenres;
+    if (!searchQuery.trim()) return narratorsWithData;
     const lowerQuery = searchQuery.toLowerCase();
-    return narratorsWithGenres.filter(n => n.name.toLowerCase().includes(lowerQuery));
-  }, [narratorsWithGenres, searchQuery]);
-
-  // Sort narrators
-  const sortedNarrators = useMemo(() => {
-    const sorted = [...filteredNarrators];
-    switch (sortBy) {
-      case 'name':
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'bookCount':
-        sorted.sort((a, b) => b.bookCount - a.bookCount);
-        break;
-      case 'recent':
-        sorted.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-        break;
-    }
-    return sorted;
-  }, [filteredNarrators, sortBy]);
+    return narratorsWithData.filter(n => n.name.toLowerCase().includes(lowerQuery));
+  }, [narratorsWithData, searchQuery]);
 
   // Get "Your Narrators" - narrators from books user is listening to
-  const yourNarrators = useMemo((): NarratorWithGenres[] => {
+  const yourNarrators = useMemo((): PersonWithData[] => {
     const listenedBookIds = new Set(inProgressItems.map(item => item.id));
     if (listenedBookIds.size === 0) return [];
 
     const narratorCounts = new Map<string, number>();
-    narratorsWithGenres.forEach(narrator => {
-      // Get books that match this narrator from cache
-      const narratorBooks = filterItems({ narrators: [narrator.name] }) || [];
-      const listenedCount = narratorBooks.filter(b => listenedBookIds.has(b.id)).length;
+    narratorsWithData.forEach(narrator => {
+      // Use pre-indexed books from cache instead of filterItems
+      const listenedCount = (narrator.books || []).filter(b => listenedBookIds.has(b.id)).length;
       if (listenedCount > 0) {
         narratorCounts.set(narrator.name, listenedCount);
       }
     });
 
-    return narratorsWithGenres
+    return narratorsWithData
       .filter(n => narratorCounts.has(n.name))
       .sort((a, b) => (narratorCounts.get(b.name) || 0) - (narratorCounts.get(a.name) || 0))
-      .slice(0, 8);
-  }, [narratorsWithGenres, inProgressItems, filterItems]);
+      .slice(0, 5);
+  }, [narratorsWithData, inProgressItems]);
 
-  // Create sections for A-Z list
-  const sections = useMemo(() => {
-    if (sortBy !== 'name') {
-      // Non-alphabetical sort - single section
-      return [{ title: '', data: sortedNarrators }];
-    }
+  // Get popular narrators (top 6 by book count)
+  const popularNarrators = useMemo((): PersonWithData[] => {
+    return [...filteredNarrators]
+      .sort((a, b) => b.bookCount - a.bookCount)
+      .slice(0, 6);
+  }, [filteredNarrators]);
 
-    const sectionMap = new Map<string, NarratorWithGenres[]>();
-    sortedNarrators.forEach(narrator => {
-      const letter = narrator.name[0].toUpperCase();
-      const section = sectionMap.get(letter) || [];
-      section.push(narrator);
-      sectionMap.set(letter, section);
+  // Group narrators by meta-category
+  const narratorsByCategory = useMemo(() => {
+    const grouped = new Map<MetaCategory, PersonWithData[]>();
+
+    // Initialize all categories
+    META_CATEGORIES.forEach(cat => grouped.set(cat, []));
+
+    // Assign narrators
+    filteredNarrators.forEach(narrator => {
+      const category = META_CATEGORIES.find(c => c.id === narrator.metaCategoryId);
+      if (category) {
+        const existing = grouped.get(category) || [];
+        existing.push(narrator);
+        grouped.set(category, existing);
+      } else {
+        // Fallback to Fiction
+        const fiction = META_CATEGORIES[0];
+        const existing = grouped.get(fiction) || [];
+        existing.push(narrator);
+        grouped.set(fiction, existing);
+      }
     });
 
-    return [...sectionMap.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([title, data]) => ({ title, data }));
-  }, [sortedNarrators, sortBy]);
+    // Sort narrators within each category by book count
+    grouped.forEach((narrators, category) => {
+      narrators.sort((a, b) => b.bookCount - a.bookCount);
+    });
 
-  // Available letters for scrubber
+    return grouped;
+  }, [filteredNarrators]);
+
+  // Get total books per category
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    narratorsByCategory.forEach((narrators, category) => {
+      totals.set(category.id, narrators.reduce((sum, n) => sum + n.bookCount, 0));
+    });
+    return totals;
+  }, [narratorsByCategory]);
+
+  // Flat list sections (A-Z) for SectionList
+  const flatSections = useMemo(() => {
+    const sorted = [...filteredNarrators].sort((a, b) => a.name.localeCompare(b.name));
+    const sections: { title: string; data: PersonWithData[] }[] = [];
+
+    sorted.forEach(narrator => {
+      const letter = narrator.name[0].toUpperCase();
+      const existing = sections.find(s => s.title === letter);
+      if (existing) {
+        existing.data.push(narrator);
+      } else {
+        sections.push({ title: letter, data: [narrator] });
+      }
+    });
+
+    return sections;
+  }, [filteredNarrators]);
+
+  // Available letters for alphabet index
   const availableLetters = useMemo(() => {
-    if (sortBy !== 'name') return [];
-    return sections.filter(s => s.title).map(s => s.title);
-  }, [sections, sortBy]);
+    return flatSections.map(s => s.title);
+  }, [flatSections]);
+
+  // Handle alphabet letter press - scroll to section
+  const handleLetterPress = useCallback((letter: string) => {
+    const sectionIndex = flatSections.findIndex(s => s.title === letter);
+    if (sectionIndex >= 0 && sectionListRef.current) {
+      sectionListRef.current.scrollToLocation({
+        sectionIndex,
+        itemIndex: 0,
+        animated: true,
+        viewPosition: 0,
+      });
+    }
+  }, [flatSections]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -178,17 +245,17 @@ export function NarratorsListScreen() {
     navigation.navigate('NarratorDetail', { narratorName });
   };
 
-  const handleLetterPress = useCallback((letter: string) => {
-    const sectionIndex = sections.findIndex(s => s.title === letter);
-    if (sectionIndex >= 0 && sectionListRef.current) {
-      sectionListRef.current.scrollToLocation({
-        sectionIndex,
-        itemIndex: 0,
-        animated: true,
-        viewPosition: 0,
-      });
-    }
-  }, [sections]);
+  const handleToggleCategory = useCallback((categoryId: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -201,8 +268,19 @@ export function NarratorsListScreen() {
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Render narrator list item
-  const renderNarratorItem = ({ item }: { item: NarratorWithGenres }) => (
+  if (!isLoaded) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Render narrator list item for flat view
+  const renderNarratorItem = ({ item }: { item: PersonWithData }) => (
     <TouchableOpacity
       style={styles.narratorRow}
       onPress={() => handleNarratorPress(item.name)}
@@ -217,41 +295,117 @@ export function NarratorsListScreen() {
       <View style={styles.narratorInfo}>
         <Text style={[styles.narratorName, { color: colors.text.primary }]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.bookCount, { color: colors.text.secondary }]}>{item.bookCount} books in library</Text>
-        {item.topGenres.length > 0 && (
-          <Text style={[styles.genres, { color: colors.text.tertiary }]} numberOfLines={1}>
-            {item.topGenres.join(', ')}
-          </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Render grouped view
+  const renderGroupedView = () => (
+    <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Your Narrators Section */}
+        {!isSearching && yourNarrators.length > 0 && (
+          <YourPersonsSection
+            persons={yourNarrators}
+            onPersonPress={handleNarratorPress}
+            type="narrator"
+          />
         )}
-      </View>
-    </TouchableOpacity>
+
+        {/* Popular Narrators Section */}
+        {!isSearching && (
+          <PopularPersonsSection
+            persons={popularNarrators}
+            onPersonPress={handleNarratorPress}
+            type="narrator"
+          />
+        )}
+
+        {/* Browse by Category Header */}
+        {!isSearching && (
+          <View style={styles.browseHeader}>
+            <Text style={[styles.browseTitle, { color: colors.text.secondary }]}>Browse by Category</Text>
+          </View>
+        )}
+
+        {/* Meta-Category Sections */}
+        {META_CATEGORIES.map(category => {
+          const narrators = narratorsByCategory.get(category) || [];
+          if (narrators.length === 0) return null;
+
+          return (
+            <MetaCategoryPersonSection
+              key={category.id}
+              metaCategory={category}
+              persons={narrators}
+              totalBooks={categoryTotals.get(category.id) || 0}
+              isExpanded={expandedCategories.has(category.id)}
+              onToggle={() => handleToggleCategory(category.id)}
+              onPersonPress={handleNarratorPress}
+              type="narrator"
+              label={`${category.name} Narrators`}
+            />
+          );
+        })}
+
+        {/* Empty State */}
+        {filteredNarrators.length === 0 && (
+          <View style={styles.emptyState}>
+            <Icon name="Search" size={48} color={colors.text.tertiary} />
+            <Text style={[styles.emptyText, { color: colors.text.primary }]}>No narrators found</Text>
+            <Text style={[styles.emptySubtext, { color: colors.text.secondary }]}>Try a different search term</Text>
+          </View>
+        )}
+      </ScrollView>
+    </SkullRefreshControl>
   );
 
-  // Render "Your Narrators" card
-  const renderYourNarratorCard = (narrator: NarratorWithGenres) => (
-    <TouchableOpacity
-      key={narrator.name}
-      style={styles.yourNarratorCard}
-      onPress={() => handleNarratorPress(narrator.name)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.yourNarratorAvatar, { backgroundColor: getAvatarColor(narrator.name) }]}>
-        <Text style={styles.yourNarratorAvatarText}>{getInitials(narrator.name)}</Text>
-      </View>
-      <Text style={[styles.yourNarratorName, { color: colors.text.primary }]} numberOfLines={2}>{narrator.name}</Text>
-      <Text style={[styles.yourNarratorBooks, { color: colors.text.secondary }]}>{narrator.bookCount} books</Text>
-    </TouchableOpacity>
-  );
+  // Render flat A-Z view with SectionList
+  const renderFlatView = () => (
+    <View style={styles.flatContainer}>
+      <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+        <SectionList
+          ref={sectionListRef}
+          sections={flatSections}
+          keyExtractor={(item) => item.name}
+          stickySectionHeadersEnabled
+          contentContainerStyle={{ paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom, paddingRight: 28 }}
+          showsVerticalScrollIndicator={false}
+          renderSectionHeader={({ section }) => (
+            <View style={[styles.sectionHeader, { backgroundColor: colors.background.primary }]}>
+              <Text style={[styles.sectionHeaderText, { color: accent }]}>{section.title}</Text>
+            </View>
+          )}
+          renderItem={renderNarratorItem}
+          onScrollToIndexFailed={() => {}}
+          getItemLayout={(data, index) => ({
+            length: 72,
+            offset: 72 * index,
+            index,
+          })}
+        />
+      </SkullRefreshControl>
 
-  if (!isLoaded) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading...</Text>
+      {/* Custom Alphabet Index */}
+      {availableLetters.length > 1 && (
+        <View style={[styles.alphabetIndex, { bottom: SCREEN_BOTTOM_PADDING + insets.bottom + 60 }]}>
+          {availableLetters.map((letter) => (
+            <TouchableOpacity
+              key={letter}
+              style={styles.alphabetLetterButton}
+              onPress={() => handleLetterPress(letter)}
+            >
+              <Text style={[styles.alphabetLetter, { color: accent }]}>{letter}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </View>
-    );
-  }
+      )}
+    </View>
+  );
 
   const handleLogoPress = useCallback(() => {
     navigation.navigate('Main', { screen: 'HomeTab' });
@@ -260,6 +414,9 @@ export function NarratorsListScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+
+      {/* Loading overlay for initial load */}
+      <ScreenLoadingOverlay visible={!mounted} />
 
       {/* TopNav with skull logo and integrated search bar */}
       <TopNav
@@ -288,73 +445,40 @@ export function NarratorsListScreen() {
         }}
       />
 
-      {/* Sort Bar */}
-      <View style={styles.sortBar}>
+      {/* View Mode Toggle & Count */}
+      <View style={styles.controlBar}>
         <Text style={[styles.resultCount, { color: colors.text.secondary }]}>{filteredNarrators.length} narrators</Text>
-        <View style={styles.sortButtons}>
-          {(['name', 'bookCount', 'recent'] as SortType[]).map(type => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.sortButton, { backgroundColor: colors.border.default }, sortBy === type && { backgroundColor: accent }]}
-              onPress={() => setSortBy(type)}
-            >
-              <Text style={[styles.sortButtonText, { color: colors.text.secondary }, sortBy === type && [styles.sortButtonTextActive, { color: colors.text.inverse }]]}>
-                {type === 'name' ? 'A-Z' : type === 'bookCount' ? 'Books' : 'Recent'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={[
+          styles.viewToggle,
+          {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+          }
+        ]}>
+          <TouchableOpacity
+            style={[styles.toggleButton, viewMode === 'grouped' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
+            onPress={() => setViewMode('grouped')}
+          >
+            <Icon
+              name="LayoutGrid"
+              size={16}
+              color={viewMode === 'grouped' ? colors.text.primary : colors.text.tertiary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButton, viewMode === 'flat' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
+            onPress={() => setViewMode('flat')}
+          >
+            <Icon
+              name="List"
+              size={16}
+              color={viewMode === 'flat' ? colors.text.primary : colors.text.tertiary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-          <SectionList
-            ref={sectionListRef}
-            sections={sections}
-            keyExtractor={(item) => item.name}
-            stickySectionHeadersEnabled={sortBy === 'name'}
-            contentContainerStyle={{ paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom, paddingRight: sortBy === 'name' ? 28 : 0 }}
-            showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            !isSearching && yourNarrators.length > 0 ? (
-              <View style={styles.yourNarratorsSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>Your Narrators</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.yourNarratorsScroll}
-                >
-                  {yourNarrators.map(renderYourNarratorCard)}
-                </ScrollView>
-              </View>
-            ) : null
-          }
-          renderSectionHeader={({ section }) =>
-            section.title ? (
-              <View style={[styles.letterHeader, { backgroundColor: colors.background.primary }]}>
-                <Text style={[styles.letterText, { color: accent }]}>{section.title}</Text>
-              </View>
-            ) : null
-          }
-          renderItem={renderNarratorItem}
-          onScrollToIndexFailed={() => {}}
-          getItemLayout={(data, index) => ({
-            length: 72,
-            offset: 72 * index,
-            index,
-          })}
-          />
-        </SkullRefreshControl>
-
-        {/* A-Z Scrubber */}
-        <AlphabetScrubber
-          letters={availableLetters}
-          onLetterSelect={handleLetterPress}
-          visible={availableLetters.length > 1 && !isSearching}
-          style={{ bottom: SCREEN_BOTTOM_PADDING + insets.bottom + 60 }}
-        />
-      </View>
+      {/* Content */}
+      {viewMode === 'grouped' || isSearching ? renderGroupedView() : renderFlatView()}
     </View>
   );
 }
@@ -362,30 +486,6 @@ export function NarratorsListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor set via themeColors.background in JSX
-  },
-  searchRow: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    // backgroundColor set via themeColors.border in JSX
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  searchInput: {
-    flex: 1,
-    // color set via themeColors.text in JSX
-    fontSize: 15,
-    marginLeft: 8,
-    paddingVertical: 0,
-  },
-  clearButton: {
-    padding: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -393,10 +493,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    // color set via themeColors.textSecondary in JSX
     fontSize: 16,
   },
-  sortBar: {
+  controlBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -404,90 +503,84 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   resultCount: {
-    // color set via themeColors.textSecondary in JSX
     fontSize: 14,
   },
-  sortButtons: {
+  viewToggle: {
     flexDirection: 'row',
-    gap: 8,
+    borderRadius: 8,
+    padding: 2,
   },
-  sortButton: {
+  toggleButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
-    // backgroundColor set via themeColors.border in JSX
+    borderRadius: 6,
   },
-  sortButtonActive: {
-    // backgroundColor set dynamically via accent in JSX
-  },
-  sortButtonText: {
-    fontSize: 12,
-    // color set via themeColors.textSecondary in JSX
-    fontWeight: '500',
-  },
-  sortButtonTextActive: {
-    // color applied inline via colors.text.inverse
+  toggleButtonActive: {
+    // backgroundColor applied inline
   },
   content: {
     flex: 1,
   },
-  // Your Narrators section
-  yourNarratorsSection: {
-    marginBottom: 16,
+  scrollContent: {
+    paddingTop: 8,
   },
-  sectionTitle: {
+  flatContainer: {
+    flex: 1,
+  },
+  browseHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  browseTitle: {
     fontSize: 13,
     fontWeight: '600',
-    // color set via themeColors.textSecondary in JSX
     letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    marginBottom: 12,
   },
-  yourNarratorsScroll: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  yourNarratorCard: {
-    width: 100,
-    alignItems: 'center',
-  },
-  yourNarratorAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    overflow: 'hidden',
+    paddingTop: 80,
   },
-  yourNarratorAvatarText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000', // Intentional: black text on colored avatar
-  },
-  yourNarratorName: {
-    fontSize: 13,
+  emptyText: {
+    fontSize: 18,
     fontWeight: '600',
-    // color set via themeColors.text in JSX
-    textAlign: 'center',
-    marginBottom: 2,
+    marginTop: 16,
   },
-  yourNarratorBooks: {
-    fontSize: 11,
-    // color set via themeColors.textSecondary in JSX
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 4,
   },
-  // Letter header
-  letterHeader: {
-    // backgroundColor set via themeColors.background in JSX
+  // Flat view styles
+  sectionHeader: {
     paddingVertical: 6,
     paddingHorizontal: 16,
   },
-  letterText: {
+  sectionHeaderText: {
     fontSize: 14,
     fontWeight: '700',
-    // color set dynamically via accent in JSX
   },
-  // Narrator row
+  alphabetIndex: {
+    position: 'absolute',
+    right: 2,
+    top: 8,
+    width: 24,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  alphabetLetterButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 24,
+    minHeight: 14,
+  },
+  alphabetLetter: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  // Narrator row for flat view
   narratorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -507,7 +600,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000', // Intentional: black text on colored avatar
+    color: '#000',
   },
   narratorInfo: {
     flex: 1,
@@ -515,16 +608,10 @@ const styles = StyleSheet.create({
   narratorName: {
     fontSize: 16,
     fontWeight: '500',
-    // color set via themeColors.text in JSX
     marginBottom: 2,
   },
   bookCount: {
     fontSize: 14,
-    // color set via themeColors.textSecondary in JSX
     marginBottom: 2,
-  },
-  genres: {
-    fontSize: 12,
-    // color set via themeColors.textTertiary in JSX
   },
 });

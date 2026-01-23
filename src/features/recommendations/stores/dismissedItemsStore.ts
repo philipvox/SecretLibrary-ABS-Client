@@ -114,5 +114,6 @@ export const useDismissedCount = () => {
   const dismissedItems = useDismissedItemsStore(
     useShallow((state) => state.dismissedItems)
   );
-  return useMemo(() => Object.keys(dismissedItems).length, [dismissedItems]);
+  // No need for useMemo - Object.keys().length is cheap
+  return Object.keys(dismissedItems).length;
 };

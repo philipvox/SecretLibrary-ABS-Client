@@ -27,7 +27,7 @@ export const BookRow = React.memo(function BookRow({
   isMarkedFinished = false,
 }: BookRowProps) {
   const { colors } = useTheme();
-  const coverUrl = apiClient.getItemCoverUrl(book.id);
+  const coverUrl = apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 });
   const isCompleted = book.progress >= 0.95 || isMarkedFinished;
   const isInProgress = book.progress > 0 && book.progress < 0.95;
 

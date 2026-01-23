@@ -11,6 +11,9 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { apiClient } from '@/core/api';
 import { queryClient, queryKeys } from '@/core/queryClient';
+import { createLogger } from '@/shared/utils/logger';
+
+const log = createLogger('CompletionStore');
 
 interface CompletionState {
   // Map of bookId -> isComplete
@@ -121,7 +124,7 @@ export const useCompletionStore = create<CompletionStore>()(
           isLoading: false
         });
       } catch (error) {
-        console.error('[CompletionStore] Hydration failed:', error);
+        log.error('Hydration failed:', error);
         set({ isHydrated: true, isLoading: false });
       }
     },
@@ -145,9 +148,9 @@ export const useCompletionStore = create<CompletionStore>()(
         // Mark as synced locally
         await sqliteCache.markCompleteSynced(bookId);
 
-        console.log(`[CompletionStore] Synced ${bookId} as ${isComplete ? 'complete' : 'incomplete'}`);
+        log.debug(`Synced ${bookId} as ${isComplete ? 'complete' : 'incomplete'}`);
       } catch (error) {
-        console.error('[CompletionStore] Server sync failed:', error);
+        log.error('Server sync failed:', error);
         // Local state is still valid, will retry on next app launch
       }
     },

@@ -11,7 +11,7 @@ import { SpineConfigBuilder } from './config';
 import { calculateWidth, calculateHeight, GENRE_HEIGHT_PROFILES } from './core/dimensions';
 import { hashString, seededRandom, hashToPick } from './core/hashing';
 import { matchBestGenre } from './genre/matcher';
-import { getGenreProfile } from './genre/profiles';
+import { getGenreProfile } from './profiles';
 import { BASE_DIMENSIONS, WIDTH_CALCULATION, TOUCH_TARGETS } from './constants';
 import { useNewSpineSystem } from './featureFlags';
 import { generateComposition, SpineComposition } from './composition';
@@ -265,17 +265,18 @@ export const FONT_CHAR_RATIOS = {
 
 /**
  * @deprecated Use generateComposition from composition module
- * Legacy: generateSpineComposition(bookId, title, author, genres, series)
+ * Legacy: generateSpineComposition(bookId, title, author, genres, series, spineWidth)
  */
 export function generateSpineComposition(
   bookId: string,
   title: string,
   author: string,
   genres: string[],
-  series?: { name: string; number: number }
+  series?: { name: string; number: number },
+  spineWidth?: number
 ): any {
   if (__DEV__) {
-    console.log(`[Adapter] generateSpineComposition called for "${title}"`);
+    console.log(`[Adapter] generateSpineComposition called for "${title}" (width: ${spineWidth || 'unknown'})`);
   }
 
   if (!useNewSpineSystem()) {
@@ -286,13 +287,8 @@ export function generateSpineComposition(
   }
 
   if (__DEV__) {
-    console.log(`[Adapter] Using NEW system for "${title}"`);
+    console.log(`[Adapter] Using NEW system for "${title}" with width ${spineWidth || 'unknown'}`);
   }
-
-  // Calculate spine width for smart constraints
-  // We need duration for width, but we don't have it here
-  // Pass undefined for now - will be refined when called from components that have it
-  const spineWidth = undefined;
 
   // Use new composition generator with smart constraints
   const genreMatch = matchBestGenre(genres);
@@ -302,7 +298,7 @@ export function generateSpineComposition(
     genreProfile,
     title,      // Pass title for smart rotation logic
     author,     // Pass author for thin spine logic
-    spineWidth  // Pass width (undefined for now)
+    spineWidth  // Pass width for layout constraints
   );
 
   // Return in old format for compatibility - add text properties

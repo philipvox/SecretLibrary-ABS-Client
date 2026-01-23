@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secret Library</title>
+  <meta name="description" content="Listen beautifully.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    @font-face {
+      font-family: 'Woodcut';
+      src: url('TypographerWoodcut.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --black: #000000;
+      --white: #ffffff;
+      --gray-100: #f5f5f5;
+      --gray-200: #e5e5e5;
+      --gray-400: #a3a3a3;
+      --gray-600: #525252;
+      --gray-800: #262626;
+      --cream: #faf9f7;
+      --serif: 'Playfair Display', Georgia, serif;
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    ::selection {
+      background: var(--black);
+      color: var(--white);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--cream);
+      color: var(--black);
+      line-height: 1.6;
+      font-weight: 300;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Typography */
+    h1, h2, h3 {
+      font-family: var(--serif);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      background: var(--black);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-logo img {
+      height: 40px;
+      width: auto;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    .nav-links a {
+      font-size: 0.65rem;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+      opacity: 0.5;
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      background: var(--black);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 6rem 3rem 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-animation {
+      width: 90px;
+      height: auto;
+      margin-bottom: 0.75rem;
+      animation: heroBlurIn 1.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 8vw, 6rem);
+      color: var(--white);
+      text-align: center;
+      line-height: 1;
+      margin-bottom: 1.5rem;
+      animation: heroBlurIn 1.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.2s forwards;
+      opacity: 0;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+    }
+
+    .hero-tagline {
+      font-size: 0.8rem;
+      color: var(--gray-400);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      animation: heroBlurIn 1.2s cubic-bezier(0.25, 0.1, 0.25, 1) 0.4s forwards;
+      opacity: 0;
+    }
+
+    .hero-buttons {
+      animation: heroBlurIn 1.2s cubic-bezier(0.25, 0.1, 0.25, 1) 0.6s forwards;
+      opacity: 0;
+    }
+
+    @keyframes heroBlurIn {
+      0% {
+        opacity: 0;
+        filter: blur(20px);
+        transform: scale(0.95);
+      }
+      100% {
+        opacity: 1;
+        filter: blur(0);
+        transform: scale(1);
+      }
+    }
+
+    /* Hero buttons */
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 3rem;
+      z-index: 10;
+    }
+
+    .hero-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-family: var(--sans);
+      font-size: 0.7rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid var(--white);
+      background: var(--white);
+      color: var(--black);
+    }
+
+    .hero-btn:hover {
+      background: transparent;
+      color: var(--white);
+    }
+
+    .hero-btn-outline {
+      background: transparent;
+      color: var(--white);
+    }
+
+    .hero-btn-outline:hover {
+      background: var(--white);
+      color: var(--black);
+    }
+
+    .hero-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Floating phones container - sits between hero and showcase */
+    .floating-phones {
+      position: absolute;
+      top: 35vh;
+      left: 0;
+      right: 0;
+      height: 0;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .floating-phone {
+      position: absolute;
+      background: #1a1a1a;
+      border-radius: clamp(35px, 3.5vw, 55px);
+      padding: clamp(10px, 1.1vw, 18px);
+      box-shadow:
+        0 60px 120px -25px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+      pointer-events: auto;
+    }
+
+    .floating-phone::before {
+      content: '';
+      position: absolute;
+      top: clamp(10px, 1.1vw, 18px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: clamp(64px, 6.4vw, 112px);
+      height: clamp(19px, 1.9vw, 34px);
+      background: #000;
+      border-radius: clamp(10px, 1vw, 17px);
+      z-index: 10;
+    }
+
+    .floating-phone-screen {
+      width: clamp(220px, 20vw, 380px);
+      height: clamp(476px, 44vw, 820px);
+      border-radius: clamp(28px, 2.8vw, 44px);
+      overflow: hidden;
+      background: #000;
+    }
+
+    .floating-phone-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      object-position: top;
+    }
+
+    .floating-phone-left {
+      left: clamp(-5%, calc(12% - 10vw), 8%);
+      transform: rotate(-6deg);
+    }
+
+    .floating-phone-right {
+      right: clamp(-5%, calc(12% - 10vw), 8%);
+      transform: rotate(6deg);
+    }
+
+    .scroll-indicator {
+      position: absolute;
+      bottom: 3rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--gray-600);
+      font-size: 0.625rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      z-index: 10;
+    }
+
+    .scroll-line {
+      width: 1px;
+      height: 48px;
+      background: linear-gradient(to bottom, var(--gray-600), transparent);
+      animation: scroll-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes scroll-pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* Showcase Section - iPhone Mockups */
+    .showcase {
+      padding: 18rem 3rem 6rem;
+      background: #0a0a0a;
+      overflow: visible;
+      position: relative;
+    }
+
+    .showcase-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .showcase-header span {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    .showcase-header h2 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      color: var(--white);
+    }
+
+    .phones-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      perspective: 1000px;
+    }
+
+    .iphone {
+      position: relative;
+      background: #1a1a1a;
+      border-radius: 40px;
+      padding: 12px;
+      box-shadow:
+        0 50px 100px -20px rgba(0, 0, 0, 0.5),
+        0 30px 60px -30px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+    }
+
+    .iphone::before {
+      content: '';
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 24px;
+      background: #000;
+      border-radius: 12px;
+      z-index: 10;
+    }
+
+    .iphone-screen {
+      width: 220px;
+      height: 476px;
+      border-radius: 28px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .iphone-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+    }
+
+    .iphone-small {
+      transform: scale(0.85);
+      opacity: 0.9;
+    }
+
+    .iphone-large {
+      transform: scale(1.1);
+      z-index: 2;
+    }
+
+    /* Statement - now part of showcase */
+    .showcase-statement {
+      max-width: 700px;
+      margin: 4rem auto 0;
+      text-align: center;
+    }
+
+    .showcase-statement p {
+      font-family: var(--serif);
+      font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+      line-height: 1.5;
+      color: var(--white);
+    }
+
+    .showcase-statement p em {
+      font-style: italic;
+    }
+
+    /* Story Section - Two Column with Drop Cap */
+    .story {
+      padding: 6rem 3rem;
+      background: var(--black);
+    }
+
+    .story-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+    }
+
+    .story-column {
+      color: var(--gray-400);
+      font-family: 'Lora', Georgia, var(--serif);
+      font-size: 1.35rem;
+      line-height: 1.5;
+      align-self: start;
+    }
+
+    .story-column p {
+      margin-bottom: 1.25rem;
+    }
+
+    .has-dropcap::first-letter {
+      font-family: 'Woodcut', var(--serif);
+      font-size: 6.25rem;
+      float: left;
+      line-height: 0.85;
+      margin-right: 0.85rem;
+      margin-top: -0.1rem;
+      color: var(--white);
+      font-weight: normal;
+    }
+
+    .story-column strong {
+      color: var(--white);
+      font-weight: 500;
+    }
+
+    .story-column em {
+      font-style: italic;
+    }
+
+    .story-header {
+      grid-column: 1 / -1;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .story-header span {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    .story-header h2 {
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      color: var(--white);
+    }
+
+    @media (max-width: 768px) {
+      .story {
+        padding: 4rem 2rem;
+      }
+
+      .story-container {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+
+      .has-dropcap::first-letter {
+        font-size: 4rem;
+      }
+    }
+
+    /* Features Grid */
+    .features {
+      padding: 6rem 3rem;
+      background: #050505;
+    }
+
+    .features-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .features-header span {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    .features-header h2 {
+      font-size: clamp(1.75rem, 4vw, 2.75rem);
+      color: var(--white);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .feature {
+      background: #050505;
+      padding: 2.5rem 2rem;
+      transition: background 0.3s;
+    }
+
+    .feature:hover {
+      background: #0f0f0f;
+    }
+
+    .feature-number {
+      font-family: var(--serif);
+      font-size: 0.75rem;
+      color: var(--gray-600);
+      margin-bottom: 1.5rem;
+    }
+
+    .feature h3 {
+      font-size: 1.125rem;
+      margin-bottom: 0.75rem;
+      color: var(--white);
+    }
+
+    .feature p {
+      color: var(--gray-400);
+      font-size: 0.8125rem;
+      line-height: 1.7;
+    }
+
+    /* Download Section */
+    .download {
+      padding: 6rem 3rem;
+      background: #0a0a0a;
+      text-align: center;
+    }
+
+    /* Download CTA */
+    .download-cta {
+      margin-bottom: 2rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .download-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      display: block;
+      margin-bottom: 1.5rem;
+    }
+
+    .download-candle {
+      width: 80px;
+      height: auto;
+      margin-bottom: 1.5rem;
+    }
+
+    .download-cta h2 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      color: var(--white);
+      margin-bottom: 1rem;
+    }
+
+    .download-description {
+      font-size: 0.875rem;
+      color: var(--gray-400);
+      line-height: 1.8;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .download-description a {
+      color: var(--white);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .download-description a:hover {
+      text-decoration-thickness: 2px;
+    }
+
+    .download-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 2rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 1.75rem;
+      font-family: var(--sans);
+      font-size: 0.7rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid;
+    }
+
+    .btn-primary {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+    }
+
+    .btn-primary:hover {
+      background: transparent;
+      color: var(--white);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--gray-400);
+      border-color: var(--gray-800);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--gray-400);
+      color: var(--white);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 3rem;
+      background: var(--black);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--gray-800);
+    }
+
+    footer p {
+      font-size: 0.75rem;
+      color: var(--gray-600);
+      letter-spacing: 0.1em;
+    }
+
+    footer a {
+      color: var(--gray-400);
+      text-decoration: none;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    footer a:hover {
+      color: var(--white);
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .phones-container {
+        gap: 1rem;
+      }
+
+      .iphone-screen {
+        width: 180px;
+        height: 390px;
+      }
+
+      .iphone {
+        border-radius: 32px;
+        padding: 10px;
+      }
+
+      .iphone::before {
+        width: 60px;
+        height: 20px;
+        top: 10px;
+      }
+
+      .iphone-screen {
+        border-radius: 22px;
+      }
+
+      .floating-phones {
+        top: 45vh;
+      }
+
+      .floating-phone-screen {
+        width: 260px;
+        height: 563px;
+        border-radius: 32px;
+      }
+
+      .floating-phone {
+        border-radius: 42px;
+        padding: 12px;
+      }
+
+      .floating-phone::before {
+        width: 75px;
+        height: 22px;
+        top: 12px;
+      }
+
+      .floating-phone-left {
+        left: -8%;
+      }
+
+      .floating-phone-right {
+        right: -8%;
+      }
+
+      .showcase {
+        padding: 14rem 4rem 6rem;
+      }
+    }
+
+    @media (max-width: 768px) {
+      nav {
+        padding: 1.5rem 2rem;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero {
+        padding: 6rem 2rem 4rem;
+        justify-content: flex-start;
+        padding-top: 15vh;
+      }
+
+      .hero-animation {
+        width: 60px;
+        margin-bottom: 1.5rem;
+      }
+
+      .hero-buttons {
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .hero-btn {
+        width: 200px;
+        justify-content: center;
+      }
+
+      .floating-phones {
+        top: 68vh;
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
+        z-index: 50;
+      }
+
+      .floating-phone-screen {
+        width: 300px;
+        height: 650px;
+        border-radius: 44px;
+      }
+
+      .floating-phone {
+        border-radius: 54px;
+        padding: 14px;
+      }
+
+      .floating-phone::before {
+        width: 100px;
+        height: 30px;
+        top: 14px;
+        border-radius: 15px;
+      }
+
+      .floating-phone-left {
+        display: none;
+      }
+
+      .floating-phone-right {
+        position: relative;
+        right: auto;
+        left: auto;
+        transform: none;
+      }
+
+      .download-candle {
+        width: 70px;
+      }
+
+      .download-description {
+        font-size: 0.9375rem;
+      }
+
+      .showcase {
+        padding: 4rem 1rem 4rem;
+        z-index: 101;
+      }
+
+      .phones-container {
+        flex-wrap: wrap;
+        gap: 2rem;
+      }
+
+      .iphone-small {
+        transform: scale(0.85);
+      }
+
+      .iphone-large {
+        transform: scale(1.1);
+      }
+
+      .iphone-screen {
+        width: 160px;
+        height: 346px;
+      }
+
+      .showcase-header h2 {
+        color: var(--white);
+      }
+
+      .showcase-statement {
+        margin-top: 4rem;
+        padding: 0 1rem;
+      }
+
+      .features {
+        padding: 4rem 2rem;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .feature {
+        padding: 3rem 2rem;
+      }
+
+      .download {
+        padding: 6rem 2rem;
+      }
+
+      .download-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .btn {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+      }
+
+      footer {
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+        padding: 3rem 2rem;
+      }
+    }
+
+    /* ============================================
+       ANIMATION SYSTEM - Apple-style consistency
+       ============================================ */
+
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+                  transform 0.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Staggered timing for grouped elements */
+    .feature.fade-in:nth-child(1) { transition-delay: 0s; }
+    .feature.fade-in:nth-child(2) { transition-delay: 0.05s; }
+    .feature.fade-in:nth-child(3) { transition-delay: 0.1s; }
+    .feature.fade-in:nth-child(4) { transition-delay: 0.15s; }
+    .feature.fade-in:nth-child(5) { transition-delay: 0.2s; }
+    .feature.fade-in:nth-child(6) { transition-delay: 0.25s; }
+
+    /* Slightly longer duration for hero elements */
+    .phones-container.fade-in {
+      transition-duration: 1s;
+    }
+
+    .showcase-statement.fade-in {
+      transition-delay: 0.1s;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="#" class="nav-logo"><img src="logo.svg" alt="Secret Library"></a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="tagger.html">Tagger</a>
+      <a href="docs.html">Docs</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </nav>
+
+  <!-- Floating phones that span hero and showcase -->
+  <div class="floating-phones">
+    <div class="floating-phone floating-phone-left">
+      <div class="floating-phone-screen">
+        <img src="screenshot-detail.png" alt="Book Detail">
+      </div>
+    </div>
+    <div class="floating-phone floating-phone-right">
+      <div class="floating-phone-screen">
+        <img src="screenshot-spines.png" alt="Library">
+      </div>
+    </div>
+  </div>
+
+  <section class="hero">
+    <img src="skull_loader.gif" alt="Secret Library" class="hero-animation">
+    <h1>Listen<br><em>beautifully.</em></h1>
+    <p class="hero-tagline">Your audiobookshelf sanctuary</p>
+    <div class="hero-buttons">
+      <a href="downloads/secret-library.apk" class="hero-btn" download>
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.523 15.341c-.5 0-.91.41-.91.91s.41.91.91.91.91-.41.91-.91-.41-.91-.91-.91zm-11.046 0c-.5 0-.91.41-.91.91s.41.91.91.91.91-.41.91-.91-.41-.91-.91-.91zm11.405-6.02l1.997-3.46a.416.416 0 00-.152-.566.416.416 0 00-.566.152l-2.02 3.5c-1.533-.7-3.253-1.09-5.141-1.09s-3.608.39-5.141 1.09l-2.02-3.5a.416.416 0 00-.566-.152.416.416 0 00-.152.566l1.997 3.46C2.688 11.196.343 14.614 0 18.761h24c-.343-4.147-2.688-7.565-6.118-9.44z"/>
+        </svg>
+        Android
+      </a>
+      <a href="#" class="hero-btn hero-btn-outline" style="pointer-events: none;">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+        </svg>
+        iOS Soon
+      </a>
+    </div>
+
+    <div class="scroll-indicator">
+      <span>Scroll</span>
+      <div class="scroll-line"></div>
+    </div>
+  </section>
+
+  <section class="showcase">
+    <div class="showcase-header fade-in">
+      <span>The Experience</span>
+      <h2>Crafted for <em>readers.</em></h2>
+    </div>
+    <div class="phones-container fade-in">
+      <div class="iphone iphone-small">
+        <div class="iphone-screen">
+          <img src="screenshot-spines.png" alt="Library Spines">
+        </div>
+      </div>
+      <div class="iphone iphone-large">
+        <div class="iphone-screen">
+          <img src="screenshot-detail.png" alt="Book Detail">
+        </div>
+      </div>
+      <div class="iphone iphone-small">
+        <div class="iphone-screen">
+          <img src="screenshot-spines.png" alt="Library">
+        </div>
+      </div>
+    </div>
+
+    <div class="showcase-statement fade-in">
+      <p>A <em>premium</em> audiobook player crafted for your personal library. Designed with intention. Built without compromise. For those who believe listening is an <em>art form.</em></p>
+    </div>
+  </section>
+
+  <section class="story">
+    <div class="story-container">
+      <div class="story-header fade-in">
+        <span>The Story</span>
+        <h2>Why I built <em>this.</em></h2>
+      </div>
+      <div class="story-column fade-in">
+        <p class="has-dropcap">This project exists because I wanted to learn how to build an app—and because navigating my overly complicated Audiobookshelf library had become a chore. It started simply enough: I wanted to standardize genres across my collection. That turned into an elaborate but functional tool for fixing audiobook metadata, which you can download below. It's not perfect, but if you're willing to work with it, it can be genuinely helpful.</p>
+        <p>From there, things spiraled. Title normalization. Tag cleanup. Series and sequence ordering (still in progress). Description formatting. Each fix revealed another annoyance.</p>
+      </div>
+      <div class="story-column fade-in">
+        <p>Along the way, I kept running into frustrations with the existing Audiobookshelf apps—and the near-impossibility of sharing my library with friends and family on iOS. Every app I recommended ended with the same response: "I wanted to use it, but it wasn't working, so I didn't."</p>
+        <p>So I built Secret Library. A tool for me, my friends, and my family to actually enjoy my collection. It will likely work with yours too. It has bugs. It has quirks. It's optimized for my preferences, not mass appeal—some things aren't intuitive by design (hold the skull to find settings). If that frustrates you, I'm sorry. But feel free to fork it and make it your own. This isn't the perfect tool. I just think it's better than what's out there.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="features-header fade-in">
+      <span>Capabilities</span>
+      <h2>Everything, <em>nothing more.</em></h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature fade-in">
+        <span class="feature-number">01</span>
+        <h3>Offline Mode</h3>
+        <p>Download your entire library. Listen anywhere—subway, plane, wilderness. Your books, always with you.</p>
+      </div>
+      <div class="feature fade-in">
+        <span class="feature-number">02</span>
+        <h3>CarPlay & Auto</h3>
+        <p>Seamless integration with your vehicle. Full control without reaching for your phone.</p>
+      </div>
+      <div class="feature fade-in">
+        <span class="feature-number">03</span>
+        <h3>Smart Rewind</h3>
+        <p>Picks up where your memory left off. Brief pause? Short rewind. Long absence? We'll help you remember.</p>
+      </div>
+      <div class="feature fade-in">
+        <span class="feature-number">04</span>
+        <h3>Sleep Timer</h3>
+        <p>Drift off to stories. Customizable fade-out. Wake up exactly where you fell asleep.</p>
+      </div>
+      <div class="feature fade-in">
+        <span class="feature-number">05</span>
+        <h3>Cross-Device Sync</h3>
+        <p>Start on your phone. Continue on your tablet. Your position follows you everywhere.</p>
+      </div>
+      <div class="feature fade-in">
+        <span class="feature-number">06</span>
+        <h3>Obsessive Details</h3>
+        <p>Chapter navigation. Playback speed. Bookmarks. Every feature considered, refined, perfected.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="download" id="download">
+    <div class="download-cta fade-in">
+      <span class="download-label">Get Started</span>
+      <img src="candle_white.svg" alt="Secret Library" class="download-candle">
+      <h2>Begin your <em>journey.</em></h2>
+      <p class="download-description">Self-hosted. Private. Yours. Your library lives on your server—we never see your books, your data, or your listening habits. Powered by <a href="https://www.audiobookshelf.org/" target="_blank">Audiobookshelf</a>, the open-source audiobook server trusted by thousands.</p>
+
+      <div class="download-buttons">
+      <a href="downloads/secret-library.apk" class="btn btn-primary" download>
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.523 15.341c-.5 0-.91.41-.91.91s.41.91.91.91.91-.41.91-.91-.41-.91-.91-.91zm-11.046 0c-.5 0-.91.41-.91.91s.41.91.91.91.91-.41.91-.91-.41-.91-.91-.91zm11.405-6.02l1.997-3.46a.416.416 0 00-.152-.566.416.416 0 00-.566.152l-2.02 3.5c-1.533-.7-3.253-1.09-5.141-1.09s-3.608.39-5.141 1.09l-2.02-3.5a.416.416 0 00-.566-.152.416.416 0 00-.152.566l1.997 3.46C2.688 11.196.343 14.614 0 18.761h24c-.343-4.147-2.688-7.565-6.118-9.44z"/>
+        </svg>
+        Android
+      </a>
+      <a href="#" class="btn btn-secondary" style="pointer-events: none;">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+        </svg>
+        iOS — Soon
+      </a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2026 Secret Library</p>
+    <a href="privacy.html">Privacy</a>
+  </footer>
+
+  <script>
+    // Intersection Observer for fade-in animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

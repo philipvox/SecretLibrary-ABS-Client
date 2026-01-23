@@ -22,7 +22,7 @@ import { spacing, radius, scale, useTheme } from '@/shared/theme';
 import { logger } from '@/shared/utils/logger';
 
 // App logo (horizontal version with text)
-const APP_LOGO = require('../../../../assets/login-logo.png');
+const APP_LOGO = require('@assets/login-logo.png');
 
 /**
  * Normalize server URL to standard format:

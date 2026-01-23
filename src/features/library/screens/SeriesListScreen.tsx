@@ -6,7 +6,7 @@
  * Uses library cache for instant loading.
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache, getAllSeries } from '@/core/cache';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { Icon } from '@/shared/components/Icon';
-import { SeriesHeartButton, SkullRefreshControl, TopNav, TopNavBackIcon, BookIcon } from '@/shared/components';
+import { SeriesHeartButton, SkullRefreshControl, TopNav, TopNavBackIcon, BookIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { scale, useTheme } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
@@ -113,6 +114,16 @@ export function SeriesListScreen() {
   const [sortBy, setSortBy] = useState<SortType>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Mark as mounted after first render and hide global loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+      globalLoading.hide();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const { refreshCache, isLoaded } = useLibraryCache();
   const favoriteSeriesNames = useMyLibraryStore((state) => state.favoriteSeriesNames);
@@ -223,6 +234,9 @@ export function SeriesListScreen() {
     <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
 
+      {/* Loading overlay for initial load */}
+      <ScreenLoadingOverlay visible={!mounted} />
+
       {/* TopNav with skull logo and integrated search bar */}
       <TopNav
         variant={isDark ? 'dark' : 'light'}
@@ -256,29 +270,36 @@ export function SeriesListScreen() {
         <Text style={[styles.resultCount, { color: colors.text.secondary }]}>{sortedSeries.length} series</Text>
         <View style={styles.sortButtons}>
           <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: colors.border.default }, sortBy === 'name' && { backgroundColor: accent }]}
+            style={[
+              styles.sortButton,
+              { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+              sortBy === 'name' && { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' },
+            ]}
             onPress={() => handleSortPress('name')}
           >
             <Icon
               name={sortBy === 'name' ? (sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown') : 'ArrowUpDown'}
               size={14}
-              color={sortBy === 'name' ? colors.text.inverse : colors.text.secondary}
-
+              color={sortBy === 'name' ? colors.text.primary : colors.text.tertiary}
             />
-            <Text style={[styles.sortButtonText, { color: colors.text.secondary }, sortBy === 'name' && [styles.sortButtonTextActive, { color: colors.text.inverse }]]}>
+            <Text style={[styles.sortButtonText, { color: colors.text.tertiary }, sortBy === 'name' && { color: colors.text.primary }]}>
               {sortBy === 'name' ? (sortDirection === 'asc' ? 'A-Z' : 'Z-A') : 'Name'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sortButton, { backgroundColor: colors.border.default }, sortBy === 'bookCount' && { backgroundColor: accent }]}
+            style={[
+              styles.sortButton,
+              { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+              sortBy === 'bookCount' && { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' },
+            ]}
             onPress={() => handleSortPress('bookCount')}
           >
             <Icon
               name={sortBy === 'bookCount' ? (sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown') : 'Library'}
               size={14}
-              color={sortBy === 'bookCount' ? colors.text.inverse : colors.text.secondary}
+              color={sortBy === 'bookCount' ? colors.text.primary : colors.text.tertiary}
             />
-            <Text style={[styles.sortButtonText, { color: colors.text.secondary }, sortBy === 'bookCount' && [styles.sortButtonTextActive, { color: colors.text.inverse }]]}>Books</Text>
+            <Text style={[styles.sortButtonText, { color: colors.text.tertiary }, sortBy === 'bookCount' && { color: colors.text.primary }]}>Books</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -371,7 +392,7 @@ export function SeriesListScreen() {
                 )}
               </View>
 
-              {/* Right side: Color dots + complete badge + heart */}
+              {/* Right side: Color dots + complete badge */}
               <View style={styles.seriesCardRight}>
                 {/* Complete badge */}
                 {isComplete && (
@@ -389,13 +410,14 @@ export function SeriesListScreen() {
                     />
                   ))}
                 </View>
+              </View>
 
-                {/* Heart button */}
+              {/* Heart button - far right */}
+              <View style={styles.heartContainer}>
                 <SeriesHeartButton
                   seriesName={series.name}
-                  size={10}
+                  size={18}
                   showCircle
-                  style={{ marginTop: 8 }}
                 />
               </View>
             </Pressable>
@@ -474,6 +496,12 @@ const styles = StyleSheet.create({
   },
   seriesCardRight: {
     alignItems: 'flex-end',
+    marginRight: 12,
+  },
+  heartContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 4,
   },
   seriesName: {
     fontFamily: secretLibraryFonts.playfair.regular,

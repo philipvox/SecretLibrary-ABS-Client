@@ -8,8 +8,9 @@
  * - Request queue with priority
  */
 
-const DEBUG = __DEV__;
-const log = (...args: any[]) => DEBUG && console.log('[Network]', ...args);
+import { createLogger } from '@/shared/utils/logger';
+
+const log = createLogger('Network');
 
 // ============================================================================
 // REQUEST DEDUPLICATION
@@ -37,7 +38,7 @@ class RequestDeduplicator {
     // Check for existing in-flight request
     const existing = this.inFlight.get(key);
     if (existing && now - existing.timestamp < this.maxAge) {
-      log(`Deduped request: ${key}`);
+      log.debug(`Deduped request: ${key}`);
       return existing.promise;
     }
 
@@ -86,7 +87,7 @@ class ResponseCache {
       return null;
     }
 
-    log(`Cache hit: ${key}`);
+    log.debug(`Cache hit: ${key}`);
     return entry.data;
   }
 
@@ -151,7 +152,7 @@ class ResponseCache {
 }
 
 // ============================================================================
-// RETRY WITH EXPONENTIAL BACKOFF
+// RETRY WITH EXPONENTIAL BACKOFF (Enhanced with 429 Rate Limit Handling)
 // ============================================================================
 
 interface RetryConfig {
@@ -162,16 +163,40 @@ interface RetryConfig {
 }
 
 const defaultRetryConfig: RetryConfig = {
-  maxRetries: 2,
+  maxRetries: 3, // Increased from 2 for better resilience
   baseDelay: 500,
-  maxDelay: 3000,
+  maxDelay: 10000, // Increased from 3000 for rate limit scenarios
   retryOn: (error: any) => {
-    // Retry on network errors and 5xx server errors
+    // Retry on network errors, 5xx server errors, and 429 rate limit
     if (!error.response) return true; // Network error
     const status = error.response?.status;
-    return status >= 500 && status < 600;
+    // Retry on 5xx server errors AND 429 rate limit
+    return (status >= 500 && status < 600) || status === 429;
   },
 };
+
+/**
+ * Parse Retry-After header value
+ * Can be either a number (seconds) or an HTTP date
+ */
+function parseRetryAfter(retryAfter: string | undefined): number | null {
+  if (!retryAfter) return null;
+
+  // Try parsing as number (seconds)
+  const seconds = parseInt(retryAfter, 10);
+  if (!isNaN(seconds)) {
+    return seconds * 1000; // Convert to ms
+  }
+
+  // Try parsing as HTTP date
+  const date = Date.parse(retryAfter);
+  if (!isNaN(date)) {
+    const delayMs = date - Date.now();
+    return delayMs > 0 ? delayMs : null;
+  }
+
+  return null;
+}
 
 async function withRetry<T>(
   requestFn: () => Promise<T>,
@@ -187,20 +212,39 @@ async function withRetry<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await requestFn();
-    } catch (error) {
+    } catch (error: any) {
       lastError = error;
 
       if (attempt === maxRetries || !retryOn(error)) {
         throw error;
       }
 
-      // Calculate delay with exponential backoff + jitter
-      const delay = Math.min(
-        baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
-        maxDelay
-      );
+      let delay: number;
 
-      log(`Retry ${attempt + 1}/${maxRetries} after ${delay.toFixed(0)}ms`);
+      // RATE LIMIT HANDLING: Check for 429 with Retry-After header
+      if (error.response?.status === 429) {
+        const retryAfterHeader = error.response?.headers?.['retry-after'];
+        const retryAfterMs = parseRetryAfter(retryAfterHeader);
+
+        if (retryAfterMs !== null) {
+          // Use server-specified delay (capped at maxDelay)
+          delay = Math.min(retryAfterMs, maxDelay);
+          log.warn(`[RATE_LIMIT] 429 received - waiting ${delay}ms (from Retry-After header)`);
+        } else {
+          // No Retry-After header - use aggressive backoff for rate limits
+          // Start with 5 seconds, double each time
+          delay = Math.min(5000 * Math.pow(2, attempt), maxDelay);
+          log.warn(`[RATE_LIMIT] 429 received - waiting ${delay}ms (no Retry-After, using backoff)`);
+        }
+      } else {
+        // Standard exponential backoff for other errors (5xx, network)
+        delay = Math.min(
+          baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
+          maxDelay
+        );
+      }
+
+      log.debug(`Retry ${attempt + 1}/${maxRetries} after ${delay.toFixed(0)}ms`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

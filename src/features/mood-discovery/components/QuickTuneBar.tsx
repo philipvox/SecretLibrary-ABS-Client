@@ -26,6 +26,7 @@ import {
 } from '../stores/moodSessionStore';
 import { Icon } from '@/shared/components/Icon';
 import { spacing, radius, useTheme, type ThemeColors } from '@/shared/theme';
+import { secretLibraryColors } from '@/shared/theme/secretLibrary';
 
 interface QuickTuneBarProps {
   /** Active session to display */
@@ -67,7 +68,7 @@ export function QuickTuneBar({
   onClear,
 }: QuickTuneBarProps) {
   const { colors } = useTheme();
-  const accent = colors.accent.primary;
+  const accent = secretLibraryColors.gold;
   const textOnAccent = colors.accent.textOnAccent;
   const { expiresAt, clearSession } = useSessionInfo();
 

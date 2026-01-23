@@ -14,6 +14,8 @@ export {
   type ErrorHandler,
   type ErrorFilter,
   type CreateErrorOptions,
+  type ErrorContext,
+  createErrorContext,
   isAppError,
   isNetworkError,
   isAuthError,

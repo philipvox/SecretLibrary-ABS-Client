@@ -17,8 +17,8 @@ import {
 describe('Spine Dimensions', () => {
   describe('calculateWidth', () => {
     it('returns minimum width for very short audiobooks', () => {
-      expect(calculateWidth(1800)).toBe(20);  // 30 minutes
-      expect(calculateWidth(3000)).toBe(20);  // 50 minutes
+      expect(calculateWidth(1800)).toBe(44);  // 30 minutes - MIN width
+      expect(calculateWidth(3000)).toBe(44);  // 50 minutes - MIN width
     });
 
     it('returns maximum width for very long audiobooks', () => {
@@ -26,7 +26,7 @@ describe('Spine Dimensions', () => {
       expect(calculateWidth(200000)).toBe(280);  // 55+ hours
     });
 
-    it('scales linearly between min and max', () => {
+    it('scales with ease-out curve between min and max', () => {
       const w5hr = calculateWidth(18000);   // 5 hours
       const w10hr = calculateWidth(36000);  // 10 hours
       const w25hr = calculateWidth(90000);  // 25 hours
@@ -35,29 +35,30 @@ describe('Spine Dimensions', () => {
       expect(w10hr).toBeGreaterThan(w5hr);
       expect(w25hr).toBeGreaterThan(w10hr);
 
-      // Should be roughly linear
+      // With ease-out curve, early growth is faster than late growth
+      // So diff5to10 should be greater than the proportional diff10to25/3
       const diff10to25 = w25hr - w10hr;
       const diff5to10 = w10hr - w5hr;
-      expect(Math.abs(diff10to25 - diff5to10 * 3)).toBeLessThan(5);
+      expect(diff5to10).toBeGreaterThan(diff10to25 / 3);
     });
 
     it('returns median for undefined duration', () => {
-      expect(calculateWidth(undefined)).toBe(60);
+      expect(calculateWidth(undefined)).toBe(44);  // MEDIAN = 44
     });
 
     it('returns median for null duration', () => {
-      expect(calculateWidth(null as any)).toBe(60);
+      expect(calculateWidth(null as any)).toBe(44);  // MEDIAN = 44
     });
 
     it('returns median for zero duration', () => {
-      expect(calculateWidth(0)).toBe(60);
+      expect(calculateWidth(0)).toBe(44);  // MEDIAN = 44
     });
 
     it('produces realistic widths for common audiobook lengths', () => {
-      expect(calculateWidth(3600)).toBeGreaterThanOrEqual(20);    // 1hr
-      expect(calculateWidth(18000)).toBeGreaterThanOrEqual(40);   // 5hr
-      expect(calculateWidth(36000)).toBeGreaterThanOrEqual(70);   // 10hr
-      expect(calculateWidth(90000)).toBeGreaterThanOrEqual(140);  // 25hr
+      expect(calculateWidth(3600)).toBeGreaterThanOrEqual(44);    // 1hr - MIN
+      expect(calculateWidth(18000)).toBeGreaterThanOrEqual(80);   // 5hr
+      expect(calculateWidth(36000)).toBeGreaterThanOrEqual(120);  // 10hr
+      expect(calculateWidth(90000)).toBeGreaterThanOrEqual(200);  // 25hr
     });
   });
 
@@ -130,9 +131,9 @@ describe('Spine Dimensions', () => {
         'shelf'
       );
 
-      expect(result.width).toBe(95);   // 100 * 0.95
-      expect(result.height).toBe(380); // 400 * 0.95
-      expect(result.scaleFactor).toBe(0.95);
+      expect(result.width).toBe(100);   // 100 * 1.0 (shelf scale = 1)
+      expect(result.height).toBe(400);  // 400 * 1.0 (shelf scale = 1)
+      expect(result.scaleFactor).toBe(1);
       expect(result.context).toBe('shelf');
     });
 

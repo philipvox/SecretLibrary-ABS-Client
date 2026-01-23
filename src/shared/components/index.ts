@@ -33,6 +33,12 @@ export { SkullLoadingSpinner } from './SkullLoadingSpinner';
 export { SkullRefreshControl } from './SkullRefreshControl';
 export type { SkullRefreshControlProps } from './SkullRefreshControl';
 
+// Screen loading overlay (initial load)
+export { ScreenLoadingOverlay } from './ScreenLoadingOverlay';
+
+// Global loading overlay (triggered from buttons before navigation)
+export { GlobalLoadingOverlay } from './GlobalLoadingOverlay';
+
 // =============================================================================
 // FEEDBACK & STATES
 // =============================================================================

@@ -28,6 +28,13 @@ export interface BrowseItem {
   isPlayable: boolean;
   isBrowsable: boolean;
   progress?: number;  // 0-1 for continue listening
+  durationMs?: number; // Duration in milliseconds for Android Auto
+  /** For browsable items, the children to show when expanded */
+  children?: BrowseItem[];
+  /** Number of items (for folder display, e.g. "12 books") */
+  itemCount?: number;
+  /** Series sequence number for ordering */
+  sequence?: number;
 }
 
 /**
@@ -37,6 +44,8 @@ export interface BrowseSection {
   id: string;
   title: string;
   items: BrowseItem[];
+  /** If true, this section contains browsable folders, not playable items */
+  isBrowsableSection?: boolean;
 }
 
 /**
@@ -108,7 +117,7 @@ export const DEFAULT_AUTOMOTIVE_CONFIG: AutomotiveConfig = {
   appName: 'Audiobookshelf',
   enableCarPlay: true,   // Native config now in place
   enableAndroidAuto: true, // Native config now in place
-  maxListItems: 30,
+  maxListItems: 50,      // Increased for better browsing experience
   showSpeedControl: true,
   showSleepTimer: false,
   skipInterval: 30,

@@ -3,16 +3,27 @@
  *
  * Animated splash screen shown during app initialization.
  * Shows animated skull with flickering candle flame.
- * Uses the same animation as the unified Loading component.
  *
- * PERFORMANCE: SkullCandle uses forceUpdate pattern instead of useState
- * to avoid re-render cascade when parent props change.
+ * PERFORMANCE: Uses Reanimated for UI thread animations.
+ * Animation continues smoothly even during heavy JS operations.
  */
 
-import React, { useEffect, useRef, useState, useCallback, memo, useReducer } from 'react';
+import React, { useEffect, useRef, useCallback, memo } from 'react';
 import { StyleSheet, Animated, View, Text } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
+import {
+  useSharedValue,
+  useAnimatedProps,
+  useDerivedValue,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import ReanimatedDefault from 'react-native-reanimated';
 import { scale, useTheme } from '@/shared/theme';
+
+// Create animated SVG Path for UI thread animations
+const AnimatedPath = ReanimatedDefault.createAnimatedComponent(Path);
 
 interface AnimatedSplashProps {
   onReady: () => void;
@@ -69,28 +80,37 @@ interface SkullCandleProps {
 }
 
 /**
- * SkullCandle - Memoized to prevent re-renders from parent prop changes.
- * Uses useReducer for frame state which is more efficient than useState
- * for frequent updates that don't need batching with other state.
+ * SkullCandle - Uses Reanimated for UI thread animations.
+ * Animation runs on UI thread so it won't freeze during heavy JS operations.
  */
 const SkullCandle = memo(function SkullCandle({ color, size }: SkullCandleProps) {
-  // Use useReducer instead of useState - slightly more efficient for frequent updates
-  // and doesn't batch with other state updates
-  const [frameIndex, nextFrame] = useReducer(
-    (prev: number) => (prev + 1) % CANDLE_FRAMES.length,
-    0
-  );
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const totalFrames = CANDLE_FRAMES.length;
+  const totalDuration = totalFrames * FRAME_DURATION_MS;
+
+  // Shared value that continuously increments from 0 to totalFrames
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    intervalRef.current = setInterval(nextFrame, FRAME_DURATION_MS);
+    // Start the animation loop on UI thread
+    progress.value = withRepeat(
+      withTiming(totalFrames, {
+        duration: totalDuration,
+        easing: Easing.linear,
+      }),
+      -1, // Infinite repeat
+      false // Don't reverse
+    );
+  }, [totalFrames, totalDuration]);
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
+  // Derive the frame index from progress (runs on UI thread)
+  const frameIndex = useDerivedValue(() => {
+    return Math.floor(progress.value) % totalFrames;
+  });
+
+  // Animated props for the flame path (runs on UI thread)
+  const animatedFlameProps = useAnimatedProps(() => {
+    return { d: CANDLE_FRAMES[frameIndex.value] || CANDLE_FRAMES[0] };
+  });
 
   const scaledHeight = scale(size);
   const scaledWidth = scaledHeight * ASPECT_RATIO;
@@ -107,8 +127,8 @@ const SkullCandle = memo(function SkullCandle({ color, size }: SkullCandleProps)
           <Path key={`skull-${i}`} d={d} fill={color} />
         ))}
       </G>
-      {/* Animated candle flame */}
-      <Path d={CANDLE_FRAMES[frameIndex]} fill={color} />
+      {/* Animated candle flame - runs on UI thread */}
+      <AnimatedPath animatedProps={animatedFlameProps} fill={color} />
     </Svg>
   );
 });

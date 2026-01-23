@@ -15,7 +15,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -96,7 +96,8 @@ export const ToastContainer: React.FC = () => {
   const toasts = useToastStore((state) => state.toasts);
   const removeToast = useToastStore((state) => state.removeToast);
 
-  if (toasts.length === 0) return null;
+  // Return empty View on Android to prevent SafeAreaProvider crash
+  if (toasts.length === 0) return Platform.OS === 'android' ? <View /> : null;
 
   return (
     <View

@@ -35,8 +35,8 @@ function GridItem({ iconName, title, count, onPress }: GridItemProps) {
     <Pressable
       style={({ pressed }) => [
         styles.gridItem,
-        { backgroundColor: colors.white },
-        pressed && { backgroundColor: colors.cream },
+        { backgroundColor: 'transparent' },
+        pressed && { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.05)' : colors.cream },
       ]}
       onPress={onPress}
     >
@@ -121,7 +121,7 @@ export function QuickBrowseGrid({ onCategoryPress, onBrowsePagePress }: QuickBro
             onPress={() => handleCategoryPress('duration')}
           />
           <View style={[styles.verticalDivider, { backgroundColor: colors.grayLine }]} />
-          <View style={[styles.gridItem, { backgroundColor: colors.white }]} />
+          <View style={[styles.gridItem, { backgroundColor: 'transparent' }]} />
         </View>
       </View>
     </View>

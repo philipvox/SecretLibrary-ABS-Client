@@ -7,7 +7,7 @@
 
 export const PERFORMANCE_BUDGETS = {
   /**
-   * Screen mount/render time budgets
+   * Default screen mount/render time budgets
    * - warn: Log warning if exceeded
    * - error: Log error if exceeded
    */
@@ -15,6 +15,41 @@ export const PERFORMANCE_BUDGETS = {
     warn: 250,  // ms
     error: 400, // ms
   },
+
+  /**
+   * Per-screen budgets (ms) - override defaults for specific screens
+   * Some screens are expected to take longer due to complexity
+   */
+  screens: {
+    // Simple screens - should be fast
+    HomeScreen: { warn: 200, error: 350 },
+    ProfileScreen: { warn: 200, error: 350 },
+    SettingsScreen: { warn: 150, error: 300 },
+
+    // Medium complexity - data fetching
+    MyLibraryScreen: { warn: 300, error: 500 },
+    SearchScreen: { warn: 250, error: 400 },
+    BrowseScreen: { warn: 300, error: 500 },
+
+    // Complex screens - lots of data/rendering
+    BookDetailScreen: { warn: 350, error: 600 },
+    SecretLibraryBookDetailScreen: { warn: 400, error: 700 },
+    SecretLibraryPlayerScreen: { warn: 400, error: 700 },
+    CDPlayerScreen: { warn: 350, error: 600 },
+
+    // List screens - may have many items
+    SeriesListScreen: { warn: 300, error: 500 },
+    AuthorsListScreen: { warn: 300, error: 500 },
+    NarratorsListScreen: { warn: 300, error: 500 },
+    GenresListScreen: { warn: 250, error: 450 },
+    CollectionDetailScreen: { warn: 350, error: 600 },
+
+    // Feature screens
+    MoodDiscoveryScreen: { warn: 300, error: 500 },
+    MoodResultsScreen: { warn: 350, error: 600 },
+    DownloadsScreen: { warn: 250, error: 450 },
+    QueueScreen: { warn: 250, error: 400 },
+  } as Record<string, { warn: number; error: number }>,
 
   /**
    * App cold start budget (time to interactive)
