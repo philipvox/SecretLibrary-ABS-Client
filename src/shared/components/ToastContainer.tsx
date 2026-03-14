@@ -1,22 +1,14 @@
 /**
  * src/shared/components/ToastContainer.tsx
  *
- * Global toast display component.
+ * Global toast display component — narrow centered pill design.
  * Add this to your root navigator to render toasts from useToast().
  *
  * Features:
+ * - Centered pill shape (rounded ends, narrow height)
  * - Slide-in animation from top
  * - Swipe-to-dismiss (horizontal pan gesture)
  * - Optional "Undo" button (golden orange) when toast.onUndo is set
- *
- * Usage in AppNavigator:
- *   import { ToastContainer } from '@/shared/components/ToastContainer';
- *
- *   // At root level, after NavigationContainer
- *   <>
- *     <NavigationContainer>...</NavigationContainer>
- *     <ToastContainer />
- *   </>
  */
 
 import React from 'react';
@@ -32,9 +24,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-react-native';
+import { CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react-native';
 import { useToastStore, Toast, ToastType } from '@/shared/hooks/useToast';
-import { scale, spacing, radius, useTheme } from '@/shared/theme';
+import { scale, spacing, useTheme } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 
 // ============================================================================
 // CONSTANTS
@@ -64,7 +57,6 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
   const Icon = TOAST_ICONS[toast.type];
   const translateX = useSharedValue(0);
 
-  // Map toast types to theme semantic colors
   const toastColorMap: Record<ToastType, string> = {
     success: colors.semantic.success,
     error: colors.semantic.error,
@@ -81,13 +73,11 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
     })
     .onEnd((e) => {
       if (Math.abs(e.translationX) > SWIPE_THRESHOLD) {
-        // Swipe off screen in the direction of the gesture
         const direction = e.translationX > 0 ? 1 : -1;
         translateX.value = withTiming(direction * 400, { duration: 200 }, () => {
           runOnJS(handleDismiss)();
         });
       } else {
-        // Snap back
         translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
       }
     });
@@ -109,12 +99,12 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
         exiting={FadeOut.duration(200)}
         style={[
           styles.toast,
-          { borderLeftColor: iconColor, backgroundColor: colors.background.secondary },
+          { backgroundColor: 'rgba(40,40,40,0.95)' },
           animatedStyle,
         ]}
       >
-        <Icon size={scale(20)} color={iconColor} />
-        <Text style={[styles.message, { color: colors.text.primary }]} numberOfLines={3}>
+        <Icon size={scale(14)} color={iconColor} />
+        <Text style={styles.message} numberOfLines={1}>
           {toast.message}
         </Text>
         {toast.onUndo && (
@@ -126,13 +116,6 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
             <Text style={styles.undoText}>Undo</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          onPress={onDismiss}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={styles.dismissButton}
-        >
-          <X size={scale(16)} color={colors.text.secondary} />
-        </TouchableOpacity>
       </Animated.View>
     </GestureDetector>
   );
@@ -147,12 +130,11 @@ export const ToastContainer: React.FC = () => {
   const toasts = useToastStore((state) => state.toasts);
   const removeToast = useToastStore((state) => state.removeToast);
 
-  // Return empty View on Android to prevent SafeAreaProvider crash
   if (toasts.length === 0) return Platform.OS === 'android' ? <View /> : null;
 
   return (
     <View
-      style={[styles.container, { top: insets.top + spacing.md }]}
+      style={[styles.container, { top: insets.top + spacing.sm }]}
       pointerEvents="box-none"
     >
       {toasts.map((toast) => (
@@ -173,30 +155,34 @@ export const ToastContainer: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
+    left: 0,
+    right: 0,
     zIndex: 9999,
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    borderLeftWidth: 4,
-    gap: spacing.sm,
+    height: scale(32),
+    paddingHorizontal: scale(14),
+    borderRadius: scale(16),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    gap: scale(6),
     // Shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     elevation: 8,
   },
   message: {
-    flex: 1,
-    fontSize: scale(14),
-    lineHeight: scale(20),
+    color: '#FFFFFF',
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   undoButton: {
     paddingVertical: spacing.xs,
@@ -204,11 +190,11 @@ const styles = StyleSheet.create({
   },
   undoText: {
     color: UNDO_COLOR,
-    fontSize: scale(14),
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
     fontWeight: '700',
-  },
-  dismissButton: {
-    padding: spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
 

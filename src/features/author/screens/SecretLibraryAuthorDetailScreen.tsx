@@ -28,6 +28,7 @@ import { TopNav, TopNavBackIcon, UserIcon, BellIcon, BellOffIcon, CollapsibleSec
 import * as Haptics from 'expo-haptics';
 import { useLibraryCache } from '@/core/cache';
 import { apiClient } from '@/core/api';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { useWishlistStore, useIsAuthorFollowed } from '@/features/wishlist';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
@@ -380,13 +381,16 @@ export function SecretLibraryAuthorDetailScreen() {
               key={book.id}
               style={[styles.verticalListItem, { borderBottomColor: colors.borderLight }]}
               onPress={() => handleBookPress(book.id)}
-              onLongPress={() => showMenu(book)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
               delayLongPress={400}
             >
-              <Image
-                source={{ uri: coverUrl }}
-                style={styles.verticalCover}
-              />
+              <View style={{ width: scale(40), height: scale(40), borderRadius: 4, overflow: 'hidden' }}>
+                <Image
+                  source={{ uri: coverUrl }}
+                  style={styles.verticalCover}
+                />
+                <CoverStars bookId={book.id} starSize={scale(12)} />
+              </View>
               <View style={styles.verticalInfo}>
                 <Text style={[styles.verticalTitle, { color: colors.black }]} numberOfLines={1}>{title}</Text>
                 {seriesName && (
@@ -417,7 +421,7 @@ export function SecretLibraryAuthorDetailScreen() {
             circleButtons={[
               {
                 key: 'back',
-                icon: <TopNavBackIcon color={staticColors.white} size={14} />,
+                icon: <TopNavBackIcon color={staticColors.white} size={16} />,
                 onPress: handleBack,
               },
             ]}
@@ -444,7 +448,7 @@ export function SecretLibraryAuthorDetailScreen() {
             circleButtons={[
               {
                 key: 'back',
-                icon: <TopNavBackIcon color={staticColors.white} size={14} />,
+                icon: <TopNavBackIcon color={staticColors.white} size={16} />,
                 onPress: handleBack,
               },
             ]}
@@ -462,56 +466,55 @@ export function SecretLibraryAuthorDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.white }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={staticColors.black} />
 
-      {/* Header section with dark background */}
-      <View style={{ backgroundColor: staticColors.black }}>
-        <TopNav
-          variant="dark"
-          showLogo={true}
-          onLogoPress={handleLogoPress}
-          style={{ backgroundColor: 'transparent' }}
-          pills={[
-            {
-              key: 'all-authors',
-              label: 'All Authors',
-              icon: <UserIcon size={12} color={staticColors.white} />,
-              onPress: () => navigation.navigate('AuthorsList'),
-            },
-            {
-              key: 'follow',
-              label: isFollowing ? 'Following' : 'Follow',
-              icon: isFollowing
-                ? <BellOffIcon size={12} color={staticColors.black} />
-                : <BellIcon size={12} color={staticColors.white} />,
-              active: isFollowing,
-              onPress: handleFollowToggle,
-            },
-          ]}
-          circleButtons={[
-            {
-              key: 'back',
-              icon: <TopNavBackIcon color={staticColors.white} size={14} />,
-              onPress: handleBack,
-            },
-          ]}
-        />
-
-        {/* Author Info - dark header area */}
-        <View style={[styles.authorInfoBlock, { paddingHorizontal: 24 }]}>
-          <Text style={[styles.headerName, { color: staticColors.white }]}>{authorInfo.name}</Text>
-          <Text style={[styles.headerStats, { color: colors.gray }]}>
-            {authorInfo.bookCount} {authorInfo.bookCount === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
-          </Text>
-        </View>
-      </View>
-
       <ScrollView
         style={[styles.scrollView, { backgroundColor: colors.white }]}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: 20, paddingBottom: 40 + insets.bottom },
+          { paddingTop: 0, paddingBottom: 40 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header section with dark background — scrolls with content */}
+        <View style={{ backgroundColor: staticColors.black }}>
+          <TopNav
+            variant="dark"
+            showLogo={true}
+            onLogoPress={handleLogoPress}
+            style={{ backgroundColor: 'transparent' }}
+            pills={[
+              {
+                key: 'all-authors',
+                label: 'All Authors',
+                icon: <UserIcon size={16} color={staticColors.white} />,
+                onPress: () => navigation.navigate('AuthorsList'),
+              },
+              {
+                key: 'follow',
+                label: isFollowing ? 'Following' : 'Follow',
+                icon: isFollowing
+                  ? <BellOffIcon size={16} color={staticColors.black} />
+                  : <BellIcon size={16} color={staticColors.white} />,
+                active: isFollowing,
+                onPress: handleFollowToggle,
+              },
+            ]}
+            circleButtons={[
+              {
+                key: 'back',
+                icon: <TopNavBackIcon color={staticColors.white} size={16} />,
+                onPress: handleBack,
+              },
+            ]}
+          />
+
+          {/* Author Info - dark header area */}
+          <View style={[styles.authorInfoBlock, { paddingHorizontal: 24 }]}>
+            <Text style={[styles.headerName, { color: staticColors.white }]}>{authorInfo.name}</Text>
+            <Text style={[styles.headerStats, { color: colors.gray }]}>
+              {authorInfo.bookCount} {authorInfo.bookCount === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
+            </Text>
+          </View>
+        </View>
         {/* Tabs Row with View Toggle */}
         <View style={styles.tabsRow}>
           <View style={styles.tabs}>
@@ -715,7 +718,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
   },
   authorInfoBlock: {
     marginBottom: 24,
@@ -738,6 +740,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 24,
   },
   tabs: {
     flexDirection: 'row',
@@ -781,6 +784,7 @@ const styles = StyleSheet.create({
   },
   textList: {
     flex: 1,
+    paddingHorizontal: 24,
   },
   flowingText: {
     fontFamily: secretLibraryFonts.playfair.regular,
@@ -816,6 +820,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
@@ -882,6 +887,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
     marginTop: 20,
+    paddingHorizontal: 24,
   },
   footerText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,

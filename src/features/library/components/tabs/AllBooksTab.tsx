@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SectionHeader } from '@/shared/components/SectionHeader';
 import { useBookContextMenu } from '@/shared/components';
 import { ContinueListeningHero } from '../ContinueListeningHero';
@@ -67,6 +68,7 @@ export function AllBooksTab({
   onBrowse,
 }: AllBooksTabProps) {
   const { showMenu } = useBookContextMenu();
+  const navigation = useNavigation<any>();
 
   const hasContent = books.length > 0 || activeDownloads.length > 0 ||
     favoriteSeriesData.length > 0 || favoriteAuthorData.length > 0 ||
@@ -126,7 +128,7 @@ export function AllBooksTab({
               key={book.id}
               book={book}
               onPress={() => onBookPress(book.id)}
-              onLongPress={() => showMenu(book.item)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
               onPlay={() => onBookPlay(book)}
               isMarkedFinished={isMarkedFinished(book.id)}
             />

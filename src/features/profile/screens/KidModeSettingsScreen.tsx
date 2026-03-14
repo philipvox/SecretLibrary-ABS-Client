@@ -36,11 +36,8 @@ import {
   KeyRound,
 } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale } from '@/shared/theme';
-import {
-  secretLibraryColors as colors,
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { haptics } from '@/core/native/haptics';
 import { PinInput } from '@/shared/components/PinInput';
 import {
@@ -73,12 +70,13 @@ interface ChipProps {
 }
 
 function Chip({ label, onRemove, variant = 'allowed' }: ChipProps) {
+  const colors = useSecretLibraryColors();
   const bgColor = variant === 'blocked' ? 'rgba(255,75,75,0.1)' : 'rgba(52,199,89,0.1)';
   const borderColor = variant === 'blocked' ? DANGER : SUCCESS;
 
   return (
     <View style={[styles.chip, { backgroundColor: bgColor, borderColor }]}>
-      <Text style={styles.chipText}>{label}</Text>
+      <Text style={[styles.chipText, { color: colors.black }]}>{label}</Text>
       <TouchableOpacity
         onPress={() => {
           haptics.selection();
@@ -98,6 +96,7 @@ interface AddItemInputProps {
 }
 
 function AddItemInput({ placeholder, onAdd }: AddItemInputProps) {
+  const colors = useSecretLibraryColors();
   const [value, setValue] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
@@ -112,17 +111,20 @@ function AddItemInput({ placeholder, onAdd }: AddItemInputProps) {
 
   if (!isAdding) {
     return (
-      <TouchableOpacity style={styles.addButton} onPress={() => setIsAdding(true)}>
+      <TouchableOpacity
+        style={[styles.addButton, { borderColor: colors.gray }]}
+        onPress={() => setIsAdding(true)}
+      >
         <Plus size={16} color={colors.black} />
-        <Text style={styles.addButtonText}>Add</Text>
+        <Text style={[styles.addButtonText, { color: colors.black }]}>Add</Text>
       </TouchableOpacity>
     );
   }
 
   return (
-    <View style={styles.addInputContainer}>
+    <View style={[styles.addInputContainer, { borderColor: colors.black }]}>
       <TextInput
-        style={styles.addInput}
+        style={[styles.addInput, { color: colors.black }]}
         placeholder={placeholder}
         placeholderTextColor={colors.gray}
         value={value}
@@ -155,13 +157,14 @@ interface SectionHeaderProps {
 }
 
 function SectionHeader({ title, subtitle, Icon }: SectionHeaderProps) {
+  const colors = useSecretLibraryColors();
   return (
     <View style={styles.sectionHeaderContainer}>
       <View style={styles.sectionHeaderRow}>
         {Icon && <Icon size={14} color={colors.black} style={{ marginRight: 6 }} />}
-        <Text style={styles.sectionHeader}>{title}</Text>
+        <Text style={[styles.sectionHeader, { color: colors.gray }]}>{title}</Text>
       </View>
-      {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+      {subtitle && <Text style={[styles.sectionSubtitle, { color: colors.gray }]}>{subtitle}</Text>}
     </View>
   );
 }
@@ -171,6 +174,7 @@ function SectionHeader({ title, subtitle, Icon }: SectionHeaderProps) {
 // =============================================================================
 
 export function KidModeSettingsScreen() {
+  const colors = useSecretLibraryColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
@@ -472,8 +476,11 @@ export function KidModeSettingsScreen() {
   }, [resetToDefaults]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+    <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+      <StatusBar
+        barStyle={colors.isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.grayLight}
+      />
       <SettingsHeader title="Kid Mode" />
 
       <ScrollView
@@ -485,23 +492,23 @@ export function KidModeSettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Master Toggle */}
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
           <View style={styles.masterToggleRow}>
-            <View style={styles.masterIconContainer}>
+            <View style={[styles.masterIconContainer, { backgroundColor: colors.black }]}>
               <Baby size={scale(20)} color={colors.white} strokeWidth={2} />
             </View>
             <View style={styles.masterToggleContent}>
-              <Text style={styles.masterToggleLabel}>Kid Mode</Text>
-              <Text style={styles.masterToggleNote}>
+              <Text style={[styles.masterToggleLabel, { color: colors.black }]}>Kid Mode</Text>
+              <Text style={[styles.masterToggleNote, { color: colors.gray }]}>
                 {enabled ? 'Active - filtering content' : 'Off - showing all content'}
               </Text>
             </View>
             <Switch
               value={enabled}
               onValueChange={handleToggle}
-              trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
+              trackColor={{ false: colors.borderLight, true: colors.black }}
               thumbColor={colors.white}
-              ios_backgroundColor="rgba(0,0,0,0.1)"
+              ios_backgroundColor={colors.borderLight}
             />
           </View>
         </View>
@@ -509,13 +516,13 @@ export function KidModeSettingsScreen() {
         {/* Reset Button */}
         <TouchableOpacity style={styles.resetButton} onPress={handleResetToDefaults}>
           <RotateCcw size={16} color={colors.gray} />
-          <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+          <Text style={[styles.resetButtonText, { color: colors.gray }]}>Reset to Defaults</Text>
         </TouchableOpacity>
 
         {/* Info Card */}
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, { backgroundColor: colors.white }]}>
           <Info size={16} color={colors.gray} />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, { color: colors.gray }]}>
             Books with category tags pass if they match your max category. Books without category
             tags must have an allowed genre/tag and no blocked items.
           </Text>
@@ -529,7 +536,7 @@ export function KidModeSettingsScreen() {
               subtitle="Prevent children from disabling Kid Mode"
               Icon={Lock}
             />
-            <View style={styles.sectionCard}>
+            <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
               {!pin ? (
                 <TouchableOpacity
                   style={styles.pinRow}
@@ -547,8 +554,8 @@ export function KidModeSettingsScreen() {
                     <KeyRound size={scale(18)} color={SUCCESS} strokeWidth={2} />
                   </View>
                   <View style={styles.pinRowContent}>
-                    <Text style={styles.pinRowLabel}>Set PIN</Text>
-                    <Text style={styles.pinRowNote}>
+                    <Text style={[styles.pinRowLabel, { color: colors.black }]}>Set PIN</Text>
+                    <Text style={[styles.pinRowNote, { color: colors.gray }]}>
                       Require a 4-digit PIN to disable Kid Mode
                     </Text>
                   </View>
@@ -565,16 +572,16 @@ export function KidModeSettingsScreen() {
                       <Lock size={scale(18)} color={colors.black} strokeWidth={2} />
                     </View>
                     <View style={styles.pinRowContent}>
-                      <Text style={styles.pinRowLabel}>PIN Protected</Text>
-                      <Text style={styles.pinRowNote}>
+                      <Text style={[styles.pinRowLabel, { color: colors.black }]}>PIN Protected</Text>
+                      <Text style={[styles.pinRowNote, { color: colors.gray }]}>
                         A PIN is required to disable Kid Mode
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.pinButtonsRow}>
+                  <View style={[styles.pinButtonsRow, { borderTopColor: colors.borderLight }]}>
                     <TouchableOpacity
-                      style={styles.pinActionButton}
+                      style={[styles.pinActionButton, { backgroundColor: colors.grayLight }]}
                       onPress={() => {
                         haptics.selection();
                         setPinModalMode('change');
@@ -586,7 +593,7 @@ export function KidModeSettingsScreen() {
                       activeOpacity={0.7}
                     >
                       <KeyRound size={16} color={colors.black} />
-                      <Text style={styles.pinActionButtonText}>Change PIN</Text>
+                      <Text style={[styles.pinActionButtonText, { color: colors.black }]}>Change PIN</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -617,11 +624,11 @@ export function KidModeSettingsScreen() {
           subtitle="Filter by category tags (Children's, Teens, etc.)"
           Icon={Users}
         />
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
           <View style={styles.toggleRow}>
             <View style={styles.toggleContent}>
-              <Text style={styles.toggleLabel}>Use Category Filtering</Text>
-              <Text style={styles.toggleNote}>Filter books by age category tags if present</Text>
+              <Text style={[styles.toggleLabel, { color: colors.black }]}>Use Category Filtering</Text>
+              <Text style={[styles.toggleNote, { color: colors.gray }]}>Filter books by age category tags if present</Text>
             </View>
             <Switch
               value={useAgeFiltering}
@@ -629,16 +636,16 @@ export function KidModeSettingsScreen() {
                 haptics.selection();
                 setUseAgeFiltering(value);
               }}
-              trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
+              trackColor={{ false: colors.borderLight, true: colors.black }}
               thumbColor={colors.white}
-              ios_backgroundColor="rgba(0,0,0,0.1)"
+              ios_backgroundColor={colors.borderLight}
             />
           </View>
 
           {useAgeFiltering && (
-            <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Maximum Age Category</Text>
-              <Text style={styles.pickerHint}>Books in higher categories will be hidden</Text>
+            <View style={[styles.pickerContainer, { borderTopColor: colors.borderLight }]}>
+              <Text style={[styles.pickerLabel, { color: colors.black }]}>Maximum Age Category</Text>
+              <Text style={[styles.pickerHint, { color: colors.gray }]}>Books in higher categories will be hidden</Text>
               <View style={styles.categoryOptions}>
                 {AGE_CATEGORY_ORDER.map((category, index) => {
                   const isSelected = maxAgeCategory === category;
@@ -649,7 +656,8 @@ export function KidModeSettingsScreen() {
                       key={category}
                       style={[
                         styles.categoryOption,
-                        isSelected && styles.categoryOptionSelected,
+                        { backgroundColor: colors.grayLight },
+                        isSelected && { backgroundColor: colors.black },
                         isPastMax && { opacity: 0.4 },
                       ]}
                       onPress={() => {
@@ -660,7 +668,8 @@ export function KidModeSettingsScreen() {
                       <Text
                         style={[
                           styles.categoryOptionLabel,
-                          isSelected && styles.categoryOptionLabelSelected,
+                          { color: colors.black },
+                          isSelected && { color: colors.white, fontFamily: fonts.jetbrainsMono.bold },
                         ]}
                       >
                         {AGE_CATEGORY_LABELS[category]}
@@ -679,11 +688,11 @@ export function KidModeSettingsScreen() {
           subtitle="Filter by content ratings (G, PG, PG-13, R)"
           Icon={Star}
         />
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
           <View style={styles.toggleRow}>
             <View style={styles.toggleContent}>
-              <Text style={styles.toggleLabel}>Use Rating Filtering</Text>
-              <Text style={styles.toggleNote}>Filter books by content rating tags if present</Text>
+              <Text style={[styles.toggleLabel, { color: colors.black }]}>Use Rating Filtering</Text>
+              <Text style={[styles.toggleNote, { color: colors.gray }]}>Filter books by content rating tags if present</Text>
             </View>
             <Switch
               value={useRatingFiltering}
@@ -691,16 +700,16 @@ export function KidModeSettingsScreen() {
                 haptics.selection();
                 setUseRatingFiltering(value);
               }}
-              trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
+              trackColor={{ false: colors.borderLight, true: colors.black }}
               thumbColor={colors.white}
-              ios_backgroundColor="rgba(0,0,0,0.1)"
+              ios_backgroundColor={colors.borderLight}
             />
           </View>
 
           {useRatingFiltering && (
-            <View style={styles.pickerContainer}>
-              <Text style={styles.pickerLabel}>Maximum Content Rating</Text>
-              <Text style={styles.pickerHint}>Books rated higher will be hidden</Text>
+            <View style={[styles.pickerContainer, { borderTopColor: colors.borderLight }]}>
+              <Text style={[styles.pickerLabel, { color: colors.black }]}>Maximum Content Rating</Text>
+              <Text style={[styles.pickerHint, { color: colors.gray }]}>Books rated higher will be hidden</Text>
               <View style={styles.ratingOptions}>
                 {RATING_ORDER.map((rating, index) => {
                   const isSelected = maxRating === rating;
@@ -711,7 +720,8 @@ export function KidModeSettingsScreen() {
                       key={rating}
                       style={[
                         styles.ratingOption,
-                        isSelected && styles.ratingOptionSelected,
+                        { backgroundColor: colors.grayLight },
+                        isSelected && { backgroundColor: colors.black },
                         isPastMax && { opacity: 0.4 },
                       ]}
                       onPress={() => {
@@ -722,7 +732,8 @@ export function KidModeSettingsScreen() {
                       <Text
                         style={[
                           styles.ratingOptionLabel,
-                          isSelected && styles.ratingOptionLabelSelected,
+                          { color: colors.black },
+                          isSelected && { color: colors.white, fontFamily: fonts.jetbrainsMono.bold },
                         ]}
                       >
                         {RATING_LABELS[rating]}
@@ -730,7 +741,8 @@ export function KidModeSettingsScreen() {
                       <Text
                         style={[
                           styles.ratingOptionAge,
-                          isSelected && styles.ratingOptionAgeSelected,
+                          { color: colors.gray },
+                          isSelected && { color: 'rgba(255,255,255,0.7)' },
                         ]}
                       >
                         {rating === 'g'
@@ -755,11 +767,11 @@ export function KidModeSettingsScreen() {
           subtitle="Require books to have specific genres or tags"
           Icon={Check}
         />
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
           <View style={styles.toggleRow}>
             <View style={styles.toggleContent}>
-              <Text style={styles.toggleLabel}>Require Allowed Genres/Tags</Text>
-              <Text style={styles.toggleNote}>
+              <Text style={[styles.toggleLabel, { color: colors.black }]}>Require Allowed Genres/Tags</Text>
+              <Text style={[styles.toggleNote, { color: colors.gray }]}>
                 {useAllowedGenresTags
                   ? 'Books must have an allowed genre or tag'
                   : 'Off - only blocked items are checked'}
@@ -771,9 +783,9 @@ export function KidModeSettingsScreen() {
                 haptics.selection();
                 setUseAllowedGenresTags(value);
               }}
-              trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
+              trackColor={{ false: colors.borderLight, true: colors.black }}
               thumbColor={colors.white}
-              ios_backgroundColor="rgba(0,0,0,0.1)"
+              ios_backgroundColor={colors.borderLight}
             />
           </View>
         </View>
@@ -781,8 +793,8 @@ export function KidModeSettingsScreen() {
         {/* Allowed Genres - only show if toggle is on */}
         {useAllowedGenresTags && (
           <>
-            <Text style={styles.subSectionLabel}>Allowed Genres</Text>
-            <View style={styles.sectionCard}>
+            <Text style={[styles.subSectionLabel, { color: colors.gray }]}>Allowed Genres</Text>
+            <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
               <View style={styles.chipGrid}>
                 {allowedGenres.map((genre) => (
                   <Chip
@@ -796,8 +808,8 @@ export function KidModeSettingsScreen() {
               </View>
             </View>
 
-            <Text style={styles.subSectionLabel}>Allowed Tags</Text>
-            <View style={styles.sectionCard}>
+            <Text style={[styles.subSectionLabel, { color: colors.gray }]}>Allowed Tags</Text>
+            <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
               <View style={styles.chipGrid}>
                 {allowedTags.map((tag) => (
                   <Chip
@@ -819,7 +831,7 @@ export function KidModeSettingsScreen() {
           subtitle="Books with these genres will be hidden"
           Icon={Ban}
         />
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
           <View style={styles.chipGrid}>
             {blockedGenres.map((genre) => (
               <Chip
@@ -839,7 +851,7 @@ export function KidModeSettingsScreen() {
           subtitle="Books with these tags will be hidden"
           Icon={Ban}
         />
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
           <View style={styles.chipGrid}>
             {blockedTags.map((tag) => (
               <Chip
@@ -854,16 +866,16 @@ export function KidModeSettingsScreen() {
         </View>
 
         {/* Tips */}
-        <View style={styles.tipsCard}>
-          <Text style={styles.tipsTitle}>Tips</Text>
-          <Text style={styles.tipText}>
+        <View style={[styles.tipsCard, { backgroundColor: colors.white }]}>
+          <Text style={[styles.tipsTitle, { color: colors.black }]}>Tips</Text>
+          <Text style={[styles.tipText, { color: colors.gray }]}>
             • Age categories: Children's → Teens → Young Adult → Adult
           </Text>
-          <Text style={styles.tipText}>• Content ratings: G → PG → PG-13 → R</Text>
-          <Text style={styles.tipText}>
+          <Text style={[styles.tipText, { color: colors.gray }]}>• Content ratings: G → PG → PG-13 → R</Text>
+          <Text style={[styles.tipText, { color: colors.gray }]}>
             • Both filters apply independently - book must pass both if enabled
           </Text>
-          <Text style={styles.tipText}>
+          <Text style={[styles.tipText, { color: colors.gray }]}>
             • Books without category/rating tags fall back to genre/tag filtering
           </Text>
         </View>
@@ -877,14 +889,14 @@ export function KidModeSettingsScreen() {
         onRequestClose={closePinModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.white }]}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <View style={styles.modalIconContainer}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.grayLight }]}>
                 <Lock size={scale(32)} color={colors.black} strokeWidth={1.5} />
               </View>
-              <Text style={styles.modalTitle}>{getPinModalTitle()}</Text>
-              <Text style={styles.modalSubtitle}>{getPinModalSubtitle()}</Text>
+              <Text style={[styles.modalTitle, { color: colors.black }]}>{getPinModalTitle()}</Text>
+              <Text style={[styles.modalSubtitle, { color: colors.gray }]}>{getPinModalSubtitle()}</Text>
             </View>
 
             {/* PIN Input */}
@@ -927,24 +939,24 @@ export function KidModeSettingsScreen() {
               isConfirmStep &&
               pinModalMode === 'change' &&
               pinValue.length === 4 && (
-                <Text style={styles.confirmHint}>Confirm your new PIN</Text>
+                <Text style={[styles.confirmHint, { color: colors.gray }]}>Confirm your new PIN</Text>
               )}
 
             {/* Modal Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancelButton]}
+                style={[styles.modalButton, { backgroundColor: colors.grayLight }]}
                 onPress={closePinModal}
                 activeOpacity={0.7}
               >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                <Text style={[styles.modalCancelButtonText, { color: colors.gray }]}>Cancel</Text>
               </TouchableOpacity>
 
               {(pinModalMode === 'set' || (pinModalMode === 'change' && isConfirmStep)) && (
                 <TouchableOpacity
                   style={[
                     styles.modalButton,
-                    styles.modalConfirmButton,
+                    { backgroundColor: colors.black },
                     pinModalMode === 'set' &&
                       !isConfirmStep &&
                       pinValue.length !== 4 &&
@@ -954,7 +966,7 @@ export function KidModeSettingsScreen() {
                   activeOpacity={0.7}
                   disabled={pinModalMode === 'set' && !isConfirmStep && pinValue.length !== 4}
                 >
-                  <Text style={styles.modalConfirmButtonText}>
+                  <Text style={[styles.modalConfirmButtonText, { color: colors.white }]}>
                     {isConfirmStep ? 'Confirm' : 'Next'}
                   </Text>
                 </TouchableOpacity>
@@ -974,7 +986,6 @@ export function KidModeSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.grayLight,
   },
   scrollView: {
     flex: 1,
@@ -983,7 +994,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sectionCard: {
-    backgroundColor: colors.white,
     marginBottom: 16,
     padding: 16,
   },
@@ -995,7 +1005,6 @@ const styles = StyleSheet.create({
   masterIconContainer: {
     width: scale(40),
     height: scale(40),
-    backgroundColor: colors.black,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1006,12 +1015,10 @@ const styles = StyleSheet.create({
   masterToggleLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(16),
-    color: colors.black,
   },
   masterToggleNote: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 2,
   },
   // Reset Button
@@ -1026,7 +1033,6 @@ const styles = StyleSheet.create({
   resetButtonText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1035,14 +1041,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: 16,
-    backgroundColor: colors.white,
     marginBottom: 24,
     gap: 10,
   },
   infoText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     flex: 1,
     lineHeight: scale(16),
   },
@@ -1058,14 +1062,12 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   sectionSubtitle: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 2,
   },
   // Toggle Row
@@ -1079,12 +1081,10 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    color: colors.black,
   },
   toggleNote: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 2,
   },
   // Picker Container
@@ -1092,18 +1092,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
   },
   pickerLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(14),
-    color: colors.black,
     marginBottom: 4,
   },
   pickerHint: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginBottom: 12,
   },
   // Category Options
@@ -1117,20 +1114,11 @@ const styles = StyleSheet.create({
     flexBasis: '45%',
     paddingVertical: 12,
     paddingHorizontal: 8,
-    backgroundColor: colors.grayLight,
     alignItems: 'center',
-  },
-  categoryOptionSelected: {
-    backgroundColor: colors.black,
   },
   categoryOptionLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(11),
-    color: colors.black,
-  },
-  categoryOptionLabelSelected: {
-    color: colors.white,
-    fontFamily: fonts.jetbrainsMono.bold,
   },
   // Rating Options
   ratingOptions: {
@@ -1141,29 +1129,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 4,
-    backgroundColor: colors.grayLight,
     alignItems: 'center',
-  },
-  ratingOptionSelected: {
-    backgroundColor: colors.black,
   },
   ratingOptionLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(11),
-    color: colors.black,
-  },
-  ratingOptionLabelSelected: {
-    color: colors.white,
-    fontFamily: fonts.jetbrainsMono.bold,
   },
   ratingOptionAge: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
-    color: colors.gray,
     marginTop: 2,
-  },
-  ratingOptionAgeSelected: {
-    color: 'rgba(255,255,255,0.7)',
   },
   // Chip Grid
   chipGrid: {
@@ -1183,7 +1158,6 @@ const styles = StyleSheet.create({
   chipText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.black,
   },
   // Add Button
   addButton: {
@@ -1193,26 +1167,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.gray,
     gap: 6,
   },
   addButtonText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.black,
   },
   addInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.black,
     paddingLeft: 10,
     minWidth: scale(150),
   },
   addInput: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.black,
     flex: 1,
     paddingVertical: 6,
   },
@@ -1223,7 +1193,6 @@ const styles = StyleSheet.create({
   subSectionLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 8,
@@ -1249,12 +1218,10 @@ const styles = StyleSheet.create({
   pinRowLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    color: colors.black,
   },
   pinRowNote: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 2,
   },
   pinStatusRow: {
@@ -1268,7 +1235,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
   },
   pinActionButton: {
     flex: 1,
@@ -1276,7 +1242,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    backgroundColor: colors.grayLight,
     gap: 6,
   },
   pinActionButtonDanger: {
@@ -1285,25 +1250,21 @@ const styles = StyleSheet.create({
   pinActionButtonText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.black,
   },
   // Tips Card
   tipsCard: {
     padding: 16,
-    backgroundColor: colors.white,
     marginTop: 8,
     marginBottom: 16,
   },
   tipsTitle: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(14),
-    color: colors.black,
     marginBottom: 10,
   },
   tipText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     lineHeight: scale(16),
     marginBottom: 4,
   },
@@ -1318,7 +1279,6 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: scale(340),
-    backgroundColor: colors.white,
     paddingTop: 32,
     paddingBottom: 24,
     paddingHorizontal: 24,
@@ -1331,7 +1291,6 @@ const styles = StyleSheet.create({
   modalIconContainer: {
     width: scale(72),
     height: scale(72),
-    backgroundColor: colors.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -1339,14 +1298,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(24),
-    color: colors.black,
     textAlign: 'center',
     marginBottom: 4,
   },
   modalSubtitle: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     textAlign: 'center',
   },
   pinErrorText: {
@@ -1359,7 +1316,6 @@ const styles = StyleSheet.create({
   confirmHint: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     textAlign: 'center',
     marginTop: 10,
   },
@@ -1376,23 +1332,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: scale(48),
   },
-  modalCancelButton: {
-    backgroundColor: colors.grayLight,
-  },
   modalCancelButtonText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(11),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  modalConfirmButton: {
-    backgroundColor: colors.black,
   },
   modalConfirmButtonText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(11),
-    color: colors.white,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

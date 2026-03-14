@@ -73,7 +73,7 @@ export const secretLibraryDarkColors = {
 
   // Core - inverted for dark mode
   black: '#FFFFFF',        // Text color (was black, now white)
-  white: '#0f0f0f',        // Background color (soft black, not pure black)
+  white: '#141414',        // Background color (soft black, not pure black)
   cream: '#1A1A1A',        // Dark warm surface
   creamGray: '#1F1F1F',    // Dark grey surface
   buttonGray: '#2A2A2A',   // Dark button background

@@ -438,13 +438,13 @@ export function AuthorsListScreen() {
           {
             key: 'authors',
             label: 'Authors',
-            icon: <UserIcon size={10} color={colors.text.primary} />,
+            icon: <UserIcon size={13} color={colors.text.primary} />,
           },
         ]}
         circleButtons={[
           {
             key: 'back',
-            icon: <TopNavBackIcon color={colors.text.primary} size={14} />,
+            icon: <TopNavBackIcon color={colors.text.primary} size={16} />,
             onPress: handleBack,
           },
         ]}

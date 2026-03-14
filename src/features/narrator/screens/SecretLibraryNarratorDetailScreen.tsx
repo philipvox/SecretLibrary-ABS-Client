@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopNav, TopNavBackIcon, MicIcon, CollapsibleSection, useBookContextMenu } from '@/shared/components';
 import { useLibraryCache } from '@/core/cache';
 import { apiClient } from '@/core/api';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -338,13 +339,16 @@ export function SecretLibraryNarratorDetailScreen() {
               key={book.id}
               style={[styles.verticalListItem, { borderBottomColor: colors.grayLine }]}
               onPress={() => handleBookPress(book.id)}
-              onLongPress={() => showMenu(book)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
               delayLongPress={400}
             >
-              <Image
-                source={{ uri: coverUrl }}
-                style={styles.verticalCover}
-              />
+              <View style={{ width: scale(40), height: scale(40), borderRadius: 4, overflow: 'hidden' }}>
+                <Image
+                  source={{ uri: coverUrl }}
+                  style={styles.verticalCover}
+                />
+                <CoverStars bookId={book.id} starSize={scale(12)} />
+              </View>
               <View style={styles.verticalInfo}>
                 <Text style={[styles.verticalTitle, { color: colors.black }]} numberOfLines={1}>{title}</Text>
                 {seriesName && (
@@ -374,7 +378,7 @@ export function SecretLibraryNarratorDetailScreen() {
           circleButtons={[
             {
               key: 'back',
-              icon: <TopNavBackIcon color={staticColors.white} size={14} />,
+              icon: <TopNavBackIcon color={staticColors.white} size={16} />,
               onPress: handleBack,
             },
           ]}
@@ -399,7 +403,7 @@ export function SecretLibraryNarratorDetailScreen() {
           circleButtons={[
             {
               key: 'back',
-              icon: <TopNavBackIcon color={staticColors.white} size={14} />,
+              icon: <TopNavBackIcon color={staticColors.white} size={16} />,
               onPress: handleBack,
             },
           ]}
@@ -416,40 +420,6 @@ export function SecretLibraryNarratorDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.white }]}>
       <StatusBar barStyle="light-content" backgroundColor={staticColors.black} />
 
-      {/* Header area with dark background */}
-      <View style={[styles.headerArea, { backgroundColor: staticColors.black }]}>
-        {/* TopNav */}
-        <TopNav
-          variant="dark"
-          showLogo={true}
-          onLogoPress={handleLogoPress}
-          style={{ backgroundColor: 'transparent' }}
-          pills={[
-            {
-              key: 'all-narrators',
-              label: 'All Narrators',
-              icon: <MicIcon size={12} color={staticColors.white} />,
-              onPress: () => navigation.navigate('NarratorsList' as never),
-            },
-          ]}
-          circleButtons={[
-            {
-              key: 'back',
-              icon: <TopNavBackIcon color={staticColors.white} size={14} />,
-              onPress: handleBack,
-            },
-          ]}
-        />
-
-        {/* Narrator Info */}
-        <View style={[styles.narratorInfoBlock, { paddingHorizontal: 24 }]}>
-          <Text style={[styles.headerName, { color: staticColors.white }]}>{narratorInfo.name}</Text>
-          <Text style={[styles.headerStats, { color: colors.gray }]}>
-            {narratorInfo.bookCount} {narratorInfo.bookCount === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
-          </Text>
-        </View>
-      </View>
-
       <ScrollView
         style={[styles.scrollView, { backgroundColor: colors.white }]}
         contentContainerStyle={[
@@ -458,6 +428,38 @@ export function SecretLibraryNarratorDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header area with dark background — scrolls with content */}
+        <View style={[styles.headerArea, { backgroundColor: staticColors.black }]}>
+          <TopNav
+            variant="dark"
+            showLogo={true}
+            onLogoPress={handleLogoPress}
+            style={{ backgroundColor: 'transparent' }}
+            pills={[
+              {
+                key: 'all-narrators',
+                label: 'All Narrators',
+                icon: <MicIcon size={16} color={staticColors.white} />,
+                onPress: () => navigation.navigate('NarratorsList' as never),
+              },
+            ]}
+            circleButtons={[
+              {
+                key: 'back',
+                icon: <TopNavBackIcon color={staticColors.white} size={16} />,
+                onPress: handleBack,
+              },
+            ]}
+          />
+
+          {/* Narrator Info */}
+          <View style={[styles.narratorInfoBlock, { paddingHorizontal: 24 }]}>
+            <Text style={[styles.headerName, { color: staticColors.white }]}>{narratorInfo.name}</Text>
+            <Text style={[styles.headerStats, { color: colors.gray }]}>
+              {narratorInfo.bookCount} {narratorInfo.bookCount === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
+            </Text>
+          </View>
+        </View>
         {/* Tabs Row with View Toggle */}
         <View style={styles.tabsRow}>
           <View style={styles.tabs}>
@@ -665,8 +667,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 0,
   },
   narratorInfoBlock: {
     marginBottom: 24,
@@ -689,6 +690,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 24,
   },
   tabs: {
     flexDirection: 'row',
@@ -732,6 +734,7 @@ const styles = StyleSheet.create({
   },
   textList: {
     flex: 1,
+    paddingHorizontal: 24,
   },
   flowingText: {
     fontFamily: secretLibraryFonts.playfair.regular,
@@ -767,6 +770,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderBottomColor: staticColors.grayLine,
   },
@@ -833,6 +837,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: staticColors.grayLine,
     marginTop: 20,
+    paddingHorizontal: 24,
   },
   footerText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,

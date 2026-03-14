@@ -30,7 +30,7 @@ import { useColors } from '@/shared/theme/themeStore';
 
 // Type guard for book media
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'chapters' in media;
+  return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 
 interface ContinueListeningHeroProps {

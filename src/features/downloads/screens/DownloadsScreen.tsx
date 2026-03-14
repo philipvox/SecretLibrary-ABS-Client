@@ -33,6 +33,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { DownloadTask, downloadManager } from '@/core/services/downloadManager';
 import { useCoverUrl } from '@/core/cache';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { LibraryItem } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
@@ -239,7 +240,10 @@ function ActiveDownloadRow({ download, onPause, onResume, onCancel, colors }: Ac
 
   return (
     <View style={[styles.downloadRow, { backgroundColor: colors.cardBackground }]}>
-      <Image source={coverUrl} style={styles.downloadCover} contentFit="cover" />
+      <View style={{ width: wp(15), height: wp(15), borderRadius: 6, overflow: 'hidden' }}>
+        <Image source={coverUrl} style={styles.downloadCover} contentFit="cover" />
+        <CoverStars bookId={download.itemId} starSize={scale(14)} />
+      </View>
 
       <View style={styles.downloadInfo}>
         <Text style={[styles.downloadTitle, { color: colors.textPrimary }]} numberOfLines={1}>{title}</Text>
@@ -349,7 +353,10 @@ function DownloadedRow({ download, onPress, onDelete, colors }: DownloadedRowPro
       friction={2}
     >
       <TouchableOpacity style={[styles.downloadedRow, { backgroundColor: colors.cardBackground }]} onPress={onPress} activeOpacity={0.7}>
-        <Image source={coverUrl} style={styles.downloadCover} contentFit="cover" />
+        <View style={{ width: wp(15), height: wp(15), borderRadius: 6, overflow: 'hidden' }}>
+          <Image source={coverUrl} style={styles.downloadCover} contentFit="cover" />
+          <CoverStars bookId={download.itemId} starSize={scale(14)} />
+        </View>
 
         <View style={styles.downloadInfo}>
           <Text style={[styles.downloadTitle, { color: colors.textPrimary }]} numberOfLines={1}>{title}</Text>

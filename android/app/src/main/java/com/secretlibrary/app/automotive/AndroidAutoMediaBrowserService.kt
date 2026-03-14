@@ -19,7 +19,7 @@ import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-// ConcurrentHashMap no longer needed — replaced with LruCache
+import java.util.concurrent.TimeUnit
 
 /**
  * MediaBrowserService for Android Auto integration.
@@ -44,7 +44,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         // Media ID prefixes for routing
         const val PREFIX_SECTION = "section:"
         const val PREFIX_ITEM = "item:"
-        const val PREFIX_FOLDER = "folder:"  // For browsable folders (authors, series, etc.)
         const val PREFIX_SEARCH = "search:"  // For search results
 
         // Custom extras keys for progress
@@ -192,8 +191,9 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         // Detach result so we can load async
         result.detach()
 
-        // Reload browse data to get latest
-        loadBrowseData()
+        // Use cached browseData (refreshed by notifyBrowseDataChanged).
+        // Don't re-read from disk on every call — Android Auto calls this
+        // frequently when scrolling/expanding sections.
 
         // Load children with cover art asynchronously
         serviceScope.launch {
@@ -228,39 +228,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
                     }
                 }
             }
-            parentId.startsWith(PREFIX_FOLDER) -> {
-                // Folder level: return children of a browsable folder (author, series, genre, narrator)
-                // parentId format: "folder:author:Name" or "folder:series:Name" etc.
-                val folderId = parentId.removePrefix(PREFIX_FOLDER)
-                Log.d(TAG, "Loading folder children for: $folderId")
-
-                // Search through all sections for items with matching id
-                browseData?.let { sections ->
-                    outer@ for (i in 0 until sections.length()) {
-                        val section = sections.getJSONObject(i)
-                        val sectionItems = section.optJSONArray("items") ?: continue
-
-                        for (j in 0 until sectionItems.length()) {
-                            val item = sectionItems.getJSONObject(j)
-                            val itemId = item.getString("id")
-
-                            if (itemId == folderId) {
-                                // Found the folder, now return its children
-                                val children = item.optJSONArray("children")
-                                if (children != null) {
-                                    Log.d(TAG, "Found ${children.length()} children for folder: $folderId")
-                                    for (k in 0 until children.length()) {
-                                        val child = children.getJSONObject(k)
-                                        val mediaItem = createMediaItemWithArt(child)
-                                        items.add(mediaItem)
-                                    }
-                                }
-                                break@outer
-                            }
-                        }
-                    }
-                }
-            }
             parentId.startsWith(PREFIX_SECTION) -> {
                 // Section level: return items in that section with cover art
                 val sectionId = parentId.removePrefix(PREFIX_SECTION)
@@ -268,18 +235,11 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
                     for (i in 0 until sections.length()) {
                         val section = sections.getJSONObject(i)
                         if (section.getString("id") == sectionId) {
-                            val isBrowsableSection = section.optBoolean("isBrowsableSection", false)
                             val sectionItems = section.getJSONArray("items")
 
                             for (j in 0 until sectionItems.length()) {
                                 val item = sectionItems.getJSONObject(j)
-                                val mediaItem = if (isBrowsableSection) {
-                                    // For browsable sections, create folder items
-                                    createFolderItem(item)
-                                } else {
-                                    createMediaItemWithArt(item)
-                                }
-                                items.add(mediaItem)
+                                items.add(createMediaItemWithArt(item))
                             }
                             break
                         }
@@ -290,27 +250,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
 
         Log.d(TAG, "Returning ${items.size} items for $parentId")
         return items
-    }
-
-    /**
-     * Create a browsable folder item (for authors, series, genres, narrators)
-     */
-    private fun createFolderItem(item: JSONObject): MediaBrowserCompat.MediaItem {
-        val id = item.getString("id")
-        val title = item.getString("title")
-        val subtitle = item.optString("subtitle", "")
-        val itemCount = item.optInt("itemCount", 0)
-
-        val description = MediaDescriptionCompat.Builder()
-            .setMediaId("$PREFIX_FOLDER$id")
-            .setTitle(title)
-            .setSubtitle(if (subtitle.isNotEmpty()) subtitle else "$itemCount items")
-            .build()
-
-        return MediaBrowserCompat.MediaItem(
-            description,
-            MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
-        )
     }
 
     /**
@@ -390,7 +329,7 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
                     .load(imageUrl)
                     .apply(glideOptions)
                     .submit()
-                    .get()
+                    .get(5, TimeUnit.SECONDS)
 
                 // Cache the result
                 coverArtCache.put(cacheKey, bitmap)
@@ -533,31 +472,21 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     }
 
     /**
-     * Notify that browse data has been updated - triggers refresh in Android Auto
+     * Notify that browse data has been updated - triggers refresh in Android Auto.
+     * Notifies root AND each section so Android Auto refreshes cached children.
+     * DO NOT clear cover art cache here; covers rarely change and clearing
+     * forces re-download of all art, causing blank images during reload.
      */
     fun notifyBrowseDataChanged() {
         loadBrowseData()
-        // Clear cache since data changed
-        clearCoverArtCache()
         notifyChildrenChanged(MEDIA_ROOT_ID)
+        // Also notify each section — Android Auto caches children at each level,
+        // so notifying root alone won't refresh the book list inside sections.
         browseData?.let { sections ->
             for (i in 0 until sections.length()) {
                 val section = sections.getJSONObject(i)
                 val sectionId = section.getString("id")
                 notifyChildrenChanged("$PREFIX_SECTION$sectionId")
-
-                // Also notify about folder changes for hierarchical sections
-                val isBrowsableSection = section.optBoolean("isBrowsableSection", false)
-                if (isBrowsableSection) {
-                    val sectionItems = section.optJSONArray("items")
-                    if (sectionItems != null) {
-                        for (j in 0 until sectionItems.length()) {
-                            val item = sectionItems.getJSONObject(j)
-                            val itemId = item.getString("id")
-                            notifyChildrenChanged("$PREFIX_FOLDER$itemId")
-                        }
-                    }
-                }
             }
         }
     }

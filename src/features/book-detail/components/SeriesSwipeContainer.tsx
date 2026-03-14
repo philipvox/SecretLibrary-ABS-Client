@@ -6,7 +6,7 @@
  * TopNav stays fixed while content slides.
  */
 
-import React, { useMemo, useCallback, createContext, useContext } from 'react';
+import React, { useMemo, useCallback, useRef, createContext, useContext } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ import { PlayIcon } from '@/features/player/components/PlayerIcons';
 import { useNavigation } from '@react-navigation/native';
 import { LibraryItem } from '@/core/types';
 import { getSeriesNavigationInfo, useCoverUrl } from '@/core/cache';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { scale } from '@/shared/theme';
 import { useSecretLibraryColors } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
@@ -51,6 +52,8 @@ interface SeriesNavigationContextType {
   hasNext: boolean;
   navigateToPrevious: () => void;
   navigateToNext: () => void;
+  /** Ref to the Pan gesture so inner Tap gestures can declare simultaneity */
+  panGestureRef?: React.MutableRefObject<any>;
 }
 
 const SeriesNavigationContext = createContext<SeriesNavigationContextType | null>(null);
@@ -172,6 +175,7 @@ function splitTitle(title: string): { line1: string; line2: string } {
 }
 
 // Full book detail preview - matches SecretLibraryBookDetailScreen layout exactly
+
 function AdjacentBookPage({ book, seriesName: parentSeriesName, bookSequence }: { book: LibraryItem; seriesName: string; bookSequence?: string }) {
   const colors = useSecretLibraryColors();
   const navigation = useNavigation<any>();
@@ -285,6 +289,7 @@ function AdjacentBookPage({ book, seriesName: parentSeriesName, bookSequence }: 
             <Text style={styles.coverPlaceholderText}>{title.substring(0, 3).toUpperCase()}</Text>
           </View>
         )}
+        <CoverStars bookId={book.id} starSize={scale(32)} />
       </View>
 
       {/* Title - Split into two lines with Georgia/serif */}
@@ -485,15 +490,27 @@ export function SeriesSwipeContainer({ book, children }: SeriesSwipeContainerPro
     });
   }, [translateX, isAnimating, navigateToBook]);
 
-  const navigateToPrevious = useCallback(() => {
+  // Swipe gesture completion — animate carousel, then replace
+  const swipeToPrevious = useCallback(() => {
     if (previousBook) animateToBook(previousBook, 'left');
   }, [previousBook, animateToBook]);
 
-  const navigateToNext = useCallback(() => {
+  const swipeToNext = useCallback(() => {
     if (nextBook) animateToBook(nextBook, 'right');
   }, [nextBook, animateToBook]);
 
+  // Arrow tap — instant replace (skips AdjacentBookPage preview)
+  const arrowToPrevious = useCallback(() => {
+    if (previousBook) navigateToBook(previousBook);
+  }, [previousBook, navigateToBook]);
+
+  const arrowToNext = useCallback(() => {
+    if (nextBook) navigateToBook(nextBook);
+  }, [nextBook, navigateToBook]);
+
+  const panGestureRef = useRef<any>();
   const panGesture = useMemo(() => Gesture.Pan()
+    .withRef(panGestureRef)
     .activeOffsetX([-20, 20])
     .failOffsetY([-15, 15])
     .onUpdate((event) => {
@@ -515,26 +532,27 @@ export function SeriesSwipeContainer({ book, children }: SeriesSwipeContainerPro
       const fastSwipe = Math.abs(velocityX) > VELOCITY_THRESHOLD;
 
       if (translationX > 0 && (pastThreshold || fastSwipe) && hasPrevious) {
-        runOnJS(navigateToPrevious)();
+        runOnJS(swipeToPrevious)();
       } else if (translationX < 0 && (pastThreshold || fastSwipe) && hasNext) {
-        runOnJS(navigateToNext)();
+        runOnJS(swipeToNext)();
       } else {
         translateX.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.cubic) });
       }
-    }), [hasPrevious, hasNext, translateX, isAnimating, navigateToPrevious, navigateToNext]);
+    }), [hasPrevious, hasNext, translateX, isAnimating, swipeToPrevious, swipeToNext]);
 
   const carouselStyle = useAnimatedStyle(() => {
     'worklet';
     return { transform: [{ translateX: translateX.value }] };
   });
 
-  // Context value for arrows
+  // Context value for arrows — uses instant replace (no carousel animation)
   const navigationContextValue = useMemo(() => ({
     hasPrevious,
     hasNext,
-    navigateToPrevious,
-    navigateToNext,
-  }), [hasPrevious, hasNext, navigateToPrevious, navigateToNext]);
+    navigateToPrevious: arrowToPrevious,
+    navigateToNext: arrowToNext,
+    panGestureRef,
+  }), [hasPrevious, hasNext, arrowToPrevious, arrowToNext]);
 
   if (!isInSeries) {
     return <>{children}</>;

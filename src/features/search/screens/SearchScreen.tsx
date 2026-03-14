@@ -21,6 +21,7 @@ import {
   ScrollView,
   Keyboard,
   Pressable,
+  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -690,29 +691,29 @@ export function SearchScreen() {
   const hasResults = bookResults.length > 0 || seriesResults.length > 0 ||
     authorResults.length > 0 || narratorResults.length > 0;
 
-  // Header colors based on theme
-  const headerBg = colors.isDark ? staticColors.black : staticColors.cream;
+  // Header colors based on theme — match page bg for seamless look
+  const headerBg = colors.white; // Same as page background
   const headerIconColor = colors.isDark ? staticColors.white : staticColors.black;
   const headerBorderColor = colors.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>
-      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={headerBg} />
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.white} />
 
-      {/* Safe area for top nav - matches theme */}
-      <View style={{ height: insets.top, backgroundColor: headerBg }} />
+      {/* Safe area for top nav - matches page bg */}
+      <View style={{ height: insets.top, backgroundColor: colors.white }} />
 
-      {/* TopNav with skull logo and integrated search bar - theme-aware */}
+      {/* TopNav with skull logo and integrated search bar */}
       <TopNav
         variant={colors.isDark ? 'dark' : 'light'}
         showLogo={true}
         onLogoPress={handleLogoPress}
         includeSafeArea={false}
-        style={{ backgroundColor: headerBg, zIndex: 30 }}
+        style={{ backgroundColor: colors.white, zIndex: 30 }}
         circleButtons={[
           {
             key: 'back',
-            icon: <TopNavBackIcon color={headerIconColor} size={14} />,
+            icon: <TopNavBackIcon color={headerIconColor} size={16} />,
             onPress: handleBack,
           },
         ]}
@@ -722,6 +723,7 @@ export function SearchScreen() {
             setQuery(text);
             setHasCommittedSearch(false);
           },
+          onClear: handleClear,
           placeholder: 'Search books, authors, series...',
           onSubmitEditing: handleSearch,
           onFocus: handleInputFocus,
@@ -740,7 +742,7 @@ export function SearchScreen() {
                 accessibilityLabel="Scan ISBN barcode"
                 accessibilityRole="button"
               >
-                <Icon name="ScanBarcode" size={18} color={headerIconColor} />
+                <Icon name="ScanBarcode" size={12} color={headerIconColor} strokeWidth={1.5} />
               </TouchableOpacity>
               {/* Filter Button */}
               <TouchableOpacity
@@ -753,7 +755,7 @@ export function SearchScreen() {
                 accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
                 accessibilityRole="button"
               >
-                <Icon name="SlidersHorizontal" size={18} color={activeFilterCount > 0 ? (colors.isDark ? staticColors.black : staticColors.white) : headerIconColor} />
+                <Icon name="SlidersHorizontal" size={12} color={activeFilterCount > 0 ? (colors.isDark ? staticColors.black : staticColors.white) : headerIconColor} strokeWidth={1.5} />
                 {activeFilterCount > 0 && (
                   <View style={styles.filterBadge}>
                     <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
@@ -771,122 +773,124 @@ export function SearchScreen() {
           {/* Darkened background per Baymard research */}
           <Pressable style={styles.autocompleteBackdrop} onPress={dismissAutocomplete} />
 
-          <View style={[styles.autocompleteContainer, { top: insets.top + 64 }]}>
-            {/* Books */}
-            {autocompleteSuggestions.books.length > 0 && (
-              <View style={styles.autocompleteSectionContainer}>
-                <Text style={styles.autocompleteSection}>BOOKS</Text>
-                {autocompleteSuggestions.books.map((book) => (
-                  <TouchableOpacity
-                    key={book.id}
-                    style={styles.autocompleteItem}
-                    onPress={() => handleAutocompleteBook(book.id)}
-                    accessibilityLabel={`${book.title} by ${book.author}, ${book.duration}`}
-                    accessibilityRole="button"
-                    accessibilityHint="Double tap to view book"
-                  >
-                    <View style={styles.autocompleteItemContent}>
-                      <Text style={styles.autocompleteTitle} numberOfLines={1}>{book.title}</Text>
-                      <Text style={styles.autocompleteMeta}>{book.author} · {book.duration}</Text>
-                    </View>
-                    <Icon name="ChevronRight" size={16} color={TEXT_TERTIARY} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Authors */}
-            {autocompleteSuggestions.authors.length > 0 && (
-              <View style={styles.autocompleteSectionContainer}>
-                <Text style={styles.autocompleteSection}>AUTHORS</Text>
-                {autocompleteSuggestions.authors.map((author) => {
-                  const imageUrl = author.id && author.imagePath
-                    ? apiClient.getAuthorImageUrl(author.id)
-                    : null;
-                  const initials = author.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-                  return (
+          <View style={[styles.autocompleteContainer, { top: insets.top + 64, maxHeight: Dimensions.get('window').height * 0.6 }]}>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
+              {/* Books */}
+              {autocompleteSuggestions.books.length > 0 && (
+                <View style={styles.autocompleteSectionContainer}>
+                  <Text style={styles.autocompleteSection}>BOOKS</Text>
+                  {autocompleteSuggestions.books.map((book) => (
                     <TouchableOpacity
-                      key={author.name}
+                      key={book.id}
                       style={styles.autocompleteItem}
-                      onPress={() => handleAutocompleteAuthor(author.name)}
-                      accessibilityLabel={`Author: ${author.name}, ${author.bookCount} books`}
+                      onPress={() => handleAutocompleteBook(book.id)}
+                      accessibilityLabel={`${book.title} by ${book.author}, ${book.duration}`}
                       accessibilityRole="button"
-                      accessibilityHint="Double tap to view author"
+                      accessibilityHint="Double tap to view book"
                     >
-                      {/* Author Thumbnail */}
-                      {imageUrl ? (
-                        <Image source={imageUrl} style={styles.autocompleteThumbnail} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.autocompleteThumbnail, styles.autocompleteThumbnailPlaceholder]}>
-                          <Text style={styles.autocompleteThumbnailInitials}>{initials}</Text>
-                        </View>
-                      )}
                       <View style={styles.autocompleteItemContent}>
-                        <Text style={styles.autocompleteTitle}>{author.name}</Text>
-                        <Text style={styles.autocompleteMeta}>{author.bookCount} books</Text>
+                        <Text style={styles.autocompleteTitle} numberOfLines={1}>{book.title}</Text>
+                        <Text style={styles.autocompleteMeta}>{book.author} · {book.duration}</Text>
                       </View>
-                      <Icon name="ChevronRight" size={16} color={TEXT_TERTIARY} />
+                      <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Series */}
-            {autocompleteSuggestions.series.length > 0 && (
-              <View style={styles.autocompleteSectionContainer}>
-                <Text style={styles.autocompleteSection}>SERIES</Text>
-                {autocompleteSuggestions.series.map((series) => (
-                  <TouchableOpacity
-                    key={series.name}
-                    style={styles.autocompleteItem}
-                    onPress={() => handleAutocompleteSeries(series.name)}
-                    accessibilityLabel={`Series: ${series.name}, ${series.bookCount} books`}
-                    accessibilityRole="button"
-                    accessibilityHint="Double tap to view series"
-                  >
-                    <View style={styles.autocompleteItemContent}>
-                      <Text style={styles.autocompleteTitle}>{series.name}</Text>
-                      <Text style={styles.autocompleteMeta}>{series.bookCount} books</Text>
-                    </View>
-                    <Icon name="ChevronRight" size={16} color={TEXT_TERTIARY} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Narrators */}
-            {autocompleteSuggestions.narrators.length > 0 && (
-              <View style={styles.autocompleteSectionContainer}>
-                <Text style={styles.autocompleteSection}>NARRATORS</Text>
-                {autocompleteSuggestions.narrators.map((narrator) => (
-                  <TouchableOpacity
-                    key={narrator.name}
-                    style={styles.autocompleteItem}
-                    onPress={() => handleAutocompleteNarrator(narrator.name)}
-                    accessibilityLabel={`Narrator: ${narrator.name}, ${narrator.bookCount} books`}
-                    accessibilityRole="button"
-                    accessibilityHint="Double tap to view narrator"
-                  >
-                    <View style={styles.autocompleteItemContent}>
-                      <Text style={styles.autocompleteTitle}>{narrator.name}</Text>
-                      <Text style={styles.autocompleteMeta}>{narrator.bookCount} books narrated</Text>
-                    </View>
-                    <Icon name="ChevronRight" size={16} color={TEXT_TERTIARY} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* No autocomplete results */}
-            {autocompleteSuggestions.books.length === 0 &&
-              autocompleteSuggestions.authors.length === 0 &&
-              autocompleteSuggestions.series.length === 0 &&
-              autocompleteSuggestions.narrators.length === 0 && (
-                <View style={styles.noAutocomplete}>
-                  <Text style={styles.noAutocompleteText}>Press search to find results</Text>
+                  ))}
                 </View>
               )}
+
+              {/* Authors */}
+              {autocompleteSuggestions.authors.length > 0 && (
+                <View style={styles.autocompleteSectionContainer}>
+                  <Text style={styles.autocompleteSection}>AUTHORS</Text>
+                  {autocompleteSuggestions.authors.map((author) => {
+                    const imageUrl = author.id && author.imagePath
+                      ? apiClient.getAuthorImageUrl(author.id)
+                      : null;
+                    const initials = author.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                    return (
+                      <TouchableOpacity
+                        key={author.name}
+                        style={styles.autocompleteItem}
+                        onPress={() => handleAutocompleteAuthor(author.name)}
+                        accessibilityLabel={`Author: ${author.name}, ${author.bookCount} books`}
+                        accessibilityRole="button"
+                        accessibilityHint="Double tap to view author"
+                      >
+                        {/* Author Thumbnail */}
+                        {imageUrl ? (
+                          <Image source={imageUrl} style={styles.autocompleteThumbnail} contentFit="cover" />
+                        ) : (
+                          <View style={[styles.autocompleteThumbnail, styles.autocompleteThumbnailPlaceholder]}>
+                            <Text style={styles.autocompleteThumbnailInitials}>{initials}</Text>
+                          </View>
+                        )}
+                        <View style={styles.autocompleteItemContent}>
+                          <Text style={styles.autocompleteTitle}>{author.name}</Text>
+                          <Text style={styles.autocompleteMeta}>{author.bookCount} books</Text>
+                        </View>
+                        <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Series */}
+              {autocompleteSuggestions.series.length > 0 && (
+                <View style={styles.autocompleteSectionContainer}>
+                  <Text style={styles.autocompleteSection}>SERIES</Text>
+                  {autocompleteSuggestions.series.map((series) => (
+                    <TouchableOpacity
+                      key={series.name}
+                      style={styles.autocompleteItem}
+                      onPress={() => handleAutocompleteSeries(series.name)}
+                      accessibilityLabel={`Series: ${series.name}, ${series.bookCount} books`}
+                      accessibilityRole="button"
+                      accessibilityHint="Double tap to view series"
+                    >
+                      <View style={styles.autocompleteItemContent}>
+                        <Text style={styles.autocompleteTitle}>{series.name}</Text>
+                        <Text style={styles.autocompleteMeta}>{series.bookCount} books</Text>
+                      </View>
+                      <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Narrators */}
+              {autocompleteSuggestions.narrators.length > 0 && (
+                <View style={styles.autocompleteSectionContainer}>
+                  <Text style={styles.autocompleteSection}>NARRATORS</Text>
+                  {autocompleteSuggestions.narrators.map((narrator) => (
+                    <TouchableOpacity
+                      key={narrator.name}
+                      style={styles.autocompleteItem}
+                      onPress={() => handleAutocompleteNarrator(narrator.name)}
+                      accessibilityLabel={`Narrator: ${narrator.name}, ${narrator.bookCount} books`}
+                      accessibilityRole="button"
+                      accessibilityHint="Double tap to view narrator"
+                    >
+                      <View style={styles.autocompleteItemContent}>
+                        <Text style={styles.autocompleteTitle}>{narrator.name}</Text>
+                        <Text style={styles.autocompleteMeta}>{narrator.bookCount} books narrated</Text>
+                      </View>
+                      <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* No autocomplete results */}
+              {autocompleteSuggestions.books.length === 0 &&
+                autocompleteSuggestions.authors.length === 0 &&
+                autocompleteSuggestions.series.length === 0 &&
+                autocompleteSuggestions.narrators.length === 0 && (
+                  <View style={styles.noAutocomplete}>
+                    <Text style={styles.noAutocompleteText}>Press search to find results</Text>
+                  </View>
+                )}
+            </ScrollView>
           </View>
         </>
       )}
@@ -916,6 +920,7 @@ export function SearchScreen() {
               <View style={styles.previousSearches}>
                 <View style={styles.previousSearchesHeader}>
                   <Text style={styles.previousSearchesTitle}>Recent Searches</Text>
+
                   <TouchableOpacity onPress={clearSearchHistory}>
                     <Text style={styles.clearHistoryText}>Clear</Text>
                   </TouchableOpacity>
@@ -926,13 +931,13 @@ export function SearchScreen() {
                     style={styles.previousSearchItem}
                     onPress={() => handlePreviousSearchPress(search)}
                   >
-                    <Icon name="Clock" size={18} color={TEXT_TERTIARY} />
+                    <Icon name="Clock" size={16} color={TEXT_TERTIARY} strokeWidth={1.5} />
                     <Text style={styles.previousSearchText}>{search}</Text>
                     <TouchableOpacity
                       style={styles.removeSearchButton}
                       onPress={() => removeFromHistory(search)}
                     >
-                      <Icon name="X" size={16} color={TEXT_TERTIARY} />
+                      <Icon name="X" size={14} color={TEXT_TERTIARY} strokeWidth={1.5} />
                     </TouchableOpacity>
                   </TouchableOpacity>
                 ))}
@@ -979,11 +984,11 @@ export function SearchScreen() {
               </View>
               {/* Big Browse Button */}
               <TouchableOpacity
-                style={[styles.bigBrowseButton, { backgroundColor: colors.black }]}
+                style={styles.bigBrowseButton}
                 onPress={() => { navigation.navigate('BrowsePage'); }}
               >
-                <Icon name="Globe" size={20} color={colors.white} strokeWidth={1.5} />
-                <Text style={[styles.bigBrowseButtonText, { color: colors.white }]}>Browse All Books</Text>
+                <Icon name="Globe" size={18} color="rgba(255,255,255,0.5)" strokeWidth={1.5} />
+                <Text style={styles.bigBrowseButtonText}>Discover</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1048,11 +1053,11 @@ export function SearchScreen() {
               </View>
               {/* Big Browse Button */}
               <TouchableOpacity
-                style={[styles.bigBrowseButton, { backgroundColor: colors.black }]}
+                style={styles.bigBrowseButton}
                 onPress={() => { navigation.navigate('BrowsePage'); }}
               >
-                <Icon name="Globe" size={20} color={colors.white} strokeWidth={1.5} />
-                <Text style={[styles.bigBrowseButtonText, { color: colors.white }]}>Browse All Books</Text>
+                <Icon name="Globe" size={18} color="rgba(255,255,255,0.5)" strokeWidth={1.5} />
+                <Text style={styles.bigBrowseButtonText}>Discover</Text>
               </TouchableOpacity>
             </View>
 
@@ -1071,11 +1076,6 @@ export function SearchScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Books</Text>
-              {bookResults.length > 5 && (
-                <TouchableOpacity>
-                  <Text style={styles.viewAllText}>VIEW ALL</Text>
-                </TouchableOpacity>
-              )}
             </View>
             <View>
               {bookResults.slice(0, 10).map((book, index) => {
@@ -1091,7 +1091,7 @@ export function SearchScreen() {
                     duration={duration}
                     showSeparator={index < bookResults.slice(0, 10).length - 1}
                     onPress={() => handleBookPress(book)}
-                    onLongPress={() => showMenu(book)}
+                    onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
                   />
                 );
               })}
@@ -1287,9 +1287,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: 4,
   },
   filterButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'transparent',
     borderWidth: 1,
     // borderColor set dynamically in JSX based on theme
@@ -1302,18 +1302,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   filterBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -3,
+    right: -3,
     backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    width: 16,
-    height: 16,
+    borderRadius: 6,
+    width: 12,
+    height: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   filterBadgeText: {
     color: '#FFF',
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
   },
 
@@ -1510,25 +1510,31 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   previousSearchesTitle: {
     color: colors.TEXT_PRIMARY,
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    opacity: 0.5,
   },
   clearHistoryText: {
     color: colors.ACCENT,
-    fontSize: 14,
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   previousSearchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.BORDER_DEFAULT,
   },
   previousSearchText: {
     flex: 1,
     color: colors.TEXT_SECONDARY,
-    fontSize: 15,
-    marginLeft: 12,
+    fontSize: 14,
+    marginLeft: 10,
   },
   removeSearchButton: {
     padding: 4,
@@ -1709,9 +1715,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.isDarkMode ? '#1A1A1A' : colors.CARD_COLOR,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
-    maxHeight: 400,
     zIndex: 20,
     paddingVertical: 8,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1726,36 +1732,42 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   autocompleteSection: {
     color: colors.TEXT_TERTIARY,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 12,
+    paddingBottom: 6,
+    opacity: 0.6,
   },
   autocompleteItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   autocompleteItemContent: {
     flex: 1,
   },
   autocompleteTitle: {
     color: colors.TEXT_PRIMARY,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
   },
   autocompleteMeta: {
     color: colors.TEXT_TERTIARY,
-    fontSize: 13,
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginTop: 2,
   },
   autocompleteThumbnail: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
     backgroundColor: colors.BORDER_DEFAULT,
   },
   autocompleteThumbnailPlaceholder: {
@@ -1765,17 +1777,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   autocompleteThumbnailInitials: {
     color: colors.TEXT_INVERSE,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   noAutocomplete: {
-    paddingVertical: 24,
+    paddingVertical: 20,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   noAutocompleteText: {
     color: colors.TEXT_TERTIARY,
-    fontSize: 14,
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   // No results recovery styles
@@ -1850,24 +1865,28 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   browseRecoveryText: {
     color: colors.TEXT_SECONDARY,
-    fontSize: 13,
-    fontWeight: '500',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   bigBrowseButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   bigBrowseButtonText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(12),
-    fontWeight: '600',
+    fontSize: scale(11),
     textTransform: 'uppercase',
     letterSpacing: 1,
+    color: 'rgba(255,255,255,0.5)',
   },
 
   // Search tips

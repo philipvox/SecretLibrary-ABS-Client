@@ -16,15 +16,13 @@ import {
   StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Undo2, Trash2, BookX, Info } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale } from '@/shared/theme';
-import {
-  secretLibraryColors as colors,
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { useDismissedItemsStore } from '@/features/recommendations/stores/dismissedItemsStore';
 import { useLibraryCache, useCoverUrl } from '@/core/cache';
 import { haptics } from '@/core/native/haptics';
@@ -40,6 +38,7 @@ interface HiddenBookItemProps {
 }
 
 function HiddenBookItem({ bookId, onRestore }: HiddenBookItemProps) {
+  const colors = useSecretLibraryColors();
   const { items } = useLibraryCache();
   const coverUrl = useCoverUrl(bookId);
   const navigation = useNavigation<any>();
@@ -60,23 +59,30 @@ function HiddenBookItem({ bookId, onRestore }: HiddenBookItemProps) {
   }, [bookId, onRestore]);
 
   return (
-    <TouchableOpacity style={styles.bookItem} onPress={handlePress} activeOpacity={0.7}>
-      <Image
-        source={coverUrl}
-        style={styles.cover}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-      />
+    <TouchableOpacity
+      style={[styles.bookItem, { borderBottomColor: colors.borderLight }]}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
+      <View style={{ width: scale(48), height: scale(48), overflow: 'hidden' }}>
+        <Image
+          source={coverUrl}
+          style={styles.cover}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+        <CoverStars bookId={bookId} starSize={scale(14)} />
+      </View>
       <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={1}>
+        <Text style={[styles.bookTitle, { color: colors.black }]} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>
+        <Text style={[styles.bookAuthor, { color: colors.gray }]} numberOfLines={1}>
           {author}
         </Text>
       </View>
       <TouchableOpacity
-        style={styles.restoreButton}
+        style={[styles.restoreButton, { backgroundColor: colors.grayLight }]}
         onPress={handleRestore}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
@@ -93,6 +99,7 @@ function HiddenBookItem({ bookId, onRestore }: HiddenBookItemProps) {
 export function HiddenItemsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const colors = useSecretLibraryColors();
 
   const dismissedItems = useDismissedItemsStore((s) => s.dismissedItems);
   const undismissItem = useDismissedItemsStore((s) => s.undismissItem);
@@ -133,32 +140,32 @@ export function HiddenItemsScreen() {
   const keyExtractor = useCallback((item: string) => item, []);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+    <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
       <SettingsHeader title="Hidden Books" />
 
       <View style={styles.content}>
         {/* Header with count and clear button */}
         {!isEmpty && (
           <View style={styles.headerRow}>
-            <Text style={styles.countText}>
+            <Text style={[styles.countText, { color: colors.gray }]}>
               {dismissedIds.length} hidden book{dismissedIds.length !== 1 ? 's' : ''}
             </Text>
             <TouchableOpacity
-              style={styles.clearButton}
+              style={[styles.clearButton, { backgroundColor: colors.white }]}
               onPress={handleClearAll}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Trash2 size={scale(16)} color={colors.gray} strokeWidth={2} />
-              <Text style={styles.clearButtonText}>Restore All</Text>
+              <Text style={[styles.clearButtonText, { color: colors.gray }]}>Restore All</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Description */}
-        <View style={styles.descriptionCard}>
+        <View style={[styles.descriptionCard, { backgroundColor: colors.white }]}>
           <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-          <Text style={styles.descriptionText}>
+          <Text style={[styles.descriptionText, { color: colors.gray }]}>
             These books won't appear in your recommendations. Tap the restore button to bring them
             back.
           </Text>
@@ -166,16 +173,16 @@ export function HiddenItemsScreen() {
 
         {isEmpty ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.white }]}>
               <BookX size={scale(48)} color={colors.gray} strokeWidth={1} />
             </View>
-            <Text style={styles.emptyTitle}>No Hidden Books</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, { color: colors.black }]}>No Hidden Books</Text>
+            <Text style={[styles.emptyText, { color: colors.gray }]}>
               Swipe left on any book card in the Browse tab to hide it from recommendations.
             </Text>
           </View>
         ) : (
-          <View style={styles.listCard}>
+          <View style={[styles.listCard, { backgroundColor: colors.white }]}>
             <FlatList
               data={dismissedIds}
               renderItem={renderItem}
@@ -200,7 +207,6 @@ export function HiddenItemsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.grayLight,
   },
   content: {
     flex: 1,
@@ -217,7 +223,6 @@ const styles = StyleSheet.create({
   countText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -227,12 +232,10 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: colors.white,
   },
   clearButtonText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
   },
   // Description
   descriptionCard: {
@@ -240,20 +243,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
     padding: 16,
-    backgroundColor: colors.white,
     marginBottom: 16,
   },
   descriptionText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     flex: 1,
     lineHeight: scale(16),
   },
   // List Card
   listCard: {
     flex: 1,
-    backgroundColor: colors.white,
   },
   listContent: {
     flexGrow: 1,
@@ -265,7 +265,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   cover: {
     width: scale(48),
@@ -278,18 +277,15 @@ const styles = StyleSheet.create({
   bookTitle: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(14),
-    color: colors.black,
     marginBottom: 2,
   },
   bookAuthor: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
   },
   restoreButton: {
     width: scale(40),
     height: scale(40),
-    backgroundColor: colors.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
@@ -305,7 +301,6 @@ const styles = StyleSheet.create({
   emptyIcon: {
     width: scale(96),
     height: scale(96),
-    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -313,13 +308,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(24),
-    color: colors.black,
     marginBottom: 12,
   },
   emptyText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     textAlign: 'center',
     lineHeight: scale(18),
   },

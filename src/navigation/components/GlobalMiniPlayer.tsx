@@ -15,21 +15,26 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
-  withTiming,
+  withSpring,
+  interpolate,
+  Extrapolation,
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { scale } from '@/shared/theme';
 import { useShallow } from 'zustand/react/shallow';
 import { usePlayerStore, useCurrentChapterIndex, useSeekingStore } from '@/features/player/stores';
 import { useNormalizedChapters } from '@/shared/hooks';
 import { getTitle } from '@/shared/utils/metadata';
+import { useCoverUrl } from '@/core/cache';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { haptics } from '@/core/native/haptics';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import {
@@ -38,13 +43,18 @@ import {
   PlayIcon,
   PauseIcon,
 } from '@/features/player/components/PlayerIcons';
+import {
+  playerTransitionProgress,
+  SPRING_CONFIG,
+  SNAP_THRESHOLD,
+  VELOCITY_THRESHOLD,
+} from '@/features/player/stores/playerTransition';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-const SWIPE_UP_THRESHOLD = -50;
-const SWIPE_DOWN_THRESHOLD = 50;
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Dark background color - matches library screen (secretLibraryColors.black)
 const MINI_PLAYER_BG = '#0f0f0f';
@@ -76,13 +86,11 @@ export function GlobalMiniPlayer() {
     isPlaying,
     isLoading,
     isBuffering,
-    isPlayerVisible,
     position,
     duration,
     chapters,
     play,
     pause,
-    togglePlayer,
     cleanup,
   } = usePlayerStore(
     useShallow((s) => ({
@@ -90,13 +98,11 @@ export function GlobalMiniPlayer() {
       isPlaying: s.isPlaying,
       isLoading: s.isLoading,
       isBuffering: s.isBuffering,
-      isPlayerVisible: s.isPlayerVisible,
       position: s.position,
       duration: s.duration,
       chapters: s.chapters,
       play: s.play,
       pause: s.pause,
-      togglePlayer: s.togglePlayer,
       cleanup: s.cleanup,
     }))
   );
@@ -108,9 +114,6 @@ export function GlobalMiniPlayer() {
   });
   const currentChapter = normalizedChapters[currentChapterIndex];
   const chapterName = currentChapter?.displayTitle || `Part ${currentChapterIndex + 1}`;
-
-  // Swipe gesture state
-  const translateY = useSharedValue(0);
 
   // Handlers
   const handlePlayPause = useCallback(() => {
@@ -145,48 +148,80 @@ export function GlobalMiniPlayer() {
     useSeekingStore.getState().seekTo(newPosition, currentDur, bookId);
   }, [bookId]);
 
+  // Called from JS thread (tap handler or gesture completion)
+  const setPlayerVisible = useCallback(() => {
+    usePlayerStore.getState().setPlayerVisible(true);
+  }, []);
+
   const handleOpenPlayer = useCallback(() => {
     haptics.selection();
-    togglePlayer?.();
-  }, [togglePlayer]);
+    // Animate shared progress to 1 (expanded)
+    playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
+    // Set store state so other parts of the app know the player is visible
+    setPlayerVisible();
+  }, [setPlayerVisible]);
 
   const handleCloseMiniPlayer = useCallback(() => {
     haptics.selection();
     cleanup();
   }, [cleanup]);
 
-  // Swipe gestures: up to open full player, down to close and save progress
+  // Pan gesture: drag up to continuously reveal full player
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       'worklet';
-      translateY.value = event.translationY;
+      // Convert upward drag to 0→1 progress
+      const progress = Math.min(Math.max(-event.translationY / SCREEN_HEIGHT, 0), 1);
+      playerTransitionProgress.value = progress;
     })
     .onEnd((event) => {
       'worklet';
-      if (event.translationY < SWIPE_UP_THRESHOLD) {
-        runOnJS(handleOpenPlayer)();
-      } else if (event.translationY > SWIPE_DOWN_THRESHOLD) {
-        runOnJS(handleCloseMiniPlayer)();
+      const progress = playerTransitionProgress.value;
+      const velocity = -event.velocityY; // positive = upward
+
+      // Quick swipe overrides position threshold
+      const shouldExpand = velocity > VELOCITY_THRESHOLD || (velocity > -VELOCITY_THRESHOLD && progress > SNAP_THRESHOLD);
+
+      if (shouldExpand) {
+        playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
+        // Set store state from JS thread (animation already running on UI thread)
+        runOnJS(setPlayerVisible)();
+      } else {
+        playerTransitionProgress.value = withSpring(0, SPRING_CONFIG);
       }
-      translateY.value = withTiming(0, { duration: 150 });
     });
 
+  // Track whether the full player is expanded to disable touch on mini player
+  const isPlayerVisible = usePlayerStore((s) => s.isPlayerVisible);
+
+  // Mini player fades out as full player slides in
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value < 0
-      ? Math.min(0, translateY.value * 0.3)
-      : Math.min(translateY.value * 0.5, 30) }],
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0, 0.3],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Cover hides instantly so the full player's cover (positioned at same spot) takes over
+  const coverAnimStyle = useAnimatedStyle(() => ({
+    opacity: playerTransitionProgress.value > 0.01 ? 0 : 1,
   }));
 
   // Determine if mini player should be hidden
-  const hiddenRoutes = ['ReadingHistoryWizard', 'MoodDiscovery', 'MoodResults', 'PreferencesOnboarding', 'SpinePlayground'];
-  const shouldHide = !currentBook || isPlayerVisible || hiddenRoutes.includes(currentRouteName);
+  const hiddenRoutes = ['ReadingHistoryWizard', 'PreferencesOnboarding', 'SpinePlayground'];
+  const shouldHide = !currentBook || hiddenRoutes.includes(currentRouteName);
 
   const title = currentBook ? getTitle(currentBook) : '';
+  const coverUrl = useCoverUrl(currentBook?.id || '');
+  const metadata = currentBook?.media?.metadata as any;
+  const seriesDisplay = (metadata?.seriesName || metadata?.series?.[0]?.name || '').trim();
 
   return (
     <View
       style={[styles.wrapper, shouldHide && styles.hidden]}
-      pointerEvents={shouldHide ? 'none' : 'auto'}
+      pointerEvents={shouldHide || isPlayerVisible ? 'none' : 'auto'}
     >
       <GestureDetector gesture={panGesture}>
         <Animated.View
@@ -200,8 +235,15 @@ export function GlobalMiniPlayer() {
           <View style={styles.controlsRow}>
             {/* Book Info - tap to open player */}
             <Pressable style={styles.infoContainer} onPress={handleOpenPlayer}>
-              <Text style={styles.bookTitle} numberOfLines={1}>{title}</Text>
-              <Text style={styles.chapterName} numberOfLines={1}>{chapterName}</Text>
+              <Animated.View style={[styles.coverWrap, coverAnimStyle]}>
+                <Image source={coverUrl} style={styles.cover} contentFit="cover" />
+                {currentBook?.id && <CoverStars bookId={currentBook.id} starSize={scale(14)} />}
+              </Animated.View>
+              <View style={styles.textContainer}>
+                <Text style={styles.bookTitle} numberOfLines={1}>{title}</Text>
+                {seriesDisplay ? <Text style={styles.seriesName} numberOfLines={1}>{seriesDisplay}</Text> : null}
+                <Text style={styles.chapterName} numberOfLines={1}>{chapterName}</Text>
+              </View>
             </Pressable>
 
             {/* Buttons */}
@@ -211,7 +253,7 @@ export function GlobalMiniPlayer() {
                 style={styles.skipButton}
                 onPress={handleSkipBack}
               >
-                <RewindIcon color={secretLibraryColors.white} size={16} />
+                <RewindIcon color={secretLibraryColors.white} size={22} />
               </TouchableOpacity>
 
               {/* Skip Forward 30s */}
@@ -219,7 +261,7 @@ export function GlobalMiniPlayer() {
                 style={styles.skipButton}
                 onPress={handleSkipForward}
               >
-                <FastForwardIcon color={secretLibraryColors.white} size={16} />
+                <FastForwardIcon color={secretLibraryColors.white} size={22} />
               </TouchableOpacity>
 
               {/* Play/Pause */}
@@ -291,18 +333,43 @@ const styles = StyleSheet.create({
   // Info
   infoContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: scale(12),
+    gap: scale(10),
+  },
+  coverWrap: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(4),
+    overflow: 'hidden',
+  },
+  cover: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(4),
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  textContainer: {
+    flex: 1,
     flexDirection: 'column',
-    gap: scale(2),
-    marginRight: scale(16),
+    gap: scale(1),
   },
   bookTitle: {
     fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(18),
+    fontSize: scale(14),
     color: secretLibraryColors.white,
+  },
+  seriesName: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    color: 'rgba(255,255,255,0.4)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   chapterName: {
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),
-    fontSize: scale(13),
+    fontSize: scale(11),
     fontStyle: 'italic',
     color: secretLibraryColors.gray,
   },
@@ -314,21 +381,19 @@ const styles = StyleSheet.create({
     gap: scale(8),
   },
   skipButton: {
-    height: scale(44),
-    paddingHorizontal: scale(16),
-    borderRadius: scale(22),
-    borderWidth: 1.5,
+    width: scale(38),
+    height: scale(38),
+    borderRadius: scale(19),
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255, 255, 255, 0.4)',
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   playButton: {
-    height: scale(44),
-    paddingHorizontal: scale(22),
-    borderRadius: scale(22),
+    width: scale(38),
+    height: scale(38),
+    borderRadius: scale(19),
     backgroundColor: secretLibraryColors.white,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },

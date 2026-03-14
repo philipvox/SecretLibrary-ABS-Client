@@ -372,7 +372,7 @@ export function GenreDetailScreen() {
               key={book.id}
               style={[styles.verticalListItem, { borderBottomColor: colors.grayLine }]}
               onPress={() => handleBookPress(book.id)}
-              onLongPress={() => showMenu(book)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
             >
               <Image
                 source={{ uri: coverUrl }}
@@ -406,7 +406,7 @@ export function GenreDetailScreen() {
           circleButtons={[
             {
               key: 'back',
-              icon: <TopNavBackIcon color={staticColors.white} size={14} />,
+              icon: <TopNavBackIcon color={staticColors.white} size={16} />,
               onPress: handleBack,
             },
           ]}
@@ -420,52 +420,50 @@ export function GenreDetailScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.white }]}>
+    <View style={[styles.container, { backgroundColor: staticColors.black }]}>
       <StatusBar barStyle="light-content" backgroundColor={staticColors.black} />
-
-      {/* Header area with dark background */}
-      <View style={[styles.headerArea, { backgroundColor: staticColors.black }]}>
-        {/* TopNav */}
-        <TopNav
-          variant="dark"
-          showLogo={true}
-          onLogoPress={handleLogoPress}
-          style={{ backgroundColor: 'transparent' }}
-          pills={[
-            {
-              key: 'genre',
-              label: 'Genre',
-              icon: <Music size={12} color={staticColors.white} />,
-              onPress: () => navigation.navigate('GenresList' as never),
-            },
-          ]}
-          circleButtons={[
-            {
-              key: 'back',
-              icon: <TopNavBackIcon color={staticColors.white} size={14} />,
-              onPress: handleBack,
-            },
-          ]}
-        />
-
-        {/* Genre Info */}
-        <View style={[styles.genreInfoBlock, { paddingHorizontal: 24 }]}>
-          <Text style={[styles.headerName, { color: staticColors.white }]}>{genreName}</Text>
-          <Text style={[styles.headerStats, { color: colors.gray }]}>
-            {allBooks.length} {allBooks.length === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
-          </Text>
-        </View>
-      </View>
 
       <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
         <ScrollView
-          style={[styles.scrollView, { backgroundColor: colors.white }]}
+          style={[styles.scrollView, { backgroundColor: staticColors.black }]}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: 40 + insets.bottom },
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Header area with dark background */}
+          <View style={[styles.headerArea, { backgroundColor: staticColors.black }]}>
+            <TopNav
+              variant="dark"
+              showLogo={true}
+              onLogoPress={handleLogoPress}
+              style={{ backgroundColor: 'transparent' }}
+              pills={[
+                {
+                  key: 'genre',
+                  label: 'Genre',
+                  icon: <Music size={16} color={staticColors.white} />,
+                  onPress: () => navigation.navigate('GenresList' as never),
+                },
+              ]}
+              circleButtons={[
+                {
+                  key: 'back',
+                  icon: <TopNavBackIcon color={staticColors.white} size={16} />,
+                  onPress: handleBack,
+                },
+              ]}
+            />
+
+            {/* Genre Info */}
+            <View style={[styles.genreInfoBlock, { paddingHorizontal: 24 }]}>
+              <Text style={[styles.headerName, { color: staticColors.white }]}>{genreName}</Text>
+              <Text style={[styles.headerStats, { color: colors.gray }]}>
+                {allBooks.length} {allBooks.length === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
+              </Text>
+            </View>
+          </View>
           {/* Tabs Row with View Toggle */}
           <View style={styles.tabsRow}>
             <View style={styles.tabs}>
@@ -674,8 +672,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 0,
   },
   genreInfoBlock: {
     marginBottom: 4,
@@ -698,6 +695,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 24,
   },
   tabs: {
     flexDirection: 'row',
@@ -746,6 +744,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderBottomColor: staticColors.grayLine,
   },
@@ -804,6 +803,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: staticColors.grayLine,
     marginTop: 20,
+    paddingHorizontal: 24,
   },
   footerText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,

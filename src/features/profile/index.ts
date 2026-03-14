@@ -8,9 +8,11 @@ export { ChapterCleaningSettingsScreen } from './screens/ChapterCleaningSettings
 export { HiddenItemsScreen } from './screens/HiddenItemsScreen';
 export { KidModeSettingsScreen } from './screens/KidModeSettingsScreen';
 export { AppearanceSettingsScreen } from './screens/AppearanceSettingsScreen';
+export { DisplaySettingsScreen } from './screens/DisplaySettingsScreen';
 export { LibrarySyncSettingsScreen } from './screens/LibrarySyncSettingsScreen';
 export { PlaylistSettingsScreen } from './screens/PlaylistSettingsScreen';
 export { DeveloperSettingsScreen } from './screens/DeveloperSettingsScreen';
+export { AboutScreen } from './screens/AboutScreen';
 
 // Stores
 export { useHapticSettingsStore, useHapticSettings, isHapticEnabled } from './stores/hapticSettingsStore';

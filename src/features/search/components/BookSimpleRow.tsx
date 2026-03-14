@@ -9,6 +9,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { apiClient } from '@/core/api';
 
 export interface BookSimpleRowProps {
@@ -54,7 +55,10 @@ export function BookSimpleRow({
       onLongPress={onLongPress}
       delayLongPress={400}
     >
-      <Image source={{ uri: coverUrl }} style={[styles.cover, { backgroundColor: colors.grayLight }]} />
+      <View style={{ width: scale(48), height: scale(48), borderRadius: 4, overflow: 'hidden' }}>
+        <Image source={{ uri: coverUrl }} style={[styles.cover, { backgroundColor: colors.grayLight }]} />
+        <CoverStars bookId={id} starSize={scale(14)} />
+      </View>
       <View style={styles.info}>
         <Text style={[styles.title, { color: colors.black }]} numberOfLines={1}>
           {title}

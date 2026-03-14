@@ -428,13 +428,13 @@ export function NarratorsListScreen() {
           {
             key: 'narrators',
             label: 'Narrators',
-            icon: <MicIcon size={10} color={colors.text.primary} />,
+            icon: <MicIcon size={13} color={colors.text.primary} />,
           },
         ]}
         circleButtons={[
           {
             key: 'back',
-            icon: <TopNavBackIcon color={colors.text.primary} size={14} />,
+            icon: <TopNavBackIcon color={colors.text.primary} size={16} />,
             onPress: handleBack,
           },
         ]}

@@ -78,7 +78,7 @@ const QueueIconPath = ({ color = '#FFB800' }: { color?: string }) => (
 export function CircularDownloadButton({
   book,
   size = scale(40),
-  strokeWidth = 3,
+  strokeWidth = 4,
 }: CircularDownloadButtonProps) {
   const {
     isDownloaded,
@@ -198,7 +198,7 @@ export function CircularDownloadButton({
               cx={center}
               cy={center}
               r={radius}
-              stroke="rgba(255, 255, 255, 0.15)"
+              stroke="rgba(255, 255, 255, 0.3)"
               strokeWidth={strokeWidth}
               fill="none"
             />

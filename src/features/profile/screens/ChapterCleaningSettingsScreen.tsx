@@ -13,22 +13,20 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
-  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, Code, Info, ArrowRight, type LucideIcon } from 'lucide-react-native';
+import { Check, Code, Info, ArrowRight } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale } from '@/shared/theme';
-import {
-  secretLibraryColors as colors,
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import {
   useChapterCleaningStore,
   CLEANING_LEVEL_INFO,
   type ChapterCleaningLevel,
 } from '../stores/chapterCleaningStore';
 import { SettingsHeader } from '../components/SettingsHeader';
+import { SettingsRow } from '../components/SettingsRow';
+import { SectionHeader } from '../components/SectionHeader';
 
 // =============================================================================
 // CONSTANTS
@@ -48,34 +46,39 @@ interface LevelOptionProps {
 }
 
 function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOptionProps) {
+  const colors = useSecretLibraryColors();
   const info = CLEANING_LEVEL_INFO[level];
 
   return (
     <TouchableOpacity
-      style={[styles.levelOption, isSelected && styles.levelOptionSelected]}
+      style={[
+        styles.levelOption,
+        { borderBottomColor: colors.borderLight },
+        isSelected && { backgroundColor: colors.grayLight },
+      ]}
       onPress={() => onSelect(level)}
       activeOpacity={0.7}
     >
       <View style={styles.levelOptionLeft}>
         {/* Radio circle */}
-        <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
-          {isSelected && <View style={styles.radioInner} />}
+        <View style={[styles.radioOuter, { borderColor: colors.gray }, isSelected && { borderColor: colors.black }]}>
+          {isSelected && <View style={[styles.radioInner, { backgroundColor: colors.black }]} />}
         </View>
 
         {/* Content */}
         <View style={styles.levelContent}>
           <View style={styles.labelRow}>
-            <Text style={[styles.levelLabel, isSelected && styles.levelLabelSelected]}>
+            <Text style={[styles.levelLabel, { color: colors.black }, isSelected && styles.levelLabelSelected]}>
               {info.label}
             </Text>
             {isRecommended && (
-              <View style={styles.recommendedBadge}>
-                <Text style={styles.recommendedText}>Recommended</Text>
+              <View style={[styles.recommendedBadge, { backgroundColor: colors.grayLight }]}>
+                <Text style={[styles.recommendedText, { color: colors.gray }]}>Recommended</Text>
               </View>
             )}
           </View>
-          <Text style={styles.levelDescription}>{info.description}</Text>
-          <Text style={styles.levelExample}>{info.example}</Text>
+          <Text style={[styles.levelDescription, { color: colors.gray }]}>{info.description}</Text>
+          <Text style={[styles.levelExample, { color: colors.gray }]}>{info.example}</Text>
         </View>
       </View>
 
@@ -85,41 +88,6 @@ function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOption
   );
 }
 
-interface SettingsRowProps {
-  Icon: LucideIcon;
-  label: string;
-  note?: string;
-  switchValue: boolean;
-  onSwitchChange: (value: boolean) => void;
-}
-
-function SettingsRow({ Icon, label, note, switchValue, onSwitchChange }: SettingsRowProps) {
-  return (
-    <View style={styles.settingsRow}>
-      <View style={styles.rowLeft}>
-        <View style={styles.iconContainer}>
-          <Icon size={scale(18)} color={colors.gray} strokeWidth={1.5} />
-        </View>
-        <View style={styles.rowContent}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          {note && <Text style={styles.rowNote}>{note}</Text>}
-        </View>
-      </View>
-      <Switch
-        value={switchValue}
-        onValueChange={onSwitchChange}
-        trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
-        thumbColor={colors.white}
-        ios_backgroundColor="rgba(0,0,0,0.1)"
-      />
-    </View>
-  );
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return <Text style={styles.sectionHeader}>{title}</Text>;
-}
-
 interface ExampleRowProps {
   before: string;
   after: string;
@@ -127,21 +95,23 @@ interface ExampleRowProps {
 }
 
 function ExampleRow({ before, after, note }: ExampleRowProps) {
+  const colors = useSecretLibraryColors();
+
   return (
-    <View style={styles.exampleRow}>
+    <View style={[styles.exampleRow, { borderBottomColor: colors.borderLight }]}>
       <View style={styles.exampleBefore}>
-        <Text style={styles.exampleLabel}>Before</Text>
-        <Text style={styles.exampleText} numberOfLines={1}>
+        <Text style={[styles.exampleLabel, { color: colors.gray }]}>Before</Text>
+        <Text style={[styles.exampleText, { color: colors.gray }]} numberOfLines={1}>
           {before}
         </Text>
       </View>
       <ArrowRight size={scale(14)} color={colors.gray} strokeWidth={1.5} style={styles.exampleArrow} />
       <View style={styles.exampleAfter}>
-        <Text style={styles.exampleLabel}>After</Text>
-        <Text style={styles.exampleTextClean} numberOfLines={1}>
+        <Text style={[styles.exampleLabel, { color: colors.gray }]}>After</Text>
+        <Text style={[styles.exampleTextClean, { color: colors.black }]} numberOfLines={1}>
           {after}
         </Text>
-        {note && <Text style={styles.exampleNote}>{note}</Text>}
+        {note && <Text style={[styles.exampleNote, { color: colors.gray }]}>{note}</Text>}
       </View>
     </View>
   );
@@ -152,6 +122,7 @@ function ExampleRow({ before, after, note }: ExampleRowProps) {
 // =============================================================================
 
 export function ChapterCleaningSettingsScreen() {
+  const colors = useSecretLibraryColors();
   const insets = useSafeAreaInsets();
 
   // Settings from store
@@ -168,8 +139,8 @@ export function ChapterCleaningSettingsScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+    <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
       <SettingsHeader title="Chapter Names" />
 
       <ScrollView
@@ -182,7 +153,7 @@ export function ChapterCleaningSettingsScreen() {
       >
         {/* Intro */}
         <View style={styles.introSection}>
-          <Text style={styles.introText}>
+          <Text style={[styles.introText, { color: colors.black }]}>
             Clean up inconsistent chapter names for a more polished listening experience. Original
             metadata is always preserved.
           </Text>
@@ -191,7 +162,7 @@ export function ChapterCleaningSettingsScreen() {
         {/* Cleaning Level Section */}
         <View style={styles.section}>
           <SectionHeader title="Cleaning Level" />
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             {LEVEL_OPTIONS.map((opt) => (
               <LevelOption
                 key={opt}
@@ -207,11 +178,11 @@ export function ChapterCleaningSettingsScreen() {
         {/* Advanced Section */}
         <View style={styles.section}>
           <SectionHeader title="Advanced" />
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             <SettingsRow
               Icon={Code}
               label="Show Original Names"
-              note="Display original metadata for debugging"
+              description="Display original metadata for debugging"
               switchValue={showOriginalNames}
               onSwitchChange={setShowOriginalNames}
             />
@@ -221,7 +192,7 @@ export function ChapterCleaningSettingsScreen() {
         {/* Before/After Examples */}
         <View style={styles.section}>
           <SectionHeader title="Example Transformations" />
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             <ExampleRow before="01 - The Great Gatsby: Chapter 1" after="Chapter 1" />
             <ExampleRow before="D01T05 - Interview With the Vampire" after="Chapter 5" />
             <ExampleRow
@@ -235,7 +206,7 @@ export function ChapterCleaningSettingsScreen() {
         {/* Info Note */}
         <View style={styles.infoSection}>
           <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, { color: colors.gray }]}>
             Changes only affect how chapters are displayed. Your server data remains unchanged.
             Based on analysis of 68,000+ real audiobook chapters.
           </Text>
@@ -252,7 +223,6 @@ export function ChapterCleaningSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.grayLight,
   },
   scrollView: {
     flex: 1,
@@ -266,23 +236,12 @@ const styles = StyleSheet.create({
   introText: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(14),
-    color: colors.black,
     lineHeight: scale(22),
   },
   section: {
     marginBottom: 28,
   },
-  sectionHeader: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    color: colors.gray,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 12,
-    paddingLeft: 4,
-  },
   sectionCard: {
-    backgroundColor: colors.white,
   },
   // Level Option
   levelOption: {
@@ -292,10 +251,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  levelOptionSelected: {
-    backgroundColor: colors.grayLight,
   },
   levelOptionLeft: {
     flexDirection: 'row',
@@ -307,19 +262,14 @@ const styles = StyleSheet.create({
     height: scale(20),
     borderRadius: scale(10),
     borderWidth: 2,
-    borderColor: colors.gray,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: scale(2),
-  },
-  radioOuterSelected: {
-    borderColor: colors.black,
   },
   radioInner: {
     width: scale(10),
     height: scale(10),
     borderRadius: scale(5),
-    backgroundColor: colors.black,
   },
   levelContent: {
     flex: 1,
@@ -334,74 +284,30 @@ const styles = StyleSheet.create({
   levelLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    color: colors.black,
   },
   levelLabelSelected: {
     fontFamily: fonts.playfair.bold,
   },
   recommendedBadge: {
-    backgroundColor: colors.grayLight,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   recommendedText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   levelDescription: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 2,
   },
   levelExample: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 4,
     fontStyle: 'italic',
-  },
-  // Settings Row
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(8),
-    backgroundColor: colors.grayLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rowContent: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 12,
-  },
-  rowLabel: {
-    fontFamily: fonts.playfair.regular,
-    fontSize: scale(15),
-    color: colors.black,
-  },
-  rowNote: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    color: colors.gray,
-    marginTop: 2,
   },
   // Example Row
   exampleRow: {
@@ -410,7 +316,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   exampleBefore: {
     flex: 1,
@@ -425,7 +330,6 @@ const styles = StyleSheet.create({
   exampleLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -433,17 +337,14 @@ const styles = StyleSheet.create({
   exampleText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
   },
   exampleTextClean: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.black,
   },
   exampleNote: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
-    color: colors.gray,
     marginTop: 2,
     fontStyle: 'italic',
   },
@@ -457,7 +358,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     flex: 1,
     lineHeight: scale(16),
   },

@@ -34,7 +34,7 @@ function useNavColors() {
 }
 
 // Design constants
-const ICON_SIZE = 20; // Slightly smaller for cleaner look
+const ICON_SIZE = 26;
 // Platform-appropriate bar heights (iOS: 49pt, Android: 56dp)
 // Using 52 as a balanced cross-platform value
 const BAR_HEIGHT = 52;
@@ -220,7 +220,7 @@ function FloatingTabBarInner() {
 
   // Hide tab bar on full-screen modal routes or when player is open
   // Return empty View on Android to prevent SafeAreaProvider crash
-  const hiddenRoutes = ['ReadingHistoryWizard', 'MoodDiscovery', 'MoodResults', 'PreferencesOnboarding'];
+  const hiddenRoutes = ['ReadingHistoryWizard', 'PreferencesOnboarding'];
   if (hiddenRoutes.includes(currentRouteName) || isPlayerVisible) {
     return Platform.OS === 'android' ? <View /> : null;
   }

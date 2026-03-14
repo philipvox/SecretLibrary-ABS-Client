@@ -34,11 +34,8 @@ import {
   Heart,
 } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale } from '@/shared/theme';
-import {
-  secretLibraryColors as colors,
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { haptics } from '@/core/native/haptics';
 import { SettingsHeader } from '../components/SettingsHeader';
 import {
@@ -84,6 +81,8 @@ function UnifiedViewRow({
   drag,
   isActive,
 }: UnifiedViewRowProps) {
+  const colors = useSecretLibraryColors();
+
   const handleToggle = useCallback(
     (newValue: boolean) => {
       haptics.selection();
@@ -108,10 +107,11 @@ function UnifiedViewRow({
   return (
     <View style={[
       styles.unifiedRow,
-      !isVisible && styles.unifiedRowDisabled,
-      isActive && styles.unifiedRowActive,
+      { backgroundColor: colors.white, borderBottomColor: colors.borderLight },
+      !isVisible && { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' },
+      isActive && { backgroundColor: colors.grayLight },
     ]}>
-      {/* Drag Handle — all items are draggable */}
+      {/* Drag Handle -- all items are draggable */}
       <TouchableOpacity
         style={styles.dragHandle}
         onLongPress={drag}
@@ -126,7 +126,11 @@ function UnifiedViewRow({
 
       {/* Left side: Icon + Label */}
       <View style={styles.rowLeft}>
-        <View style={[styles.iconContainer, !isVisible && styles.iconContainerDisabled]}>
+        <View style={[
+          styles.iconContainer,
+          { backgroundColor: colors.grayLight },
+          !isVisible && { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' },
+        ]}>
           <IconComponent
             size={scale(16)}
             color={isVisible ? colors.gray : colors.grayLine}
@@ -134,7 +138,7 @@ function UnifiedViewRow({
           />
         </View>
         <Text
-          style={[styles.rowLabel, !isVisible && styles.rowLabelDisabled]}
+          style={[styles.rowLabel, { color: colors.black }, !isVisible && { color: colors.grayLine }]}
           numberOfLines={1}
         >
           {item.label}
@@ -160,7 +164,7 @@ function UnifiedViewRow({
           ) : (
             <Circle
               size={scale(22)}
-              color={isVisible ? colors.grayLine : 'rgba(0,0,0,0.1)'}
+              color={isVisible ? colors.grayLine : colors.borderLight}
               strokeWidth={1.5}
             />
           )}
@@ -170,9 +174,9 @@ function UnifiedViewRow({
         <Switch
           value={isVisible}
           onValueChange={handleToggle}
-          trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
+          trackColor={{ false: colors.borderLight, true: colors.black }}
           thumbColor={colors.white}
-          ios_backgroundColor="rgba(0,0,0,0.1)"
+          ios_backgroundColor={colors.borderLight}
           style={styles.toggle}
         />
       </View>
@@ -185,6 +189,7 @@ function UnifiedViewRow({
 // =============================================================================
 
 export function PlaylistSettingsScreen() {
+  const colors = useSecretLibraryColors();
   const insets = useSafeAreaInsets();
 
   // Fetch playlists
@@ -328,12 +333,12 @@ export function PlaylistSettingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+      <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+        <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
         <SettingsHeader title="Homepage Settings" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.black} />
-          <Text style={styles.loadingText}>Loading views...</Text>
+          <Text style={[styles.loadingText, { color: colors.gray }]}>Loading views...</Text>
         </View>
       </View>
     );
@@ -341,33 +346,33 @@ export function PlaylistSettingsScreen() {
 
   if (error) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+      <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+        <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
         <SettingsHeader title="Homepage Settings" />
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Failed to load views</Text>
-          <Text style={styles.emptySubtext}>Please check your connection and try again</Text>
+          <Text style={[styles.emptyText, { color: colors.black }]}>Failed to load views</Text>
+          <Text style={[styles.emptySubtext, { color: colors.gray }]}>Please check your connection and try again</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+    <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
       <SettingsHeader title="Homepage Settings" />
 
       {/* Column Headers */}
       <View style={styles.headerRow}>
-        <Text style={styles.headerLabel}>View</Text>
+        <Text style={[styles.headerLabel, { color: colors.gray }]}>View</Text>
         <View style={styles.headerControls}>
-          <Text style={[styles.headerText, styles.headerDefault]}>Default</Text>
-          <Text style={[styles.headerText, styles.headerShow]}>Show</Text>
+          <Text style={[styles.headerText, styles.headerDefault, { color: colors.gray }]}>Default</Text>
+          <Text style={[styles.headerText, styles.headerShow, { color: colors.gray }]}>Show</Text>
         </View>
       </View>
 
       {/* Draggable List */}
-      <View style={styles.sectionCard}>
+      <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
         <DraggableFlatList
           data={allViewItems}
           renderItem={renderItem}
@@ -380,10 +385,10 @@ export function PlaylistSettingsScreen() {
       {/* Info Note */}
       <View style={styles.infoSection}>
         <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-        <Text style={styles.infoText}>
-          <Text style={styles.infoBold}>Default:</Text> The view shown when opening Library.{'\n'}
-          <Text style={styles.infoBold}>Drag:</Text> Long press and drag to reorder.{'\n'}
-          <Text style={styles.infoBold}>Show:</Text> Toggle visibility in the dropdown.
+        <Text style={[styles.infoText, { color: colors.gray }]}>
+          <Text style={[styles.infoBold, { color: colors.black }]}>Default:</Text> The view shown when opening Library.{'\n'}
+          <Text style={[styles.infoBold, { color: colors.black }]}>Drag:</Text> Long press and drag to reorder.{'\n'}
+          <Text style={[styles.infoBold, { color: colors.black }]}>Show:</Text> Toggle visibility in the dropdown.
         </Text>
       </View>
     </View>
@@ -397,7 +402,6 @@ export function PlaylistSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.grayLight,
   },
   scrollView: {
     flex: 1,
@@ -415,7 +419,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(12),
-    color: colors.gray,
   },
   emptyContainer: {
     flex: 1,
@@ -427,14 +430,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(20),
-    color: colors.black,
     textAlign: 'center',
     marginTop: 8,
   },
   emptySubtext: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(11),
-    color: colors.gray,
     textAlign: 'center',
   },
   // Header Row
@@ -449,7 +450,6 @@ const styles = StyleSheet.create({
   headerLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -460,7 +460,6 @@ const styles = StyleSheet.create({
   headerText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
-    color: colors.gray,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -474,7 +473,6 @@ const styles = StyleSheet.create({
   },
   // Section Card
   sectionCard: {
-    backgroundColor: colors.white,
   },
   // Unified Row
   unifiedRow: {
@@ -485,20 +483,7 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
     paddingRight: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
     minHeight: scale(56),
-    backgroundColor: colors.white,
-  },
-  unifiedRowDisabled: {
-    backgroundColor: 'rgba(0,0,0,0.02)',
-  },
-  unifiedRowActive: {
-    backgroundColor: colors.grayLight,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
   },
   dragHandle: {
     width: scale(32),
@@ -516,22 +501,14 @@ const styles = StyleSheet.create({
     width: scale(28),
     height: scale(28),
     borderRadius: scale(6),
-    backgroundColor: colors.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  iconContainerDisabled: {
-    backgroundColor: 'rgba(0,0,0,0.04)',
   },
   rowLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(14),
-    color: colors.black,
     marginLeft: 10,
     flex: 1,
-  },
-  rowLabelDisabled: {
-    color: colors.grayLine,
   },
   rowControls: {
     flexDirection: 'row',
@@ -558,12 +535,10 @@ const styles = StyleSheet.create({
   infoText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     flex: 1,
     lineHeight: scale(16),
   },
   infoBold: {
     fontFamily: fonts.jetbrainsMono.medium,
-    color: colors.black,
   },
 });

@@ -10,7 +10,7 @@
  */
 
 import React, { ReactNode, useCallback, forwardRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ViewStyle, TextInput, TextInputProps, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ViewStyle, TextInput, TextInputProps, Platform, TouchableOpacity } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -78,6 +78,8 @@ export interface TopNavSearchConfig {
   rightElement?: ReactNode;
   /** Ref for the TextInput */
   inputRef?: React.RefObject<TextInput>;
+  /** Called when clear (X) button is pressed — shown when value is non-empty */
+  onClear?: () => void;
 }
 
 export interface TopNavProps {
@@ -277,7 +279,7 @@ export function TopNav({
               borderWidth: 1,
             },
           ]}>
-            <SearchIcon color={searchPlaceholderColor} size={18} />
+            <SearchIcon color={searchPlaceholderColor} size={16} />
             <TextInput
               ref={searchBar.inputRef}
               style={[
@@ -296,6 +298,15 @@ export function TopNav({
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {searchBar.value.length > 0 && searchBar.onClear && (
+              <TouchableOpacity
+                onPress={searchBar.onClear}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ padding: 4, marginLeft: 4, backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', borderRadius: 10 }}
+              >
+                <CloseIcon color={isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)'} size={12} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -310,7 +321,7 @@ export function TopNav({
             // Determine pill styling
             const isOutline = pill.outline && !pill.active;
             const pillBgColor = pill.active ? pillActiveBg : 'transparent';
-            const pillBorder = pill.active ? pillActiveBorder : (isOutline ? colors.white : pillBorderColor);
+            const pillBorder = pill.active ? pillActiveBorder : pillBorderColor;
             const pillTextColor = pill.active ? pillActiveText : textColor;
 
             return (
@@ -414,26 +425,26 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   pill: {
-    height: 32,
-    paddingHorizontal: 14,
-    borderRadius: 16,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pillIconOnly: {
-    width: 32,
+    width: 36,
     paddingHorizontal: 0,
   },
   pillIcon: {
-    marginRight: 6,
+    marginRight: 5,
   },
   pillCloseIcon: {
-    marginLeft: 6,
+    marginLeft: 5,
   },
   pillText: {
     fontFamily: fonts.jetbrainsMono.regular,
@@ -442,27 +453,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   circleButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Inline search bar styles (single row) - pill shape with border
+  // Inline search bar styles (single row) - pill shape matching button height
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20, // Pill shape (fully rounded)
-    paddingHorizontal: 14,
-    minHeight: 40,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    height: 36,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    marginLeft: 8,
-    paddingVertical: Platform.OS === 'android' ? 6 : 0,
+    fontSize: 14,
+    marginLeft: 6,
+    paddingVertical: Platform.OS === 'android' ? 2 : 0,
     textAlignVertical: 'center',
   },
   searchInputCentered: {

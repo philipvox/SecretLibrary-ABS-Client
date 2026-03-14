@@ -18,6 +18,7 @@ import {
   Pressable,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache, useCoverUrl } from '@/core/cache';
@@ -87,6 +88,7 @@ const ListBookItem = React.memo(function ListBookItem({ item, onPress, isDark }:
           style={styles.cover}
           contentFit="cover"
         />
+        <CoverStars bookId={item.id} starSize={scale(14)} />
         <CompleteBadgeOverlay bookId={item.id} size="tiny" />
       </View>
 
@@ -297,27 +299,25 @@ export function AllBooksScreen() {
     return sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown';
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
-
+  const listHeader = useMemo(() => (
+    <>
       {/* TopNav with skull logo and integrated search bar */}
       <TopNav
         variant={isDark ? 'dark' : 'light'}
         showLogo={true}
         onLogoPress={handleLogoPress}
-        style={{ backgroundColor: colors.background.primary }}
+        style={{ backgroundColor: 'transparent' }}
         pills={[
           {
             key: 'books',
             label: 'All Books',
-            icon: <BookIcon size={10} color={colors.text.primary} />,
+            icon: <BookIcon size={13} color={colors.text.primary} />,
           },
         ]}
         circleButtons={[
           {
             key: 'back',
-            icon: <TopNavBackIcon color={colors.text.primary} size={14} />,
+            icon: <TopNavBackIcon color={colors.text.primary} size={16} />,
             onPress: handleBack,
           },
         ]}
@@ -362,6 +362,12 @@ export function AllBooksScreen() {
           ))}
         </View>
       </View>
+    </>
+  ), [isDark, colors, searchQuery, sortedBooks.length, sortBy, sortDirection, handleLogoPress, handleBack, handleSortPress]);
+
+  return (
+    <View style={[styles.container, { backgroundColor: secretLibraryColors.black }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={secretLibraryColors.black} />
 
       {/* Book List */}
       <View style={styles.listContainer}>
@@ -371,16 +377,13 @@ export function AllBooksScreen() {
             data={mounted ? sortedBooks : []}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
+            ListHeaderComponent={listHeader}
             contentContainerStyle={[styles.list, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
             showsVerticalScrollIndicator={false}
             initialNumToRender={12}
             maxToRenderPerBatch={8}
             windowSize={7}
-            getItemLayout={(data, index) => ({
-              length: 80,
-              offset: 80 * index,
-              index,
-            })}
+            getItemLayout={undefined}
           />
         </SkullRefreshControl>
 

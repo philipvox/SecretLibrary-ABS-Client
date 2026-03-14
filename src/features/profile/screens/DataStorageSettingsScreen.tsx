@@ -13,7 +13,6 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
-  Switch,
   Alert,
   ActivityIndicator,
   Modal,
@@ -22,7 +21,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
-  ChevronRight,
   Folder,
   Download,
   Wifi,
@@ -37,7 +35,7 @@ import {
   X,
   Image as ImageIcon,
   Heart,
-  type LucideIcon,
+  Library,
 } from 'lucide-react-native';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { useDownloads } from '@/core/hooks/useDownloads';
@@ -50,12 +48,12 @@ import { librarySyncService } from '@/core/services/librarySyncService';
 import { playlistsApi } from '@/core/api/endpoints/playlists';
 import { Playlist } from '@/core/types/library';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale } from '@/shared/theme';
-import {
-  secretLibraryColors as colors,
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { SettingsHeader } from '../components/SettingsHeader';
+import { SettingsRow } from '../components/SettingsRow';
+import { SectionHeader } from '../components/SectionHeader';
+import { AccordionSection } from '../components/AccordionSection';
 import { logger } from '@/shared/utils/logger';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
 
@@ -66,87 +64,6 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
-
-// =============================================================================
-// COMPONENTS
-// =============================================================================
-
-interface SettingsRowProps {
-  Icon: LucideIcon;
-  label: string;
-  value?: string;
-  onPress?: () => void;
-  switchValue?: boolean;
-  onSwitchChange?: (value: boolean) => void;
-  description?: string;
-  danger?: boolean;
-  loading?: boolean;
-}
-
-function SettingsRow({
-  Icon,
-  label,
-  value,
-  onPress,
-  switchValue,
-  onSwitchChange,
-  description,
-  danger,
-  loading,
-}: SettingsRowProps) {
-  const content = (
-    <View style={styles.settingsRow}>
-      <View style={styles.rowLeft}>
-        <View style={[styles.iconContainer, danger && styles.iconContainerDanger]}>
-          <Icon
-            size={scale(18)}
-            color={danger ? '#ff4b4b' : colors.gray}
-            strokeWidth={1.5}
-          />
-        </View>
-        <View style={styles.rowContent}>
-          <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
-          {description && <Text style={styles.rowDescription}>{description}</Text>}
-        </View>
-      </View>
-      <View style={styles.rowRight}>
-        {loading && <ActivityIndicator size="small" color={colors.gray} />}
-        {value && !loading && (
-          <Text style={[styles.rowValue, danger && styles.rowValueDanger]}>{value}</Text>
-        )}
-        {onSwitchChange !== undefined && (
-          <Switch
-            value={switchValue}
-            onValueChange={onSwitchChange}
-            trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
-            thumbColor={colors.white}
-            ios_backgroundColor="rgba(0,0,0,0.1)"
-          />
-        )}
-        {onPress && !loading && <ChevronRight size={scale(16)} color={colors.gray} strokeWidth={1.5} />}
-      </View>
-    </View>
-  );
-
-  if (onPress && !loading) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-        {content}
-      </TouchableOpacity>
-    );
-  }
-
-  return content;
-}
-
-function SectionHeader({ title, description }: { title: string; description?: string }) {
-  return (
-    <View style={styles.sectionHeaderContainer}>
-      <Text style={styles.sectionHeader}>{title}</Text>
-      {description && <Text style={styles.sectionDescription}>{description}</Text>}
-    </View>
-  );
 }
 
 // =============================================================================
@@ -173,6 +90,7 @@ function PlaylistPickerModal({
   currentPlaylistId,
 }: PlaylistPickerModalProps) {
   const insets = useSafeAreaInsets();
+  const colors = useSecretLibraryColors();
 
   const renderPlaylist = ({ item }: { item: Playlist }) => {
     const isSelected = item.id === currentPlaylistId;
@@ -184,13 +102,17 @@ function PlaylistPickerModal({
 
     return (
       <TouchableOpacity
-        style={[styles.playlistRow, isSelected && styles.playlistRowSelected]}
+        style={[
+          styles.playlistRow,
+          { borderBottomColor: colors.grayLight },
+          isSelected && { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' },
+        ]}
         onPress={() => onSelect(item)}
         activeOpacity={0.7}
       >
         <View style={styles.playlistInfo}>
-          <Text style={styles.playlistName}>{displayName}</Text>
-          <Text style={styles.playlistMeta}>{itemCount} book{itemCount !== 1 ? 's' : ''}</Text>
+          <Text style={[styles.playlistName, { color: colors.black }]}>{displayName}</Text>
+          <Text style={[styles.playlistMeta, { color: colors.gray }]}>{itemCount} book{itemCount !== 1 ? 's' : ''}</Text>
         </View>
         {isSelected && (
           <Check size={scale(18)} color={colors.black} strokeWidth={2} />
@@ -206,36 +128,36 @@ function PlaylistPickerModal({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+      <View style={[styles.modalContainer, { backgroundColor: colors.white, paddingTop: insets.top }]}>
         {/* Header */}
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Choose Playlist</Text>
+        <View style={[styles.modalHeader, { borderBottomColor: colors.grayLight }]}>
+          <Text style={[styles.modalTitle, { color: colors.black }]}>Choose Playlist</Text>
           <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
             <X size={scale(24)} color={colors.black} strokeWidth={1.5} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.modalDescription}>
+        <Text style={[styles.modalDescription, { color: colors.gray }]}>
           Select a playlist to sync with your library, or create a new one.
         </Text>
 
         {/* Create New Button */}
-        <TouchableOpacity style={styles.createNewButton} onPress={onCreateNew}>
+        <TouchableOpacity style={[styles.createNewButton, { borderBottomColor: colors.grayLight }]} onPress={onCreateNew}>
           <Plus size={scale(18)} color={colors.black} strokeWidth={1.5} />
-          <Text style={styles.createNewText}>Create New Playlist</Text>
+          <Text style={[styles.createNewText, { color: colors.black }]}>Create New Playlist</Text>
         </TouchableOpacity>
 
         {/* Playlist List */}
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.gray} />
-            <Text style={styles.loadingText}>Loading playlists...</Text>
+            <Text style={[styles.loadingText, { color: colors.gray }]}>Loading playlists...</Text>
           </View>
         ) : playlists.length === 0 ? (
           <View style={styles.emptyContainer}>
             <List size={scale(32)} color={colors.gray} strokeWidth={1.5} />
-            <Text style={styles.emptyText}>No playlists yet</Text>
-            <Text style={styles.emptySubtext}>Create one to start syncing</Text>
+            <Text style={[styles.emptyText, { color: colors.gray }]}>No playlists yet</Text>
+            <Text style={[styles.emptySubtext, { color: colors.gray }]}>Create one to start syncing</Text>
           </View>
         ) : (
           <FlatList
@@ -259,6 +181,7 @@ export function DataStorageSettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { library } = useDefaultLibrary();
+  const colors = useSecretLibraryColors();
 
   // Downloads data
   const { downloads } = useDownloads();
@@ -274,6 +197,9 @@ export function DataStorageSettingsScreen() {
 
   // Network settings
   const [wifiOnlyEnabled, setWifiOnlyEnabled] = useState(networkMonitor.isWifiOnlyEnabled());
+  const [autoDownloadSeriesEnabled, setAutoDownloadSeriesEnabled] = useState(
+    networkMonitor.isAutoDownloadSeriesEnabled()
+  );
 
   // Cloud sync
   const libraryPlaylistId = useLibrarySyncStore(s => s.libraryPlaylistId);
@@ -360,6 +286,11 @@ export function DataStorageSettingsScreen() {
       setIsRefreshingSpines(false);
     }
   }, [isRefreshingSpines, refreshCache]);
+
+  const handleAutoDownloadSeriesToggle = useCallback(async (enabled: boolean) => {
+    setAutoDownloadSeriesEnabled(enabled);
+    await networkMonitor.setAutoDownloadSeriesEnabled(enabled);
+  }, []);
 
   const handleOpenPlaylistPicker = useCallback(() => {
     loadPlaylists();
@@ -627,9 +558,18 @@ export function DataStorageSettingsScreen() {
     return new Date(lastSyncAt).toLocaleDateString();
   };
 
+  // Accordion single-open state
+  const [expandedSection, setExpandedSection] = useState<string>('downloads');
+  const toggleSection = (section: string) => {
+    setExpandedSection(prev => prev === section ? '' : section);
+  };
+
+  // Accordion status text
+  const cloudSyncStatus = isCloudSyncEnabled ? 'Synced' : 'Off';
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+    <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
       <SettingsHeader title="Data & Storage" />
 
       <ScrollView
@@ -638,168 +578,169 @@ export function DataStorageSettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Storage Overview */}
-        <View style={styles.storageOverview}>
-          <View style={styles.storageIcon}>
+        <View style={[styles.storageOverview, { backgroundColor: colors.white }]}>
+          <View style={[styles.storageIcon, { backgroundColor: colors.grayLight }]}>
             <Folder size={scale(24)} color={colors.black} strokeWidth={1.5} />
           </View>
           <View style={styles.storageInfo}>
-            <Text style={styles.storageValue}>{formatBytes(totalStorage)}</Text>
-            <Text style={styles.storageLabel}>
+            <Text style={[styles.storageValue, { color: colors.black }]}>{formatBytes(totalStorage)}</Text>
+            <Text style={[styles.storageLabel, { color: colors.gray }]}>
               {downloadCount} book{downloadCount !== 1 ? 's' : ''} downloaded
             </Text>
           </View>
         </View>
 
-        {/* Downloads Section */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Downloads"
-            description="Save books to your device so you can listen without internet"
+        {/* Downloads Accordion */}
+        <AccordionSection
+          title="Downloads"
+          status={`${downloadCount}`}
+          isExpanded={expandedSection === 'downloads'}
+          onToggle={() => toggleSection('downloads')}
+        >
+          <SettingsRow
+            Icon={Download}
+            label="View Downloaded Books"
+            value={`${downloadCount}`}
+            onPress={handleManageDownloads}
+            description="See and manage your offline books"
           />
-          <View style={styles.sectionCard}>
-            <SettingsRow
-              Icon={Download}
-              label="View Downloaded Books"
-              value={`${downloadCount}`}
-              onPress={handleManageDownloads}
-              description="See and manage your offline books"
-            />
-            <SettingsRow
-              Icon={Wifi}
-              label="Download Only on WiFi"
-              switchValue={wifiOnlyEnabled}
-              onSwitchChange={handleWifiOnlyToggle}
-              description="Saves mobile data"
-            />
-          </View>
-        </View>
+          <SettingsRow
+            Icon={Wifi}
+            label="Download Only on WiFi"
+            switchValue={wifiOnlyEnabled}
+            onSwitchChange={handleWifiOnlyToggle}
+            description="Restricts downloads to Wi-Fi networks"
+          />
+          <SettingsRow
+            Icon={Library}
+            label="Auto-Download Series"
+            switchValue={autoDownloadSeriesEnabled}
+            onSwitchChange={handleAutoDownloadSeriesToggle}
+            description="Downloads next book in series at 80%"
+          />
+        </AccordionSection>
 
-        {/* Cloud Sync Section */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Cloud Sync"
-            description="Automatically keep your library the same on all your devices"
-          />
-          <View style={styles.sectionCard}>
-            {isCloudSyncEnabled ? (
-              <>
-                <SettingsRow
-                  Icon={List}
-                  label="Synced My Library"
-                  value={linkedPlaylistName || 'Unknown'}
-                  onPress={handleOpenPlaylistPicker}
-                  description="Tap to change which playlist syncs"
-                />
-                <SettingsRow
-                  Icon={Heart}
-                  label="Synced My Series"
-                  value={linkedSeriesPlaylistName || 'Not set'}
-                  onPress={handleOpenSeriesPlaylistPicker}
-                  description="Tap to change which playlist syncs series"
-                />
-                <SettingsRow
-                  Icon={Cloud}
-                  label="Sync Status"
-                  value={formatLastSync()}
-                  description={`${libraryCount} books in library`}
-                />
-                <SettingsRow
-                  Icon={RefreshCw}
-                  label="Sync Now"
-                  onPress={handleSyncNow}
-                  loading={isSyncing}
-                  description="Upload and download library changes"
-                />
-                <SettingsRow
-                  Icon={CloudOff}
-                  label="Turn Off Cloud Sync"
-                  onPress={handleDisableCloudSync}
-                  description="Stop syncing to other devices"
-                  danger
-                />
-              </>
-            ) : (
+        {/* Cloud Sync Accordion */}
+        <AccordionSection
+          title="Cloud Sync"
+          status={cloudSyncStatus}
+          isExpanded={expandedSection === 'cloudSync'}
+          onToggle={() => toggleSection('cloudSync')}
+        >
+          {isCloudSyncEnabled ? (
+            <>
+              <SettingsRow
+                Icon={List}
+                label="Synced My Library"
+                value={linkedPlaylistName || 'Unknown'}
+                onPress={handleOpenPlaylistPicker}
+                description="Tap to change which playlist syncs"
+              />
+              <SettingsRow
+                Icon={Heart}
+                label="Synced My Series"
+                value={linkedSeriesPlaylistName || 'Not set'}
+                onPress={handleOpenSeriesPlaylistPicker}
+                description="Tap to change which playlist syncs series"
+              />
               <SettingsRow
                 Icon={Cloud}
-                label="Turn On Cloud Sync"
-                onPress={handleOpenPlaylistPicker}
-                loading={isEnablingSync}
-                description={`Sync your ${libraryCount} books across devices`}
+                label="Sync Status"
+                value={formatLastSync()}
+                description={`${libraryCount} books in library`}
               />
-            )}
-          </View>
-        </View>
-
-        {/* Troubleshooting Section */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Troubleshooting"
-            description="Having problems? These options can help fix things"
-          />
-          <View style={styles.sectionCard}>
-            <SettingsRow
-              Icon={RefreshCw}
-              label="Reload Library from Server"
-              onPress={handleReloadLibrary}
-              loading={isRefreshingCache}
-              description="Re-download your book list and covers"
-            />
-            <SettingsRow
-              Icon={ImageIcon}
-              label="Refresh Spines"
-              onPress={isRefreshingSpines ? undefined : handleRefreshSpines}
-              loading={isRefreshingSpines}
-              description="Reload spine images from server"
-            />
-            {isCloudSyncEnabled && (
               <SettingsRow
                 Icon={RefreshCw}
-                label="Reset from Server"
-                onPress={handleResetFromServer}
-                description="Replace local library with server version"
-                danger
+                label="Sync Now"
+                onPress={handleSyncNow}
                 loading={isSyncing}
+                description="Upload and download library changes"
               />
-            )}
-          </View>
-        </View>
+              <SettingsRow
+                Icon={CloudOff}
+                label="Turn Off Cloud Sync"
+                onPress={handleDisableCloudSync}
+                description="Stop syncing to other devices"
+                danger
+              />
+            </>
+          ) : (
+            <SettingsRow
+              Icon={Cloud}
+              label="Turn On Cloud Sync"
+              onPress={handleOpenPlaylistPicker}
+              loading={isEnablingSync}
+              description={`Sync your ${libraryCount} books across devices`}
+            />
+          )}
+        </AccordionSection>
 
-        {/* Clear Data Section */}
-        <View style={styles.section}>
-          <SectionHeader
-            title="Clear Data"
-            description="Remove files to free up storage space on this device"
+        {/* Troubleshooting Accordion */}
+        <AccordionSection
+          title="Troubleshooting"
+          isExpanded={expandedSection === 'troubleshooting'}
+          onToggle={() => toggleSection('troubleshooting')}
+        >
+          <SettingsRow
+            Icon={RefreshCw}
+            label="Reload Library from Server"
+            onPress={handleReloadLibrary}
+            loading={isRefreshingCache}
+            description="Re-download your book list and covers"
           />
-          <View style={styles.sectionCard}>
+          <SettingsRow
+            Icon={ImageIcon}
+            label="Refresh Spines"
+            onPress={isRefreshingSpines ? undefined : handleRefreshSpines}
+            loading={isRefreshingSpines}
+            description="Reload spine images from server"
+          />
+          {isCloudSyncEnabled && (
             <SettingsRow
-              Icon={Trash2}
-              label="Clear Temporary Files"
-              onPress={handleClearTempFiles}
-              loading={isClearingCache}
-              description="Frees space without deleting books"
-            />
-            <SettingsRow
-              Icon={Trash2}
-              label="Remove All Downloads"
-              onPress={handleRemoveAllDownloads}
-              loading={isClearingDownloads}
-              description={downloadCount > 0 ? `Delete ${downloadCount} books (${formatBytes(totalStorage)})` : 'No downloads to remove'}
+              Icon={RefreshCw}
+              label="Reset from Server"
+              onPress={handleResetFromServer}
+              description="Replace local library with server version"
               danger
+              loading={isSyncing}
             />
-            <SettingsRow
-              Icon={Trash2}
-              label="Empty My Library"
-              onPress={handleEmptyLibrary}
-              description={libraryCount > 0 ? `Remove all ${libraryCount} books from list` : 'Library is empty'}
-              danger
-            />
-          </View>
-        </View>
+          )}
+        </AccordionSection>
+
+        {/* Clear Data Accordion */}
+        <AccordionSection
+          title="Clear Data"
+          isExpanded={expandedSection === 'clearData'}
+          onToggle={() => toggleSection('clearData')}
+        >
+          <SettingsRow
+            Icon={Trash2}
+            label="Clear Temporary Files"
+            onPress={handleClearTempFiles}
+            loading={isClearingCache}
+            description="Frees space without deleting books"
+          />
+          <SettingsRow
+            Icon={Trash2}
+            label="Remove All Downloads"
+            onPress={handleRemoveAllDownloads}
+            loading={isClearingDownloads}
+            description={downloadCount > 0 ? `Delete ${downloadCount} books (${formatBytes(totalStorage)})` : 'No downloads to remove'}
+            danger
+          />
+          <SettingsRow
+            Icon={Trash2}
+            label="Empty My Library"
+            onPress={handleEmptyLibrary}
+            description={libraryCount > 0 ? `Remove all ${libraryCount} books from list` : 'Library is empty'}
+            danger
+          />
+        </AccordionSection>
 
         {/* Info Note */}
         <View style={styles.infoSection}>
           <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, { color: colors.gray }]}>
             Your listening progress is always saved to the server. Downloads and library data are stored locally on this device.
           </Text>
         </View>
@@ -837,7 +778,6 @@ export function DataStorageSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.grayLight,
   },
   scrollView: {
     flex: 1,
@@ -849,14 +789,12 @@ const styles = StyleSheet.create({
   storageOverview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
     padding: 20,
     marginBottom: 24,
   },
   storageIcon: {
     width: scale(48),
     height: scale(48),
-    backgroundColor: colors.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -866,93 +804,11 @@ const styles = StyleSheet.create({
   storageValue: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(28),
-    color: colors.black,
   },
   storageLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     marginTop: 2,
-  },
-  // Sections
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeaderContainer: {
-    marginBottom: 12,
-    paddingLeft: 4,
-  },
-  sectionHeader: {
-    fontFamily: fonts.playfair.regular,
-    fontSize: scale(16),
-    color: colors.black,
-    marginBottom: 4,
-  },
-  sectionDescription: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(11),
-    color: colors.gray,
-    lineHeight: scale(16),
-  },
-  sectionCard: {
-    backgroundColor: colors.white,
-  },
-  // Settings Row
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(8),
-    backgroundColor: colors.grayLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconContainerDanger: {
-    backgroundColor: 'rgba(255,75,75,0.1)',
-  },
-  rowContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  rowLabel: {
-    fontFamily: fonts.playfair.regular,
-    fontSize: scale(15),
-    color: colors.black,
-  },
-  rowLabelDanger: {
-    color: '#ff4b4b',
-  },
-  rowDescription: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    color: colors.gray,
-    marginTop: 2,
-  },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  rowValue: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(11),
-    color: colors.black,
-  },
-  rowValueDanger: {
-    color: colors.gray,
   },
   // Info Section
   infoSection: {
@@ -964,14 +820,12 @@ const styles = StyleSheet.create({
   infoText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     flex: 1,
     lineHeight: scale(16),
   },
   // Modal
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.white,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -980,12 +834,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.grayLight,
   },
   modalTitle: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(20),
-    color: colors.black,
   },
   modalCloseButton: {
     width: 44,
@@ -996,7 +848,6 @@ const styles = StyleSheet.create({
   modalDescription: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -1006,13 +857,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.grayLight,
     gap: 12,
   },
   createNewText: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    color: colors.black,
   },
   playlistList: {
     flex: 1,
@@ -1024,10 +873,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.grayLight,
-  },
-  playlistRowSelected: {
-    backgroundColor: 'rgba(0,0,0,0.03)',
   },
   playlistInfo: {
     flex: 1,
@@ -1035,12 +880,10 @@ const styles = StyleSheet.create({
   playlistName: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    color: colors.black,
   },
   playlistMeta: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     marginTop: 2,
   },
   loadingContainer: {
@@ -1052,7 +895,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
   },
   emptyContainer: {
     flex: 1,
@@ -1064,12 +906,10 @@ const styles = StyleSheet.create({
   emptyText: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(16),
-    color: colors.gray,
     marginTop: 8,
   },
   emptySubtext: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
   },
 });

@@ -29,6 +29,7 @@ import { BookIcon, HeartIconSvg, TopNav, TopNavSearchIcon, TopNavCloseIcon, Coll
 import * as Haptics from 'expo-haptics';
 import { useLibraryCache } from '@/core/cache';
 import { apiClient } from '@/core/api';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
@@ -287,13 +288,16 @@ export function SecretLibrarySeriesDetailScreen() {
               key={book.id}
               style={[styles.verticalListItem, { borderBottomColor: colors.grayLine }]}
               onPress={() => handleBookPress(book.id)}
-              onLongPress={() => showMenu(book)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
               delayLongPress={400}
             >
-              <Image
-                source={{ uri: coverUrl }}
-                style={styles.verticalCover}
-              />
+              <View style={{ width: scale(40), height: scale(40), borderRadius: 4, overflow: 'hidden' }}>
+                <Image
+                  source={{ uri: coverUrl }}
+                  style={styles.verticalCover}
+                />
+                <CoverStars bookId={book.id} starSize={scale(12)} />
+              </View>
               <View style={styles.verticalInfo}>
                 <Text style={[styles.verticalTitle, { color: colors.black }]} numberOfLines={1}>{title}</Text>
                 {seriesSeq !== undefined && (
@@ -346,57 +350,58 @@ export function SecretLibrarySeriesDetailScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-
-      {/* Top Navigation - stays dark */}
-      <TopNav
-        variant="dark"
-        showLogo={true}
-        onLogoPress={handleLogoPress}
-        pills={[
-          {
-            key: 'all-series',
-            label: 'All Series',
-            icon: <BookIcon size={10} color={staticColors.white} />,
-            onPress: () => navigation.navigate('SeriesList'),
-          },
-          {
-            key: 'favorite',
-            label: isFavorited ? 'Favorite' : 'Favorite',
-            active: isFavorited,
-            icon: (
-              <HeartIconSvg
-                size={10}
-                color={isFavorited ? staticColors.black : staticColors.white}
-                filled={isFavorited}
-              />
-            ),
-            onPress: handleFavoriteToggle,
-          },
-        ]}
-        circleButtons={[
-          {
-            key: 'search',
-            icon: <TopNavSearchIcon color={staticColors.white} size={14} />,
-            onPress: handleSearchPress,
-          },
-          {
-            key: 'close',
-            icon: <TopNavCloseIcon color={staticColors.white} size={14} />,
-            onPress: handleBack,
-          },
-        ]}
-      />
+    <View style={[styles.container, { backgroundColor: staticColors.black }]}>
+      <StatusBar barStyle="light-content" backgroundColor={staticColors.black} />
 
       <ScrollView
-        style={[styles.scrollView, { backgroundColor: colors.white }]}
+        style={[styles.scrollView, { backgroundColor: staticColors.black }]}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: 40 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Top Navigation - scrolls with content */}
+        <View style={{ backgroundColor: staticColors.black }}>
+          <TopNav
+            variant="dark"
+            showLogo={true}
+            onLogoPress={handleLogoPress}
+            pills={[
+              {
+                key: 'all-series',
+                label: 'All Series',
+                icon: <BookIcon size={13} color={staticColors.white} />,
+                onPress: () => navigation.navigate('SeriesList'),
+              },
+              {
+                key: 'favorite',
+                label: isFavorited ? 'Favorite' : 'Favorite',
+                active: isFavorited,
+                icon: (
+                  <HeartIconSvg
+                    size={13}
+                    color={isFavorited ? staticColors.black : staticColors.white}
+                    filled={isFavorited}
+                  />
+                ),
+                onPress: handleFavoriteToggle,
+              },
+            ]}
+            circleButtons={[
+              {
+                key: 'search',
+                icon: <TopNavSearchIcon color={staticColors.white} size={14} />,
+                onPress: handleSearchPress,
+              },
+              {
+                key: 'close',
+                icon: <TopNavCloseIcon color={staticColors.white} size={14} />,
+                onPress: handleBack,
+              },
+            ]}
+          />
+        </View>
         {/* Series Title Header */}
         <View style={styles.titleHeader}>
           <Text style={[styles.headerName, { color: colors.black }]}>{seriesInfo.name}</Text>
@@ -599,11 +604,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
   },
   titleHeader: {
     paddingTop: 16,
     paddingBottom: 20,
+    paddingHorizontal: 24,
   },
   headerName: {
     fontFamily: secretLibraryFonts.playfair.regular,
@@ -623,6 +628,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 24,
   },
   tabs: {
     flexDirection: 'row',
@@ -671,6 +677,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
@@ -737,6 +744,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
     marginTop: 20,
+    paddingHorizontal: 24,
   },
   footerText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,

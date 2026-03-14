@@ -12,14 +12,11 @@ import {
   ScrollView,
   StyleSheet,
   StatusBar,
-  TouchableOpacity,
-  Switch,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
-  ChevronRight,
   Folder,
   Download,
   Wifi,
@@ -28,7 +25,6 @@ import {
   Trash2,
   Info,
   Image as ImageIcon,
-  type LucideIcon,
 } from 'lucide-react-native';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { useDownloads } from '@/core/hooks/useDownloads';
@@ -38,12 +34,11 @@ import { networkMonitor } from '@/core/services/networkMonitor';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { imageCacheService, CacheProgress, estimateCacheSize } from '@/core/services/imageCacheService';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale } from '@/shared/theme';
-import {
-  secretLibraryColors as colors,
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { SettingsHeader } from '../components/SettingsHeader';
+import { SettingsRow } from '../components/SettingsRow';
+import { SectionHeader } from '../components/SectionHeader';
 import { logger } from '@/shared/utils/logger';
 
 // Format bytes to human readable
@@ -56,85 +51,13 @@ function formatBytes(bytes: number): string {
 }
 
 // =============================================================================
-// COMPONENTS
-// =============================================================================
-
-interface SettingsRowProps {
-  Icon: LucideIcon;
-  label: string;
-  value?: string;
-  onPress?: () => void;
-  switchValue?: boolean;
-  onSwitchChange?: (value: boolean) => void;
-  note?: string;
-  danger?: boolean;
-}
-
-function SettingsRow({
-  Icon,
-  label,
-  value,
-  onPress,
-  switchValue,
-  onSwitchChange,
-  note,
-  danger,
-}: SettingsRowProps) {
-  const content = (
-    <View style={styles.settingsRow}>
-      <View style={styles.rowLeft}>
-        <View style={[styles.iconContainer, danger && styles.iconContainerDanger]}>
-          <Icon
-            size={scale(18)}
-            color={danger ? '#ff4b4b' : colors.gray}
-            strokeWidth={1.5}
-          />
-        </View>
-        <View style={styles.rowContent}>
-          <Text style={[styles.rowLabel, danger && styles.rowLabelDanger]}>{label}</Text>
-          {note && <Text style={styles.rowNote}>{note}</Text>}
-        </View>
-      </View>
-      <View style={styles.rowRight}>
-        {value && (
-          <Text style={[styles.rowValue, danger && styles.rowValueDanger]}>{value}</Text>
-        )}
-        {onSwitchChange !== undefined && (
-          <Switch
-            value={switchValue}
-            onValueChange={onSwitchChange}
-            trackColor={{ false: 'rgba(0,0,0,0.1)', true: colors.black }}
-            thumbColor={colors.white}
-            ios_backgroundColor="rgba(0,0,0,0.1)"
-          />
-        )}
-        {onPress && <ChevronRight size={scale(16)} color={colors.gray} strokeWidth={1.5} />}
-      </View>
-    </View>
-  );
-
-  if (onPress) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-        {content}
-      </TouchableOpacity>
-    );
-  }
-
-  return content;
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return <Text style={styles.sectionHeader}>{title}</Text>;
-}
-
-// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
 export function StorageSettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const colors = useSecretLibraryColors();
 
   // Downloads data
   const { downloads } = useDownloads();
@@ -358,8 +281,8 @@ export function StorageSettingsScreen() {
   }, [libraryCount, clearAllLibrary]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.grayLight} />
+    <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
+      <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
       <SettingsHeader title="Storage" />
 
       <ScrollView
@@ -368,13 +291,13 @@ export function StorageSettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Storage Overview */}
-        <View style={styles.storageOverview}>
-          <View style={styles.storageIcon}>
+        <View style={[styles.storageOverview, { backgroundColor: colors.white }]}>
+          <View style={[styles.storageIcon, { backgroundColor: colors.grayLight }]}>
             <Folder size={scale(24)} color={colors.black} strokeWidth={1.5} />
           </View>
           <View style={styles.storageInfo}>
-            <Text style={styles.storageValue}>{formatBytes(totalStorage)}</Text>
-            <Text style={styles.storageLabel}>
+            <Text style={[styles.storageValue, { color: colors.black }]}>{formatBytes(totalStorage)}</Text>
+            <Text style={[styles.storageLabel, { color: colors.gray }]}>
               {downloadCount} downloaded book{downloadCount !== 1 ? 's' : ''}
             </Text>
           </View>
@@ -383,7 +306,7 @@ export function StorageSettingsScreen() {
         {/* Downloads Section */}
         <View style={styles.section}>
           <SectionHeader title="Downloads" />
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             <SettingsRow
               Icon={Download}
               label="Manage Downloads"
@@ -395,14 +318,14 @@ export function StorageSettingsScreen() {
               label="WiFi Only"
               switchValue={wifiOnlyEnabled}
               onSwitchChange={handleWifiOnlyToggle}
-              note="Pause downloads when not on WiFi"
+              description="Pause downloads when not on WiFi"
             />
             <SettingsRow
               Icon={Library}
               label="Auto-Download Series"
               switchValue={autoDownloadSeriesEnabled}
               onSwitchChange={handleAutoDownloadSeriesToggle}
-              note="Queue next book at 80% progress"
+              description="Queue next book at 80% progress"
             />
           </View>
         </View>
@@ -410,54 +333,37 @@ export function StorageSettingsScreen() {
         {/* Image Cache Section */}
         <View style={styles.section}>
           <SectionHeader title="Image Cache" />
-          <View style={styles.sectionCard}>
-            {/* Cache status display */}
-            <View style={styles.settingsRow}>
-              <View style={styles.rowLeft}>
-                <View style={styles.iconContainer}>
-                  <ImageIcon
-                    size={scale(18)}
-                    color={colors.gray}
-                    strokeWidth={1.5}
-                  />
-                </View>
-                <View style={styles.rowContent}>
-                  <Text style={styles.rowLabel}>Cache Status</Text>
-                  <Text style={styles.rowNote}>
-                    {isCachingImages && cacheProgress
-                      ? `${cacheProgress.phase === 'covers' ? 'Covers' : 'Spines'}: ${cacheProgress.current} / ${cacheProgress.total}`
-                      : imageCacheStatus}
-                  </Text>
-                </View>
-              </View>
-              {isCachingImages && (
-                <View style={styles.rowRight}>
-                  <Text style={[styles.rowValue, { color: colors.gold }]}>
-                    {cacheProgress?.percentComplete || 0}%
-                  </Text>
-                </View>
-              )}
-            </View>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
+            <SettingsRow
+              Icon={ImageIcon}
+              label="Cache Status"
+              description={
+                isCachingImages && cacheProgress
+                  ? `${cacheProgress.phase === 'covers' ? 'Covers' : 'Spines'}: ${cacheProgress.current} / ${cacheProgress.total}`
+                  : imageCacheStatus
+              }
+              value={isCachingImages ? `${cacheProgress?.percentComplete || 0}%` : undefined}
+            />
             <SettingsRow
               Icon={Download}
               label="Cache All Images"
               value={isCachingImages ? 'Caching...' : libraryItemCount > 0 ? estimateCacheSize(libraryItemCount).formatted : undefined}
               onPress={isCachingImages ? undefined : handleCacheAllImages}
-              note="Download all covers and spines for instant loading"
+              description="Download all covers and spines for instant loading"
             />
             <SettingsRow
               Icon={RefreshCw}
               label="Auto-Cache New Books"
               switchValue={autoCacheEnabled}
               onSwitchChange={handleAutoCacheToggle}
-              note="Automatically cache images when library syncs"
+              description="Automatically cache images when library syncs"
             />
             <SettingsRow
               Icon={Trash2}
               label="Clear Image Cache"
               value={isClearingImageCache ? 'Clearing...' : undefined}
               onPress={isClearingImageCache ? undefined : handleClearImageCache}
-              note="Remove cached cover and spine images"
+              description="Remove cached cover and spine images"
               danger
             />
           </View>
@@ -466,20 +372,20 @@ export function StorageSettingsScreen() {
         {/* Cache Section */}
         <View style={styles.section}>
           <SectionHeader title="Library Cache" />
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             <SettingsRow
               Icon={RefreshCw}
               label="Refresh Library Cache"
               value={isRefreshingCache ? 'Refreshing...' : undefined}
               onPress={handleRefreshCache}
-              note="Re-sync books and series from server"
+              description="Re-sync books and series from server"
             />
             <SettingsRow
               Icon={Trash2}
               label="Clear Cache"
               value={isClearingCache ? 'Clearing...' : undefined}
               onPress={isClearingCache ? undefined : handleClearCache}
-              note="Remove cached library data"
+              description="Remove cached library data"
               danger
             />
           </View>
@@ -488,12 +394,12 @@ export function StorageSettingsScreen() {
         {/* Danger Zone Section */}
         <View style={styles.section}>
           <SectionHeader title="Danger Zone" />
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             <SettingsRow
               Icon={Trash2}
               label="Clear My Library"
               onPress={handleClearLibrary}
-              note={`Remove all ${libraryCount} books from your library`}
+              description={`Remove all ${libraryCount} books from your library`}
               danger
             />
             <SettingsRow
@@ -501,7 +407,7 @@ export function StorageSettingsScreen() {
               label="Clear All Downloads"
               onPress={isClearingDownloads ? undefined : handleClearAllDownloads}
               value={isClearingDownloads ? 'Clearing...' : undefined}
-              note={`Free up ${formatBytes(totalStorage)}`}
+              description={`Free up ${formatBytes(totalStorage)}`}
               danger
             />
           </View>
@@ -510,7 +416,7 @@ export function StorageSettingsScreen() {
         {/* Info Note */}
         <View style={styles.infoSection}>
           <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, { color: colors.gray }]}>
             Downloads are stored locally on your device. Clearing downloads will not affect your
             listening progress, which is synced with the server.
           </Text>
@@ -527,7 +433,6 @@ export function StorageSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.grayLight,
   },
   scrollView: {
     flex: 1,
@@ -539,14 +444,12 @@ const styles = StyleSheet.create({
   storageOverview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
     padding: 20,
     marginBottom: 28,
   },
   storageIcon: {
     width: scale(48),
     height: scale(48),
-    backgroundColor: colors.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -556,86 +459,17 @@ const styles = StyleSheet.create({
   storageValue: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(28),
-    color: colors.black,
   },
   storageLabel: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
-    color: colors.gray,
     marginTop: 2,
   },
   // Sections
   section: {
     marginBottom: 28,
   },
-  sectionHeader: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    color: colors.gray,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 12,
-    paddingLeft: 4,
-  },
   sectionCard: {
-    backgroundColor: colors.white,
-  },
-  // Settings Row
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(8),
-    backgroundColor: colors.grayLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconContainerDanger: {
-    backgroundColor: 'rgba(255,75,75,0.1)',
-  },
-  rowContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  rowLabel: {
-    fontFamily: fonts.playfair.regular,
-    fontSize: scale(15),
-    color: colors.black,
-  },
-  rowLabelDanger: {
-    color: '#ff4b4b',
-  },
-  rowNote: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    color: colors.gray,
-    marginTop: 2,
-  },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  rowValue: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(11),
-    color: colors.black,
-  },
-  rowValueDanger: {
-    color: colors.gray,
   },
   // Info Section
   infoSection: {
@@ -647,7 +481,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    color: colors.gray,
     flex: 1,
     lineHeight: scale(16),
   },

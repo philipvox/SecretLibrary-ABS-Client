@@ -9,6 +9,830 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.209] - 2026-03-14
+
+### Fixed — Playback Stability (Audit Round 2)
+
+**audioService.ts:**
+- HIGH: `unloadAudio` now resets `trackEndInProgress`, `trackSwitchInProgress`, `isScrubbing`, `pendingTrackSwitch`, `pendingSeekAfterLoad` — prevents stuck flags after book switch
+- HIGH: Debounced `executeTrackSwitch` in setTimeout now has `.catch()` — prevents unhandled promise rejection crash
+- MEDIUM: `handleTrackEnd()` event listener call now has `.catch()` with `trackEndInProgress` cleanup on error
+- MEDIUM: `handleTrackEnd` preload path wrapped in try-finally for `trackSwitchInProgress` — ensures flag is always cleared
+- MEDIUM: `loadAudio` and `loadTracks` reset all scrubbing/transition flags on new load
+- MEDIUM: `loadTracks` clears stale `durationUpdateTimeout` from previous load
+- LOW: SEEK media control handler now catches rejection
+
+**automotiveService.ts:**
+- MEDIUM: `seekTo` handler uses `playerStore.play()` instead of direct `audioService.play()` — prevents isPlaying state mismatch on Android Auto
+
+**backgroundSyncService.ts:**
+- MEDIUM: `processSyncQueue` concurrency guard prevents overlapping async executions and duplicate server API calls
+- LOW: `destroy()` resets `isInitialized` so service can be re-initialized
+
+**playerStore.ts:**
+- MEDIUM: `cleanup()` stops `backgroundSyncService` sync loop to prevent orphaned sync after book unload
+
+**bufferRecoveryService.ts:**
+- MEDIUM: `checkForStall()` promise rejection now caught in setInterval callback
+
+### Files Modified
+- `src/features/player/services/audioService.ts`
+- `src/features/automotive/automotiveService.ts`
+- `src/features/player/services/backgroundSyncService.ts`
+- `src/features/player/stores/playerStore.ts`
+- `src/features/player/services/bufferRecoveryService.ts`
+- `src/constants/version.ts`
+
+---
+
+## [0.9.208] - 2026-03-12
+
+### Refactor — Procedural Spine System Cleanup
+
+Major cleanup of the book spine rendering system, removing ~1,100 lines of dead code, vestigial systems, and unused rendering paths. All books now route through the template-based renderer exclusively.
+
+**Dead code removed:**
+- `getRotationJitter()`, `getAuthorRotationDirection()` — defined but never called
+- `progressBelowContainer`, `progressBelowText` styles — never rendered
+- `imageCacheCleared` flag in spineCache — set but never read
+- Author box computation (`resolveAuthorBox`, `authorBoxBounds`) — result never consumed after composition path removal
+
+**Vestigial systems removed:**
+- `featureFlags.ts` — feature flag always returned `true`, removed all conditional branches in adapter.ts
+- `ROLLBACK_GUIDE.md` — rollback no longer applicable
+
+**Composition/solver rendering path removed:**
+- `layoutSolver.ts` (1,173 lines) — deleted entirely
+- `composition/` directory (generator.ts, index.ts, types.ts) — deleted entirely
+- ~640 lines of composition JSX rendering in BookSpineVertical.tsx
+- Helper functions: `processAuthorText()`, `getCompositionFontWeightValue()`, `applyTextCase()`
+- Composition-derived variables: `useStackedLetters`, `useStackedWords`, `compositionTitleOrientation`, etc.
+
+**Deduplicated:**
+- `getDurationScale()` — extracted to `spine/core/dimensions.ts`, removed duplicates from BookshelfView.tsx and useBookRowLayout.ts
+- `FONT_LINE_HEIGHTS` partial copy in spine/constants.ts — removed (full version in spineCalculations.ts)
+
+**Unified:**
+- Genre matching — `matchBookToTemplate()` now uses `matchBestGenre()` internally
+- All books (including genre-less) now route through template renderer via DEFAULT profile
+
+### Files Deleted
+- `src/features/home/utils/spine/featureFlags.ts`
+- `src/features/home/utils/spine/ROLLBACK_GUIDE.md`
+- `src/features/home/utils/layoutSolver.ts` (1,173 lines)
+- `src/features/home/utils/spine/composition/generator.ts`
+- `src/features/home/utils/spine/composition/index.ts`
+- `src/features/home/utils/spine/composition/types.ts`
+
+### Files Modified
+- `src/features/home/components/BookSpineVertical.tsx` — removed ~1,030 lines (dead code, composition JSX, solver integration, unused helpers)
+- `src/features/home/stores/spineCache.ts` — removed dead flags and composition generation
+- `src/features/home/hooks/useSpineCache.ts` — removed composition field
+- `src/features/home/utils/spine/adapter.ts` — removed feature flag branches and composition exports
+- `src/features/home/utils/spine/templateAdapter.ts` — unified genre matching, always-true template routing
+- `src/features/home/utils/spine/constants.ts` — removed duplicate FONT_LINE_HEIGHTS
+- `src/features/home/utils/spine/core/dimensions.ts` — added shared getDurationScale()
+- `src/features/home/components/BookshelfView.tsx` — use shared getDurationScale
+- `src/features/home/hooks/useBookRowLayout.ts` — use shared getDurationScale
+- `src/constants/version.ts` — version bump
+
+---
+
+## [0.9.207] - 2026-03-11
+
+### Added — Star Stickers on All Book Covers
+
+- **Shared `CoverStars` component** — Lightweight overlay that reads star positions from `useStarPositionStore` by bookId and renders gold star stickers at the correct positions, sized appropriately for each cover
+- **Stars everywhere** — Stars placed via double-tap on the book detail screen now appear on covers across the entire app: Browse carousels, Library lists, mini player, search results, queue, downloads, collections, series swipe, completion sheet, and hidden items
+- Star sizes scale proportionally: large covers (detail/player) use scale(28-48), medium covers (browse cards) use scale(20-24), small covers (mini player, queue, search) use scale(12-14)
+
+### Files Added
+- `src/shared/components/CoverStars.tsx` — shared star sticker overlay component
+
+### Files Modified
+- `src/shared/components/index.ts` — export CoverStars
+- Browse sections: `RecentlyAddedSection`, `ListenAgainSection`, `BecauseYouListenedSection`, `AwardWinnersSection`, `BecauseYouFinishedSeriesSection`, `FeelingResultsCarousel`, `MeaningToReadSection`, `MostCollectedAuthorSection`, `RecentSeriesSection`, `TasteTextList`, `TopPickHero`, `BrowseBookSheet`
+- Library: `AllBooksScreen`, `FilteredBooksScreen`
+- Player: `GlobalMiniPlayer`, `BookCompletionSheet`
+- Detail: `SeriesSwipeContainer`, `CollectionDetailScreen`
+- Other: `BookSimpleRow` (search), `QueueItem`, `DownloadsScreen`, `HiddenItemsScreen`
+- `src/constants/version.ts` — version bump
+
+---
+
+## [0.9.206] - 2026-03-11
+
+### Added — Continuous Mini Player → Full Player Transition
+
+- **Gesture-driven transition** — Drag up on mini player to smoothly reveal the full player; release to snap open or closed based on position/velocity
+- **Cover scale animation** — Cover image grows from 50% to 100% during the transition for a polished "expanding" effect
+- **Staggered fade-in** — Controls (byline, progress bar, buttons) fade in at 65-90% progress; TopNav fades in at 70-95%
+- **Swipe-down dismiss** — Drag down on the full player to dismiss it back to mini player
+- **Shared Reanimated value** — Both mini player and full player share a single `playerTransitionProgress` mutable value running on the UI thread for zero-lag gestures
+- **Always-rendered player** — Full player now stays mounted (off-screen at translateY=screenHeight) when a book is loaded, eliminating mount/unmount overhead
+
+### Files Added
+- `src/features/player/stores/playerTransition.ts` — shared Reanimated mutable value, spring config, snap threshold
+
+### Files Modified
+- `src/navigation/components/GlobalMiniPlayer.tsx` — pan gesture writes to shared progress, animated opacity fade-out
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` — Reanimated outer container, cover scale, controls fade-in, gesture dismiss
+- `src/features/player/stores/playerStore.ts` — togglePlayer/closePlayer animate transition progress, added setPlayerVisible
+- `src/constants/version.ts` — version bump
+
+---
+
+## [0.9.204] - 2026-03-10
+
+### Changed — Unified Display Settings Screen
+
+- **New Display Settings screen** — Consolidated Spine Appearance, Series Display, Home Screen Views, and Chapter Names into a single accordion-based settings screen
+- **Hub simplified** — Display section in ProfileScreen now links to one unified Display Settings screen instead of 3 separate screens
+- **Switch thumb color** softened from pure white to light grey (#CCCCCC) for dark mode
+
+### Files Added
+- `src/features/profile/screens/DisplaySettingsScreen.tsx`
+
+### Files Modified
+- `src/features/profile/screens/ProfileScreen.tsx` — simplified Display section to single link
+- `src/features/profile/components/SettingsRow.tsx` — switch thumb color
+- `src/features/profile/index.ts` — added DisplaySettingsScreen export
+- `src/navigation/AppNavigator.tsx` — added DisplaySettings route
+- `src/constants/version.ts` — version bump
+
+---
+
+## [0.9.203] - 2026-03-10
+
+### Changed — Settings Screens UX Overhaul
+
+- **Hub reorganization** — Renamed sections from MY STUFF/PLAYBACK/LIBRARY to PLAYBACK/DISPLAY/DATA for clearer grouping; moved Haptics to Playback, Home Screen Settings + Spine Appearance + Chapter Names to Display
+- **Removed standalone Downloads row** from hub — Downloads are accessible via Data & Storage
+- **Dynamic subtitles on all hub rows** — Home Screen Settings shows default view, Spine Appearance shows server/generated + series filter, Haptics shows "On · X of 8" count, Data & Storage shows sync status
+- **Accordion layout for Data & Storage** — 5 collapsible sections (Downloads, Cloud Sync, Image Cache, Troubleshooting, Clear Data) with single-open behavior and status text when collapsed
+- **Unified shared components** — Created `SettingsRow`, `SectionHeader`, and `AccordionSection` in `src/features/profile/components/`, replacing 7 duplicated local implementations
+- **Standardized description voice** — All toggle descriptions now use present-tense verb phrases (e.g., "Restricts downloads to Wi-Fi networks" instead of "Saves mobile data")
+- **Playback Settings header** now reads "Playback Settings" to match hub label
+- **Haptics footer note** updated to reference Taptic Engine compatibility
+
+### Files Added
+- `src/features/profile/components/SettingsRow.tsx`
+- `src/features/profile/components/SectionHeader.tsx`
+- `src/features/profile/components/AccordionSection.tsx`
+
+### Files Modified
+- `src/features/profile/components/index.ts` — exports for new shared components
+- `src/features/profile/screens/ProfileScreen.tsx` — hub reorg, dynamic subtitles, removed Downloads row
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx` — shared components, updated descriptions, header title fix
+- `src/features/profile/screens/DataStorageSettingsScreen.tsx` — accordion layout, shared components, updated descriptions
+- `src/features/profile/screens/HapticSettingsScreen.tsx` — shared components, updated footer and description
+- `src/features/profile/screens/ChapterCleaningSettingsScreen.tsx` — shared components
+- `src/features/profile/screens/StorageSettingsScreen.tsx` — shared components
+- `src/constants/version.ts` — version bump to 0.9.203
+
+---
+
+## [0.9.202] - 2026-03-10
+
+### Fixed — Dark Mode for All Settings Pages
+
+- **All settings sub-screens now respect dark mode** — Replaced static `secretLibraryColors` imports with the `useSecretLibraryColors()` hook across 10 settings screens and the shared `SettingsHeader` component
+- Colors are now reactive to theme changes: backgrounds, text, borders, switch tracks, icons, and modals all update dynamically
+- StatusBar `barStyle` toggles between `light-content` and `dark-content` based on active theme
+
+### Files Modified
+- `src/features/profile/components/SettingsHeader.tsx` — hook-based colors, dynamic header background
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx` — all color refs moved to inline styles
+- `src/features/profile/screens/DataStorageSettingsScreen.tsx` — including PlaylistPickerModal
+- `src/features/profile/screens/AboutScreen.tsx` — SkullLogo color now dynamic
+- `src/features/profile/screens/HapticSettingsScreen.tsx`
+- `src/features/profile/screens/ChapterCleaningSettingsScreen.tsx`
+- `src/features/profile/screens/PlaylistSettingsScreen.tsx`
+- `src/features/profile/screens/StorageSettingsScreen.tsx`
+- `src/features/profile/screens/KidModeSettingsScreen.tsx`
+- `src/features/profile/screens/HiddenItemsScreen.tsx`
+- `src/constants/version.ts` — bumped to 0.9.202
+
+---
+
+## [0.9.201] - 2026-03-09
+
+### Added — Settings Page Improvements
+
+- **About Screen** — New screen with app identity, version info, and open source licenses
+- **Bluetooth Auto-Resume setting** — Toggle in Playback Settings to resume on Bluetooth connect (persisted, listener is a future task)
+- **Time Display format setting** — Toggle between elapsed/remaining time in Playback Settings
+- **Dynamic subtitles on ProfileScreen** — Settings links now show live values:
+  - Playback Settings: `1.0x · 30s/15s`
+  - Haptics: `On` / `Off`
+  - Data & Storage: `3 books · 1.2 GB`
+  - Chapter Names: cleaning level label (e.g., `Standard`)
+- **Auto-Download Series** merged into Data & Storage screen from old StorageSettingsScreen
+- **Image Cache section** merged into Data & Storage screen (cache status, cache all, auto-cache, clear)
+
+### Files Modified
+- `src/features/profile/screens/AboutScreen.tsx` — new file
+- `src/features/profile/screens/ProfileScreen.tsx` — dynamic subtitles, About link
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx` — Bluetooth + Time Display sections
+- `src/features/profile/screens/DataStorageSettingsScreen.tsx` — Auto-Download Series + Image Cache
+- `src/features/player/stores/playerSettingsStore.ts` — bluetoothAutoResume + showTimeRemaining
+- `src/features/profile/index.ts` — export AboutScreen
+- `src/navigation/AppNavigator.tsx` — register About route
+- `src/constants/version.ts` — bumped to 0.9.201
+
+## [0.9.200] - 2026-03-08
+
+### Fixed — Seeking Glitch (play-stop-play stutter on skip/scrub)
+
+**Root cause:** Three issues combined to cause audio glitching when using skip forward/backward, chapter jumps, or the scrubber:
+
+1. **`seekTo()` in seekingStore never set `isSeeking = true`** — The 100ms polling in playerStore checks `seekingStore.isSeeking` to block position updates during seeks. But instant seeks (skipForward, skipBackward, jumpToChapter) called `seekTo()` which never set this flag. The polling freely overwrote position and `isPlaying` state with stale native values during the seek window, causing the play-stop-play stutter.
+
+2. **Player screen position selector read dead `isSeeking` from playerStore** — The Phase 7 refactor moved seeking state to seekingStore, but the position selector at line 317 still read `s.isSeeking` from playerStore (always `false`/`undefined`). The seek position was never displayed during seeks.
+
+3. **`handleSliderComplete` didn't await `seekTo()`** — `setScrubbing(false)` ran before the seek completed, allowing the polling to pick up the old native position and snap the UI back.
+
+**Fixes:**
+- **seekingStore.seekTo()** now wraps the seek with `isSeeking = true` before and `false` after, blocking polling during the seek window
+- **Player screen position selector** reads `isSeeking`/`seekPosition` from `useSeekingStore` instead of dead playerStore properties
+- **handleSliderComplete** awaits `seekTo()` before clearing scrubbing state
+- **Cleaned up dead seeking properties** from playerStore reset states (moved to seekingStore.resetSeekingState())
+
+### Files Modified
+- `src/features/player/stores/seekingStore.ts` — wrap seekTo with isSeeking protection
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` — fix position selector, await seekTo in slider complete
+- `src/features/player/stores/playerStore.ts` — remove dead isSeeking/seekPosition properties, delegate to seekingStore
+- `src/constants/version.ts` — bumped to 0.9.200
+
+## [0.9.199] - 2026-03-08
+
+### Fixed — My Library "Last Played" Sort + Missing Books
+
+**Root cause:** Two issues caused the app's library to show different/fewer books than the ABS server:
+
+1. **progressStore never reloaded after server sync** — During app startup, `loadFromDatabase()` runs first (populating the in-memory Map), then `importRecentProgress()` and `importFromServer()` write new server data to SQLite — but progressStore was never reloaded. Books played via web UI or other clients were in SQLite but invisible to the app.
+
+2. **Inconsistent `lastPlayedAt` timestamps** — Each of the 4 book collections (downloaded, in-progress, favorited, finished) used different timestamp sources, causing incorrect sort order.
+
+**Fixes:**
+- **Reload progressStore after server sync** — `syncRecentProgress()` and `importFromServer()` now call `loadFromDatabase()` after writing to SQLite, so the in-memory Map matches the server
+- **Unified `getLastPlayedAt()` resolver** — all collections use the same priority: progressStore (real-time) → SQLite → server API
+- **Finished books in All tab** — `markedFinishedBooks` merged into `allLibraryBooks` union
+- **progressStore fallback** — catches books in the timing gap between auto-finish and React Query refresh
+- **Dedup prefers most recent** — when a book appears in multiple sources, the entry with the newest `lastPlayedAt` wins
+
+### Files Modified
+- `src/core/services/appInitializer.ts` — reload progressStore after `syncRecentProgress()` and `importFromServer()`
+- `src/features/library/hooks/useLibraryData.ts` — unified `getLastPlayedAt()`, progressStore as primary source, markedFinishedBooks in union, fallback loop
+- `src/constants/version.ts` — bumped to 0.9.199
+
+## [0.9.197] - 2026-03-08
+
+### Added — Double-Tap Cover Art to Skip
+
+- **Double-tap left half of cover** → rewind (same interval as skip back button)
+- **Double-tap right half of cover** → fast-forward (same interval as skip forward button)
+- Uses the existing delta popup overlay to show the time jump (+30s / -30s)
+- Haptic feedback on double-tap (same as skip buttons)
+- Single taps are ignored (no accidental skips)
+
+### Files Modified
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` — added double-tap handler on cover Pressable
+- `src/constants/version.ts` — bumped to 0.9.197
+
+## [0.9.196] - 2026-03-08
+
+### Added — Mood Chips Filter Entire Page + New Releases Section
+
+- **Mood chips now filter all sections** — tapping "THRILLING" filters the Hero, BecauseYouFinished, MoreToRead, WhatsTheVibe, MeaningToRead, NewToLibrary, NewReleases, and all other sections to only show thrilling books. Tap again to deselect and see everything.
+  - `BrowseContent` reads `activeChip` from `feelingChipStore` and applies `filterByFeeling()` as a layer on `filteredItems` → `displayItems`
+  - `LibraryMoodChips` receives the unfiltered `filteredItems` for accurate counts
+  - All other sections receive `displayItems` (mood-filtered when active)
+- **New "New Releases" section** — horizontal cover cards sorted by publication date (`publishedYear`/`publishedDate`), showing newest publications first
+  - Reuses `RecentlyAddedSection` with new `sortBy="published"` prop
+  - Books without a publication year are excluded from this view
+  - Appears between "New To Library" and "Featured Collection"
+
+### Files Modified
+- `src/features/browse/components/BrowseContent.tsx` — mood filter layer, added New Releases section
+- `src/features/browse/components/LibraryMoodChips.tsx` — simplified (filtering now in BrowseContent)
+- `src/features/browse/components/RecentlyAddedSection.tsx` — added `sortBy` prop ('added' | 'published')
+- `src/constants/version.ts` — bumped to 0.9.196
+
+## [0.9.195] - 2026-03-08
+
+### Fixed — Don't Recommend Mid-Series Books
+
+- **Series entry point filter** — both "Because You Finished" and "More To Read" sections now check if a book is part of a series before recommending it:
+  - **Book 1 / standalone**: always safe to recommend
+  - **Book 2+**: only recommended if user has read all preceding books in the series (>5% progress or finished)
+  - **No sequence info**: allowed through (can't determine position)
+- Builds a series index (`seriesName → sequence# → bookId`) from `BookMetadata.series[].sequence` field
+- Applied to both `useRecentlyCompletedSeries` (DNA-matched recs) and `MostCollectedAuthorSection` (unread author books)
+
+### Files Modified
+- `src/features/browse/hooks/useRecentlyCompletedSeries.ts` — added `isSeriesEntryPoint()` filter in candidate loop
+- `src/features/browse/components/MostCollectedAuthorSection.tsx` — added same filter for unread books per author
+- `src/constants/version.ts` — bumped to 0.9.195
+
+## [0.9.194] - 2026-03-08
+
+### Improved — DNA-Aware Series Recommendations
+
+- **"Because You Finished" now uses BookDNA for matching** — when DNA tags exist on the series' books, recommendations are scored using:
+  - **Mood scores** (thrills, drama, laughs, wonder, heart, ideas) — weighted 40%
+  - **Spectrum alignment** (dark↔light, serious↔humorous, dense↔accessible, plot↔character, bleak↔hopeful) — weighted 25%
+  - **Shared tropes** (found-family, enemies-to-lovers, etc.) — weighted 15%
+  - **Shared themes** (identity, grief, redemption, etc.) — weighted 15%
+  - **Pacing match** (slow, moderate, fast) — weighted 5%
+- **Builds an averaged DNA profile** from all books in the completed series, then scores every candidate book against that profile
+- **Falls back to genre matching** for books without DNA tags (requires 2+ specific genre matches, excludes broad genres like "Fiction")
+- DNA-matched books rank higher than genre-only matches (0.2 base for genre-only vs up to 1.0 for DNA)
+
+### Files Modified
+- `src/features/browse/hooks/useRecentlyCompletedSeries.ts` — complete rewrite with DNA matching
+- `src/constants/version.ts` — bumped to 0.9.194
+
+## [0.9.193] - 2026-03-08
+
+### Fixed — Kids Series Filtering + Matching Spine Sizes
+
+- **"Because You Finished" now excludes kids series** — rewrote `useRecentlyCompletedSeries` to derive series from `filteredItems` instead of `seriesMap`. Since kids books are already filtered out of `filteredItems` in 'all' mode, kids series like Magic Tree House won't appear as the seed series.
+- **Matched spine row sizes** — both `BecauseYouFinishedSeriesSection` and `MostCollectedAuthorSection` now use `COMPACT_SCALE = 0.3` (was 0.65 for BecauseYouFinished)
+- **Faster rendering** — `useRecentlyCompletedSeries` switched from `InteractionManager` + `useState/useEffect` to synchronous `useMemo`
+
+### Files Modified
+- `src/features/browse/hooks/useRecentlyCompletedSeries.ts` — rewrite: derive series from filteredItems, useMemo
+- `src/features/browse/components/BecauseYouFinishedSeriesSection.tsx` — COMPACT_SCALE 0.65 → 0.3
+- `src/constants/version.ts` — bumped to 0.9.193
+
+## [0.9.192] - 2026-03-08
+
+### Changed — "More To Read" Section + Meaning To Read Fix
+
+- **Replaced "Most Collected Author" with "More To Read"** — now finds authors where user has read/started some books but has unread books remaining (progress-aware via `progressStore`)
+  - Shows only the author's **unread** books as spines (not all books)
+  - Label: "X of Y read" · Heading: "More [Author Name]"
+  - Session-rotates among top 3 qualifying authors
+  - Requires author to have 3+ books, user to have read 1+, and 2+ unread remaining
+- **Reduced spine scale to ~1/4 size** — `COMPACT_SCALE` from 0.65 → 0.3 for compact display
+- **Kids authors/series naturally excluded** — section now derives from `filteredItems` (which already excludes kids content in 'all' mode) instead of the unfiltered `authorsMap`
+- **Fixed MeaningToRead not showing** — replaced `InteractionManager.runAfterInteractions` + `useState/useEffect` with synchronous `useMemo` so section renders immediately instead of waiting for interaction queue
+
+### Files Modified
+- `src/features/browse/components/MostCollectedAuthorSection.tsx` — complete rewrite: progress-aware "More To Read", 1/4 scale, derives from filteredItems
+- `src/features/browse/hooks/useMeaningToRead.ts` — switched from InteractionManager to useMemo
+- `src/features/browse/components/BrowseContent.tsx` — pass `filteredItems` to MostCollectedAuthorSection, remove unused imports
+- `src/constants/version.ts` — bumped to 0.9.192
+
+## [0.9.191] - 2026-03-08
+
+### Fixed — "Meaning To Read" Now Uses User's Library, Not Full Catalog
+
+- **Rewrote `useMeaningToRead` hook** — now reads from `progressStore.progressMap` (user's actual library) instead of scanning the full server library
+- **Two categories of books shown**:
+  1. **Abandoned**: started (>1% progress) but not played in 30+ days → label: "X% · STALLED"
+  2. **Unstarted**: explicitly in library (`isInLibrary=true`) but never opened, added 30+ days ago → label: "ADDED X MO AGO"
+- Abandoned books sort first (they had intent), then unstarted, both oldest first
+- Threshold reduced from 60 days to 30 days for both categories
+- Minimum to show section reduced from 3 to 2 books
+- Cards now show contextual status: "12% · STALLED" for abandoned, "ADDED 6 MO AGO" for unstarted
+
+### Files Modified
+- `src/features/browse/hooks/useMeaningToRead.ts` — complete rewrite using progressStore
+- `src/features/browse/components/MeaningToReadSection.tsx` — cards read progress for contextual labels
+- `src/constants/version.ts` — bumped to 0.9.191
+
+## [0.9.190] - 2026-03-08
+
+### Changed — Exclude Kids Content from Default Browse
+
+- **`filterByAudience`** — when audience is `'all'`, kids content (`isKidsContent()`) is now excluded
+- Kids books (for-kids tag, age-childrens, age-rec <= 12, rated-g/pg) only appear when audience is explicitly set to `'kids'`
+- Prevents children's books (Magic Tree House, etc.) from mixing with adult fiction in Browse, series shelves, mood chips, recommendations
+- No change to `'kids'` mode (still shows only kids content) or `'adults'` mode (still shows adult/teen only)
+
+### Files Modified
+- `src/features/browse/stores/contentFilterStore.ts` — added `isKidsContent()` exclusion in `'all'` audience path
+- `src/constants/version.ts` — bumped to 0.9.190
+
+## [0.9.189] - 2026-03-08
+
+### Changed — Unified Browse Page (Tab Merge)
+
+- **Removed three-tab architecture** — FOR YOU, DISCOVER, and CURATED merged into one continuous scroll
+- **Removed tab bar** from BrowseTopNav (logo + tag filter + close only)
+- **New `BrowseContent` component** — single unified scroll with all sections:
+  1. Hidden Gem Hero (from Discover)
+  2. ActionNeeded series gap alerts (from For You)
+  3. Because You Finished [Series] spine row (from For You)
+  4. Most Collected Author spine row (from For You)
+  5. Library Mood Chips horizontal scroll (from For You)
+  6. What's The Vibe cards (from Discover)
+  7. Meaning To Read cards (from For You)
+  8. New To Library covers (from Discover)
+  9. Featured Collection mosaic + Award Winners (from Curated)
+  10. Browse Grid (from Discover)
+  11. Stat line footer
+- **Removed**: browseTabStore usage from screen, ForYouTabContent/DiscoverTabContent/CollectionsTabContent no longer mounted conditionally
+- **Kept**: Series completion shelves and TopAuthorsCloud removed from the unified page (were deep in Curated, not "top section")
+
+### Files Modified
+- `src/features/browse/components/BrowseContent.tsx` — **New** unified content component
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` — removed tab switching, uses BrowseContent
+- `src/features/browse/components/BrowseTopNav.tsx` — removed tab pills, simplified to logo + buttons
+- `src/constants/version.ts` — bumped to 0.9.189
+
+## [0.9.188] - 2026-03-08
+
+### Fixed — Browse Screen Typography & Layout Polish
+
+- **Typography consistency** — enforced two-level system everywhere: caps monospace LABEL above, serif bold HEADING below
+  - `RecentlyAddedSection` — replaced custom header with `SectionHeader` component
+  - `SeriesCompletionShelf` — replaced custom header with `SectionHeader` (label: "X OF Y BOOKS", heading: series name in serif bold)
+  - `WhatsTheVibeSection` — replaced custom header with `SectionHeader`
+  - `BrowseGrid` — replaced custom header with `SectionHeader`
+  - `FeaturedCollectionCard` — added "FEATURED COLLECTION" caps monospace label above card in CollectionsTabContent
+- **LibraryMoodChips** — changed from wrapping layout (ragged orphan problem) to single-row horizontal scroll with live counts
+- **MeaningToReadSection** — reduced card height (cover 55% ratio instead of 70%), changed title from serif to caps monospace, tightened all text sizes
+- **ActionNeeded visibility** — removed InteractionManager delay so series gap alerts appear immediately (above the fold, first section)
+- **Bottom padding** — increased from 80 to 180 across all three tabs to prevent mini player from eating content
+- Cleaned up unused imports in BrowseGrid, WhatsTheVibeSection
+
+### Files Modified
+- `src/features/browse/components/LibraryMoodChips.tsx` — horizontal scroll
+- `src/features/browse/components/MeaningToReadSection.tsx` — compact cards, caps mono typography
+- `src/features/browse/components/RecentlyAddedSection.tsx` — SectionHeader
+- `src/features/browse/components/SeriesCompletionShelf.tsx` — SectionHeader with two-level pattern
+- `src/features/browse/components/WhatsTheVibeSection.tsx` — SectionHeader
+- `src/features/browse/components/BrowseGrid.tsx` — SectionHeader
+- `src/features/browse/components/FeaturedCollectionCard.tsx` — removed top margin (SectionHeader handles spacing)
+- `src/features/browse/components/CollectionsTabContent.tsx` — added SectionHeader before FeaturedCollectionCard
+- `src/features/browse/components/ForYouTabContent.tsx` — increased bottom clearance
+- `src/features/browse/components/DiscoverTabContent.tsx` — increased bottom clearance
+- `src/features/browse/hooks/useSeriesGaps.ts` — synchronous useMemo (no InteractionManager), removed missing<=5 limit
+- `src/constants/version.ts` — bumped to 0.9.188
+
+## [0.9.187] - 2026-03-08
+
+### Changed — Browse Screen Three-Tab Redesign
+
+- **FOR YOU tab** — replaced generic sections with personalized library analysis:
+  - `ActionNeededSection` — series gap alerts (max 2 items, white left border, shows missing book count)
+  - `BecauseYouFinishedSeriesSection` — spine row of genre-matched recommendations from completed series
+  - `MostCollectedAuthorSection` — session-rotating author spine row (top 3 authors by book count)
+  - `LibraryMoodChips` — wrapping mood chips derived from library metadata (10+ books threshold)
+  - `MeaningToReadSection` — unstarted books added 60+ days ago with "ADDED X MONTHS AGO" labels
+- **DISCOVER tab** — replaced FeelingChips with `MoodChipsRow` (horizontal scroll, navigates to filtered results); kept TopPickHero, WhatsTheVibe, RecentlyAdded (covers mode), BrowseGrid
+- **CURATED tab** — replaced CollectionsSection with `AwardWinnersSection` (horizontal cover cards with book count badges); replaced AuthorsTextList with `TopAuthorsCloud` (tag cloud with varying font sizes); series shelves sorted by completion % desc
+- **No gold accent** — all gold (#F3B60C) replaced with white/black accents across TagFilterSheet (badges, checkmarks, counts) and all new components
+- **SectionHeader** — standardized section header component used by all new sections (caps monospace label, optional serif bold heading, count, VIEW ALL)
+
+### New Hooks
+- `useSeriesGaps` — detects series with missing books based on sequence numbers
+- `useRecentlyCompletedSeries` — finds most recently completed series for "Because You Finished" section
+- `useLibraryMoods` — scans library items with scoreFeelingChip(), returns moods with 10+ matches
+- `useMeaningToRead` — finds unstarted books added 60+ days ago
+
+### Removed from tabs (components still exist for potential future use)
+- `BecauseYouListenedSection` — removed from FOR YOU
+- `ListenAgainSection` — removed from FOR YOU
+- `AuthorsTextList` — removed from FOR YOU and CURATED (replaced by TopAuthorsCloud)
+- `RecentSeriesSection` — removed from FOR YOU
+- `TopPickHero` — removed from FOR YOU (kept in DISCOVER)
+- `FeelingChips` + `FeelingResultsCarousel` — removed from DISCOVER (replaced by MoodChipsRow)
+- `CollectionsSection` — removed from CURATED (replaced by AwardWinnersSection)
+
+### Files Modified
+- `src/features/browse/components/ForYouTabContent.tsx` — complete rewrite
+- `src/features/browse/components/DiscoverTabContent.tsx` — rewrite with MoodChipsRow
+- `src/features/browse/components/CollectionsTabContent.tsx` — rewrite with AwardWinners + TopAuthorsCloud
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` — updated props, added handleMoodPress
+- `src/features/browse/components/TagFilterSheet.tsx` — removed gold accent colors
+- `src/constants/version.ts` — v0.9.187
+
+### New Files
+- `src/features/browse/components/SectionHeader.tsx`
+- `src/features/browse/components/ActionNeededSection.tsx`
+- `src/features/browse/components/BecauseYouFinishedSeriesSection.tsx`
+- `src/features/browse/components/MostCollectedAuthorSection.tsx`
+- `src/features/browse/components/LibraryMoodChips.tsx`
+- `src/features/browse/components/MoodChipsRow.tsx`
+- `src/features/browse/components/MeaningToReadSection.tsx`
+- `src/features/browse/components/AwardWinnersSection.tsx`
+- `src/features/browse/components/TopAuthorsCloud.tsx`
+- `src/features/browse/hooks/useSeriesGaps.ts`
+- `src/features/browse/hooks/useRecentlyCompletedSeries.ts`
+- `src/features/browse/hooks/useLibraryMoods.ts`
+- `src/features/browse/hooks/useMeaningToRead.ts`
+
+---
+
+## [0.9.186] - 2026-03-08
+
+### Changed — NN/g Filter UX Principles
+
+- **Accordion collapse** — Genres and Tags sections show first 8 items by default with "SHOW ALL (N MORE)" / "SHOW LESS" toggle; auto-expands if user has selections beyond the preview window
+- **Genres alphabetical** — sorted A-Z since users know genre names; tags remain sorted by frequency for discovery
+- **Section badges** — gold count badge on section header showing how many filters are active in that section
+- **Tappable section headers** — chevron on section header to expand/collapse, consistent with Length accordion
+- **Extracted FilterSection component** — reusable collapsible list with preview count, checkmarks, counts, and expand toggle
+
+### Files Modified
+- `src/features/browse/components/TagFilterSheet.tsx` — extracted `FilterSection` component with accordion logic
+- `src/features/browse/hooks/useDynamicFilters.ts` — genres alphabetical sort, tags frequency sort
+- `src/constants/version.ts` — v0.9.186
+
+---
+
+## [0.9.185] - 2026-03-08
+
+### Fixed — Filter Sheet Visual Polish
+
+- **Chip grid → full-width list** — genres and tags now render as full-width rows (name left, count right in amber) with hairline dividers; eliminates orphaned single-chip rows from ragged wrapping
+- **All-caps typography** — header "FILTERS", "LENGTH", section headers, audience pills, all labels and counts now consistently uppercase JetBrains Mono throughout
+- **Audience pills** — replaced bordered segmented control with pill track matching BrowseTopNav style (filled black active pill on gray track)
+- **Full-width DONE button** — replaced small floating pill with full-width black button spanning the bottom of the sheet
+- **Gold accent counts** — book counts in amber (#F3B60C) for visual hierarchy; gold checkmark circle on selected rows
+
+### Files Modified
+- `src/features/browse/components/TagFilterSheet.tsx` — full rewrite of layout, typography, and interactions
+- `src/constants/version.ts` — v0.9.185
+
+---
+
+## [0.9.184] - 2026-03-08
+
+### Changed — Dynamic Filter Categories from Library Data
+
+- **Dynamic genres & tags** — filter sheet now scans library items and shows actual genres (from metadata) and tags (from DNA tags) with book counts, instead of 7 hardcoded category tabs with static lists
+- **Genre filtering** — new `selectedGenres` state in content filter store; genres use OR logic matching like tags
+- **System tags excluded** — `dna:*`, `age-*`, `rated-*`, `for-kids`, `not-for-kids` hidden from tag filter chips
+- **Removed 40+ icon imports** — TagFilterSheet no longer maps individual icons per tag; chips show `Label (count)` text only
+- **Filter count includes genres** — TopNav badge and Done button count now reflect genres + tags + length + audience
+
+### Files Modified
+- `src/features/browse/hooks/useDynamicFilters.ts` — **new** hook scanning library for unique tags/genres with counts
+- `src/features/browse/stores/contentFilterStore.ts` — removed `TAG_CATEGORIES`/`TagCategory`, added `selectedGenres`, `toggleGenre`, `matchesSelectedGenres`, updated `filterByAudience`
+- `src/features/browse/components/TagFilterSheet.tsx` — rewritten: dynamic Genres + Tags sections with count chips
+- `src/features/browse/hooks/useBrowseLibrary.ts` — passes `selectedGenres` to `filterByAudience`
+- `src/features/browse/components/RecentSeriesSection.tsx` — passes `selectedGenres` to `filterByAudience`
+- `src/features/browse/components/BrowseTopNav.tsx` — includes `selectedGenres` in filter count
+- `src/constants/version.ts` — v0.9.184
+
+---
+
+## [0.9.183] - 2026-03-07
+
+### Changed — Content Dropdown + Playlist Picker Polish
+
+- **Content dropdown redesign** — removed "VIEW" label, removed dividers, tighter row height, book counts per row, gold accent checkmark for active item
+- **Sync moved to dropdown** — sync button removed from TopNav hero, added as pinned "Sync Library" action at bottom of content dropdown
+- **Playlist picker (context menu)** — removed icon boxes, inline book count, tighter rows, JetBrains Mono throughout, gold checkmark for active, pinned "+ New Playlist" at bottom with hairline separator
+- **Active pill states** — content and sort pills only show active (filled) when dropdown is open, not always
+- **SortArrow color fix** — arrow now properly inverts when pill is active vs inactive
+
+### Files Modified
+- `src/features/home/screens/LibraryScreen.tsx` — content dropdown redesign, sync moved, contentCounts memo, active pill toggle
+- `src/shared/components/BookContextMenu.tsx` — playlist picker redesign
+- `src/constants/version.ts` — v0.9.183
+
+---
+
+## [0.9.182] - 2026-03-07
+
+### Changed — Context Menu Redesign + TopNav Polish
+
+- **BookContextMenu: 3-tier visual hierarchy** — Play (solid white CTA), toggles (white filled circles when active), navigation rows (text + chevron)
+- **BookContextMenu: editorial voice** — all labels use JetBrains Mono uppercase, consistent with BookDetail metadata grid
+- **BookContextMenu: navigation rows** — Details, Series, Author, Playlist pulled out of icon grid into iOS-style text rows with chevrons
+- **BookContextMenu: high contrast** — white/black palette replaces gold accent for premium feel
+- **TopNav: smaller pills** — height 32→28, font scale(10)→scale(9), tighter padding for better fit
+- **TopNav: smaller circle buttons** — 32→28px to match pill height
+- **Sort pill in hero** — moved into TopNav with bold chevron arrow icon (SortArrow SVG)
+- **Sync as circle button** — refresh icon only, with toast notifications (Syncing/Synced/Failed)
+- **Download filter toggle removed** — simplified UI
+- **Active pill states** — content and sort pills show filled/active state for clear user feedback
+- **SortArrow color fix** — arrow now uses correct text color on active pill (was invisible)
+
+### Files Modified
+- `src/shared/components/BookContextMenu.tsx` — full rewrite: 3-tier hierarchy, white/black palette, nav rows
+- `src/shared/components/TopNav.tsx` — smaller pills (28px), tighter gap
+- `src/features/home/screens/LibraryScreen.tsx` — sort pill in TopNav, sync icon button, SortArrow SVG, removed download toggle
+- `src/constants/version.ts` — v0.9.182
+
+---
+
+## [0.9.181] - 2026-03-07
+
+### Changed — BookContextMenu Grid Polish + UI Tweaks
+
+- **BookContextMenu: clean 3×2 grid** — reorganized to 3 items per row (Queue, Save, Download / Details, Series|Author, Finished)
+- **BookContextMenu: visual state differentiation** — Save uses filled accent background when active; Queue uses outline accent. Different visual treatments for different states
+- **BookContextMenu: dismiss X** — added X button in header for explicit close
+- **BookContextMenu: divider** — thin separator between action grid and Play button
+- **BookContextMenu: larger Play** — increased Play icon and text size
+- **BookContextMenu: Author action** — falls back to Author when no Series available, navigates to AuthorDetail
+- **BookContextMenu: Playlist** — shown when Details is not available; playlist context shows Remove in separate row
+- **LibraryScreen sort** — "Recent" renamed to "Last Played", added "Added" sort, same-sort tap toggles direction with arrow indicator
+- **TopNav** — content mode as pill, "Sync" → "Refresh", download filter as cycling icon with toast notification
+- **Toast redesign** — narrow centered pill style matching nav pills (JetBrains Mono, uppercase, 32px height)
+- **Sort persistence** — My Library sort survives app restarts; sort doesn't leak between My Library and My Series
+
+### Files Modified
+- `src/shared/components/BookContextMenu.tsx` — 3×2 grid, filled prop, dismiss X, divider, author action, larger Play
+- `src/shared/components/ToastContainer.tsx` — narrow pill redesign
+- `src/shared/components/TopNav.tsx` — pill border consistency
+- `src/features/home/screens/LibraryScreen.tsx` — sort rework, download toggle, tap→context menu
+- `src/features/library/screens/MyLibraryScreen.tsx` — tap→context menu, persisted sort
+- `src/features/library/stores/libraryViewStore.ts` — **new** persisted sort store
+- `src/features/library/screens/FilteredBooksScreen.tsx` — default to shelf view
+- `src/constants/version.ts` — v0.9.181
+
+---
+
+## [0.9.179] - 2026-03-06
+
+### Changed — Browse Polish: Unified Detail Pages + VibeCard Redesign
+
+- **Unified FilteredBooksScreen** — all filter types now use the SeriesDetail-style dark layout (large Playfair title, filter tabs, shelf/book toggle)
+- **Added** `'similar'` filter type to FilteredBooksScreen — "Because You Listened To" View More pages
+- **Added** `'all_books'` filter type to FilteredBooksScreen — replaces old AllBooksScreen
+- **Redesigned BecauseYouListenedSection** — 2×2 grid layout (4 books) replacing horizontal scroll; "View More" navigates to FilteredBooksScreen
+- **Redesigned VibeCard** — wider cards (68% screen width), larger covers (`scale(42)`), Playfair serif text, chevron indicator
+- **Updated** "View All Books" to navigate to FilteredBooksScreen instead of AllBooksScreen
+- **Cleaned up** FilteredBooksScreen — removed dead code (alphabet scrubber, viewport prefetch, sort UI, FlatList rendering)
+
+### Files Modified
+- `src/features/library/screens/FilteredBooksScreen.tsx` — major cleanup, unified layout
+- `src/features/browse/components/BecauseYouListenedSection.tsx` — 2×2 grid redesign
+- `src/features/browse/components/VibeCard.tsx` — wider, more impactful design
+- `src/features/browse/components/WhatsTheVibeSection.tsx` — spacing adjustments
+- `src/features/browse/components/ForYouTabContent.tsx` — added onSimilarViewMore prop
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx` — handleSimilarViewMore, handleViewAllBooks → FilteredBooks
+- `src/constants/version.ts` — v0.9.179
+
+---
+
+## [0.9.178] - 2026-03-06
+
+### Changed — Browse Page Three-Tab Redesign
+
+- **Restructured** Browse into three tabs: For You, Discover, Collections
+- **Added** `browseTabStore` — persisted Zustand store for active tab selection
+- **Added** `BrowseTabBar` — three-tab navigation below BrowseTopNav
+- **Added** `ForYouTabContent` — personalized sections (TopPickHero, BecauseYouListened ×3, RecentlyAdded, ListenAgain, RecentSeries, AuthorsTextList)
+- **Added** `DiscoverTabContent` — mood-based exploration with FeelingChips, filtered results carousel, BrowseGrid, Hidden Gem hero, WhatsTheVibe, New To Library
+- **Added** `CollectionsTabContent` — FeaturedCollectionCard, CollectionsSection, SeriesCompletionShelf ×5, AuthorsTextList
+- **Added** `FeelingChips` — 2×4 grid of mood-based filter chips (Thrilling, Funny, Dark, Heartwarming, Escapist, Thought-Provoking, Cozy, Intense)
+- **Added** `feelingChipStore` — ephemeral Zustand store for chip selection
+- **Added** `feelingScoring.ts` — BookDNA-based scoring for feeling chips (mood scores, spectrum values, genres, tags)
+- **Added** `FeelingResultsCarousel` — horizontal carousel of books matching active feeling chip
+- **Added** `FeaturedCollectionCard` — full-width featured collection with cover mosaic
+- **Added** `SeriesCompletionShelf` — horizontal carousel with completion status dots (green/gold/gray)
+- **Added** `BrowseBookSheet` — bottom sheet on book tap in Browse (Play, Download, Details actions)
+- **Updated** `TopPickHero` — added `variant` prop (forYou/discover); removed vibeStore dependency
+- **Updated** `VibeCard` — added mini cover thumbnails (3 per card)
+- **Updated** `WhatsTheVibeSection` — collects book IDs for vibe card thumbnails
+- **Updated** `RecentlyAddedSection` — added optional `title` prop
+- **Updated** `CollectionsSection` — added `skipFirst` prop
+- **Updated** `BookSpineVertical` — visual states: 40% opacity for unlistened, gold dot for in-progress
+- **Deleted** `vibeStore.ts` — replaced by feelingChipStore
+- **Deleted** `VibeSliders.tsx` — replaced by FeelingChips
+- **Changed** Browse book tap behavior — opens BrowseBookSheet instead of navigating to BookDetail
+
+### Files Created
+- `src/features/browse/stores/browseTabStore.ts`
+- `src/features/browse/stores/feelingChipStore.ts`
+- `src/features/browse/components/BrowseTabBar.tsx`
+- `src/features/browse/components/ForYouTabContent.tsx`
+- `src/features/browse/components/DiscoverTabContent.tsx`
+- `src/features/browse/components/CollectionsTabContent.tsx`
+- `src/features/browse/components/FeelingChips.tsx`
+- `src/features/browse/components/FeelingResultsCarousel.tsx`
+- `src/features/browse/components/FeaturedCollectionCard.tsx`
+- `src/features/browse/components/SeriesCompletionShelf.tsx`
+- `src/features/browse/components/BrowseBookSheet.tsx`
+- `src/shared/utils/bookDNA/feelingScoring.ts`
+
+### Files Modified
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx`
+- `src/features/browse/components/TopPickHero.tsx`
+- `src/features/browse/components/WhatsTheVibeSection.tsx`
+- `src/features/browse/components/VibeCard.tsx`
+- `src/features/browse/components/RecentlyAddedSection.tsx`
+- `src/features/browse/components/CollectionsSection.tsx`
+- `src/features/home/components/BookSpineVertical.tsx`
+- `src/shared/utils/bookDNA/index.ts`
+
+### Files Deleted
+- `src/features/browse/stores/vibeStore.ts`
+- `src/features/browse/components/VibeSliders.tsx`
+
+---
+
+## [0.9.177] - 2026-03-06
+
+### Changed — Replace Mood Discovery with Vibe Sliders
+
+- **Removed** the 3-step Mood Discovery quiz (screens, stores, components, hooks)
+- **Added** always-visible Vibe Sliders on Browse page (dark↔light, serious↔funny spectrums)
+- **Added** "What's The Vibe" section with comp-vibe cards (e.g., "Game of Thrones meets Peaky Blinders")
+- **Moved** `parseBookDNA.ts` to `src/shared/utils/bookDNA/` for shared access
+- **Created** `vibeStore.ts` — ephemeral Zustand store for slider state (not persisted)
+- **Created** `vibeScoring.ts` — pure scoring function for spectrum-based filtering
+- **Simplified** BrowseTopNav — removed mood pill, kept audience toggle and filter buttons
+- **Simplified** TopPickHero — uses vibe state instead of mood session for label
+- **Updated** recommendation engine — removed mood session dependency, kept preferences-based scoring
+- **Extracted** mood genre/indicator maps to `src/features/recommendations/utils/moodMaps.ts`
+
+### Files Added
+- `src/shared/utils/bookDNA/parseBookDNA.ts` (moved from mood-discovery)
+- `src/shared/utils/bookDNA/vibeScoring.ts`
+- `src/shared/utils/bookDNA/index.ts`
+- `src/features/browse/stores/vibeStore.ts`
+- `src/features/browse/components/VibeSliders.tsx`
+- `src/features/browse/components/VibeCard.tsx`
+- `src/features/browse/components/WhatsTheVibeSection.tsx`
+- `src/features/recommendations/utils/moodMaps.ts`
+
+### Files Deleted
+- Entire `src/features/mood-discovery/` directory (19 files)
+
+### Files Modified
+- `src/features/browse/components/BrowseTopNav.tsx`
+- `src/features/browse/screens/SecretLibraryBrowseScreen.tsx`
+- `src/features/browse/components/TopPickHero.tsx`
+- `src/navigation/AppNavigator.tsx`
+- `src/navigation/components/FloatingTabBar.tsx`
+- `src/navigation/components/GlobalMiniPlayer.tsx`
+- `src/features/recommendations/hooks/useRecommendations.ts`
+- `src/features/recommendations/utils/comprehensiveScoring.ts`
+- `src/features/recommendations/utils/comparableBooksEngine.ts`
+- `src/features/library/screens/FilteredBooksScreen.tsx`
+- `src/features/discover/hooks/discoverUtils.ts`
+- `src/core/constants/performanceBudgets.ts`
+
+---
+
+## [0.9.176] - 2026-03-06
+
+### Fixed — Progress sync losing minutes of position
+
+- **Fix timestamp poisoning in server import** — `importRecentProgress()` and `importFromServer()` in finishedBooksSync were writing `Date.now()` as `updatedAt` when caching server progress in memory. This made stale server data appear as the freshest local data, causing position resolution to pick outdated positions. Now uses `serverProgress.lastUpdate` (the real server timestamp) so conflict resolution works correctly.
+- **Fix prefetch sessions bumping server timestamp** — `prefetchSessions()` was closing sessions with `currentTime: session.currentTime`, which bumped the server's `lastUpdate` timestamp on every app startup. This made stale server positions appear recent. Now closes sessions without sending position data.
+- **Fix background sync not saving locally before timeout** — When the app goes to background, `forceSyncAll()` races against a 4s timeout. If the timeout fires first, position is lost. Now saves current position to SQLite FIRST (instant, guaranteed), then attempts server sync as best-effort.
+- **Reduce progress save interval from 30s to 10s** — The periodic local save during playback now runs every 10 seconds instead of 30, reducing the maximum position loss window from 30s to 10s.
+- **Fix pause() not awaiting local save** — `pause()` was fire-and-forgetting both the local SQLite write and server sync. Now awaits the local `saveProgressLocal()` call before returning, ensuring position is durably saved when the user pauses.
+- **Fix active book skipping local save in sync** — `syncToServer()` was skipping the actively playing book entirely (no local save, no server sync). Now saves to SQLite locally even when skipping server sync, preventing progress loss if the app crashes during playback.
+
+### Files Modified
+- `src/core/services/finishedBooksSync.ts` — Use server timestamps, fix prefetch session close
+- `src/features/player/services/backgroundSyncService.ts` — Pre-background local save, active book local save
+- `src/features/player/stores/playerStore.ts` — 10s save interval, await local save on pause
+- `src/constants/version.ts` — v0.9.176
+
+---
+
+## [0.9.175] - 2026-03-05
+
+### Fixed — Player showing 00:00:00 for duration/time on some books
+
+- **Fix `isBookMedia` type guard failing for library cache items** — The ABS library items API (`/api/libraries/{id}/items`) returns `numTracks`, `numAudioFiles`, `numChapters` instead of `audioFiles[]` and `chapters[]`. The `isBookMedia()` type guard was checking `'audioFiles' in media`, which always returned `false` for library cache items. This caused duration to show as 0, tags to be unreadable, and other data access failures throughout the app. Changed to check `'duration' in media && !('episodes' in media)` which works for both full items and library list items. Fixed in 6 files with the broken check (playerStore, libraryCache, downloadManager, useHomeData, ContinueListeningHero, metadata.ts).
+- **Fix `viewBook` not setting duration/position** — When opening the player screen to view a book without playing it, the duration and position were not set, showing 00:00:00. Now reads duration from book data and progress from SQLite.
+- **Make `audioFiles` and `chapters` optional in `BookMedia` type** — These fields are not included in the library items list API response. Added `numTracks`, `numAudioFiles`, `numChapters` optional fields to match what the API returns. Added null guards where these fields are accessed after the type guard.
+
+### Files Modified
+- `src/core/types/media.ts` — Made audioFiles/chapters optional, added numTracks/numAudioFiles/numChapters
+- `src/shared/utils/metadata.ts` — Fixed isBookMedia type guard
+- `src/features/player/stores/playerStore.ts` — Fixed isBookMedia, viewBook sets duration/position
+- `src/core/cache/libraryCache.ts` — Fixed isBookMedia
+- `src/core/services/downloadManager.ts` — Fixed isBookMedia
+- `src/features/home/hooks/useHomeData.ts` — Fixed isBookMedia, null guards for chapters
+- `src/features/library/components/ContinueListeningHero.tsx` — Fixed isBookMedia (was checking 'chapters')
+- `src/constants/version.ts` — v0.9.175
+
+---
+
+## [0.9.174] - 2026-02-28
+
+### Fixed — Android Auto stability, cover art, and audio focus
+
+- **Simplify Android Auto to 2 tabs** — Removed Continue Listening, Downloads, Recently Added, Series, and Authors sections. Now shows only "Last Played" (quick resume) and "Library" (all books alphabetically with progress). Removed all folder/hierarchical browsing code (`PREFIX_FOLDER`, `createFolderItem()`, `isBrowsableSection`). (automotiveService.ts, AndroidAutoMediaBrowserService.kt)
+- **Fix browse sections not refreshing** — `notifyBrowseDataChanged()` was only notifying root, but Android Auto caches children at each level. Now notifies root + each section ID so cached book lists are refreshed. (AndroidAutoMediaBrowserService.kt)
+- **Fix cover art disappearing on every browse update** — `clearCoverArtCache()` was called on every browse data change, forcing re-download of all cover art and showing blank images during the reload. Cache is now preserved across browse updates. (AndroidAutoMediaBrowserService.kt)
+- **Fix audio focus thrashing** — The "already playing" play handler was calling `forceAndroidAutoSync()` which triggers `updatePlaybackState()` → `mediaSession.setPlaybackState()` → audio focus renegotiation. Removed the redundant sync; the subscription handles state updates. (automotiveService.ts)
+- **Fix redundant disk I/O** — `onLoadChildren()` was re-reading the browse JSON file from disk on every call (scrolling, expanding sections). Now uses cached data refreshed only by `notifyBrowseDataChanged()`. (AndroidAutoMediaBrowserService.kt)
+- **Add 5s timeout to cover art loading** — Glide `.get()` was blocking indefinitely if server is slow/unreachable, starving the thread pool. Now times out after 5 seconds. (AndroidAutoMediaBrowserService.kt)
+
+### Files Modified
+- `src/features/automotive/automotiveService.ts` — Simplified browse sections, fixed audio focus thrashing
+- `android/.../AndroidAutoMediaBrowserService.kt` — Section notifications, caching, Glide timeout
+- `plugins/android-auto/src/AndroidAutoMediaBrowserService.kt` — Mirror of Kotlin changes
+- `src/constants/version.ts` — v0.9.174
+
+---
+
 ## [0.9.173] - 2026-02-27
 
 ### Fixed — Smart rewind never worked on app restart

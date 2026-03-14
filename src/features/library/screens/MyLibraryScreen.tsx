@@ -26,8 +26,9 @@ import { usePlayerStore } from '@/features/player';
 import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 import { scale, spacing, useTheme } from '@/shared/theme';
-import { SectionSkeleton, BookCardSkeleton, SkullRefreshControl } from '@/shared/components';
+import { SectionSkeleton, BookCardSkeleton, SkullRefreshControl, useBookContextMenu } from '@/shared/components';
 import { SortPicker, SortOption } from '../components/SortPicker';
+import { useLibraryViewStore } from '../stores/libraryViewStore';
 import { LibraryTabBar } from '../components/LibraryTabBar';
 import { LibraryEmptyState } from '../components/LibraryEmptyState';
 import {
@@ -60,10 +61,13 @@ export function MyLibraryScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
   const { loadBook } = usePlayerStore();
+  const { showMenu } = useBookContextMenu();
+  const { getItem } = useLibraryCache();
 
   // Tab, sort, and search state
   const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [sort, setSort] = useState<SortOption>('recently-played');
+  const sort = useLibraryViewStore((s) => s.sort);
+  const setSort = useLibraryViewStore((s) => s.setSort);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -124,7 +128,10 @@ export function MyLibraryScreen() {
       navigation.navigate('Main', { screen: 'DiscoverTab' });
     }
   };
-  const handleBookPress = (itemId: string) => navigation.navigate('BookDetail', { id: itemId });
+  const handleBookPress = useCallback((itemId: string) => {
+    const item = getItem(itemId);
+    if (item) showMenu(item);
+  }, [getItem, showMenu]);
   const handleSeriesPress = (seriesName: string) => navigation.navigate('SeriesDetail', { seriesName });
   const handleAuthorPress = (authorName: string) => navigation.navigate('AuthorDetail', { name: authorName });
   const handleNarratorPress = (narratorName: string) => navigation.navigate('NarratorDetail', { name: narratorName });

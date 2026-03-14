@@ -26,10 +26,11 @@ import { formatDuration } from './format';
  * WHEN NOT TO USE:
  * - Metadata display (title, author, narrator) - use getMetadata() instead
  * - Duration display - use getDuration() instead
- * - Library cache items don't have audioFiles, so this will return false
  */
 export function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'audioFiles' in media && Array.isArray(media.audioFiles);
+  // Check for 'duration' (present on BookMedia) and absence of 'episodes' (PodcastMedia).
+  // NOTE: Library items list API omits audioFiles/chapters, so we can't check for those.
+  return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 
 /**

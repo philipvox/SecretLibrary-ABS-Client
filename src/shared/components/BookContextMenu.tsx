@@ -1,20 +1,24 @@
 /**
  * src/shared/components/BookContextMenu.tsx
  *
- * Bottom sheet context menu for book cards.
- * Triggered on long-press to show quick actions.
+ * Bottom sheet context menu — editorial, high-contrast design.
  *
- * Layout:
+ * Layout (top to bottom):
  * ┌─────────────────────────────────────┐
- * │  ─── (handle bar)                   │
- * │  [Cover] Title          [X close]   │
- * │          Author                     │
- * │  ─── (divider) ────────────────     │
- * │  List items (Library, Playlist)     │
- * │  ─── (divider) ────────────────     │
- * │  [▶ Play] [⊕ Queue] [↓ DL] [📖]   │
- * │   Play     Queue    Download Details│
+ * │          ˅ (close chevron)          │
+ * │  [Cover] Title              [share] │
+ * │          Author / Narrator / Series │
+ * │                                     │
+ * │  Series Name                      > │
+ * │  Author Name                      > │
+ * │  Narrator Name                    > │
+ * │                                     │
+ * │  (Queue)(Save)(DL)(Done)(Playlist)  │
+ * │                                     │
+ * │  [DETAILS]  [▶▶▶▶▶ PLAY ▶▶▶▶▶]    │
  * └─────────────────────────────────────┘
+ *
+ * Toggle actions do NOT close the sheet. Only backdrop tap, chevron, or navigation rows close.
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
@@ -30,7 +34,10 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Share,
   useWindowDimensions,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -38,136 +45,158 @@ import {
   Play,
   ListPlus,
   BookOpen,
-  X,
   Check,
   Trash2,
   Library,
   ListMusic,
   Plus,
   ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle,
+  Layers,
+  User,
+  Mic,
+  Share2,
+  X as XIcon,
   type LucideIcon,
 } from 'lucide-react-native';
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
 import { useDownloadStatus, useDownloads } from '@/core/hooks/useDownloads';
 import { useQueueStore, useIsInQueue } from '@/features/queue/stores/queueStore';
 import { useProgressStore, useIsInLibrary } from '@/core/stores/progressStore';
 import { usePlayerStore } from '@/features/player/stores';
+import { useIsComplete, useToggleComplete } from '@/features/completion';
 import { usePlaylists } from '@/features/playlists/hooks/usePlaylists';
 import { playlistsApi } from '@/core/api/endpoints/playlists';
 import { useLibraryCache } from '@/core/cache';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '@/shared/hooks/useToast';
-import { scale, spacing, radius, useTheme, colors, type ThemeColors } from '@/shared/theme';
+import { scale, spacing, radius, useTheme, type ThemeColors } from '@/shared/theme';
+import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import type { LibraryItem, Playlist } from '@/core/types';
 
-// Helper to extract semantic colors
-function getSemanticColors(c: ThemeColors) {
-  return {
-    error: '#E8A020',  // Bright golden orange (matches app accent tone)
-    accent: '#E8A020',  // Bright golden orange
-  };
-}
+// Palette — high contrast black/white
+const BLACK = '#0f0f0f';
+const WHITE = '#FFFFFF';
+const WHITE_DIM = '#e8e8e8';
+const ICON_SIZE = scale(16);
+const DANGER = '#E85050';
+const ACCENT = '#F3B60C';
 
-// SCREEN_HEIGHT now read reactively via useWindowDimensions inside the component
+// =============================================================================
+// TOGGLE ACTION — icon circle grid
+// =============================================================================
 
-interface BookContextMenuProps {
-  book: LibraryItem | null;
-  visible: boolean;
-  onClose: () => void;
-  onViewDetails?: (book: LibraryItem) => void;
-  playlistId?: string;
-}
-
-interface MenuItemProps {
+interface ToggleActionProps {
   icon: LucideIcon;
   label: string;
-  sublabel?: string;
   onPress: () => void;
-  variant?: 'default' | 'accent' | 'danger';
-  disabled?: boolean;
-  colors: ThemeColors;
-  semanticColors: { error: string; accent: string };
+  active?: boolean;
+  danger?: boolean;
+  progress?: number; // 0-1 for progress ring
 }
 
-function MenuItem({ icon: Icon, label, sublabel, onPress, variant = 'default', disabled, colors, semanticColors }: MenuItemProps) {
-  const getColor = () => {
-    if (disabled) return colors.text.tertiary;
-    switch (variant) {
-      case 'accent': return semanticColors.accent;
-      case 'danger': return semanticColors.error;
-      default: return colors.text.primary;
-    }
-  };
+const TOGGLE_SIZE = scale(44);
+const PROGRESS_STROKE = 3;
 
-  const color = getColor();
+function ToggleAction({ icon: Icon, label, onPress, active, danger, progress }: ToggleActionProps) {
+  const iconColor = danger ? DANGER
+    : active ? BLACK
+    : 'rgba(255,255,255,0.5)';
+  const circleBg = danger ? 'transparent'
+    : active ? WHITE
+    : 'transparent';
+  const circleBorder = danger ? 'rgba(232,80,80,0.3)'
+    : active ? WHITE
+    : 'rgba(255,255,255,0.15)';
+  const labelColor = danger ? DANGER
+    : active ? WHITE
+    : 'rgba(255,255,255,0.4)';
+
+  const showProgress = progress !== undefined && progress > 0 && progress < 1;
 
   return (
     <TouchableOpacity
-      style={[styles.menuItem, disabled && styles.menuItemDisabled]}
+      style={styles.toggleAction}
       onPress={() => {
-        if (!disabled) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress();
-        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
       }}
-      disabled={disabled}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={[styles.menuItemIcon, { backgroundColor: colors.background.elevated }]}>
-        <Icon size={scale(20)} color={color} strokeWidth={2} />
-      </View>
-      <View style={styles.menuItemContent}>
-        <Text style={[styles.menuItemLabel, { color }]}>{label}</Text>
-        {sublabel && <Text style={[styles.menuItemSublabel, { color: colors.text.tertiary }]}>{sublabel}</Text>}
-      </View>
+      {showProgress ? (
+        <View style={[styles.toggleCircle, { borderWidth: 0 }]}>
+          <Svg width={TOGGLE_SIZE} height={TOGGLE_SIZE} style={StyleSheet.absoluteFill}>
+            <SvgCircle
+              cx={TOGGLE_SIZE / 2}
+              cy={TOGGLE_SIZE / 2}
+              r={(TOGGLE_SIZE - PROGRESS_STROKE) / 2}
+              stroke="rgba(255,255,255,0.15)"
+              strokeWidth={PROGRESS_STROKE}
+              fill="none"
+            />
+            <SvgCircle
+              cx={TOGGLE_SIZE / 2}
+              cy={TOGGLE_SIZE / 2}
+              r={(TOGGLE_SIZE - PROGRESS_STROKE) / 2}
+              stroke="#4ADE80"
+              strokeWidth={PROGRESS_STROKE}
+              fill="none"
+              strokeDasharray={`${Math.PI * (TOGGLE_SIZE - PROGRESS_STROKE)}`}
+              strokeDashoffset={`${Math.PI * (TOGGLE_SIZE - PROGRESS_STROKE) * (1 - progress!)}`}
+              strokeLinecap="round"
+              rotation={-90}
+              origin={`${TOGGLE_SIZE / 2}, ${TOGGLE_SIZE / 2}`}
+            />
+          </Svg>
+          <Icon size={ICON_SIZE} color="rgba(255,255,255,0.5)" strokeWidth={1.5} />
+        </View>
+      ) : (
+        <View style={[
+          styles.toggleCircle,
+          { backgroundColor: circleBg, borderColor: circleBorder },
+        ]}>
+          <Icon size={ICON_SIZE} color={iconColor} strokeWidth={active ? 2.5 : 1.5} />
+        </View>
+      )}
+      <Text style={[styles.toggleLabel, { color: showProgress ? '#4ADE80' : labelColor }]} numberOfLines={1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 // =============================================================================
-// QUICK ACTION BUTTON (circular icon button with label)
+// NAV ROW — text row with chevron
 // =============================================================================
 
-interface QuickActionProps {
+interface NavRowProps {
   icon: LucideIcon;
   label: string;
   onPress: () => void;
-  active?: boolean;
-  variant?: 'default' | 'accent' | 'danger';
-  colors: ThemeColors;
-  semanticColors: { error: string; accent: string };
+  danger?: boolean;
 }
 
-function QuickAction({ icon: Icon, label, onPress, active, variant = 'default', colors, semanticColors }: QuickActionProps) {
-  const getColor = () => {
-    if (active) return semanticColors.accent;
-    switch (variant) {
-      case 'accent': return semanticColors.accent;
-      case 'danger': return semanticColors.error;
-      default: return colors.text.primary;
-    }
-  };
-
-  const color = getColor();
-  const bgColor = active ? `${semanticColors.accent}20` : colors.background.elevated;
-
+function NavRow({ icon: Icon, label, onPress, danger }: NavRowProps) {
+  const color = danger ? DANGER : 'rgba(255,255,255,0.5)';
+  const chevronColor = danger ? 'rgba(232,80,80,0.4)' : 'rgba(255,255,255,0.25)';
   return (
     <TouchableOpacity
-      style={styles.quickAction}
+      style={styles.navRow}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={[styles.quickActionCircle, { backgroundColor: bgColor }]}>
-        <Icon size={scale(22)} color={color} strokeWidth={2} />
-      </View>
-      <Text style={[styles.quickActionLabel, { color: colors.text.secondary }]} numberOfLines={1}>
-        {label}
-      </Text>
+      <Icon size={scale(14)} color={color} strokeWidth={1.5} />
+      <Text style={[styles.navRowLabel, danger && { color: DANGER }]}>{label}</Text>
+      <ChevronRight size={scale(14)} color={chevronColor} strokeWidth={2} />
     </TouchableOpacity>
   );
 }
@@ -180,14 +209,10 @@ function PlaylistPicker({
   book,
   onBack,
   onDone,
-  themeColors,
-  semanticColors,
 }: {
   book: LibraryItem;
   onBack: () => void;
   onDone: (playlistName?: string, playlistId?: string) => void;
-  themeColors: ThemeColors;
-  semanticColors: { error: string; accent: string };
 }) {
   const { data: playlists, isLoading } = usePlaylists();
   const [creating, setCreating] = useState(false);
@@ -196,7 +221,6 @@ function PlaylistPicker({
   const queryClient = useQueryClient();
   const libraryId = useLibraryCache((s) => s.currentLibraryId);
 
-  // Filter out special __sl_ playlists
   const filteredPlaylists = (playlists || []).filter(p => !p.name.startsWith('__sl_'));
 
   const handleAddToPlaylist = useCallback(async (playlist: Playlist) => {
@@ -239,38 +263,36 @@ function PlaylistPicker({
         disabled={alreadyAdded}
         activeOpacity={0.7}
       >
-        <View style={[styles.playlistIcon, { backgroundColor: themeColors.background.elevated }]}>
-          <ListMusic size={scale(18)} color={themeColors.text.secondary} strokeWidth={2} />
+        <Text
+          style={[
+            styles.playlistName,
+            alreadyAdded && styles.playlistNameActive,
+          ]}
+          numberOfLines={1}
+        >
+          {item.name}
+        </Text>
+        <View style={styles.playlistRowRight}>
+          <Text style={styles.playlistCount}>{itemCount}</Text>
+          {alreadyAdded && <Check size={scale(13)} color={ACCENT} strokeWidth={2.5} />}
         </View>
-        <View style={styles.playlistInfo}>
-          <Text style={[styles.playlistName, { color: themeColors.text.primary }]} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={[styles.playlistCount, { color: themeColors.text.tertiary }]}>
-            {itemCount} {itemCount === 1 ? 'book' : 'books'}
-          </Text>
-        </View>
-        {alreadyAdded && (
-          <Check size={scale(18)} color={semanticColors.accent} strokeWidth={2} />
-        )}
       </TouchableOpacity>
     );
-  }, [book.id, handleAddToPlaylist, themeColors, semanticColors]);
+  }, [book.id, handleAddToPlaylist]);
 
   return (
     <View>
-      {/* Back header */}
       <View style={styles.playlistHeader}>
         <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <ChevronLeft size={scale(22)} color={themeColors.text.primary} strokeWidth={2} />
+          <ChevronLeft size={scale(16)} color={WHITE_DIM} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={[styles.playlistTitle, { color: themeColors.text.primary }]}>Add to Playlist</Text>
-        <View style={{ width: scale(22) }} />
+        <Text style={styles.playlistTitle}>Add to Playlist</Text>
+        <View style={{ width: scale(16) }} />
       </View>
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={themeColors.text.secondary} />
+          <ActivityIndicator color="rgba(255,255,255,0.5)" />
         </View>
       ) : (
         <FlatList
@@ -280,18 +302,17 @@ function PlaylistPicker({
           style={styles.playlistList}
           scrollEnabled={false}
           ListEmptyComponent={
-            <Text style={[styles.emptyText, { color: themeColors.text.tertiary }]}>No playlists yet</Text>
+            <Text style={styles.emptyText}>No playlists yet</Text>
           }
         />
       )}
 
-      {/* Create new playlist */}
       {creating ? (
         <View style={styles.createRow}>
           <TextInput
-            style={[styles.createInput, { color: themeColors.text.primary, borderColor: themeColors.border.default }]}
+            style={styles.createInput}
             placeholder="Playlist name"
-            placeholderTextColor={themeColors.text.tertiary}
+            placeholderTextColor="rgba(255,255,255,0.3)"
             value={newName}
             onChangeText={setNewName}
             autoFocus
@@ -299,29 +320,25 @@ function PlaylistPicker({
             onSubmitEditing={handleCreatePlaylist}
           />
           <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: semanticColors.accent }]}
+            style={styles.createButton}
             onPress={handleCreatePlaylist}
             disabled={!newName.trim() || submitting}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color={themeColors.background.primary} />
+              <ActivityIndicator size="small" color={BLACK} />
             ) : (
-              <Check size={scale(18)} color={themeColors.background.primary} strokeWidth={3} />
+              <Check size={scale(14)} color={BLACK} strokeWidth={3} />
             )}
           </TouchableOpacity>
         </View>
       ) : (
         <TouchableOpacity
-          style={styles.menuItem}
+          style={styles.createNewRow}
           onPress={() => setCreating(true)}
           activeOpacity={0.7}
         >
-          <View style={[styles.menuItemIcon, { backgroundColor: themeColors.background.elevated }]}>
-            <Plus size={scale(20)} color={themeColors.text.primary} strokeWidth={2} />
-          </View>
-          <View style={styles.menuItemContent}>
-            <Text style={[styles.menuItemLabel, { color: themeColors.text.primary }]}>Create New Playlist</Text>
-          </View>
+          <Plus size={scale(13)} color={WHITE_DIM} strokeWidth={2} />
+          <Text style={styles.createNewLabel}>New Playlist</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -332,6 +349,14 @@ function PlaylistPicker({
 // MAIN COMPONENT
 // =============================================================================
 
+interface BookContextMenuProps {
+  book: LibraryItem | null;
+  visible: boolean;
+  onClose: () => void;
+  onViewDetails?: (book: LibraryItem) => void;
+  playlistId?: string;
+}
+
 export function BookContextMenu({
   book,
   visible,
@@ -340,22 +365,21 @@ export function BookContextMenu({
   playlistId,
 }: BookContextMenuProps) {
   const { colors } = useTheme();
-  const semanticColors = getSemanticColors(colors);
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { height: screenHeight } = useWindowDimensions();
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Toast store for undo toasts
   const addToast = useToastStore((s) => s.addToast);
-
-  // Sub-view state
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
 
-  // Book state hooks
-  const { isDownloaded, isDownloading } = useDownloadStatus(book?.id || '');
+  // Book state
+  const { isDownloaded, isDownloading, progress: dlProgress } = useDownloadStatus(book?.id || '');
   const isInQueue = useIsInQueue(book?.id || '');
   const isInLibrary = useIsInLibrary(book?.id || '');
+  const isComplete = useIsComplete(book?.id || '');
+  const toggleComplete = useToggleComplete();
   const coverUrl = useCoverUrl(book?.id || '');
 
   // Actions
@@ -367,43 +391,32 @@ export function BookContextMenu({
   const loadBook = usePlayerStore((s) => s.loadBook);
   const queryClient = useQueryClient();
 
-  // Reset sub-view when menu closes
+  // Metadata
+  const metadata = book?.media?.metadata as any;
+  const title = metadata?.title || 'Untitled';
+  const author = metadata?.authorName || metadata?.authors?.[0]?.name || '';
+  const narrator = metadata?.narratorName || metadata?.narrators?.[0] || '';
+  const seriesNameRaw = metadata?.seriesName || metadata?.series?.[0]?.name || '';
+  const seriesName = seriesNameRaw.replace(/\s*#[\d.]+$/, '').trim();
+  const seriesDisplay = seriesNameRaw.trim(); // Keep "#43" for display
+
   useEffect(() => {
     if (!visible) {
-      // Delay reset so animation finishes first
       const t = setTimeout(() => setShowPlaylistPicker(false), 250);
       return () => clearTimeout(t);
     }
   }, [visible]);
 
-  // Animate in/out
   useEffect(() => {
     if (visible) {
       Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 65,
-          friction: 11,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: screenHeight,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
+        Animated.timing(slideAnim, { toValue: screenHeight, duration: 200, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
   }, [visible, slideAnim, fadeAnim]);
@@ -413,7 +426,7 @@ export function BookContextMenu({
     onClose();
   }, [onClose]);
 
-  // ─── Quick Actions ─────────────────────────────────────────────────
+  // ─── Toggle actions (do NOT close sheet) ────────────────────────────
 
   const handlePlay = useCallback(() => {
     if (book) {
@@ -426,44 +439,59 @@ export function BookContextMenu({
     if (!book) return;
     if (isInQueue) {
       removeFromQueue(book.id);
-      addToast({
-        type: 'success',
-        message: 'Removed from Queue',
-        duration: 10000,
-        onUndo: () => addToQueue(book),
-      });
+      addToast({ type: 'success', message: 'Removed from Queue', duration: 3000, onUndo: () => addToQueue(book) });
     } else {
       addToQueue(book);
-      addToast({
-        type: 'success',
-        message: 'Added to Queue',
-        duration: 10000,
-        onUndo: () => removeFromQueue(book.id),
-      });
+      addToast({ type: 'success', message: 'Added to Queue', duration: 3000, onUndo: () => removeFromQueue(book.id) });
     }
-    onClose();
-  }, [book, isInQueue, addToQueue, removeFromQueue, onClose, addToast]);
+  }, [book, isInQueue, addToQueue, removeFromQueue, addToast]);
+
+  const handleLibraryToggle = useCallback(() => {
+    if (!book) return;
+    if (isInLibrary) {
+      // Confirm before removing
+      Alert.alert(
+        'Remove from Library?',
+        'This will remove your reading progress for this book.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              removeFromLibrary(book.id);
+              addToast({ type: 'success', message: 'Removed from Library', duration: 5000, onUndo: () => addToLibrary(book.id) });
+            },
+          },
+        ],
+      );
+    } else {
+      addToLibrary(book.id);
+      addToast({ type: 'success', message: 'Saved to Library', duration: 3000, onUndo: () => removeFromLibrary(book.id) });
+    }
+  }, [book, isInLibrary, addToLibrary, removeFromLibrary, addToast]);
 
   const handleDownload = useCallback(() => {
-    if (book) {
-      queueDownload(book);
-      onClose();
-    }
-  }, [book, queueDownload, onClose]);
-
-  const handleCancelDownload = useCallback(() => {
-    if (book) {
-      cancelDownload(book.id);
-      onClose();
-    }
-  }, [book, cancelDownload, onClose]);
-
-  const handleDeleteDownload = useCallback(() => {
-    if (book) {
+    if (!book) return;
+    if (isDownloaded) {
       deleteDownload(book.id);
-      onClose();
+      addToast({ type: 'info', message: 'Download Removed', duration: 3000 });
+    } else if (isDownloading) {
+      cancelDownload(book.id);
+      addToast({ type: 'info', message: 'Download Cancelled', duration: 3000 });
+    } else {
+      queueDownload(book);
+      addToast({ type: 'success', message: 'Download Started', duration: 3000 });
     }
-  }, [book, deleteDownload, onClose]);
+  }, [book, isDownloaded, isDownloading, queueDownload, cancelDownload, deleteDownload, addToast]);
+
+  const handleToggleComplete = useCallback(async () => {
+    if (!book) return;
+    await toggleComplete(book.id);
+    addToast({ type: 'success', message: isComplete ? 'Marked as Unfinished' : 'Marked as Finished', duration: 3000 });
+  }, [book, isComplete, toggleComplete, addToast]);
+
+  // ─── Navigation actions (close sheet) ───────────────────────────────
 
   const handleViewDetails = useCallback(() => {
     if (book && onViewDetails) {
@@ -472,29 +500,30 @@ export function BookContextMenu({
     }
   }, [book, onViewDetails, onClose]);
 
-  // ─── List Item Actions ─────────────────────────────────────────────
-
-  const handleLibraryToggle = useCallback(() => {
-    if (!book) return;
-    if (isInLibrary) {
-      removeFromLibrary(book.id);
-      addToast({
-        type: 'success',
-        message: 'Removed from Library',
-        duration: 10000,
-        onUndo: () => addToLibrary(book.id),
-      });
-    } else {
-      addToLibrary(book.id);
-      addToast({
-        type: 'success',
-        message: 'Added to Library',
-        duration: 10000,
-        onUndo: () => removeFromLibrary(book.id),
-      });
+  const handleGoToSeries = useCallback(() => {
+    if (seriesName) {
+      navigation.navigate('SeriesDetail', { seriesName });
+      onClose();
     }
-    onClose();
-  }, [book, isInLibrary, addToLibrary, removeFromLibrary, onClose, addToast]);
+  }, [seriesName, navigation, onClose]);
+
+  const handleGoToAuthor = useCallback(() => {
+    if (author) {
+      navigation.navigate('AuthorDetail', { authorName: author });
+      onClose();
+    }
+  }, [author, navigation, onClose]);
+
+  const handleShare = useCallback(async () => {
+    if (!book) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const parts = [title];
+    if (author) parts.push(`by ${author}`);
+    if (seriesDisplay) parts.push(`(${seriesDisplay})`);
+    try {
+      await Share.share({ message: parts.join(' ') });
+    } catch {}
+  }, [book, title, author, seriesDisplay]);
 
   const handleRemoveFromPlaylist = useCallback(async () => {
     if (!book || !playlistId) return;
@@ -504,13 +533,8 @@ export function BookContextMenu({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const bookId = book.id;
       addToast({
-        type: 'success',
-        message: 'Removed from Playlist',
-        duration: 10000,
-        onUndo: async () => {
-          await playlistsApi.batchAdd(playlistId, [bookId]);
-          queryClient.invalidateQueries({ queryKey: ['playlists'] });
-        },
+        type: 'success', message: 'Removed from Playlist', duration: 5000,
+        onUndo: async () => { await playlistsApi.batchAdd(playlistId, [bookId]); queryClient.invalidateQueries({ queryKey: ['playlists'] }); },
       });
       onClose();
     } catch {
@@ -522,23 +546,19 @@ export function BookContextMenu({
     if (book && playlistName && addedPlaylistId) {
       const bookId = book.id;
       addToast({
-        type: 'success',
-        message: `Added to ${playlistName}`,
-        duration: 10000,
-        onUndo: async () => {
-          await playlistsApi.batchRemove(addedPlaylistId, [bookId]);
-          queryClient.invalidateQueries({ queryKey: ['playlists'] });
-        },
+        type: 'success', message: `Added to ${playlistName}`, duration: 5000,
+        onUndo: async () => { await playlistsApi.batchRemove(addedPlaylistId, [bookId]); queryClient.invalidateQueries({ queryKey: ['playlists'] }); },
       });
     }
-    onClose();
-  }, [book, onClose, addToast, queryClient]);
+    setShowPlaylistPicker(false);
+  }, [book, addToast, queryClient]);
 
   if (!book) return null;
 
-  const metadata = book.media?.metadata as any;
-  const title = metadata?.title || 'Untitled';
-  const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
+  // Download label/icon
+  const dlLabel = isDownloading ? `${Math.round(dlProgress * 100)}%`
+    : isDownloaded ? 'Remove' : 'Download';
+  const DlIcon = isDownloading ? XIcon : isDownloaded ? Trash2 : Download;
 
   return (
     <Modal
@@ -554,133 +574,115 @@ export function BookContextMenu({
             <Animated.View
               style={[
                 styles.sheet,
-                { paddingBottom: insets.bottom + spacing.md, backgroundColor: colors.background.elevated },
+                { paddingBottom: insets.bottom + scale(8) },
                 { transform: [{ translateY: slideAnim }] },
               ]}
             >
-              {/* Handle bar */}
-              <View style={[styles.handleBar, { backgroundColor: colors.border.default }]} />
-
-              {/* Book header */}
-              <View style={[styles.header, { borderBottomColor: colors.border.default }]}>
-                <Image source={coverUrl} style={[styles.cover, { backgroundColor: colors.background.primary }]} contentFit="cover" />
-                <View style={styles.headerInfo}>
-                  <Text style={[styles.title, { color: colors.text.primary }]} numberOfLines={2}>{title}</Text>
-                  <Text style={[styles.author, { color: colors.text.secondary }]} numberOfLines={1}>{author}</Text>
-                </View>
-                <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.background.secondary }]} onPress={handleClose}>
-                  <X size={scale(20)} color={colors.text.secondary} strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
+              {/* Close handle */}
+              <TouchableOpacity
+                onPress={handleClose}
+                style={styles.closeHandle}
+                hitSlop={{ top: 8, bottom: 8, left: 40, right: 40 }}
+              >
+                <ChevronDown size={scale(18)} color="rgba(255,255,255,0.35)" strokeWidth={2.5} />
+              </TouchableOpacity>
 
               {showPlaylistPicker ? (
                 <PlaylistPicker
                   book={book}
                   onBack={() => setShowPlaylistPicker(false)}
                   onDone={handlePlaylistDone}
-                  themeColors={colors}
-                  semanticColors={semanticColors}
                 />
               ) : (
                 <>
-                  {/* List items */}
-                  <View style={styles.listSection}>
-                    {/* Playlist context: Remove from Playlist */}
+                  {/* Header: cover + metadata + share */}
+                  <View style={styles.header}>
+                    <Image source={coverUrl} style={styles.cover} contentFit="cover" />
+                    <View style={styles.headerInfo}>
+                      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+                      {seriesDisplay ? <Text style={styles.metaLine} numberOfLines={1}>{seriesDisplay}</Text> : null}
+                    </View>
+                    <TouchableOpacity
+                      onPress={handleShare}
+                      style={styles.shareBtn}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Share2 size={scale(20)} color="rgba(255,255,255,0.4)" strokeWidth={1.5} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* ── Navigation rows ── */}
+                  <View style={styles.navSection}>
+                    {seriesName ? (
+                      <NavRow icon={Layers} label={seriesName} onPress={handleGoToSeries} />
+                    ) : null}
+                    {author ? (
+                      <NavRow icon={User} label={author} onPress={handleGoToAuthor} />
+                    ) : null}
+                    {narrator ? (
+                      <NavRow icon={Mic} label={narrator} onPress={() => {
+                        navigation.navigate('NarratorDetail', { narratorName: narrator });
+                        onClose();
+                      }} />
+                    ) : null}
                     {playlistId && (
-                      <MenuItem
-                        icon={Trash2}
-                        label="Remove from Playlist"
-                        sublabel="Remove this book from the playlist"
-                        onPress={handleRemoveFromPlaylist}
-                        variant="danger"
-                        colors={colors}
-                        semanticColors={semanticColors}
-                      />
-                    )}
-
-                    {/* Add to Playlist */}
-                    <MenuItem
-                      icon={ListMusic}
-                      label="Add to Playlist"
-                      sublabel="Organize your listening"
-                      onPress={() => setShowPlaylistPicker(true)}
-                      colors={colors}
-                      semanticColors={semanticColors}
-                    />
-
-                    {/* Download/Cancel/Delete */}
-                    {!isDownloaded && !isDownloading && (
-                      <MenuItem
-                        icon={Download}
-                        label="Download"
-                        sublabel="Save for offline listening"
-                        onPress={handleDownload}
-                        colors={colors}
-                        semanticColors={semanticColors}
-                      />
-                    )}
-                    {isDownloading && (
-                      <MenuItem
-                        icon={X}
-                        label="Cancel Download"
-                        sublabel="Stop the current download"
-                        onPress={handleCancelDownload}
-                        variant="danger"
-                        colors={colors}
-                        semanticColors={semanticColors}
-                      />
-                    )}
-                    {isDownloaded && (
-                      <MenuItem
-                        icon={Trash2}
-                        label="Delete Download"
-                        sublabel="Remove from device"
-                        onPress={handleDeleteDownload}
-                        variant="danger"
-                        colors={colors}
-                        semanticColors={semanticColors}
-                      />
+                      <NavRow icon={Trash2} label="Remove from Playlist" onPress={handleRemoveFromPlaylist} danger />
                     )}
                   </View>
 
-                  {/* Divider */}
-                  <View style={[styles.divider, { backgroundColor: colors.border.default }]} />
-
-                  {/* Quick action row: Queue, Library, Details, Play */}
-                  <View style={styles.quickActionRow}>
-                    <QuickAction
+                  {/* ── Toggle grid (5 icons) ── */}
+                  <View style={styles.toggleGrid}>
+                    <ToggleAction
                       icon={isInQueue ? Check : ListPlus}
                       label={isInQueue ? 'Queued' : 'Queue'}
                       onPress={handleQueueToggle}
                       active={isInQueue}
-                      colors={colors}
-                      semanticColors={semanticColors}
                     />
-                    <QuickAction
+                    <ToggleAction
                       icon={isInLibrary ? Check : Library}
-                      label={isInLibrary ? 'Saved' : 'Library'}
+                      label={isInLibrary ? 'Saved' : 'Save'}
                       onPress={handleLibraryToggle}
                       active={isInLibrary}
-                      colors={colors}
-                      semanticColors={semanticColors}
                     />
+                    <ToggleAction
+                      icon={DlIcon}
+                      label={dlLabel}
+                      onPress={handleDownload}
+                      danger={isDownloaded}
+                      progress={isDownloading ? dlProgress : undefined}
+                    />
+                    <ToggleAction
+                      icon={CheckCircle}
+                      label={isComplete ? 'Unfinish' : 'Finished'}
+                      onPress={handleToggleComplete}
+                      active={isComplete}
+                    />
+                    <ToggleAction
+                      icon={ListMusic}
+                      label="Playlist"
+                      onPress={() => setShowPlaylistPicker(true)}
+                    />
+                  </View>
+
+                  {/* ── Button row: Details (1/3) + Play (2/3) ── */}
+                  <View style={styles.buttonRow}>
                     {onViewDetails && (
-                      <QuickAction
-                        icon={BookOpen}
-                        label="Details"
+                      <TouchableOpacity
+                        style={styles.detailsBtn}
                         onPress={handleViewDetails}
-                        colors={colors}
-                        semanticColors={semanticColors}
-                      />
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.detailsBtnText}>DETAILS</Text>
+                      </TouchableOpacity>
                     )}
-                    <QuickAction
-                      icon={Play}
-                      label="Play"
+                    <TouchableOpacity
+                      style={styles.playBtn}
                       onPress={handlePlay}
-                      variant="accent"
-                      colors={colors}
-                      semanticColors={semanticColors}
-                    />
+                      activeOpacity={0.85}
+                    >
+                      <Play size={scale(16)} color={BLACK} fill={BLACK} strokeWidth={0} />
+                      <Text style={styles.playBtnText}>PLAY</Text>
+                    </TouchableOpacity>
                   </View>
                 </>
               )}
@@ -695,188 +697,244 @@ export function BookContextMenu({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: scale(20),
-    borderTopRightRadius: scale(20),
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: BLACK,
+    borderTopLeftRadius: scale(16),
+    borderTopRightRadius: scale(16),
+    paddingTop: scale(10),
+    paddingHorizontal: scale(20),
   },
-  handleBar: {
-    width: scale(36),
-    height: scale(4),
-    borderRadius: scale(2),
+  closeHandle: {
     alignSelf: 'center',
-    marginBottom: spacing.md,
+    paddingVertical: scale(4),
+    marginBottom: scale(10),
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    marginBottom: spacing.sm,
+    marginBottom: scale(16),
   },
   cover: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: radius.sm,
+    width: scale(52),
+    height: scale(52),
+    borderRadius: scale(4),
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   headerInfo: {
     flex: 1,
-    marginLeft: spacing.md,
-    marginRight: spacing.sm,
+    marginLeft: scale(12),
   },
   title: {
+    color: WHITE,
     fontSize: scale(15),
-    fontWeight: '600',
-    marginBottom: scale(2),
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  author: {
-    fontSize: scale(13),
+  metaLine: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: scale(10),
+    marginTop: scale(2),
+    fontFamily: fonts.jetbrainsMono.regular,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  closeButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
-    justifyContent: 'center',
-    alignItems: 'center',
+  shareBtn: {
+    padding: scale(6),
   },
 
-  // List section (Library, Playlist items)
-  listSection: {
-    paddingVertical: spacing.xs,
+  // Navigation rows
+  navSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    marginBottom: scale(8),
   },
-  menuItem: {
+  navRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: scale(14),
+    gap: scale(10),
   },
-  menuItemDisabled: {
-    opacity: 0.5,
-  },
-  menuItemIcon: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(10),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  menuItemContent: {
+  navRowLabel: {
     flex: 1,
-  },
-  menuItemLabel: {
-    fontSize: scale(15),
-    fontWeight: '500',
-    marginBottom: scale(2),
-  },
-  menuItemSublabel: {
-    fontSize: scale(12),
+    color: 'rgba(255,255,255,0.6)',
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
-  // Divider
-  divider: {
-    height: 1,
-    marginHorizontal: -spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-
-  // Quick action row (4 circular icon buttons)
-  quickActionRow: {
+  // Toggle grid
+  toggleGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'flex-start',
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    justifyContent: 'space-around',
+    marginBottom: scale(18),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    paddingTop: scale(16),
   },
-  quickAction: {
+  toggleAction: {
     alignItems: 'center',
-    width: scale(68),
+    flex: 1,
+    paddingVertical: scale(2),
   },
-  quickActionCircle: {
-    width: scale(52),
-    height: scale(52),
-    borderRadius: scale(26),
+  toggleCircle: {
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: scale(6),
   },
-  quickActionLabel: {
-    fontSize: scale(11),
+  toggleLabel: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(8),
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
     textAlign: 'center',
   },
 
-  // Playlist picker styles
+  // Button row: Play (2/3) + Details (1/3)
+  buttonRow: {
+    flexDirection: 'row',
+    gap: scale(8),
+  },
+  playBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: WHITE,
+    height: scale(46),
+    borderRadius: scale(6),
+    gap: scale(8),
+  },
+  playBtnText: {
+    color: BLACK,
+    fontFamily: fonts.jetbrainsMono.medium,
+    fontSize: scale(12),
+    letterSpacing: 1.5,
+  },
+  detailsBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: scale(46),
+    borderRadius: scale(6),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  detailsBtnText: {
+    color: WHITE_DIM,
+    fontFamily: fonts.jetbrainsMono.medium,
+    fontSize: scale(10),
+    letterSpacing: 1,
+  },
+
+  // Playlist picker
   playlistHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    paddingVertical: scale(4),
+    marginBottom: scale(2),
   },
   backButton: {
-    padding: spacing.xs,
+    padding: scale(4),
   },
   playlistTitle: {
-    fontSize: scale(16),
-    fontWeight: '600',
+    color: WHITE,
+    fontFamily: fonts.jetbrainsMono.medium,
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   playlistList: {
-    maxHeight: scale(250),
+    maxHeight: scale(220),
   },
   playlistRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: scale(5),
+  } as ViewStyle,
+  playlistRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+  } as ViewStyle,
+  playlistName: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.6)',
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(12),
+  } as TextStyle,
+  playlistNameActive: {
+    color: WHITE,
+    fontFamily: fonts.jetbrainsMono.bold,
+  } as TextStyle,
+  playlistCount: {
+    color: 'rgba(255,255,255,0.3)',
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+  } as TextStyle,
+  emptyText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(11),
+    textAlign: 'center',
     paddingVertical: scale(12),
   },
-  playlistIcon: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(8),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  playlistInfo: {
-    flex: 1,
-  },
-  playlistName: {
-    fontSize: scale(15),
-    fontWeight: '500',
-    marginBottom: scale(2),
-  },
-  playlistCount: {
-    fontSize: scale(12),
-  },
-  emptyText: {
-    fontSize: scale(14),
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-  },
   loadingContainer: {
-    paddingVertical: spacing.xl,
+    paddingVertical: scale(16),
     alignItems: 'center',
   },
+  createNewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(6),
+    paddingVertical: scale(6),
+    marginTop: scale(4),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  } as ViewStyle,
+  createNewLabel: {
+    color: WHITE_DIM,
+    fontFamily: fonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  } as TextStyle,
   createRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingVertical: scale(4),
+    gap: scale(8),
+    marginTop: scale(4),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
   createInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: scale(10),
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: scale(15),
-    minHeight: scale(44),
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: scale(6),
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(6),
+    fontSize: scale(12),
+    fontFamily: fonts.jetbrainsMono.regular,
+    color: WHITE_DIM,
+    minHeight: scale(34),
   },
   createButton: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(10),
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(6),
+    backgroundColor: WHITE,
     justifyContent: 'center',
     alignItems: 'center',
   },

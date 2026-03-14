@@ -1,41 +1,36 @@
 /**
  * src/features/library/screens/FilteredBooksScreen.tsx
  *
- * Shows filtered books based on row type (short, long, new, mood-matched, duration, etc.)
- * Uses same design as AllBooksScreen - TopNav with pill, search bar, and sort buttons.
+ * Shows filtered books with SeriesDetail-style dark layout.
+ * Large title, filter tabs (All/Author/Narrator/Genre), shelf/book view toggle.
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
+  ScrollView,
   StyleSheet,
-  TouchableOpacity,
   StatusBar,
-  TextInput,
   Pressable,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useLibraryCache, useCoverUrl } from '@/core/cache';
+import { useLibraryCache } from '@/core/cache';
 import { useReadingHistory } from '@/features/reading-history-wizard';
-import { useViewportPrefetch } from '@/shared/hooks/useViewportPrefetch';
 import { apiClient } from '@/core/api';
 import { createSeriesFilter } from '@/shared/utils/seriesFilter';
-import { useMoodRecommendations } from '@/features/mood-discovery/hooks/useMoodRecommendations';
-import { useActiveSession } from '@/features/mood-discovery/stores/moodSessionStore';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { CompleteBadgeOverlay } from '@/features/completion';
-import { SkullRefreshControl, TopNav, TopNavBackIcon, AlphabetScrubber, useBookContextMenu } from '@/shared/components';
-import { Icon } from '@/shared/components/Icon';
-import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { scale, useTheme } from '@/shared/theme';
+import { CoverStars } from '@/shared/components/CoverStars';
+import { TopNav, TopNavBackIcon, useBookContextMenu, CollapsibleSection } from '@/shared/components';
+import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { DURATION_RANGES } from '@/features/browse/hooks/useBrowseCounts';
+import { ShelfRow, BookSpineVerticalData } from '@/shared/spine';
 
 // Type guard for book media
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
@@ -57,7 +52,6 @@ function formatDurationCompact(seconds: number): string {
   return `${mins}m`;
 }
 
-const PADDING = 16;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const SHORT_BOOK_THRESHOLD = 5 * 60 * 60;
 const LONG_BOOK_THRESHOLD = 10 * 60 * 60;
@@ -74,14 +68,24 @@ export type FilterType =
   | 'not_started'
   | 'recommended'
   | 'mood_matched'
+  | 'feeling'
   | 'continue_series'
-  | 'duration';
+  | 'duration'
+  | 'tag'
+  | 'similar'
+  | 'all_books';
 
 export type FilteredBooksParams = {
   title?: string;
   filterType: FilterType;
   filterValue?: string;
   genre?: string;
+  /** Tag to filter by (for filterType: 'tag') */
+  tag?: string;
+  /** Source book ID for 'similar' filterType */
+  sourceBookId?: string;
+  /** Feeling chip key for 'feeling' filterType */
+  feeling?: string;
   minMatchPercent?: number;
   minDuration?: number;
   maxDuration?: number;
@@ -92,71 +96,30 @@ function getMetadata(item: LibraryItem): BookMetadata | Record<string, never> {
   return item.media.metadata as BookMetadata;
 }
 
-// List item component
-interface ListItemProps {
-  item: LibraryItem;
-  onPress: () => void;
-  onLongPress?: () => void;
-  isDark: boolean;
+// Convert LibraryItem to BookSpineVerticalData for ShelfRow
+function toSpineData(item: LibraryItem, cachedData?: { backgroundColor?: string; textColor?: string }): BookSpineVerticalData {
+  const metadata = getMetadata(item) as any;
+  const progress = item.userMediaProgress?.progress || 0;
+  const base: BookSpineVerticalData = {
+    id: item.id,
+    title: metadata?.title || 'Unknown',
+    author: metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author',
+    progress,
+    genres: metadata?.genres || [],
+    tags: isBookMedia(item.media) ? item.media.tags || [] : [],
+    duration: getBookDuration(item),
+    seriesName: metadata?.seriesName?.replace(/\s*#[\d.]+$/, '') || metadata?.series?.[0]?.name,
+  };
+  if (cachedData?.backgroundColor && cachedData?.textColor) {
+    return { ...base, backgroundColor: cachedData.backgroundColor, textColor: cachedData.textColor };
+  }
+  return base;
 }
-
-const ListBookItem = React.memo(function ListBookItem({ item, onPress, onLongPress, isDark }: ListItemProps) {
-  const coverUrl = useCoverUrl(item.id);
-  const metadata = getMetadata(item);
-  const title = metadata.title || 'Untitled';
-  const author = metadata.authorName || metadata.authors?.[0]?.name || '';
-  const duration = getBookDuration(item);
-  const durationText = duration > 0 ? formatDurationCompact(duration) : '';
-
-  return (
-    <Pressable
-      style={[
-        styles.bookCard,
-        isDark ? styles.cardDark : styles.cardLight,
-      ]}
-      onPress={onPress}
-      onLongPress={onLongPress}
-    >
-      {/* Cover */}
-      <View style={styles.coverContainer}>
-        <Image
-          source={coverUrl}
-          style={styles.cover}
-          contentFit="cover"
-        />
-        <CompleteBadgeOverlay bookId={item.id} size="tiny" />
-      </View>
-
-      {/* Info */}
-      <View style={styles.bookInfo}>
-        <Text
-          style={[styles.bookTitle, isDark && styles.bookTitleDark]}
-          numberOfLines={2}
-        >
-          {title}
-        </Text>
-        {author && (
-          <Text style={styles.authorText} numberOfLines={1}>
-            {author}
-          </Text>
-        )}
-        {durationText && (
-          <Text style={styles.durationText}>
-            {durationText}
-          </Text>
-        )}
-      </View>
-    </Pressable>
-  );
-});
 
 export function FilteredBooksScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: FilteredBooksParams }, 'params'>>();
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
-  const flatListRef = useRef<FlatList>(null);
-  const inputRef = useRef<TextInput>(null);
   const { showMenu } = useBookContextMenu();
 
   const {
@@ -164,7 +127,8 @@ export function FilteredBooksScreen() {
     filterType,
     filterValue,
     genre,
-    minMatchPercent = 20,
+    tag,
+    sourceBookId,
     minDuration = 0,
     maxDuration = Infinity,
   } = route.params || {};
@@ -179,23 +143,19 @@ export function FilteredBooksScreen() {
     return 'Books';
   }, [paramTitle, filterType, filterValue]);
 
-  const [sortBy, setSortBy] = useState<SortType>('duration');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const sortBy: SortType =
+    filterType === 'all_books' || filterType === 'new_this_week' ? 'recent'
+    : filterType === 'tag' || filterType === 'similar' ? 'title'
+    : 'duration';
+  const sortDirection: SortDirection = 'asc';
+  const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'author' | 'narrator' | 'genre'>('all');
+  const [viewMode, setViewMode] = useState<'book' | 'shelf'>('shelf');
+  const [displayLimit, setDisplayLimit] = useState(50);
 
-  const { items: libraryItems, isLoaded, refreshCache } = useLibraryCache();
+  const { items: libraryItems, isLoaded } = useLibraryCache();
   const { isFinished, hasBeenStarted } = useReadingHistory();
-  const moodSession = useActiveSession();
   const { items: inProgressItems } = useContinueListening();
-
-  // Only fetch mood recommendations if needed
-  const needsMoodData = filterType === 'mood_matched';
-  const { recommendations: moodRecommendations } = useMoodRecommendations({
-    session: needsMoodData ? moodSession : null,
-    minMatchPercent,
-    limit: 500,
-  });
+  const slColors = useSecretLibraryColors();
 
   // Create series filter
   const isSeriesAppropriate = useMemo(() => {
@@ -266,8 +226,20 @@ export function FilteredBooksScreen() {
       }
 
       case 'mood_matched': {
-        const moodIds = new Set(moodRecommendations.map(r => r.id));
-        result = libraryItems.filter(item => moodIds.has(item.id));
+        // Mood quiz removed — return empty for legacy filter type
+        result = [];
+        break;
+      }
+
+      case 'feeling': {
+        // Filter by feeling chip scoring
+        const { filterByFeeling } = require('@/shared/utils/bookDNA/feelingScoring');
+        const feelingKey = route.params?.feeling;
+        if (feelingKey) {
+          result = filterByFeeling(libraryItems, feelingKey);
+        } else {
+          result = [];
+        }
         break;
       }
 
@@ -300,6 +272,49 @@ export function FilteredBooksScreen() {
         break;
       }
 
+      case 'tag': {
+        const filterTag = tag || filterValue || '';
+        if (filterTag) {
+          result = libraryItems.filter(item => {
+            const tags: string[] = isBookMedia(item.media) ? item.media.tags || [] : [];
+            return tags.some(t => t === filterTag);
+          });
+        }
+        break;
+      }
+
+      case 'similar': {
+        const srcId = sourceBookId || '';
+        if (srcId) {
+          const sourceItem = libraryItems.find(i => i.id === srcId);
+          if (sourceItem) {
+            const srcMd = getMetadata(sourceItem) as any;
+            const srcAuthor = srcMd?.authorName || srcMd?.authors?.[0]?.name || '';
+            const srcGenres: string[] = srcMd?.genres || [];
+            const srcSeries = srcMd?.series?.[0]?.name || '';
+
+            result = libraryItems.filter(item => {
+              if (item.id === srcId) return false;
+              if (item.mediaType !== 'book') return false;
+              const md = getMetadata(item) as any;
+              const author = md?.authorName || md?.authors?.[0]?.name || '';
+              const genres: string[] = md?.genres || [];
+              const series = md?.series?.[0]?.name || '';
+              if (srcAuthor && author === srcAuthor) return true;
+              if (srcSeries && series === srcSeries) return true;
+              if (srcGenres.length > 0 && genres.some(g => srcGenres.includes(g))) return true;
+              return false;
+            });
+          }
+        }
+        break;
+      }
+
+      case 'all_books': {
+        result = libraryItems.filter(item => item.mediaType === 'book');
+        break;
+      }
+
       case 'recommended':
       default:
         result = libraryItems
@@ -314,17 +329,6 @@ export function FilteredBooksScreen() {
         const metadata = getMetadata(item);
         const genres: string[] = metadata.genres || [];
         return genres.some(g => g.toLowerCase() === filterGenre);
-      });
-    }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      result = result.filter(item => {
-        const metadata = getMetadata(item);
-        const itemTitle = (metadata.title || '').toLowerCase();
-        const author = (metadata.authorName || '').toLowerCase();
-        return itemTitle.includes(query) || author.includes(query);
       });
     }
 
@@ -359,10 +363,10 @@ export function FilteredBooksScreen() {
     libraryItems,
     filterType,
     genre,
-    searchQuery,
+    tag,
+    sourceBookId,
     isFinished,
     isSeriesAppropriate,
-    moodRecommendations,
     inProgressItems,
     minDuration,
     maxDuration,
@@ -370,45 +374,67 @@ export function FilteredBooksScreen() {
     sortDirection,
   ]);
 
-  // Get alphabet letters for scrubber (only for title/author sort)
-  const { letters: alphabetLetters, letterIndexMap } = useMemo(() => {
-    if (sortBy !== 'title' && sortBy !== 'author') {
-      return { letters: [], letterIndexMap: new Map<string, number>() };
-    }
+  // Total duration and grouped lists
+  const tagTotalDuration = useMemo(() => {
+    return filteredBooks.reduce((sum, book) => sum + getBookDuration(book), 0);
+  }, [filteredBooks]);
 
-    const lettersSet = new Set<string>();
-    const indexMap = new Map<string, number>();
-
-    filteredBooks.forEach((item, index) => {
-      const metadata = getMetadata(item);
-      const text = sortBy === 'title'
-        ? metadata.title
-        : (metadata.authorName || metadata.authors?.[0]?.name || '');
-      const firstChar = (text || '').charAt(0).toUpperCase();
-      if (/[A-Z]/.test(firstChar)) {
-        if (!lettersSet.has(firstChar)) {
-          lettersSet.add(firstChar);
-          indexMap.set(firstChar, index);
-        }
-      }
+  const tagAuthorList = useMemo(() => {
+    const map = new Map<string, { name: string; books: LibraryItem[] }>();
+    filteredBooks.forEach(book => {
+      const md = getMetadata(book) as any;
+      const name = (md?.authorName || '').split(',')[0].trim();
+      if (!name) return;
+      const existing = map.get(name);
+      if (existing) existing.books.push(book);
+      else map.set(name, { name, books: [book] });
     });
+    return Array.from(map.values()).sort((a, b) => b.books.length - a.books.length);
+  }, [filteredBooks]);
 
-    return {
-      letters: Array.from(lettersSet).sort(),
-      letterIndexMap: indexMap,
-    };
-  }, [filteredBooks, sortBy]);
+  const tagNarratorList = useMemo(() => {
+    const map = new Map<string, { name: string; books: LibraryItem[] }>();
+    filteredBooks.forEach(book => {
+      const md = getMetadata(book) as any;
+      let raw = (md?.narratorName || md?.narrators?.[0] || '').replace(/^Narrated by\s*/i, '').trim();
+      const name = raw.split(',')[0].trim();
+      if (!name) return;
+      const existing = map.get(name);
+      if (existing) existing.books.push(book);
+      else map.set(name, { name, books: [book] });
+    });
+    return Array.from(map.values()).sort((a, b) => b.books.length - a.books.length);
+  }, [filteredBooks]);
 
-  // Prefetch covers
-  const getCoverUrl = useCallback((item: LibraryItem) => {
-    return apiClient.getItemCoverUrl(item.id, { width: 400, height: 400 });
-  }, []);
+  const tagGenreList = useMemo(() => {
+    const map = new Map<string, { name: string; books: LibraryItem[] }>();
+    filteredBooks.forEach(book => {
+      const md = getMetadata(book) as any;
+      (md?.genres || []).forEach((g: string) => {
+        const existing = map.get(g);
+        if (existing) existing.books.push(book);
+        else map.set(g, { name: g, books: [book] });
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => b.books.length - a.books.length);
+  }, [filteredBooks]);
 
-  const { onViewableItemsChanged, viewabilityConfig } = useViewportPrefetch(
-    filteredBooks,
-    getCoverUrl,
-    { prefetchAhead: 12 }
-  );
+  // Tag filter: navigation handlers
+  const handleSpinePress = useCallback((spine: BookSpineVerticalData) => {
+    navigation.navigate('BookDetail', { id: spine.id });
+  }, [navigation]);
+
+  const handleAuthorNavPress = useCallback((authorName: string) => {
+    navigation.navigate('AuthorDetail', { authorName });
+  }, [navigation]);
+
+  const handleNarratorNavPress = useCallback((narratorName: string) => {
+    navigation.navigate('NarratorDetail', { narratorName });
+  }, [navigation]);
+
+  const handleGenreNavPress = useCallback((genreName: string) => {
+    navigation.navigate('GenreDetail', { genreName });
+  }, [navigation]);
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -419,205 +445,215 @@ export function FilteredBooksScreen() {
     navigation.navigate('BookDetail', { id: bookId });
   }, [navigation]);
 
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await refreshCache();
-    setIsRefreshing(false);
-  }, [refreshCache]);
-
   const handleLogoPress = useCallback(() => {
     navigation.navigate('Main', { screen: 'HomeTab' });
   }, [navigation]);
 
-  const handleSortPress = useCallback((type: SortType) => {
-    if (sortBy === type) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(type);
-      // Default directions
-      setSortDirection(type === 'recent' ? 'desc' : type === 'duration' ? 'asc' : 'asc');
-    }
-  }, [sortBy]);
-
-  const handleLetterSelect = useCallback((letter: string) => {
-    const index = letterIndexMap.get(letter);
-    if (index !== undefined) {
-      flatListRef.current?.scrollToIndex({ index, animated: true });
-    }
-  }, [letterIndexMap]);
-
-  // Render functions
-  const renderItem = useCallback(({ item }: { item: LibraryItem }) => (
-    <ListBookItem
-      item={item}
-      onPress={() => handleBookPress(item.id)}
-      onLongPress={() => showMenu(item)}
-      isDark={isDark}
-    />
-  ), [handleBookPress, showMenu, isDark]);
-
-  const keyExtractor = useCallback((item: LibraryItem) => item.id, []);
-
-  // Get sort button label
-  const getSortLabel = (type: SortType) => {
-    if (sortBy !== type) {
-      switch (type) {
-        case 'recent': return 'Recent';
-        case 'title': return 'Title';
-        case 'author': return 'Author';
-        case 'duration': return 'Length';
-      }
-    }
-    // Active sort - show direction
-    switch (type) {
-      case 'recent':
-        return sortDirection === 'desc' ? 'Newest' : 'Oldest';
-      case 'title':
-        return sortDirection === 'asc' ? 'A-Z' : 'Z-A';
-      case 'author':
-        return sortDirection === 'asc' ? 'A-Z' : 'Z-A';
-      case 'duration':
-        return sortDirection === 'asc' ? 'Shortest' : 'Longest';
-    }
-  };
-
-  const getSortIcon = (type: SortType) => {
-    if (sortBy !== type) {
-      switch (type) {
-        case 'recent': return 'Clock';
-        case 'title': return 'ArrowUpDown';
-        case 'author': return 'User';
-        case 'duration': return 'Timer';
-      }
-    }
-    return sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown';
-  };
-
-  const ListEmptyComponent = useMemo(() => (
-    <View style={styles.emptyState}>
-      <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>
-        No books found
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: colors.text.secondary }]}>
-        {searchQuery ? 'Try a different search term' : 'Check back later for new additions'}
-      </Text>
-    </View>
-  ), [colors.text.primary, colors.text.secondary, searchQuery]);
-
   if (!isLoaded) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: slColors.white }]}>
+        <StatusBar barStyle="light-content" backgroundColor={secretLibraryColors.black} />
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading...</Text>
+          <Text style={[styles.loadingText, { color: slColors.gray }]}>Loading...</Text>
         </View>
       </View>
     );
   }
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+  // SeriesDetail-style layout
+  const renderTagBookList = (books: LibraryItem[], paginate = false) => {
+    const visibleBooks = paginate ? books.slice(0, displayLimit) : books;
+    const hasMore = paginate && books.length > displayLimit;
 
-      {/* TopNav with skull logo and integrated search bar */}
-      <TopNav
-        variant={isDark ? 'dark' : 'light'}
-        showLogo={true}
-        onLogoPress={handleLogoPress}
-        style={{ backgroundColor: colors.background.primary }}
-        pills={[
-          {
-            key: 'filter',
-            label: displayTitle,
-            icon: <Icon name="Timer" size={10} color={colors.text.primary} />,
-          },
-        ]}
-        circleButtons={[
-          {
-            key: 'back',
-            icon: <TopNavBackIcon color={colors.text.primary} size={14} />,
-            onPress: handleBack,
-          },
-        ]}
-        searchBar={{
-          value: searchQuery,
-          onChangeText: setSearchQuery,
-          placeholder: 'Search books...',
-          inputRef: inputRef as React.RefObject<TextInput>,
-        }}
-      />
-
-      {/* Sort Bar */}
-      <View style={styles.sortBar}>
-        <Text style={[styles.resultCount, { color: colors.text.secondary }]}>
-          {filteredBooks.length} {filteredBooks.length === 1 ? 'book' : 'books'}
-        </Text>
-        <View style={styles.sortButtons}>
-          {(['duration', 'recent', 'title', 'author'] as SortType[]).map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[
-                styles.sortButton,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                sortBy === type && { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' },
-              ]}
-              onPress={() => handleSortPress(type)}
+    return (
+      <View>
+        {visibleBooks.map((book) => {
+          const md = getMetadata(book) as any;
+          const title = md?.title || 'Untitled';
+          const author = md?.authorName || md?.authors?.[0]?.name || '';
+          const duration = getBookDuration(book);
+          const coverUrl = apiClient.getItemCoverUrl(book.id, { width: 80, height: 80 });
+          return (
+            <Pressable
+              key={book.id}
+              style={[styles.tagListItem, { borderBottomColor: slColors.grayLine }]}
+              onPress={() => handleBookPress(book.id)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
+              delayLongPress={400}
             >
-              <Icon
-                name={getSortIcon(type)}
-                size={12}
-                color={sortBy === type ? colors.text.primary : colors.text.tertiary}
-              />
-              <Text
-                style={[
-                  styles.sortButtonText,
-                  { color: sortBy === type ? colors.text.primary : colors.text.tertiary },
-                ]}
-              >
-                {getSortLabel(type)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Book List */}
-      <View style={styles.listContainer}>
-        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-          <FlatList
-            ref={flatListRef}
-            data={filteredBooks}
-            renderItem={renderItem}
-            keyExtractor={keyExtractor}
-            contentContainerStyle={[
-              styles.list,
-              { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom },
-            ]}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={12}
-            maxToRenderPerBatch={8}
-            windowSize={7}
-            getItemLayout={(data, index) => ({
-              length: 80,
-              offset: 80 * index,
-              index,
-            })}
-            ListEmptyComponent={ListEmptyComponent}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-          />
-        </SkullRefreshControl>
-
-        {/* Alphabet Scrubber (for title/author sort) */}
-        {alphabetLetters.length > 0 && (
-          <AlphabetScrubber
-            letters={alphabetLetters}
-            onLetterSelect={handleLetterSelect}
-          />
+              <View style={styles.tagListCoverWrap}>
+                <Image source={coverUrl} style={styles.tagListCover} contentFit="cover" />
+                <CoverStars bookId={book.id} starSize={scale(12)} />
+                <CompleteBadgeOverlay bookId={book.id} size="small" />
+              </View>
+              <View style={styles.tagListInfo}>
+                <Text style={[styles.tagListTitle, { color: slColors.black }]} numberOfLines={1}>{title}</Text>
+                {author ? <Text style={[styles.tagListAuthor, { color: slColors.gray }]} numberOfLines={1}>{author}</Text> : null}
+              </View>
+              <Text style={[styles.tagListDuration, { color: slColors.gray }]}>{formatDurationCompact(duration)}</Text>
+            </Pressable>
+          );
+        })}
+        {hasMore && (
+          <Pressable
+            style={[styles.showMoreBtn, { borderColor: slColors.grayLine }]}
+            onPress={() => setDisplayLimit(prev => prev + 50)}
+          >
+            <Text style={[styles.showMoreText, { color: slColors.black }]}>
+              Show More ({books.length - displayLimit} remaining)
+            </Text>
+          </Pressable>
         )}
       </View>
-    </View>
-  );
+    );
+  };
+
+    const renderShelfOrList = (books: LibraryItem[], paginate = false) => {
+      if (viewMode !== 'shelf') return renderTagBookList(books, paginate);
+
+      const visibleBooks = paginate ? books.slice(0, displayLimit) : books;
+      const hasMore = paginate && books.length > displayLimit;
+
+      return (
+        <View>
+          <ShelfRow
+            books={visibleBooks}
+            toSpineData={toSpineData}
+            onSpinePress={handleSpinePress}
+            onSpineLongPress={(spine) => { const item = filteredBooks.find(b => b.id === spine.id); if (item) showMenu(item); }}
+          />
+          {hasMore && (
+            <Pressable
+              style={[styles.showMoreBtn, { borderColor: slColors.grayLine }]}
+              onPress={() => setDisplayLimit(prev => prev + 50)}
+            >
+              <Text style={[styles.showMoreText, { color: slColors.black }]}>
+                Show More ({books.length - displayLimit} remaining)
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      );
+    };
+
+    return (
+      <View style={[styles.container, { backgroundColor: secretLibraryColors.black }]}>
+        <StatusBar barStyle="light-content" backgroundColor={secretLibraryColors.black} />
+
+        <ScrollView
+          style={{ flex: 1, backgroundColor: secretLibraryColors.black }}
+          contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+        >
+          <TopNav
+            variant="dark"
+            showLogo={true}
+            onLogoPress={handleLogoPress}
+            circleButtons={[
+              {
+                key: 'back',
+                icon: <TopNavBackIcon color={secretLibraryColors.white} size={16} />,
+                onPress: handleBack,
+              },
+            ]}
+          />
+          {/* Title */}
+          <View style={styles.tagTitleHeader}>
+            {filterType === 'similar' && (
+              <Text style={[styles.tagHeaderSubtitle, { color: slColors.gray }]}>Because you listened to</Text>
+            )}
+            <Text style={[styles.tagHeaderName, { color: slColors.black }]}>{displayTitle}</Text>
+            <Text style={[styles.tagHeaderStats, { color: slColors.gray }]}>
+              {filteredBooks.length} {filteredBooks.length === 1 ? 'book' : 'books'} · {formatDurationCompact(tagTotalDuration)}
+            </Text>
+          </View>
+
+          {/* Tabs + View Toggle */}
+          <View style={styles.tagTabsRow}>
+            <View style={styles.tagTabs}>
+              {(['all', 'author', 'narrator', 'genre'] as const).map((tab) => (
+                <Pressable
+                  key={tab}
+                  style={[
+                    styles.tagTab,
+                    { borderColor: slColors.grayLine },
+                    activeFilterTab === tab && { backgroundColor: slColors.black, borderColor: slColors.black },
+                  ]}
+                  onPress={() => { setActiveFilterTab(tab); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                >
+                  <Text style={[
+                    styles.tagTabText,
+                    { color: slColors.gray },
+                    activeFilterTab === tab && { color: slColors.white },
+                  ]}>
+                    {tab === 'all' ? 'All' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={() => setViewMode(v => v === 'book' ? 'shelf' : 'book')}>
+              <Text style={[styles.tagToggleText, { color: slColors.black }]}>
+                {viewMode === 'book' ? 'Book' : 'Shelf'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Content */}
+          {activeFilterTab === 'all' && renderShelfOrList(filteredBooks, true)}
+
+          {activeFilterTab === 'author' && tagAuthorList.map((author, i) => (
+            <CollapsibleSection
+              key={author.name}
+              title={author.name}
+              count={author.books.length}
+              defaultExpanded={i === 0}
+              onTitlePress={() => handleAuthorNavPress(author.name)}
+            >
+              {renderShelfOrList(author.books)}
+            </CollapsibleSection>
+          ))}
+
+          {activeFilterTab === 'narrator' && tagNarratorList.map((narrator, i) => (
+            <CollapsibleSection
+              key={narrator.name}
+              title={narrator.name}
+              count={narrator.books.length}
+              defaultExpanded={i === 0}
+              onTitlePress={() => handleNarratorNavPress(narrator.name)}
+            >
+              {renderShelfOrList(narrator.books)}
+            </CollapsibleSection>
+          ))}
+
+          {activeFilterTab === 'genre' && tagGenreList.map((genreItem, i) => (
+            <CollapsibleSection
+              key={genreItem.name}
+              title={genreItem.name}
+              count={genreItem.books.length}
+              defaultExpanded={i === 0}
+              onTitlePress={() => handleGenreNavPress(genreItem.name)}
+            >
+              {renderShelfOrList(genreItem.books)}
+            </CollapsibleSection>
+          ))}
+
+          {filteredBooks.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyTitle, { color: slColors.gray }]}>No books found</Text>
+            </View>
+          )}
+
+          {/* Footer */}
+          {filteredBooks.length > 0 && (
+            <View style={[styles.tagFooter, { borderTopColor: slColors.grayLine }]}>
+              <Text style={[styles.tagFooterText, { color: slColors.gray }]}>
+                {filteredBooks.length} {filteredBooks.length === 1 ? 'title' : 'titles'} · {Math.round(tagTotalDuration / 3600)} hours total
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -632,91 +668,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
   },
-  sortBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: PADDING,
-    paddingBottom: 12,
-  },
-  resultCount: {
-    fontSize: 14,
-  },
-  sortButtons: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  sortButtonText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  listContainer: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  list: {
-    paddingHorizontal: PADDING,
-  },
-  bookCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 0,
-  },
-  cardLight: {
-    backgroundColor: secretLibraryColors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
-  },
-  cardDark: {
-    backgroundColor: secretLibraryColors.black,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  coverContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  cover: {
-    width: scale(56),
-    height: scale(56),
-    borderRadius: scale(4),
-  },
-  bookInfo: {
-    flex: 1,
-  },
-  bookTitle: {
-    fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(16),
-    color: secretLibraryColors.black,
-    lineHeight: scale(20),
-    marginBottom: 2,
-  },
-  bookTitleDark: {
-    color: secretLibraryColors.white,
-  },
-  authorText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(10),
-    color: secretLibraryColors.gray,
-    marginBottom: 2,
-  },
-  durationText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: secretLibraryColors.gray,
-  },
   // Empty state
   emptyState: {
     alignItems: 'center',
@@ -728,10 +679,118 @@ const styles = StyleSheet.create({
     fontSize: scale(18),
     textAlign: 'center',
   },
-  emptySubtitle: {
+  // Tag filter: SeriesDetail-style layout
+  tagTitleHeader: {
+    paddingTop: 16,
+    paddingBottom: 20,
+    paddingHorizontal: 24,
+  },
+  tagHeaderSubtitle: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    marginTop: 8,
-    fontSize: scale(12),
-    textAlign: 'center',
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  tagHeaderName: {
+    fontFamily: secretLibraryFonts.playfair.regular,
+    fontSize: scale(36),
+    fontWeight: '400',
+    lineHeight: scale(36) * 1.1,
+    marginBottom: 6,
+  },
+  tagHeaderStats: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+  },
+  tagTabsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 24,
+  },
+  tagTabs: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  tagTab: {
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tagTabText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tagToggleText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    textTransform: 'uppercase',
+    letterSpacing: 0.45,
+    textDecorationLine: 'underline',
+  },
+  tagListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  tagListCoverWrap: {
+    position: 'relative',
+  },
+  tagListCover: {
+    width: scale(40),
+    height: scale(40),
+    borderRadius: 4,
+  },
+  tagListInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  tagListTitle: {
+    fontFamily: secretLibraryFonts.playfair.regular,
+    fontSize: scale(16),
+  },
+  tagListAuthor: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    marginTop: 2,
+  },
+  tagListDuration: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+  },
+  showMoreBtn: {
+    alignItems: 'center',
+    paddingVertical: scale(14),
+    marginTop: scale(8),
+    marginHorizontal: 24,
+    borderWidth: 1,
+    borderRadius: scale(8),
+  },
+  showMoreText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tagFooter: {
+    paddingTop: 20,
+    borderTopWidth: 1,
+    marginTop: 20,
+    paddingHorizontal: 24,
+  },
+  tagFooterText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
   },
 });

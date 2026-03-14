@@ -20,16 +20,13 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
-  Download,
   PlayCircle,
   Folder,
-  Type,
   LogOut,
   ChevronRight,
   Vibrate,
-  RefreshCw,
-  ListMusic,
   Palette,
+  Info,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useAuth } from '@/core/auth';
@@ -43,6 +40,11 @@ import {
   secretLibraryFonts as fonts,
 } from '@/shared/theme/secretLibrary';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
+import { usePlayerStore } from '@/features/player/stores';
+import { useChapterCleaningStore, CLEANING_LEVEL_INFO } from '../stores/chapterCleaningStore';
+import { useHapticSettingsStore } from '../stores/hapticSettingsStore';
+import { useSpineCacheStore } from '@/features/home/stores/spineCache';
+import { useLibrarySyncStore } from '@/shared/stores/librarySyncStore';
 
 // =============================================================================
 // HELPERS
@@ -108,22 +110,7 @@ function ProfileLink({ Icon, label, subtitle, badge, badgeColor, onPress }: Prof
 }
 
 
-interface SectionGroupProps {
-  title: string;
-  children: React.ReactNode;
-}
 
-function SectionGroup({ title, children }: SectionGroupProps) {
-  const colors = useSecretLibraryColors();
-  return (
-    <View style={styles.sectionGroup}>
-      <Text style={[styles.sectionTitle, { color: colors.gray }]}>{title}</Text>
-      <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
-        {children}
-      </View>
-    </View>
-  );
-}
 
 // =============================================================================
 // MAIN COMPONENT
@@ -137,7 +124,7 @@ export function ProfileScreen() {
 
   // Theme-aware colors
   const colors = useSecretLibraryColors();
-  const isDarkMode = colors.isDark; // Quick check: in dark mode, 'black' is white
+  const isDarkMode = colors.isDark;
 
   // Download stats
   const { downloads } = useDownloads();
@@ -145,6 +132,34 @@ export function ProfileScreen() {
   const downloadCount = completedDownloads.length;
   const totalStorage = completedDownloads.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
 
+  // Dynamic subtitle values
+  const globalDefaultRate = usePlayerStore((s) => s.globalDefaultRate);
+  const skipForwardInterval = usePlayerStore((s) => s.skipForwardInterval ?? 30);
+  const skipBackInterval = usePlayerStore((s) => s.skipBackInterval ?? 15);
+  const chapterLevel = useChapterCleaningStore((s) => s.level);
+  const hapticsEnabled = useHapticSettingsStore((s) => s.enabled);
+
+  // Haptics: count enabled categories
+  const playbackControls = useHapticSettingsStore((s) => s.playbackControls);
+  const scrubberFeedback = useHapticSettingsStore((s) => s.scrubberFeedback);
+  const speedControl = useHapticSettingsStore((s) => s.speedControl);
+  const sleepTimer = useHapticSettingsStore((s) => s.sleepTimer);
+  const hapticDownloads = useHapticSettingsStore((s) => s.downloads);
+  const hapticBookmarks = useHapticSettingsStore((s) => s.bookmarks);
+  const hapticCompletions = useHapticSettingsStore((s) => s.completions);
+  const uiInteractions = useHapticSettingsStore((s) => s.uiInteractions);
+  const enabledHapticCount = [playbackControls, scrubberFeedback, speedControl, sleepTimer, hapticDownloads, hapticBookmarks, hapticCompletions, uiInteractions].filter(Boolean).length;
+
+  // Display Settings subtitle
+  const useServerSpines = useSpineCacheStore((s) => s.useServerSpines);
+  const displaySubtitle = `${useServerSpines ? 'Server spines' : 'Generated'} · ${CLEANING_LEVEL_INFO[chapterLevel].label}`;
+
+  // Data & Storage subtitle
+  const libraryPlaylistId = useLibrarySyncStore((s) => s.libraryPlaylistId);
+  const dataStorageSubtitle = `${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}${libraryPlaylistId ? ' · Synced' : ''}`;
+
+  const playbackSubtitle = `${globalDefaultRate}x · ${skipForwardInterval}s/${skipBackInterval}s`;
+  const hapticsSubtitle = hapticsEnabled ? `On · ${enabledHapticCount} of 8` : 'Off';
 
   const handleLogout = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -191,11 +206,6 @@ export function ProfileScreen() {
     }
   }, [navigation]);
 
-  const formatAccountType = (type?: string) => {
-    if (!type) return 'User';
-    return type.charAt(0).toUpperCase() + type.slice(1);
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.white} />
@@ -238,59 +248,39 @@ export function ProfileScreen() {
         {/* Page Title */}
         <Text style={[styles.pageTitle, { color: colors.black }]}>Settings</Text>
 
-        {/* My Stuff Section */}
-        <SectionGroup title="My Stuff">
-          <ProfileLink
-            Icon={Download}
-            label="Downloads"
-            subtitle={`${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}`}
-            onPress={() => navigation.navigate('Downloads')}
-          />
-          <ProfileLink
-            Icon={ListMusic}
-            label="Home Screen Settings"
-            subtitle="Playlists and display options"
-            onPress={() => navigation.navigate('PlaylistSettings')}
-          />
-        </SectionGroup>
-
-        {/* Playback Section */}
-        <SectionGroup title="Playback">
+        {/* All Settings */}
+        <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
           <ProfileLink
             Icon={PlayCircle}
             label="Playback Settings"
-            subtitle="Speed, skip intervals, sleep timer"
+            subtitle={playbackSubtitle}
             onPress={() => navigation.navigate('PlaybackSettings')}
           />
           <ProfileLink
             Icon={Vibrate}
             label="Haptics"
-            subtitle="Vibration feedback settings"
+            subtitle={hapticsSubtitle}
             onPress={() => navigation.navigate('HapticSettings')}
           />
           <ProfileLink
             Icon={Palette}
-            label="Spine Appearance"
-            subtitle="Server spines and series display"
-            onPress={() => navigation.navigate('AppearanceSettings')}
+            label="Display Settings"
+            subtitle={displaySubtitle}
+            onPress={() => navigation.navigate('DisplaySettings')}
           />
-        </SectionGroup>
-
-        {/* Library Section */}
-        <SectionGroup title="Library">
           <ProfileLink
             Icon={Folder}
             label="Data & Storage"
-            subtitle="Downloads, sync, and storage"
+            subtitle={dataStorageSubtitle}
             onPress={() => navigation.navigate('DataStorageSettings')}
           />
           <ProfileLink
-            Icon={Type}
-            label="Chapter Names"
-            subtitle="Clean up messy chapter names"
-            onPress={() => navigation.navigate('ChapterCleaningSettings')}
+            Icon={Info}
+            label="About"
+            subtitle={`v${APP_VERSION}`}
+            onPress={() => navigation.navigate('About')}
           />
-        </SectionGroup>
+        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -313,10 +303,8 @@ export function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor applied inline with theme-aware colors
   },
   safeAreaTop: {
-    // backgroundColor applied inline with theme-aware colors
   },
   // Top Nav
   topNav: {
@@ -325,7 +313,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // backgroundColor applied inline with theme-aware colors
   },
   topNavRight: {
     flexDirection: 'row',
@@ -338,18 +325,15 @@ const styles = StyleSheet.create({
   topNavUsername: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    // color applied inline with theme-aware colors
   },
   topNavServer: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    // color applied inline with theme-aware colors
     marginTop: 1,
   },
   signOutIconButton: {
     width: scale(36),
     height: scale(36),
-    // backgroundColor applied inline with theme-aware colors
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -362,25 +346,11 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(42),
-    // color applied inline with theme-aware colors
     marginBottom: 24,
     marginTop: 8,
   },
-  // Section Group
-  sectionGroup: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    // color applied inline with theme-aware colors
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 12,
-    paddingLeft: 4,
-  },
   sectionContent: {
-    // backgroundColor applied inline with theme-aware colors
+    marginBottom: 28,
   },
   // Profile Link
   profileLink: {
@@ -389,13 +359,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    // borderBottomColor applied inline with theme-aware colors
   },
   linkIconContainer: {
     width: scale(32),
     height: scale(32),
     borderRadius: scale(8),
-    // backgroundColor applied inline with theme-aware colors
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -406,26 +374,22 @@ const styles = StyleSheet.create({
   linkLabel: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(15),
-    // color applied inline with theme-aware colors
     marginBottom: 2,
   },
   linkSubtitle: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    // color applied inline with theme-aware colors
   },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
     borderWidth: 1,
-    // borderColor applied inline with theme-aware colors
     marginRight: 8,
   },
   badgeText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    // color applied inline with theme-aware colors
     textTransform: 'uppercase',
   },
   // Footer
@@ -436,19 +400,16 @@ const styles = StyleSheet.create({
   appName: {
     fontFamily: fonts.playfair.regular,
     fontSize: scale(16),
-    // color applied inline with theme-aware colors
     marginTop: 12,
     marginBottom: 4,
   },
   versionText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    // color applied inline with theme-aware colors
   },
   buildDate: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
-    // color applied inline with theme-aware colors
     marginTop: 2,
   },
 });
