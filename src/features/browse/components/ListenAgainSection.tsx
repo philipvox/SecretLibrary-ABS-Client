@@ -2,7 +2,7 @@
  * src/features/browse/components/ListenAgainSection.tsx
  *
  * "Listen Again" section for Browse page - shows books user has listened to before.
- * Single row horizontal scrolling carousel with peeking content.
+ * Single row horizontal scrolling carousel with cover art cards.
  */
 
 import React, { useMemo, useCallback } from 'react';
@@ -14,6 +14,7 @@ import { useCoverUrl } from '@/core/cache';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { scale, wp } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/features/completion';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { useReadingHistory } from '@/features/reading-history-wizard';
 
 // Carousel layout constants
@@ -60,6 +61,7 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, o
           cachePolicy="memory-disk"
           transition={200}
         />
+        <CoverStars bookId={item.id} />
         <CompleteBadgeOverlay bookId={item.id} size="small" />
       </View>
       <Text style={[styles.cardTitle, { color: colors.white }]} numberOfLines={1}>
@@ -156,12 +158,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: PADDING,
-    marginBottom: scale(16),
+    marginBottom: scale(4),
   },
   title: {
-    fontFamily: secretLibraryFonts.playfair.bold,
-    fontSize: scale(22),
-    fontWeight: '700',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   viewAllButton: {
     flexDirection: 'row',

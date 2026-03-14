@@ -20,12 +20,13 @@ export function useBrowseLibrary(): { filteredItems: LibraryItem[]; isLoaded: bo
   const selectedAges = useContentFilterStore((s) => s.selectedAges);
   const selectedRatings = useContentFilterStore((s) => s.selectedRatings);
   const selectedTags = useContentFilterStore((s) => s.selectedTags);
+  const selectedGenres = useContentFilterStore((s) => s.selectedGenres);
   const lengthRange = useContentFilterStore((s) => s.lengthRange);
 
   const filteredItems = useMemo(() => {
     if (!isLoaded) return [];
-    return filterByAudience(items, audience, selectedAges, selectedRatings, selectedTags, lengthRange);
-  }, [items, isLoaded, audience, selectedAges, selectedRatings, selectedTags, lengthRange]);
+    return filterByAudience(items, audience, selectedAges, selectedRatings, selectedTags, lengthRange, selectedGenres);
+  }, [items, isLoaded, audience, selectedAges, selectedRatings, selectedTags, selectedGenres, lengthRange]);
 
   return { filteredItems, isLoaded };
 }

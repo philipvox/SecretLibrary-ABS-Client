@@ -1,146 +1,33 @@
 /**
  * src/features/browse/components/TagFilterSheet.tsx
  *
- * Filter popup for tag-based filtering.
- * Works across all audience modes (All, Kids, Adults).
- * Tab-based category navigation for cleaner UX.
+ * Filter sheet with collapsible Genres and Tags sections.
+ * NN/g principles: compact by default, accordion expand, batch apply via DONE,
+ * counts to prevent zero-result dead ends, alphabetical genres / frequency tags.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Modal,
   ScrollView,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import {
-  ChevronDown,
-  ChevronUp,
-  Compass,
-  Cloud,
-  Coffee,
-  Moon,
-  Heart,
-  Sun,
-  Smile,
-  Eye,
-  Sunrise,
-  Sparkles,
-  Flame,
-  Feather,
-  Search,
-  Clock,
-  Zap,
-  Lightbulb,
-  TrendingUp,
-  Wand2,
-  FastForward,
-  Hourglass,
-  Gauge,
-  Users,
-  Swords,
-  Crown,
-  Shield,
-  AlertTriangle,
-  BookOpen,
-  Mic,
-  Award,
-  Star,
-  Headphones,
-  Volume2,
-  Play,
-  ListOrdered,
-  Bookmark,
-  Timer,
-  type LucideIcon,
-} from 'lucide-react-native';
-import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
+import { ChevronDown, ChevronUp, Timer } from 'lucide-react-native';
+import { secretLibraryFonts, secretLibraryColors } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { Icon } from '@/shared/components/Icon';
-import { TAG_CATEGORIES, TagCategory, LengthRange, useContentFilterStore } from '../stores/contentFilterStore';
+import { LengthRange, AudienceFilter, useContentFilterStore } from '../stores/contentFilterStore';
+import { useDynamicFilters, FilterOption } from '../hooks/useDynamicFilters';
 
-// =============================================================================
-// Tag Icons Mapping
-// =============================================================================
-
-const TAG_ICONS: Record<string, LucideIcon> = {
-  // Mood
-  adventurous: Compass,
-  atmospheric: Cloud,
-  cozy: Coffee,
-  dark: Moon,
-  emotional: Heart,
-  'feel-good': Sun,
-  funny: Smile,
-  haunting: Eye,
-  heartwarming: Heart,
-  hopeful: Sunrise,
-  inspiring: Sparkles,
-  intense: Flame,
-  lighthearted: Feather,
-  mysterious: Search,
-  romantic: Heart,
-  suspenseful: Clock,
-  tense: Zap,
-  'thought-provoking': Lightbulb,
-  uplifting: TrendingUp,
-  whimsical: Wand2,
-  // Pacing
-  'fast-paced': FastForward,
-  'slow-burn': Hourglass,
-  'medium-paced': Gauge,
-  'page-turner': Zap,
-  // Tropes
-  'enemies-to-lovers': Swords,
-  'found-family': Users,
-  'chosen-one': Crown,
-  'redemption-arc': Shield,
-  'unreliable-narrator': Eye,
-  'love-triangle': Heart,
-  'fish-out-of-water': Compass,
-  'coming-of-age': Sunrise,
-  'second-chance': TrendingUp,
-  'underdog': Star,
-  // Content
-  'explicit-content': AlertTriangle,
-  'clean-read': BookOpen,
-  'mild-language': Volume2,
-  'violence': Swords,
-  'no-romance': BookOpen,
-  // Audiobook
-  'full-cast': Users,
-  'single-narrator': Mic,
-  'author-narrated': BookOpen,
-  'award-winning-narrator': Award,
-  'celebrity-narrator': Star,
-  // Listening
-  'good-for-sleep': Moon,
-  'good-for-commute': Headphones,
-  'good-for-workout': Flame,
-  'background-listening': Volume2,
-  'requires-attention': Eye,
-  // Series
-  'standalone': BookOpen,
-  'series-starter': Play,
-  'series-complete': ListOrdered,
-  'can-read-out-of-order': Bookmark,
-};
-
-// Category icons for tabs
-const CATEGORY_ICONS: Record<TagCategory, LucideIcon> = {
-  mood: Sparkles,
-  pacing: Gauge,
-  tropes: Crown,
-  content: BookOpen,
-  audiobook: Mic,
-  listening: Headphones,
-  series: ListOrdered,
-};
+// How many items to show before "SHOW ALL"
+const PREVIEW_COUNT = 8;
 
 // =============================================================================
 // Types
@@ -152,22 +39,23 @@ interface TagFilterSheetProps {
 }
 
 // =============================================================================
-// Helper to format tag for display
+// Helpers
 // =============================================================================
 
 function formatTagLabel(tag: string): string {
   return tag
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .join(' ')
+    .toUpperCase();
 }
 
 // =============================================================================
-// Length Range Section Component
+// Length Range Section
 // =============================================================================
 
 const LENGTH_MIN = 0;
-const LENGTH_MAX = 30; // 30+ hours
+const LENGTH_MAX = 30;
 
 interface LengthRangeSectionProps {
   lengthRange: LengthRange | null;
@@ -210,15 +98,15 @@ function LengthRangeSection({ lengthRange, onLengthChange }: LengthRangeSectionP
   };
 
   return (
-    <View style={styles.lengthContainer}>
+    <View style={[styles.lengthContainer, { borderBottomColor: colors.grayLine }]}>
       <TouchableOpacity style={styles.lengthHeader} onPress={handleToggleExpand}>
         <View style={styles.lengthTitleRow}>
-          <Timer size={16} color={colors.gray} />
-          <Text style={[styles.lengthTitle, { color: colors.black }]}>Length</Text>
+          <Timer size={14} color={colors.gray} />
+          <Text style={[styles.lengthTitle, { color: colors.black }]}>LENGTH</Text>
           {isActive && (
             <View style={[styles.lengthBadge, { backgroundColor: colors.black }]}>
               <Text style={[styles.lengthBadgeText, { color: colors.white }]}>
-                {formatHours(minValue)}-{formatHours(maxValue)}h
+                {formatHours(minValue)}-{formatHours(maxValue)}H
               </Text>
             </View>
           )}
@@ -232,21 +120,18 @@ function LengthRangeSection({ lengthRange, onLengthChange }: LengthRangeSectionP
 
       {expanded && (
         <View style={styles.lengthSection}>
-          {/* Range display */}
           <View style={styles.lengthRangeDisplay}>
             <Text style={[styles.lengthRangeText, { color: colors.black }]}>
-              {formatHours(minValue)} - {formatHours(maxValue)} hours
+              {formatHours(minValue)} - {formatHours(maxValue)} HOURS
             </Text>
             {isActive && (
               <TouchableOpacity onPress={handleClear}>
-                <Text style={[styles.clearText, { color: colors.gray }]}>Clear</Text>
+                <Text style={[styles.clearText, { color: colors.gray }]}>CLEAR</Text>
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Min slider */}
           <View style={styles.sliderRow}>
-            <Text style={[styles.sliderLabel, { color: colors.gray }]}>Min</Text>
+            <Text style={[styles.sliderLabel, { color: colors.gray }]}>MIN</Text>
             <Slider
               style={styles.slider}
               minimumValue={LENGTH_MIN}
@@ -258,12 +143,10 @@ function LengthRangeSection({ lengthRange, onLengthChange }: LengthRangeSectionP
               thumbTintColor={colors.black}
               step={1}
             />
-            <Text style={[styles.sliderValue, { color: colors.black }]}>{formatHours(minValue)}h</Text>
+            <Text style={[styles.sliderValue, { color: colors.black }]}>{formatHours(minValue)}H</Text>
           </View>
-
-          {/* Max slider */}
           <View style={styles.sliderRow}>
-            <Text style={[styles.sliderLabel, { color: colors.gray }]}>Max</Text>
+            <Text style={[styles.sliderLabel, { color: colors.gray }]}>MAX</Text>
             <Slider
               style={styles.slider}
               minimumValue={1}
@@ -275,7 +158,7 @@ function LengthRangeSection({ lengthRange, onLengthChange }: LengthRangeSectionP
               thumbTintColor={colors.black}
               step={1}
             />
-            <Text style={[styles.sliderValue, { color: colors.black }]}>{formatHours(maxValue)}h</Text>
+            <Text style={[styles.sliderValue, { color: colors.black }]}>{formatHours(maxValue)}H</Text>
           </View>
         </View>
       )}
@@ -284,50 +167,99 @@ function LengthRangeSection({ lengthRange, onLengthChange }: LengthRangeSectionP
 }
 
 // =============================================================================
-// Category Tab Component
+// Collapsible Filter Section
 // =============================================================================
 
-interface CategoryTabProps {
-  category: TagCategory;
-  isActive: boolean;
-  selectedCount: number;
-  onPress: () => void;
+interface FilterSectionProps {
+  title: string;
+  items: FilterOption[];
+  selectedKeys: string[];
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  onToggle: (key: string) => void;
+  formatLabel?: (name: string) => string;
 }
 
-function CategoryTab({ category, isActive, selectedCount, onPress }: CategoryTabProps) {
+function FilterSection({ title, items, selectedKeys, expanded, onToggleExpanded, onToggle, formatLabel }: FilterSectionProps) {
   const colors = useSecretLibraryColors();
-  const config = TAG_CATEGORIES[category];
-  const TabIcon = CATEGORY_ICONS[category];
+  const selectedCount = useMemo(
+    () => items.filter((i) => selectedKeys.includes(i.key)).length,
+    [items, selectedKeys]
+  );
+
+  const needsExpand = items.length > PREVIEW_COUNT;
+  const visibleItems = expanded || !needsExpand ? items : items.slice(0, PREVIEW_COUNT);
+  const hiddenCount = items.length - PREVIEW_COUNT;
+
+  if (items.length === 0) return null;
 
   return (
-    <TouchableOpacity
-      style={styles.categoryTab}
-      onPress={onPress}
-    >
-      <View style={styles.categoryTabContent}>
-        <TabIcon
-          size={14}
-          color={isActive ? colors.black : colors.gray}
-          strokeWidth={2}
-        />
-        <Text
-          style={[
-            styles.categoryTabText,
-            { color: isActive ? colors.black : colors.gray },
-          ]}
-        >
-          {config.label}
-        </Text>
-        {selectedCount > 0 && (
-          <View style={[styles.tabBadge, { backgroundColor: colors.black }]}>
-            <Text style={[styles.tabBadgeText, { color: colors.white }]}>
-              {selectedCount}
-            </Text>
-          </View>
+    <View style={styles.section}>
+      {/* Section header — tappable to expand/collapse */}
+      <Pressable
+        style={styles.sectionHeaderRow}
+        onPress={needsExpand ? onToggleExpanded : undefined}
+      >
+        <View style={styles.sectionHeaderLeft}>
+          <Text style={[styles.sectionHeader, { color: colors.gray }]}>{title}</Text>
+          {selectedCount > 0 && (
+            <View style={[styles.sectionBadge, { backgroundColor: colors.black }]}>
+              <Text style={[styles.sectionBadgeText, { color: colors.white }]}>{selectedCount}</Text>
+            </View>
+          )}
+        </View>
+        {needsExpand && (
+          expanded ? (
+            <ChevronUp size={14} color={colors.gray} />
+          ) : (
+            <ChevronDown size={14} color={colors.gray} />
+          )
         )}
-      </View>
-      {isActive && <View style={[styles.tabIndicator, { backgroundColor: colors.black }]} />}
-    </TouchableOpacity>
+      </Pressable>
+
+      {/* List rows */}
+      {visibleItems.map((item, index) => {
+        const isSelected = selectedKeys.includes(item.key);
+        const isLast = index === visibleItems.length - 1 && (expanded || !needsExpand);
+        return (
+          <Pressable
+            key={item.key}
+            style={[
+              styles.listRow,
+              !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.grayLine },
+              isSelected && { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onToggle(item.key);
+            }}
+          >
+            <View style={styles.listRowLeft}>
+              {isSelected && (
+                <View style={[styles.checkmark, { backgroundColor: colors.black }]}>
+                  <Icon name="Check" size={10} color={colors.white} />
+                </View>
+              )}
+              <Text style={[styles.listRowLabel, { color: colors.black }]}>
+                {formatLabel ? formatLabel(item.name) : item.name.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.listRowCount, { color: colors.black }]}>
+              {item.count}
+            </Text>
+          </Pressable>
+        );
+      })}
+
+      {/* Show All / Show Less toggle */}
+      {needsExpand && (
+        <Pressable style={styles.expandButton} onPress={onToggleExpanded}>
+          <Text style={[styles.expandText, { color: colors.gray }]}>
+            {expanded ? 'SHOW LESS' : `SHOW ALL (${hiddenCount} MORE)`}
+          </Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -337,31 +269,37 @@ function CategoryTab({ category, isActive, selectedCount, onPress }: CategoryTab
 
 export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
   const colors = useSecretLibraryColors();
-  const [activeCategory, setActiveCategory] = useState<TagCategory>('mood');
+  const { genres, tags } = useDynamicFilters();
+
+  // Accordion state — owned here so it survives child re-renders
+  const [genresExpanded, setGenresExpanded] = useState(false);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+
+  const handleToggleGenresExpanded = useCallback(() => {
+    Haptics.selectionAsync();
+    setGenresExpanded((prev) => !prev);
+  }, []);
+
+  const handleToggleTagsExpanded = useCallback(() => {
+    Haptics.selectionAsync();
+    setTagsExpanded((prev) => !prev);
+  }, []);
 
   // Store state
+  const audience = useContentFilterStore((s) => s.audience);
+  const setAudience = useContentFilterStore((s) => s.setAudience);
   const selectedTags = useContentFilterStore((s) => s.selectedTags);
+  const selectedGenres = useContentFilterStore((s) => s.selectedGenres);
   const lengthRange = useContentFilterStore((s) => s.lengthRange);
   const toggleTag = useContentFilterStore((s) => s.toggleTag);
+  const toggleGenre = useContentFilterStore((s) => s.toggleGenre);
   const setLengthRange = useContentFilterStore((s) => s.setLengthRange);
   const clearTags = useContentFilterStore((s) => s.clearTags);
 
-  // Get selected count per category
-  const getSelectedCount = useCallback((category: TagCategory) => {
-    const categoryTags = TAG_CATEGORIES[category].tags;
-    return categoryTags.filter((t) => selectedTags.includes(t)).length;
-  }, [selectedTags]);
-
-  // Handlers
-  const handleToggleTag = useCallback((tag: string) => {
+  const handleAudienceChange = useCallback((value: AudienceFilter) => {
     Haptics.selectionAsync();
-    toggleTag(tag);
-  }, [toggleTag]);
-
-  const handleCategoryChange = useCallback((category: TagCategory) => {
-    Haptics.selectionAsync();
-    setActiveCategory(category);
-  }, []);
+    setAudience(value);
+  }, [setAudience]);
 
   const handleClear = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -373,9 +311,8 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
     onClose();
   }, [onClose]);
 
-  const filterCount = selectedTags.length + (lengthRange ? 1 : 0);
+  const filterCount = selectedTags.length + selectedGenres.length + (lengthRange ? 1 : 0) + (audience !== 'all' ? 1 : 0);
   const hasActiveFilter = filterCount > 0;
-  const activeCategoryConfig = TAG_CATEGORIES[activeCategory];
 
   if (!visible) return null;
 
@@ -391,13 +328,13 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
         <View style={[styles.popup, { backgroundColor: colors.white }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.grayLine }]}>
-            <Text style={[styles.headerTitle, { color: colors.black }]}>Filters</Text>
+            <Text style={[styles.headerTitle, { color: colors.black }]}>FILTERS</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="X" size={20} color={colors.black} />
+              <Icon name="X" size={18} color={colors.black} />
             </TouchableOpacity>
           </View>
 
-          {/* Selected Tags Summary */}
+          {/* Selected Summary — horizontal scroll of active pills */}
           {hasActiveFilter && (
             <View style={styles.selectedSummary}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -406,15 +343,27 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
                     <View style={[styles.selectedTag, { backgroundColor: colors.black }]}>
                       <Timer size={12} color={colors.white} />
                       <Text style={[styles.selectedTagText, { color: colors.white }]}>
-                        {lengthRange.min}-{lengthRange.max >= 30 ? '30+' : lengthRange.max}h
+                        {lengthRange.min}-{lengthRange.max >= 30 ? '30+' : lengthRange.max}H
                       </Text>
                     </View>
                   )}
+                  {selectedGenres.map((genre) => (
+                    <TouchableOpacity
+                      key={`g-${genre}`}
+                      style={[styles.selectedTag, { backgroundColor: colors.black }]}
+                      onPress={() => { Haptics.selectionAsync(); toggleGenre(genre); }}
+                    >
+                      <Text style={[styles.selectedTagText, { color: colors.white }]}>
+                        {genre.toUpperCase()}
+                      </Text>
+                      <Icon name="X" size={12} color={colors.white} />
+                    </TouchableOpacity>
+                  ))}
                   {selectedTags.map((tag) => (
                     <TouchableOpacity
-                      key={tag}
+                      key={`t-${tag}`}
                       style={[styles.selectedTag, { backgroundColor: colors.black }]}
-                      onPress={() => handleToggleTag(tag)}
+                      onPress={() => { Haptics.selectionAsync(); toggleTag(tag); }}
                     >
                       <Text style={[styles.selectedTagText, { color: colors.white }]}>
                         {formatTagLabel(tag)}
@@ -427,79 +376,64 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
             </View>
           )}
 
-          {/* Length Range Section */}
-          <LengthRangeSection
-            lengthRange={lengthRange}
-            onLengthChange={setLengthRange}
-          />
-
-          {/* Category Tabs */}
-          <View style={styles.categoryTabsContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryTabs}
-            >
-              {(Object.keys(TAG_CATEGORIES) as TagCategory[]).map((category) => (
-                <CategoryTab
-                  key={category}
-                  category={category}
-                  isActive={activeCategory === category}
-                  selectedCount={getSelectedCount(category)}
-                  onPress={() => handleCategoryChange(category)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Tags Grid for Active Category */}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.tagsGrid}>
-              {activeCategoryConfig.tags.map((tag) => {
-                const isSelected = selectedTags.includes(tag);
-                const TagIcon = TAG_ICONS[tag] || BookOpen;
+          {/* Audience Toggle */}
+          <View style={styles.audienceContainer}>
+            <View style={styles.audiencePillTrack}>
+              {(['all', 'kids', 'adults'] as AudienceFilter[]).map((value) => {
+                const isActive = audience === value;
                 return (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[
-                      styles.tag,
-                      { borderColor: colors.grayLine },
-                      isSelected && { backgroundColor: colors.black, borderColor: colors.black },
-                    ]}
-                    onPress={() => handleToggleTag(tag)}
+                  <Pressable
+                    key={value}
+                    style={[styles.audiencePill, isActive && styles.audiencePillActive]}
+                    onPress={() => handleAudienceChange(value)}
                   >
-                    <TagIcon
-                      size={16}
-                      color={isSelected ? colors.white : colors.black}
-                      strokeWidth={2}
-                    />
-                    <Text
-                      style={[
-                        styles.tagText,
-                        { color: isSelected ? colors.white : colors.black },
-                      ]}
-                    >
-                      {formatTagLabel(tag)}
+                    <Text style={[styles.audiencePillText, isActive && styles.audiencePillTextActive]}>
+                      {value.toUpperCase()}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </View>
+          </View>
+
+          {/* Length */}
+          <LengthRangeSection lengthRange={lengthRange} onLengthChange={setLengthRange} />
+
+          {/* Scrollable accordion sections */}
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <FilterSection
+              title="GENRES"
+              items={genres}
+              selectedKeys={selectedGenres}
+              expanded={genresExpanded}
+              onToggleExpanded={handleToggleGenresExpanded}
+              onToggle={toggleGenre}
+            />
+            <FilterSection
+              title="TAGS"
+              items={tags}
+              selectedKeys={selectedTags}
+              expanded={tagsExpanded}
+              onToggleExpanded={handleToggleTagsExpanded}
+              onToggle={toggleTag}
+              formatLabel={formatTagLabel}
+            />
           </ScrollView>
 
           {/* Footer */}
           <View style={[styles.footer, { borderTopColor: colors.grayLine }]}>
             {hasActiveFilter && (
               <TouchableOpacity style={styles.resetButton} onPress={handleClear}>
-                <Text style={[styles.resetText, { color: colors.gray }]}>Clear All</Text>
+                <Text style={[styles.resetText, { color: colors.gray }]}>CLEAR ALL</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.applyButton, { backgroundColor: colors.black }]}
+              style={[styles.doneButton, { backgroundColor: colors.black }]}
               onPress={handleDone}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.applyText, { color: colors.white }]}>
-                Done{hasActiveFilter ? ` (${filterCount})` : ''}
+              <Text style={[styles.doneText, { color: colors.white }]}>
+                DONE{hasActiveFilter ? ` (${filterCount})` : ''}
               </Text>
             </TouchableOpacity>
           </View>
@@ -539,35 +473,68 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
-    fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(20),
-    fontWeight: '600',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(13),
+    letterSpacing: 1.5,
   },
   closeButton: {
     padding: 4,
   },
   selectedSummary: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   selectedTagsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   selectedTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
   },
   selectedTagText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(11),
+    fontSize: scale(9),
+    letterSpacing: 0.5,
   },
-  // Length section
+  // Audience pills
+  audienceContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  audiencePillTrack: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    borderRadius: scale(20),
+    padding: 3,
+  },
+  audiencePill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: scale(8),
+    borderRadius: scale(17),
+  },
+  audiencePillActive: {
+    backgroundColor: secretLibraryColors.black,
+  },
+  audiencePillText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    color: secretLibraryColors.gray,
+    letterSpacing: 0.5,
+  },
+  audiencePillTextActive: {
+    color: secretLibraryColors.white,
+    fontWeight: '600',
+  },
+  // Length
   lengthContainer: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   lengthHeader: {
     flexDirection: 'row',
@@ -583,8 +550,9 @@ const styles = StyleSheet.create({
   },
   lengthTitle: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(12),
+    fontSize: scale(10),
     fontWeight: '500',
+    letterSpacing: 1,
   },
   lengthBadge: {
     paddingHorizontal: 8,
@@ -593,8 +561,9 @@ const styles = StyleSheet.create({
   },
   lengthBadgeText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(10),
+    fontSize: scale(9),
     fontWeight: '600',
+    letterSpacing: 0.5,
   },
   lengthSection: {
     paddingHorizontal: 20,
@@ -608,13 +577,14 @@ const styles = StyleSheet.create({
   },
   lengthRangeText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(14),
+    fontSize: scale(12),
     fontWeight: '600',
+    letterSpacing: 0.5,
   },
   clearText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(11),
-    textTransform: 'uppercase',
+    fontSize: scale(10),
+    letterSpacing: 0.5,
   },
   sliderRow: {
     flexDirection: 'row',
@@ -623,8 +593,9 @@ const styles = StyleSheet.create({
   },
   sliderLabel: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(10),
+    fontSize: scale(9),
     width: 32,
+    letterSpacing: 0.5,
   },
   slider: {
     flex: 1,
@@ -632,106 +603,122 @@ const styles = StyleSheet.create({
   },
   sliderValue: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(11),
+    fontSize: scale(10),
     width: 36,
     textAlign: 'right',
+    letterSpacing: 0.5,
   },
-  // Category tabs
-  categoryTabsContainer: {
+  // Scrollable content
+  content: {
+    maxHeight: 340,
   },
-  categoryTabs: {
-    paddingHorizontal: 8,
-    gap: 0,
+  // Accordion section
+  section: {
+    marginBottom: 4,
   },
-  categoryTab: {
-    paddingHorizontal: 16,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 14,
+    paddingBottom: 8,
   },
-  categoryTabContent: {
+  sectionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  categoryTabText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(12),
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  sectionHeader: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(9),
+    letterSpacing: 1.5,
   },
-  tabIndicator: {
-    height: 3,
-    marginTop: 10,
-    borderRadius: 1.5,
-  },
-  tabBadge: {
+  sectionBadge: {
     minWidth: 18,
     height: 18,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 4,
+    paddingHorizontal: 5,
   },
-  tabBadgeText: {
+  sectionBadgeText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(10),
+    fontSize: scale(9),
     fontWeight: '700',
   },
-  // Content area
-  content: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    maxHeight: 280,
-  },
-  tagsGrid: {
+  // List rows
+  listRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    minHeight: scale(44),
+  },
+  listRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  checkmark: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listRowLabel: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(11),
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  listRowCount: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    letterSpacing: 0.5,
+    marginLeft: 12,
+  },
+  // Expand/collapse toggle
+  expandButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  expandText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    letterSpacing: 1,
+  },
+  // Footer
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderTopWidth: 1,
     gap: 10,
   },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 22,
-    borderWidth: 1,
-  },
-  tagText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(12),
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-  },
   resetButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   resetText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(11),
-    textTransform: 'uppercase',
+    fontSize: scale(10),
     letterSpacing: 0.5,
   },
-  applyButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+  doneButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  applyText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(11),
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  doneText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(13),
+    letterSpacing: 1.5,
   },
 });
 

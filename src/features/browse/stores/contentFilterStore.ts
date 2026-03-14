@@ -42,6 +42,9 @@ export interface ContentFilterState {
   // Selected tags for filtering (works across all audience modes)
   selectedTags: string[];
 
+  // Selected genres for filtering
+  selectedGenres: string[];
+
   // Length range filter (in hours)
   lengthRange: LengthRange | null;
 
@@ -50,9 +53,11 @@ export interface ContentFilterState {
   toggleAge: (age: AgeRecommendation) => void;
   toggleRating: (rating: AgeRating) => void;
   toggleTag: (tag: string) => void;
+  toggleGenre: (genre: string) => void;
   setSelectedAges: (ages: AgeRecommendation[]) => void;
   setSelectedRatings: (ratings: AgeRating[]) => void;
   setSelectedTags: (tags: string[]) => void;
+  setSelectedGenres: (genres: string[]) => void;
   setLengthRange: (range: LengthRange | null) => void;
   clearTags: () => void;
   reset: () => void;
@@ -105,63 +110,6 @@ const ADULT_GENRES = [
 
 // Default ages for Kids mode (10 and under)
 const DEFAULT_KIDS_AGES: AgeRecommendation[] = ['4', '6', '8', '10'];
-
-// =============================================================================
-// Tag Categories for Filtering
-// =============================================================================
-
-export const TAG_CATEGORIES = {
-  mood: {
-    label: 'Mood',
-    tags: [
-      'adventurous', 'atmospheric', 'cozy', 'dark', 'emotional', 'feel-good',
-      'funny', 'haunting', 'heartwarming', 'hopeful', 'inspiring', 'intense',
-      'lighthearted', 'mysterious', 'romantic', 'suspenseful', 'tense',
-      'thought-provoking', 'uplifting', 'whimsical',
-    ],
-  },
-  pacing: {
-    label: 'Pacing',
-    tags: [
-      'fast-paced', 'slow-burn', 'page-turner', 'unputdownable', 'action-packed',
-    ],
-  },
-  tropes: {
-    label: 'Tropes',
-    tags: [
-      'enemies-to-lovers', 'friends-to-lovers', 'found-family', 'chosen-one',
-      'second-chance', 'forced-proximity', 'fake-relationship', 'redemption-arc',
-      'grumpy-sunshine', 'opposites-attract', 'only-one-bed', 'coming-of-age',
-    ],
-  },
-  content: {
-    label: 'Content',
-    tags: [
-      'clean', 'fade-to-black', 'steamy', 'low-violence', 'graphic-violence',
-    ],
-  },
-  audiobook: {
-    label: 'Audiobook',
-    tags: [
-      'full-cast', 'single-narrator', 'dual-narrators', 'great-character-voices',
-      'soothing-narrator', 'male-narrator', 'female-narrator',
-    ],
-  },
-  listening: {
-    label: 'Listening',
-    tags: [
-      'good-for-commute', 'good-for-sleep', 'good-for-roadtrip', 'easy-listening',
-    ],
-  },
-  series: {
-    label: 'Series',
-    tags: [
-      'standalone', 'in-series', 'trilogy', 'long-series',
-    ],
-  },
-} as const;
-
-export type TagCategory = keyof typeof TAG_CATEGORIES;
 
 // =============================================================================
 // Helper Functions
@@ -415,6 +363,19 @@ export function matchesSelectedTags(
 }
 
 /**
+ * Check if book has any of the selected genres (OR logic)
+ */
+export function matchesSelectedGenres(
+  item: LibraryItem,
+  selectedGenres: string[]
+): boolean {
+  if (selectedGenres.length === 0) return true;
+
+  const bookGenres = getBookGenres(item);
+  return selectedGenres.some((genre) => bookGenres.includes(genre.toLowerCase()));
+}
+
+/**
  * Filter library items based on content filter settings
  */
 export function filterByAudience(
@@ -423,9 +384,10 @@ export function filterByAudience(
   selectedAges: AgeRecommendation[] = [],
   selectedRatings: AgeRating[] = [],
   selectedTags: string[] = [],
-  lengthRange: LengthRange | null = null
+  lengthRange: LengthRange | null = null,
+  selectedGenres: string[] = []
 ): LibraryItem[] {
-  if (audience === 'all' && selectedAges.length === 0 && selectedRatings.length === 0 && selectedTags.length === 0 && !lengthRange) {
+  if (audience === 'all' && selectedAges.length === 0 && selectedRatings.length === 0 && selectedTags.length === 0 && !lengthRange && selectedGenres.length === 0) {
     return items;
   }
 
@@ -435,6 +397,11 @@ export function filterByAudience(
 
     // Apply tag filter first (works for all audience modes)
     if (selectedTags.length > 0 && !matchesSelectedTags(item, selectedTags)) {
+      return false;
+    }
+
+    // Apply genre filter
+    if (selectedGenres.length > 0 && !matchesSelectedGenres(item, selectedGenres)) {
       return false;
     }
 
@@ -451,7 +418,11 @@ export function filterByAudience(
       return isAdultOnlyContent(item) || isTeenContent(item);
     }
 
-    // 'all' audience - apply filters if set
+    // 'all' audience — exclude kids content so adult books aren't mixed
+    // with children's books. Kids content only shows in 'kids' mode.
+    if (isKidsContent(item)) return false;
+
+    // Apply age/rating filters if set
     if (selectedAges.length > 0 || selectedRatings.length > 0) {
       const matchesAge = selectedAges.length > 0 ? matchesSelectedAges(item, selectedAges) : true;
       const matchesRating = selectedRatings.length > 0 ? matchesSelectedRatings(item, selectedRatings) : true;
@@ -473,6 +444,7 @@ export const useContentFilterStore = create<ContentFilterState>()(
       selectedAges: [],
       selectedRatings: [],
       selectedTags: [],
+      selectedGenres: [],
       lengthRange: null,
 
       setAudience: (audience) => {
@@ -514,19 +486,30 @@ export const useContentFilterStore = create<ContentFilterState>()(
         }
       },
 
+      toggleGenre: (genre) => {
+        const currentGenres = get().selectedGenres;
+        if (currentGenres.includes(genre)) {
+          set({ selectedGenres: currentGenres.filter((g) => g !== genre) });
+        } else {
+          set({ selectedGenres: [...currentGenres, genre] });
+        }
+      },
+
       setSelectedAges: (ages) => set({ selectedAges: ages }),
 
       setSelectedRatings: (ratings) => set({ selectedRatings: ratings }),
 
       setSelectedTags: (tags) => set({ selectedTags: tags }),
 
+      setSelectedGenres: (genres) => set({ selectedGenres: genres }),
+
       setLengthRange: (range) => set({ lengthRange: range }),
 
-      clearTags: () => set({ selectedTags: [], lengthRange: null }),
+      clearTags: () => set({ selectedTags: [], selectedGenres: [], lengthRange: null }),
 
-      reset: () => set({ audience: 'all', selectedAges: [], selectedRatings: [], selectedTags: [], lengthRange: null }),
+      reset: () => set({ audience: 'all', selectedAges: [], selectedRatings: [], selectedTags: [], selectedGenres: [], lengthRange: null }),
 
-      resetFilters: () => set({ selectedAges: [], selectedRatings: [], selectedTags: [], lengthRange: null }),
+      resetFilters: () => set({ selectedAges: [], selectedRatings: [], selectedTags: [], selectedGenres: [], lengthRange: null }),
     }),
     {
       name: 'content-filter-storage',
@@ -547,7 +530,8 @@ export function useFilteredItems(items: LibraryItem[]): LibraryItem[] {
   const selectedAges = useContentFilterStore((s) => s.selectedAges);
   const selectedRatings = useContentFilterStore((s) => s.selectedRatings);
   const selectedTags = useContentFilterStore((s) => s.selectedTags);
+  const selectedGenres = useContentFilterStore((s) => s.selectedGenres);
   const lengthRange = useContentFilterStore((s) => s.lengthRange);
 
-  return filterByAudience(items, audience, selectedAges, selectedRatings, selectedTags, lengthRange);
+  return filterByAudience(items, audience, selectedAges, selectedRatings, selectedTags, lengthRange, selectedGenres);
 }

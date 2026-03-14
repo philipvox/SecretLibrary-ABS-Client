@@ -140,13 +140,13 @@ export function CollectionsListScreen() {
           {
             key: 'collections',
             label: 'Collections',
-            icon: <Folder size={10} color={secretLibraryColors.white} />,
+            icon: <Folder size={13} color={secretLibraryColors.white} />,
           },
         ]}
         circleButtons={[
           {
             key: 'back',
-            icon: <TopNavBackIcon color={secretLibraryColors.white} size={14} />,
+            icon: <TopNavBackIcon color={secretLibraryColors.white} size={16} />,
             onPress: handleBack,
           },
         ]}

@@ -7,11 +7,7 @@
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
 import { downloadManager } from '@/core/services/downloadManager';
-import {
-  MoodSession,
-  WORLDS,
-  Mood,
-} from '@/features/mood-discovery/types';
+import { Mood } from '@/shared/utils/bookDNA';
 import { BookSummary, libraryItemToBookSummary } from '../types';
 
 // ============================================================================
@@ -59,60 +55,23 @@ export function getMoodAdjective(mood?: Mood): string {
 /** Generate mood-aware category title */
 export function getMoodCategoryTitle(
   baseTitle: string,
-  session: MoodSession
+  mood?: Mood
 ): string {
-  const moodAdjective = getMoodAdjective(session.mood);
-  const worldLabel = session.world !== 'any'
-    ? WORLDS.find((w) => w.id === session.world)?.label || ''
-    : '';
+  const moodAdjective = getMoodAdjective(mood);
+  if (!moodAdjective) return baseTitle;
 
   switch (baseTitle) {
     case 'Not Started':
-      if (worldLabel && moodAdjective) return `${moodAdjective} ${worldLabel} Adventures`;
-      if (moodAdjective) return `${moodAdjective} Adventures Await`;
-      if (worldLabel) return `${worldLabel} Adventures`;
-      return 'Next Adventures';
-
+      return `${moodAdjective} Adventures Await`;
     case 'New This Week':
-      if (moodAdjective) return `New ${moodAdjective} Arrivals`;
-      if (worldLabel) return `New ${worldLabel} This Week`;
-      return 'New Mood Matches';
-
+      return `New ${moodAdjective} Arrivals`;
     case 'Short & Sweet':
-      if (moodAdjective) return `Quick ${moodAdjective} Listens`;
-      return 'Quick Mood Picks';
-
+      return `Quick ${moodAdjective} Listens`;
     case 'Long Listens':
-      if (moodAdjective) return `Epic ${moodAdjective} Journeys`;
-      if (worldLabel) return `Long ${worldLabel} Adventures`;
-      return 'Long Mood Matches';
-
-    case 'Continue Series':
-      if (worldLabel) return `Continue ${worldLabel} Series`;
-      return 'Continue Your Series';
-
+      return `Epic ${moodAdjective} Journeys`;
     default:
       return baseTitle;
   }
-}
-
-/** Get mood-aware hero reason */
-export function getMoodHeroReason(session: MoodSession): string {
-  const moodAdjective = getMoodAdjective(session.mood);
-  const worldLabel = session.world !== 'any'
-    ? WORLDS.find((w) => w.id === session.world)?.label
-    : null;
-
-  if (moodAdjective && worldLabel) {
-    return `A ${moodAdjective.toLowerCase()} ${worldLabel.toLowerCase()} pick`;
-  }
-  if (moodAdjective) {
-    return `Perfect for a ${moodAdjective.toLowerCase()} mood`;
-  }
-  if (worldLabel) {
-    return `Top ${worldLabel.toLowerCase()} recommendation`;
-  }
-  return 'Matches your mood';
 }
 
 // ============================================================================

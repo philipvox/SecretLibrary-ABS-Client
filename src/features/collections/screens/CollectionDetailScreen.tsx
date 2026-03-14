@@ -22,6 +22,7 @@ import { Folder } from 'lucide-react-native';
 import { useCollectionDetails } from '../hooks/useCollectionDetails';
 import { BookIcon, TopNav, TopNavSearchIcon, TopNavCloseIcon, CollapsibleSection } from '@/shared/components';
 import { apiClient } from '@/core/api';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -190,7 +191,10 @@ export function CollectionDetailScreen() {
               style={[styles.verticalListItem, { borderBottomColor: colors.grayLine }]}
               onPress={() => handleBookPress(book.id)}
             >
-              <Image source={{ uri: coverUrl }} style={styles.verticalCover} />
+              <View style={{ width: scale(44), height: scale(44), borderRadius: 4, overflow: 'hidden' }}>
+                <Image source={{ uri: coverUrl }} style={styles.verticalCover} />
+                <CoverStars bookId={book.id} starSize={scale(12)} />
+              </View>
               <View style={styles.verticalInfo}>
                 <Text style={[styles.verticalTitle, { color: colors.black }]} numberOfLines={1}>
                   {title}
@@ -226,41 +230,42 @@ export function CollectionDetailScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-
-      {/* Top Navigation - dark header */}
-      <TopNav
-        variant="dark"
-        showLogo={true}
-        onLogoPress={handleLogoPress}
-        pills={[
-          {
-            key: 'all-collections',
-            label: 'All Collections',
-            icon: <Folder size={10} color={staticColors.white} />,
-            onPress: () => navigation.navigate('CollectionsList'),
-          },
-        ]}
-        circleButtons={[
-          {
-            key: 'search',
-            icon: <TopNavSearchIcon color={staticColors.white} size={14} />,
-            onPress: handleSearchPress,
-          },
-          {
-            key: 'close',
-            icon: <TopNavCloseIcon color={staticColors.white} size={14} />,
-            onPress: handleBack,
-          },
-        ]}
-      />
+    <View style={[styles.container, { backgroundColor: staticColors.black }]}>
+      <StatusBar barStyle="light-content" backgroundColor={staticColors.black} />
 
       <ScrollView
-        style={[styles.scrollView, { backgroundColor: colors.white }]}
+        style={[styles.scrollView, { backgroundColor: staticColors.black }]}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Top Navigation - scrolls with content */}
+        <View style={{ backgroundColor: staticColors.black }}>
+          <TopNav
+            variant="dark"
+            showLogo={true}
+            onLogoPress={handleLogoPress}
+            pills={[
+              {
+                key: 'all-collections',
+                label: 'All Collections',
+                icon: <Folder size={13} color={staticColors.white} />,
+                onPress: () => navigation.navigate('CollectionsList'),
+              },
+            ]}
+            circleButtons={[
+              {
+                key: 'search',
+                icon: <TopNavSearchIcon color={staticColors.white} size={16} />,
+                onPress: handleSearchPress,
+              },
+              {
+                key: 'close',
+                icon: <TopNavCloseIcon color={staticColors.white} size={16} />,
+                onPress: handleBack,
+              },
+            ]}
+          />
+        </View>
         {/* Collection Title Header */}
         <View style={styles.titleHeader}>
           <Text style={[styles.headerName, { color: colors.black }]}>{collection.name}</Text>

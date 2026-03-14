@@ -11,8 +11,8 @@
  */
 
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { COMPARABLE_WEIGHTS, TEMPORAL_DECAY, getTemporalDecay } from './scoreWeights';
-import { parseBookDNA, BookDNA } from '@/features/mood-discovery/utils/parseBookDNA';
+import { COMPARABLE_WEIGHTS, COMPARABLE_WEIGHTS_BYL, TEMPORAL_DECAY, getTemporalDecay } from './scoreWeights';
+import { parseBookDNA, BookDNA } from '@/shared/utils/bookDNA';
 import { getPublicationEra, PublicationEra } from './publicationEra';
 
 // ============================================================================
@@ -161,16 +161,197 @@ export function prepareCandidate(item: LibraryItem): ComparableCandidate {
 }
 
 // ============================================================================
+// SCORING CONTEXT
+// ============================================================================
+
+/**
+ * Distinguishes scoring weight sets:
+ * - MORE_LIKE_THIS: Book detail "More Like This" — identity-inclusive weights (default)
+ * - BECAUSE_YOU_LISTENED: Browse "Because You Listened" — DNA-first, identity de-emphasized
+ */
+export type ComparableScoringContext = 'BECAUSE_YOU_LISTENED' | 'MORE_LIKE_THIS';
+
+// ============================================================================
+// DNA SIMILARITY HELPERS (used by BECAUSE_YOU_LISTENED scoring)
+// ============================================================================
+
+/** Calculate mood similarity between two BookDNA profiles (0–1) */
+function scoreDNAMoodSimilarity(a: BookDNA, b: BookDNA): number {
+  const keys: (keyof BookDNA['moodScores'])[] = ['thrills', 'drama', 'laughs', 'wonder', 'heart', 'ideas'];
+  let totalSim = 0;
+  let count = 0;
+  for (const key of keys) {
+    const va = a.moodScores[key];
+    const vb = b.moodScores[key];
+    if (va !== null && vb !== null) {
+      totalSim += 1 - Math.abs(va - vb);
+      count++;
+    }
+  }
+  return count > 0 ? totalSim / count : 0;
+}
+
+/** Calculate spectrum similarity between two BookDNA profiles (0–1) */
+function scoreDNASpectrumSimilarity(a: BookDNA, b: BookDNA): number {
+  const keys: (keyof BookDNA['spectrums'])[] = ['darkLight', 'seriousHumorous', 'denseAccessible', 'plotCharacter', 'bleakHopeful', 'familiarChallenging'];
+  let totalSim = 0;
+  let count = 0;
+  for (const key of keys) {
+    const va = a.spectrums[key];
+    const vb = b.spectrums[key];
+    if (va !== null && vb !== null) {
+      totalSim += 1 - Math.abs(va - vb) / 2; // range is -1..1, max diff = 2
+      count++;
+    }
+  }
+  return count > 0 ? totalSim / count : 0;
+}
+
+/** Score pacing match between two BookDNA profiles (0 or partial/full bonus) */
+function scoreBYLPacingMatch(a: BookDNA, b: BookDNA): number {
+  if (!a.pacing || !b.pacing) return 0;
+  if (a.pacing === b.pacing) return COMPARABLE_WEIGHTS_BYL.pacingMatch;
+  // Adjacent pacing values get partial credit
+  const order = ['slow', 'moderate', 'variable', 'fast'];
+  const ai = order.indexOf(a.pacing);
+  const bi = order.indexOf(b.pacing);
+  if (ai >= 0 && bi >= 0 && Math.abs(ai - bi) === 1) {
+    return Math.round(COMPARABLE_WEIGHTS_BYL.pacingMatch * 0.6); // ~3 pts
+  }
+  return 0;
+}
+
+// ============================================================================
+// BECAUSE YOU LISTENED — DNA-FIRST SIMILARITY SCORING
+// ============================================================================
+
+/**
+ * DNA-first similarity scoring for "Because You Listened" context.
+ * Mood/spectrum/trope/theme dominate; author/narrator/series de-emphasized.
+ */
+function calculateBYLSimilarity(
+  source: ComparableSourceBook,
+  candidate: ComparableCandidate
+): { score: number; reasons: string[]; type: SimilarityType; isExplicit: boolean } {
+  const W = COMPARABLE_WEIGHTS_BYL;
+  let score = 0;
+  const reasons: string[] = [];
+  let primaryType: SimilarityType = 'similar-genre';
+  let isExplicit = false;
+
+  // 1. Explicit comparable (dna:comparable tag)
+  if (source.dna.comparableTitles.length > 0) {
+    const candidateTitle = normalize(candidate.metadata.title);
+    for (const comparable of source.dna.comparableTitles) {
+      if (candidateTitle.includes(comparable) || comparable.includes(candidateTitle)) {
+        score += W.explicitComparable;
+        reasons.push('Explicitly comparable');
+        primaryType = 'explicit';
+        isExplicit = true;
+        break;
+      }
+    }
+  }
+  if (!isExplicit && candidate.dna.comparableTitles.length > 0) {
+    const sourceTitle = normalize(source.title);
+    for (const comparable of candidate.dna.comparableTitles) {
+      if (sourceTitle.includes(comparable) || comparable.includes(sourceTitle)) {
+        score += W.explicitComparable;
+        reasons.push('Explicitly comparable');
+        primaryType = 'explicit';
+        isExplicit = true;
+        break;
+      }
+    }
+  }
+
+  // 2–5. DNA-based scoring (mood 30, spectrum 20, tropes 15, themes 10, pacing 5)
+  if (source.dna.hasDNA && candidate.dna.hasDNA) {
+    const moodSim = scoreDNAMoodSimilarity(source.dna, candidate.dna);
+    if (moodSim > 0) {
+      score += Math.round(moodSim * W.dnaMoodSimilarity);
+      if (moodSim >= 0.7) reasons.push('Strong mood match');
+      else if (moodSim >= 0.4) reasons.push('Similar mood');
+      primaryType = 'similar-dna';
+    }
+
+    const specSim = scoreDNASpectrumSimilarity(source.dna, candidate.dna);
+    if (specSim > 0) {
+      score += Math.round(specSim * W.dnaSpectrumSimilarity);
+      if (specSim >= 0.7 && !reasons.some(r => r.includes('mood'))) {
+        reasons.push('Similar tone');
+      }
+    }
+
+    const sourceTropes = new Set(source.dna.tropes);
+    const tropeMatches = candidate.dna.tropes.filter(t => sourceTropes.has(t)).length;
+    if (tropeMatches > 0) {
+      score += Math.min(tropeMatches * W.matchingTrope, W.maxTropes);
+      reasons.push(`Shared tropes: ${tropeMatches}`);
+      primaryType = 'similar-dna';
+    }
+
+    const sourceThemes = new Set(source.dna.themes);
+    const themeMatches = candidate.dna.themes.filter(t => sourceThemes.has(t)).length;
+    if (themeMatches > 0) {
+      score += Math.min(themeMatches * W.matchingTheme, W.maxThemes);
+      reasons.push(`Shared themes: ${themeMatches}`);
+      primaryType = 'similar-dna';
+    }
+
+    score += scoreBYLPacingMatch(source.dna, candidate.dna);
+  }
+
+  // 6. Genre overlap (2 per, max 12)
+  const genreMatches = countMatches(source.genres, candidate.genres);
+  if (genreMatches > 0) {
+    score += Math.min(genreMatches * W.matchingGenre, W.maxGenres);
+    if (genreMatches >= 2) reasons.push(`${genreMatches} matching genres`);
+  }
+
+  // 7. Tag overlap (1 per, max 8)
+  const tagMatches = countMatches(source.tags, candidate.tags);
+  if (tagMatches > 0) {
+    score += Math.min(tagMatches * W.matchingTag, W.maxTags);
+  }
+
+  // 8. Same narrator (3 pts — de-emphasized)
+  if (source.narrator && stringsMatch(source.narrator, candidate.narrator)) {
+    score += W.sameNarrator;
+    reasons.push(`Same narrator: ${candidate.narrator}`);
+    if (primaryType === 'similar-genre') primaryType = 'same-narrator';
+  }
+
+  // 9. Same author (2 pts — de-emphasized, should not dominate mood recs)
+  if (source.author && stringsMatch(source.author, candidate.author)) {
+    score += W.sameAuthor;
+    reasons.push(`Same author: ${candidate.author}`);
+    if (primaryType === 'similar-genre') primaryType = 'same-author';
+  }
+
+  // 10. Same series: 0 pts (series continuation handled separately)
+
+  score = Math.min(score, W.maxScore);
+  return { score, reasons, type: primaryType, isExplicit };
+}
+
+// ============================================================================
 // SIMILARITY SCORING
 // ============================================================================
 
 /**
- * Calculate similarity between a source book and a candidate
+ * Calculate similarity between a source book and a candidate.
+ * @param context - 'MORE_LIKE_THIS' (default) for book detail, 'BECAUSE_YOU_LISTENED' for browse recs
  */
 export function calculateSimilarity(
   source: ComparableSourceBook,
-  candidate: ComparableCandidate
+  candidate: ComparableCandidate,
+  context: ComparableScoringContext = 'MORE_LIKE_THIS'
 ): { score: number; reasons: string[]; type: SimilarityType; isExplicit: boolean } {
+  // DNA-first weights for "Because You Listened" context
+  if (context === 'BECAUSE_YOU_LISTENED') {
+    return calculateBYLSimilarity(source, candidate);
+  }
   let score = 0;
   const reasons: string[] = [];
   let primaryType: SimilarityType = 'similar-genre';
@@ -298,6 +479,9 @@ export interface ComparableEngineOptions {
   excludeSameAuthor?: boolean;
   /** Whether to exclude same-series matches */
   excludeSameSeries?: boolean;
+  /** Scoring context: 'BECAUSE_YOU_LISTENED' uses DNA-first weights,
+   *  'MORE_LIKE_THIS' uses identity-inclusive weights (default) */
+  scoringContext?: ComparableScoringContext;
 }
 
 /**
@@ -315,6 +499,7 @@ export function findComparableBooks(
     applyTemporalDecay = true,
     excludeSameAuthor = false,
     excludeSameSeries = false,
+    scoringContext = 'MORE_LIKE_THIS' as ComparableScoringContext,
   } = options;
 
   // Prepare all candidates once
@@ -348,7 +533,7 @@ export function findComparableBooks(
       if (excludeSameAuthor && stringsMatch(source.author, candidate.author)) continue;
       if (excludeSameSeries && stringsMatch(source.series, candidate.series)) continue;
 
-      const similarity = calculateSimilarity(source, candidate);
+      const similarity = calculateSimilarity(source, candidate, scoringContext);
 
       // Apply temporal decay
       const adjustedScore = Math.round(similarity.score * decay);

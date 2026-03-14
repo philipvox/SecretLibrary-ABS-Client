@@ -14,15 +14,14 @@
  */
 
 import { useMemo, useEffect } from 'react';
-import { LibraryItem } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 import { usePreferencesStore } from '../stores/preferencesStore';
 import { useMyLibraryStore } from '@/features/library';
 import { getGenres, getAuthorName, getNarratorName, getSeriesName, getDuration, getTags } from '@/shared/utils/metadata';
 import { createSeriesFilter } from '@/shared/utils/seriesFilter';
 import { useDismissedIds } from '../stores/dismissedItemsStore';
-import { useActiveSession } from '@/features/mood-discovery/stores/moodSessionStore';
-import { Mood, MOOD_FLAVORS, FlavorConfig } from '@/features/mood-discovery/types';
-import { parseBookDNA, BookDNA, getDNAMoodScore } from '@/features/mood-discovery/utils/parseBookDNA';
+import { parseBookDNA, BookDNA, getDNAMoodScore, Mood } from '@/shared/utils/bookDNA';
+import { ABANDONMENT_PENALTIES } from '../utils/scoreWeights';
 import {
   useRecommendationsCacheStore,
   selectHistoryStats,
@@ -92,57 +91,92 @@ const SLOT_CONFIG = {
   wild_card: 2,
 } as const;
 
-// === FLAVOR & DNA SCORING ===
+/**
+ * Minimum score (out of 100) a candidate must reach to fill a slot.
+ * Prevents low-confidence recommendations from surfacing when the pool
+ * doesn't have enough quality matches. Empty slots are better than weak ones.
+ */
+const MINIMUM_SLOT_SCORE = 25;
 
 /**
- * Get flavor config for the current session.
- * Returns the FlavorConfig with matchTags for scoring.
+ * 7-day window seed — locks the "Because You Listened To X" seed book identity
+ * so the label is stable across app sessions for one week.
  */
-function getFlavorConfig(mood: Mood, flavorId: string | null): FlavorConfig | null {
-  if (!flavorId) return null;
-  const flavors = MOOD_FLAVORS[mood];
-  if (!flavors) return null;
-  return flavors.find(f => f.id === flavorId) || null;
-}
+const WEEK_SEED = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+
+// === SEED BOOK SELECTION ===
 
 /**
- * Score how well a book's tags/genres match the selected flavor's matchTags.
- * Returns bonus points for flavor matching.
+ * Select stable seed books for "Because You Listened To X" labels.
+ * - Primary: books with progress >= 0.85 (finished or near-finished)
+ * - Fallback: progress >= 0.5 if fewer than 3 primary seeds
+ * - Hard exclude: progress < 0.3
+ * - Stable: locked to 7-day window via WEEK_SEED
  */
-function scoreFlavorMatch(
-  item: LibraryItem,
-  flavorConfig: FlavorConfig | null
-): { score: number; matchedTags: string[] } {
-  if (!flavorConfig || !flavorConfig.matchTags.length) {
-    return { score: 0, matchedTags: [] };
-  }
+function selectSeedBooks(
+  allItems: LibraryItem[],
+  userBooksMap: Map<string, { progress: number; lastPlayedAt: string | null }>,
+  finishedBookIds: Set<string>
+): LibraryItem[] {
+  const primary: { item: LibraryItem; lastPlayed: number }[] = [];
+  const fallback: { item: LibraryItem; lastPlayed: number }[] = [];
 
-  const tags = getTags(item).map(t => t.toLowerCase());
-  const genres = getGenres(item).map(g => g.toLowerCase());
-  const allTerms = [...tags, ...genres];
+  for (const item of allItems) {
+    const userData = userBooksMap.get(item.id);
+    const progress = userData?.progress || item.userMediaProgress?.progress || 0;
 
-  const matchedTags: string[] = [];
-  let score = 0;
+    // Hard remove: progress < 0.3 regardless of last-played date
+    if (progress < 0.3) continue;
 
-  for (const matchTag of flavorConfig.matchTags) {
-    const normalizedMatch = matchTag.toLowerCase();
-    // Check exact match
-    if (allTerms.includes(normalizedMatch)) {
-      matchedTags.push(matchTag);
-      score += 15; // Strong match
-    } else {
-      // Check partial/fuzzy match
-      const partialMatch = allTerms.some(term =>
-        term.includes(normalizedMatch) || normalizedMatch.includes(term)
-      );
-      if (partialMatch) {
-        matchedTags.push(matchTag);
-        score += 8; // Partial match
-      }
+    const lastPlayed = userData?.lastPlayedAt
+      ? new Date(userData.lastPlayedAt).getTime()
+      : 0;
+
+    if (progress >= 0.85 || finishedBookIds.has(item.id)) {
+      primary.push({ item, lastPlayed });
+    } else if (progress >= 0.5) {
+      fallback.push({ item, lastPlayed });
     }
   }
 
-  return { score, matchedTags };
+  // Weight by recency of completion (most recently finished = highest weight)
+  primary.sort((a, b) => b.lastPlayed - a.lastPlayed);
+  fallback.sort((a, b) => b.lastPlayed - a.lastPlayed);
+
+  // Use primary if >= 3 qualifying seeds, else fill from fallback
+  let seeds = primary.length >= 3 ? primary : [...primary, ...fallback];
+
+  const topCandidates = seeds.slice(0, 10);
+  if (topCandidates.length === 0) return [];
+
+  // Lock seed identity to 7-day window so label is stable across sessions
+  const seedIndex = WEEK_SEED % Math.min(topCandidates.length, 3);
+
+  const result: LibraryItem[] = [];
+  for (let i = 0; i < Math.min(3, topCandidates.length); i++) {
+    const idx = (seedIndex + i) % topCandidates.length;
+    result.push(topCandidates[idx].item);
+  }
+
+  return result;
+}
+
+// === FLAVOR & DNA SCORING ===
+
+/** Minimal type for flavor config (legacy, always null now) */
+interface FlavorConfig {
+  id: string;
+  label: string;
+  matchTags: string[];
+}
+
+/** Always returns null — mood quiz flavors removed */
+function scoreFlavorMatch(
+  _item: LibraryItem,
+  flavorConfig: FlavorConfig | null
+): { score: number; matchedTags: string[] } {
+  if (!flavorConfig) return { score: 0, matchedTags: [] };
+  return { score: 0, matchedTags: [] };
 }
 
 /**
@@ -479,12 +513,6 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
   const moods = usePreferencesStore((s) => s.moods);
   const hasCompletedOnboarding = usePreferencesStore((s) => s.hasCompletedOnboarding);
 
-  // Get active mood session (from Browse mood quiz) - this takes priority
-  // Extract primitives for stable dependency array (avoid object reference changes)
-  const activeSession = useActiveSession();
-  const sessionMood = activeSession?.mood || null;
-  const sessionFlavor = activeSession?.flavor || null;
-
   const libraryIds = useMyLibraryStore((s) => s.libraryIds);
   const dismissedIds = useDismissedIds();
 
@@ -501,13 +529,22 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     loadCache();
   }, [loadCache]);
 
-  // Build author penalties from abandoned books
+  // Build author penalties from abandoned books (time-decayed)
   const authorPenalties = useMemo(() => {
     const penalties = new Map<string, number>();
     for (const book of abandonedBooks) {
       const author = book.author.toLowerCase();
       const current = penalties.get(author) || 0;
-      penalties.set(author, current + 0.3);
+      // Time-decayed: recent abandons penalize more, old ones fade
+      let penalty: number;
+      if (book.daysSincePlay < 90) {
+        penalty = ABANDONMENT_PENALTIES.recentPenalty;   // 0.3
+      } else if (book.daysSincePlay < 365) {
+        penalty = ABANDONMENT_PENALTIES.olderPenalty;    // 0.15
+      } else {
+        penalty = ABANDONMENT_PENALTIES.stalePenalty;    // 0.05
+      }
+      penalties.set(author, current + penalty);
     }
     return penalties;
   }, [abandonedBooks]);
@@ -569,31 +606,16 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     });
 
     // Apply mood-based genre boosts from preferences store (legacy)
-    // Only apply if no active session mood (session takes priority)
-    if (!sessionMood) {
-      moods.forEach(mood => {
-        const moodGenres = MOOD_GENRE_MAP[mood] || [];
-        moodGenres.forEach(genre => {
-          const key = genre.toLowerCase();
-          // Mood boost is significant (+3) to influence recommendations
-          genreAffinities.set(key, (genreAffinities.get(key) || 0) + 3);
-        });
-      });
-    }
-
-    // Apply session mood boosts (from Browse mood quiz) - HIGHER PRIORITY
-    // Session mood gives stronger boost (+5) since it's "what you want right now"
-    if (sessionMood) {
-      const sessionMoodGenres = SESSION_MOOD_GENRE_MAP[sessionMood] || [];
-      sessionMoodGenres.forEach(genre => {
+    moods.forEach(mood => {
+      const moodGenres = MOOD_GENRE_MAP[mood] || [];
+      moodGenres.forEach(genre => {
         const key = genre.toLowerCase();
-        // Session mood boost is stronger (+5) - this is the user's current intent
-        genreAffinities.set(key, (genreAffinities.get(key) || 0) + 5);
+        genreAffinities.set(key, (genreAffinities.get(key) || 0) + 3);
       });
-    }
+    });
 
     return { authorAffinities, narratorAffinities, genreAffinities };
-  }, [historyStats, favoriteAuthors, favoriteNarrators, favoriteGenres, moods, sessionMood]);
+  }, [historyStats, favoriteAuthors, favoriteNarrators, favoriteGenres, moods]);
 
   // Get top genres for filtering
   const topGenres = useMemo(() => {
@@ -650,12 +672,6 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
       return true;
     });
 
-    // Get flavor config for session
-    // Use extracted primitives (sessionMood, sessionFlavor) instead of activeSession object
-    const flavorConfig = sessionMood && sessionFlavor
-      ? getFlavorConfig(sessionMood, sessionFlavor)
-      : null;
-
     // Build pool context
     const ctx: PoolContext = {
       availableItems,
@@ -668,8 +684,8 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
       authorPenalties,
       preferredLength,
       prefersSeries,
-      sessionMood,
-      flavorConfig,
+      sessionMood: null,
+      flavorConfig: null,
     };
 
     // Build pools
@@ -678,13 +694,17 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     const narratorPool = buildNarratorGatewayPool(ctx, SLOT_CONFIG.narrator_gateway);
     const wildCardPool = buildWildCardPool(ctx, SLOT_CONFIG.wild_card);
 
-    // Fill slots with deduplication
+    // Fill slots with deduplication + minimum score threshold.
+    // MINIMUM_SLOT_SCORE prevents low-confidence recommendations from surfacing.
+    // If a slot can't be filled above threshold, it stays empty rather than
+    // showing a weak match that erodes user trust in the recommendation system.
     const seen = new Set<string>();
     const result: ScoredItem[] = [];
 
     // Comfort picks (6 slots)
     for (const item of comfortPool) {
       if (seen.has(item.item.id)) continue;
+      if (item.score < MINIMUM_SLOT_SCORE) continue;
       if (result.filter(r => r.slotType === 'comfort').length >= SLOT_CONFIG.comfort) break;
       result.push(item);
       seen.add(item.item.id);
@@ -693,6 +713,7 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     // Genre exploration (5 slots)
     for (const item of genrePool) {
       if (seen.has(item.item.id)) continue;
+      if (item.score < MINIMUM_SLOT_SCORE) continue;
       if (result.filter(r => r.slotType === 'genre_exploration').length >= SLOT_CONFIG.genre_exploration) break;
       result.push(item);
       seen.add(item.item.id);
@@ -701,6 +722,7 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     // Narrator gateway (2 slots)
     for (const item of narratorPool) {
       if (seen.has(item.item.id)) continue;
+      if (item.score < MINIMUM_SLOT_SCORE) continue;
       if (result.filter(r => r.slotType === 'narrator_gateway').length >= SLOT_CONFIG.narrator_gateway) break;
       result.push(item);
       seen.add(item.item.id);
@@ -709,12 +731,13 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     // Wild cards (2 slots)
     for (const item of wildCardPool) {
       if (seen.has(item.item.id)) continue;
+      if (item.score < MINIMUM_SLOT_SCORE) continue;
       if (result.filter(r => r.slotType === 'wild_card').length >= SLOT_CONFIG.wild_card) break;
       result.push(item);
       seen.add(item.item.id);
     }
 
-    // If we don't have enough, backfill from largest pools
+    // If we don't have enough, backfill from largest pools (still respecting min score)
     let backfillIterations = 0;
     const maxBackfillIterations = 100; // Safety limit
     while (result.length < limit && (comfortPool.length + genrePool.length > result.length)) {
@@ -723,7 +746,7 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
       let addedAny = false;
       for (const pool of [comfortPool, genrePool, narratorPool, wildCardPool]) {
         for (const item of pool) {
-          if (!seen.has(item.item.id)) {
+          if (!seen.has(item.item.id) && item.score >= MINIMUM_SLOT_SCORE) {
             result.push(item);
             seen.add(item.item.id);
             addedAny = true;
@@ -737,8 +760,13 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
     }
 
     return result.slice(0, limit);
-    // Note: Don't include activeSession object - use sessionMood and sessionFlavor as stable primitives
-  }, [allItems, finishedBookIds, libraryIds, dismissedIds, userBooksMap, affinities, knownAuthors, knownNarrators, topGenres, authorPenalties, preferredLength, prefersSeries, limit, isCacheLoaded, sessionMood, sessionFlavor]);
+  }, [allItems, finishedBookIds, libraryIds, dismissedIds, userBooksMap, affinities, knownAuthors, knownNarrators, topGenres, authorPenalties, preferredLength, prefersSeries, limit, isCacheLoaded]);
+
+  // Select stable seed books for "Because You Listened To X" labels
+  const seedBooks = useMemo(() => {
+    if (!isCacheLoaded || !allItems.length) return [];
+    return selectSeedBooks(allItems, userBooksMap, finishedBookIds);
+  }, [allItems, userBooksMap, finishedBookIds, isCacheLoaded]);
 
   // Group recommendations for display
   const groupedRecommendations = useMemo((): RecommendationGroup[] => {
@@ -768,7 +796,17 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
 
     const sourceAttributions: Record<string, RecommendationSourceAttribution | undefined> = {};
 
-    if (historyStats?.mostRecentFinished) {
+    // Use stable seed books (locked to 7-day window) for "Because You Listened" labels
+    if (seedBooks.length > 0) {
+      const seed = seedBooks[0];
+      const seedMeta = (seed.media?.metadata as BookMetadata);
+      sourceAttributions['Comfort Picks'] = {
+        itemId: seed.id,
+        itemTitle: seedMeta?.title || 'Unknown',
+        type: 'finished',
+      };
+    } else if (historyStats?.mostRecentFinished) {
+      // Fallback to history stats if no seed books qualify
       sourceAttributions['Comfort Picks'] = {
         itemId: historyStats.mostRecentFinished.id,
         itemTitle: historyStats.mostRecentFinished.title,
@@ -799,7 +837,7 @@ export function useRecommendations(allItems: LibraryItem[], limit: number = 15) 
         items: items.slice(0, 10),
         sourceAttribution: sourceAttributions[title],
       }));
-  }, [recommendations, historyStats]);
+  }, [recommendations, historyStats, seedBooks]);
 
   return {
     recommendations: recommendations.map(r => r.item),
@@ -823,11 +861,3 @@ const MOOD_GENRE_MAP: Record<string, string[]> = {
   'Funny': ['humor', 'comedy', 'satire', 'comedic'],
 };
 
-// Map session moods (from moodSessionStore) to genres
-// Note: Mood type only has 4 values: comfort, thrills, escape, feels
-const SESSION_MOOD_GENRE_MAP: Record<Mood, string[]> = {
-  'comfort': ['cozy', 'romance', 'slice of life', 'contemporary', 'feel-good', 'heartwarming', 'humor', 'comedy', 'lighthearted'],
-  'thrills': ['thriller', 'mystery', 'horror', 'suspense', 'crime', 'action'],
-  'escape': ['fantasy', 'sci-fi', 'paranormal', 'urban fantasy', 'epic fantasy', 'space opera'],
-  'feels': ['literary', 'drama', 'emotional', 'contemporary', 'coming-of-age', 'family', 'philosophy', 'non-fiction', 'thought-provoking'],
-};

@@ -8,34 +8,37 @@
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { useCollections } from '@/features/collections';
+import { Collection } from '@/core/types';
 import { CollectionSquareCard } from './CollectionSquareCard';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_GAP = 12;
-const HORIZONTAL_PADDING = 24;
+const HORIZONTAL_PADDING = 16;
 const CARD_SIZE = (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
 
 interface CollectionsSectionProps {
+  /** Collections data passed from parent */
+  collections: Collection[];
   /** Called when a collection card is pressed */
   onCollectionPress?: (collectionId: string) => void;
   /** Called when View All is pressed */
   onViewAll?: () => void;
   /** Maximum number of collections to display */
   maxCollections?: number;
+  /** Skip the first collection (shown separately as featured) */
+  skipFirst?: boolean;
 }
 
 export function CollectionsSection({
+  collections,
   onCollectionPress,
   onViewAll,
   maxCollections = 4,
+  skipFirst = false,
 }: CollectionsSectionProps) {
   // Theme-aware colors (used for header)
   const colors = useSecretLibraryColors();
-
-  // Fetch collections
-  const { collections, isLoading } = useCollections();
 
   const handleCollectionPress = useCallback(
     (collectionId: string) => {
@@ -44,13 +47,14 @@ export function CollectionsSection({
     [onCollectionPress]
   );
 
-  // Don't render if no collections or still loading
-  if (isLoading || !collections || collections.length === 0) {
+  // Don't render if no collections
+  if (!collections || collections.length === 0) {
     return null;
   }
 
-  // Limit to maxCollections
-  const displayCollections = collections.slice(0, maxCollections);
+  // Optionally skip first (shown as featured card), then limit
+  const startIndex = skipFirst ? 1 : 0;
+  const displayCollections = collections.slice(startIndex, startIndex + maxCollections);
 
   return (
     <View style={styles.container}>
@@ -90,14 +94,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 24,
+    alignItems: 'center',
+    marginBottom: scale(4),
     paddingHorizontal: HORIZONTAL_PADDING,
   },
   title: {
-    fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(24),
-    fontWeight: '400',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
     color: secretLibraryColors.white,
   },
   link: {

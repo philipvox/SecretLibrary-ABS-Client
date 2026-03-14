@@ -150,6 +150,47 @@ export const COMPARABLE_WEIGHTS = {
 } as const;
 
 // ============================================================================
+// COMPARABLE WEIGHTS — "BECAUSE YOU LISTENED" CONTEXT
+// DNA-first scoring: mood/spectrum/trope/theme lead, identity de-emphasized.
+// Base weights sum to 100. Pacing bonus (up to 5) can exceed 100 before cap.
+// ============================================================================
+
+export const COMPARABLE_WEIGHTS_BYL = {
+  /** DNA mood similarity between source and candidate (0-1 scaled) */
+  dnaMoodSimilarity: 30,
+  /** DNA spectrum similarity (0-1 scaled) */
+  dnaSpectrumSimilarity: 20,
+  /** Matching trope from BookDNA (per trope) */
+  matchingTrope: 5,
+  /** Maximum trope contribution */
+  maxTropes: 15,
+  /** Matching theme (per theme) */
+  matchingTheme: 5,
+  /** Maximum theme contribution */
+  maxThemes: 10,
+  /** Matching genre (per genre) */
+  matchingGenre: 2,
+  /** Maximum genre contribution */
+  maxGenres: 12,
+  /** Matching tag (per tag) */
+  matchingTag: 1,
+  /** Maximum tag contribution */
+  maxTags: 8,
+  /** Same narrator (de-emphasized for mood-first recs) */
+  sameNarrator: 3,
+  /** Same author (de-emphasized — author match should not dominate mood recs) */
+  sameAuthor: 2,
+  /** Same series (handled separately, not scored in this path) */
+  sameSeries: 0,
+  /** Pacing match bonus (exact or adjacent values) */
+  pacingMatch: 5,
+  /** Book listed in dna:comparable tag */
+  explicitComparable: 50,
+  /** Maximum total score */
+  maxScore: 100,
+} as const;
+
+// ============================================================================
 // TEMPORAL DECAY
 // Reduces weight of older reading history
 // ============================================================================
@@ -210,12 +251,16 @@ export const MISMATCH_PENALTIES = {
 // ============================================================================
 
 export const ABANDONMENT_PENALTIES = {
-  /** Per-abandoned-book penalty for author */
-  perAbandonedAuthor: 0.3,
+  /** Penalty for books abandoned < 90 days ago */
+  recentPenalty: 0.3,
+  /** Penalty for books abandoned 90–365 days ago */
+  olderPenalty: 0.15,
+  /** Penalty for books abandoned > 365 days ago (near-zero — old abandons shouldn't poison the well) */
+  stalePenalty: 0.05,
   /** Per-abandoned-book penalty for series */
   perAbandonedSeries: 0.25,
-  /** Maximum penalty (so we don't fully exclude) */
-  maxPenalty: 0.9,
+  /** Maximum penalty — cap total reduction so same author can still score, just lower */
+  maxPenalty: 0.7,
   /** Threshold: progress % below which = abandoned */
   abandonedProgressThreshold: 0.30,
   /** Threshold: days since last play to consider abandoned */
