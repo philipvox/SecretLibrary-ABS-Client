@@ -13,11 +13,7 @@ import { hashString, seededRandom, hashToPick } from './core/hashing';
 import { matchBestGenre } from './genre/matcher';
 import { getGenreProfile } from './profiles';
 import { BASE_DIMENSIONS, WIDTH_CALCULATION, TOUCH_TARGETS } from './constants';
-import { useNewSpineSystem } from './featureFlags';
-import { generateComposition, SpineComposition } from './composition';
-
-// Import old system for fallback
-import * as oldSystem from '../spineCalculations';
+import { getTypographyForGenres as getTypographyFromOldSystem, getSpineColorForGenres as getSpineColorFromOldSystem } from '../spineCalculations';
 
 // =============================================================================
 // OLD API - DIMENSIONS
@@ -41,10 +37,6 @@ export function calculateBookDimensions(params: {
   touchPadding: number;
   hash: number;
 } {
-  if (!useNewSpineSystem()) {
-    return oldSystem.calculateBookDimensions(params);
-  }
-
   const config = new SpineConfigBuilder(params.id)
     .withGenres(params.genres)
     .withTags(params.tags || [])
@@ -76,10 +68,6 @@ export function getSpineDimensions(
   duration: number | undefined,
   seriesName?: string
 ): { width: number; height: number; touchPadding: number } {
-  if (!useNewSpineSystem()) {
-    return oldSystem.getSpineDimensions(bookId, genres, duration, seriesName);
-  }
-
   const genreMatch = matchBestGenre(genres);
   const genreProfile = genreMatch?.profile;
 
@@ -106,12 +94,7 @@ export function getTypographyForGenres(
   genres: string[] | undefined,
   bookId: string
 ): any {
-  // Always use old system for typography - it has full genre coverage
-  // The old system's getTypographyForGenres has:
-  // - Combo genre matching (Fantasy + Thriller)
-  // - 42+ templates with diverse fonts
-  // - Deterministic font selection via book hash
-  return oldSystem.getTypographyForGenres(genres, bookId);
+  return getTypographyFromOldSystem(genres, bookId);
 }
 
 /**
@@ -119,10 +102,6 @@ export function getTypographyForGenres(
  * Legacy: detectGenreCategory(genres)
  */
 export function detectGenreCategory(genres: string[] | undefined): string | null {
-  if (!useNewSpineSystem()) {
-    return oldSystem.detectGenreCategory?.(genres) || null;
-  }
-
   const match = matchBestGenre(genres);
   return match?.profile || null;
 }
@@ -136,11 +115,6 @@ export function detectGenreCategory(genres: string[] | undefined): string | null
  * Legacy: getSeriesStyle(seriesName)
  */
 export function getSeriesStyle(seriesName: string): any {
-  if (!useNewSpineSystem()) {
-    return oldSystem.getSeriesStyle(seriesName);
-  }
-
-  // For now, return compatible format
   const hash = hashString(seriesName);
   const height = BASE_DIMENSIONS.HEIGHT + seededRandom(hash, -30, 50);
 
@@ -164,29 +138,14 @@ export function getSeriesStyle(seriesName: string): any {
 export function getSpineColorForGenres(
   genres: string[] | undefined,
   bookId: string
-): { background: string; text: string } {
-  if (!useNewSpineSystem()) {
-    return oldSystem.getSpineColorForGenres?.(genres, bookId) || {
-      background: '#F5F5F5',
-      text: '#000000',
-    };
-  }
-
-  // Return default - colors should be loaded via useSpineColors hook
-  return {
-    background: '#F5F5F5',
-    text: '#000000',
-  };
+): { backgroundColor: string; textColor: string } {
+  return getSpineColorFromOldSystem(genres || [], bookId);
 }
 
 /**
  * @deprecated Use color utilities from new system
  */
 export function isLightColor(color: string): boolean {
-  if (!useNewSpineSystem()) {
-    return oldSystem.isLightColor(color);
-  }
-
   if (!color || !color.startsWith('#')) return false;
 
   const r = parseInt(color.slice(1, 3), 16);
@@ -201,10 +160,6 @@ export function isLightColor(color: string): boolean {
  * @deprecated Use color utilities from new system
  */
 export function darkenColorForDisplay(color: string): string {
-  if (!useNewSpineSystem()) {
-    return oldSystem.darkenColorForDisplay(color);
-  }
-
   if (!color || !color.startsWith('#')) return color;
 
   const r = Math.floor(parseInt(color.slice(1, 3), 16) * 0.6);
@@ -259,53 +214,4 @@ export const FONT_CHAR_RATIOS = {
   'default': { uppercase: 0.55, lowercase: 0.5, tight: 0.45 },
 };
 
-// =============================================================================
-// OLD API - COMPOSITION
-// =============================================================================
-
-/**
- * @deprecated Use generateComposition from composition module
- * Legacy: generateSpineComposition(bookId, title, author, genres, series, spineWidth)
- */
-export function generateSpineComposition(
-  bookId: string,
-  title: string,
-  author: string,
-  genres: string[],
-  series?: { name: string; number: number },
-  spineWidth?: number
-): any {
-  if (!useNewSpineSystem()) {
-    return oldSystem.generateSpineComposition(bookId, title, author, genres, series);
-  }
-
-  // Use new composition generator with smart constraints
-  const genreMatch = matchBestGenre(genres);
-  const genreProfile = genreMatch?.profile || 'default';
-  const composition = generateComposition(
-    bookId,
-    genreProfile,
-    title,      // Pass title for smart rotation logic
-    author,     // Pass author for thin spine logic
-    spineWidth  // Pass width for layout constraints
-  );
-
-  // Return in old format for compatibility - add text properties
-  return {
-    ...composition,
-    title: {
-      ...composition.title,
-      text: title,  // Add the actual title text
-    },
-    author: {
-      ...composition.author,
-      text: author,  // Add the actual author text
-    },
-  };
-}
-
-/**
- * Export SpineComposition type for compatibility
- */
-export type { SpineComposition };
 

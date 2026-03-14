@@ -21,6 +21,9 @@ import {
   FlatList,
   GestureResponderEvent,
   Animated,
+  Alert,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
 // Note: Safe area is handled by TopNav component
@@ -34,6 +37,7 @@ import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { useLibraryCache } from '@/core/cache';
+import { useToastStore } from '@/shared/hooks/useToast';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { TopNav, TopNavSearchIcon, SkullRefreshControl, SkeletonBox, useBookContextMenu } from '@/shared/components';
 import { useNavigationWithLoading } from '@/shared/hooks';
@@ -100,17 +104,18 @@ const GRID_PADDING_NO_MINI_PLAYER = 40;
 // =============================================================================
 
 type ViewMode = 'shelf' | 'list' | 'grid';  // Shelf (upright spines), List (vertical), or Grid (2-column cards)
-type SortMode = 'recent' | 'title' | 'author' | 'progress' | 'series' | 'duration';
+type SortMode = 'lastPlayed' | 'added' | 'title' | 'author' | 'progress' | 'series' | 'duration';
+type SortDirection = 'asc' | 'desc';
 type ContentMode = 'library' | 'lastPlayed' | 'finished' | string;  // What content to show (includes playlist:${id})
-type DownloadFilter = 'all' | 'downloaded' | 'not-downloaded';  // Download status filter
 
-const SORT_OPTIONS: { key: SortMode; label: string }[] = [
-  { key: 'recent', label: 'Recent' },
-  { key: 'title', label: 'Title' },
-  { key: 'author', label: 'Author' },
-  { key: 'progress', label: 'Progress' },
-  { key: 'series', label: 'Series' },
-  { key: 'duration', label: 'Duration' },
+const SORT_OPTIONS: { key: SortMode; label: string; defaultDir: SortDirection }[] = [
+  { key: 'lastPlayed', label: 'Last Played', defaultDir: 'desc' },
+  { key: 'added', label: 'Added', defaultDir: 'desc' },
+  { key: 'title', label: 'Title', defaultDir: 'asc' },
+  { key: 'author', label: 'Author', defaultDir: 'asc' },
+  { key: 'progress', label: 'Progress', defaultDir: 'desc' },
+  { key: 'series', label: 'Series', defaultDir: 'asc' },
+  { key: 'duration', label: 'Duration', defaultDir: 'desc' },
 ];
 
 // Base content options (playlists are added dynamically)
@@ -121,11 +126,7 @@ const BASE_CONTENT_OPTIONS: { key: ContentMode; label: string }[] = [
   { key: 'finished', label: 'Finished' },
 ];
 
-const DOWNLOAD_OPTIONS: { key: DownloadFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'downloaded', label: 'Downloaded' },
-  { key: 'not-downloaded', label: 'Not Downloaded' },
-];
+// Download filter cycles: all → downloaded → not-downloaded → all
 
 interface LibraryBook {
   id: string;
@@ -152,7 +153,7 @@ interface IconProps {
 
 // Shelf icon - upright books on shelf (filled)
 const ShelfIcon = ({ color = '#000' }: IconProps) => (
-  <Svg width={14} height={14} viewBox="0 0 24 24" fill={color}>
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill={color}>
     <Rect x={3} y={4} width={4} height={14} rx={1} />
     <Rect x={9} y={6} width={4} height={12} rx={1} />
     <Rect x={15} y={3} width={4} height={15} rx={1} />
@@ -162,7 +163,7 @@ const ShelfIcon = ({ color = '#000' }: IconProps) => (
 
 // List icon - horizontal lines (filled)
 const ListIcon = ({ color = '#000' }: IconProps) => (
-  <Svg width={14} height={14} viewBox="0 0 24 24" fill={color}>
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill={color}>
     <Circle cx={3} cy={6} r={1.5} />
     <Circle cx={3} cy={12} r={1.5} />
     <Circle cx={3} cy={18} r={1.5} />
@@ -174,7 +175,7 @@ const ListIcon = ({ color = '#000' }: IconProps) => (
 
 // Grid icon - 2x2 squares (filled)
 const GridIcon = ({ color = '#000' }: IconProps) => (
-  <Svg width={14} height={14} viewBox="0 0 24 24" fill={color}>
+  <Svg width={16} height={16} viewBox="0 0 24 24" fill={color}>
     <Rect x={3} y={3} width={8} height={8} rx={1.5} />
     <Rect x={13} y={3} width={8} height={8} rx={1.5} />
     <Rect x={3} y={13} width={8} height={8} rx={1.5} />
@@ -182,9 +183,31 @@ const GridIcon = ({ color = '#000' }: IconProps) => (
   </Svg>
 );
 
+// Down chevron — small arrow for pill dropdown indicator
+const DownChevron = ({ color = '#000' }: IconProps) => (
+  <Svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={3}>
+    <Path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+// Sort arrow — bold chevron, flips for asc/desc
+const SortArrow = ({ color = '#000', direction = 'desc' }: IconProps & { direction?: 'asc' | 'desc' }) => (
+  <Svg
+    width={10}
+    height={10}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={3}
+    style={direction === 'asc' ? { transform: [{ rotate: '180deg' }] } : undefined}
+  >
+    <Path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // Refresh icon - circular arrows
 const RefreshIcon = ({ color = '#000' }: IconProps) => (
-  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+  <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5}>
     <Path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
     <Path d="M21 3v5h-5" />
   </Svg>
@@ -314,8 +337,8 @@ function transformToSpineData(
 // =============================================================================
 
 const VIEW_MODES: ViewMode[] = ['shelf', 'grid', 'list'];
-const BUTTON_SIZE = 32;
-const INDICATOR_SIZE = 30;
+const BUTTON_SIZE = 36;
+const INDICATOR_SIZE = 26;
 const CAPSULE_PADDING = 4;
 const CELL_SIZE = INDICATOR_SIZE + 4;
 const CAPSULE_WIDTH = INDICATOR_SIZE + CAPSULE_PADDING * 2;
@@ -544,12 +567,12 @@ export function LibraryScreen() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('shelf');
   const [sortMode, setSortMode] = useState<SortMode>(
-    usePlaylistSettingsStore.getState().defaultView === 'mySeries' ? 'series' : 'recent'
+    usePlaylistSettingsStore.getState().defaultView === 'mySeries' ? 'series' : 'lastPlayed'
   );
-  const [downloadFilter, setDownloadFilter] = useState<DownloadFilter>('all'); // Download status filter
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const prevSortRef = useRef<{ mode: SortMode; dir: SortDirection }>({ mode: 'lastPlayed', dir: 'desc' });
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showContentDropdown, setShowContentDropdown] = useState(false);
-  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
 
   // Playlist settings from store
   const defaultView = usePlaylistSettingsStore((s) => s.defaultView);
@@ -573,7 +596,6 @@ export function LibraryScreen() {
     const unsubscribe = navigation.addListener('blur', () => {
       setShowSortDropdown(false);
       setShowContentDropdown(false);
-      setShowDownloadDropdown(false);
     });
     return unsubscribe;
   }, [navigation]);
@@ -917,18 +939,34 @@ export function LibraryScreen() {
     }
   }, [contentMode, libraryBooksFromCache, localRecentlyListened, finishedLibraryItems, playlists, cacheItemsById, favoriteSeriesNames]);
 
-  // Apply download filter on top of content mode
-  const effectiveLibraryItems = useMemo(() => {
-    switch (downloadFilter) {
-      case 'downloaded':
-        return baseLibraryItems.filter(item => downloadedIds.has(item.id));
-      case 'not-downloaded':
-        return baseLibraryItems.filter(item => !downloadedIds.has(item.id));
-      case 'all':
-      default:
-        return baseLibraryItems;
+  const effectiveLibraryItems = baseLibraryItems;
+
+  // Book counts per content mode (for dropdown display)
+  const contentCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      library: libraryBooksFromCache.length,
+      lastPlayed: localRecentlyListened.length,
+      finished: finishedLibraryItems.length,
+    };
+    // My Series count
+    const favSeriesNames = useMyLibraryStore.getState().favoriteSeriesNames;
+    let seriesCount = 0;
+    const seen = new Set<string>();
+    for (const seriesName of favSeriesNames) {
+      const seriesInfo = useLibraryCache.getState().getSeries(seriesName);
+      if (seriesInfo) {
+        for (const book of seriesInfo.books) {
+          if (!seen.has(book.id)) { seen.add(book.id); seriesCount++; }
+        }
+      }
     }
-  }, [baseLibraryItems, downloadFilter, downloadedIds]);
+    counts.mySeries = seriesCount;
+    // Playlist counts
+    for (const p of playlists) {
+      counts[`playlist:${p.id}`] = p.items?.length || 0;
+    }
+    return counts;
+  }, [libraryBooksFromCache, localRecentlyListened, finishedLibraryItems, playlists, favoriteSeriesNames]);
 
   // Transform to LibraryBook format for list/grid views
   // Uses LOCAL progressStore timestamps (not server) to avoid sort flicker on refresh
@@ -949,48 +987,50 @@ export function LibraryScreen() {
     }
 
     const sorted = [...filteredBooks];
+    const dir = sortDirection === 'asc' ? 1 : -1;
     switch (sortMode) {
       case 'title':
-        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        sorted.sort((a, b) => dir * a.title.localeCompare(b.title));
         break;
       case 'author':
-        sorted.sort((a, b) => a.author.localeCompare(b.author));
+        sorted.sort((a, b) => dir * a.author.localeCompare(b.author));
         break;
       case 'progress':
-        sorted.sort((a, b) => b.progress - a.progress); // High to low
+        sorted.sort((a, b) => dir * (a.progress - b.progress));
         break;
       case 'series':
         sorted.sort((a, b) => {
-          if (!a.seriesName && !b.seriesName) return a.title.localeCompare(b.title);
+          if (!a.seriesName && !b.seriesName) return dir * a.title.localeCompare(b.title);
           if (!a.seriesName) return 1;
           if (!b.seriesName) return -1;
-          const seriesCompare = a.seriesName.localeCompare(b.seriesName);
+          const seriesCompare = dir * a.seriesName.localeCompare(b.seriesName);
           if (seriesCompare !== 0) return seriesCompare;
-          return (a.seriesSequence || 999) - (b.seriesSequence || 999);
+          return dir * ((a.seriesSequence || 999) - (b.seriesSequence || 999));
         });
         break;
       case 'duration':
-        sorted.sort((a, b) => b.durationSeconds - a.durationSeconds); // Long to short
+        sorted.sort((a, b) => dir * (a.durationSeconds - b.durationSeconds));
         break;
-      case 'recent':
+      case 'added':
+        sorted.sort((a, b) => dir * ((a.addedAt || 0) - (b.addedAt || 0)));
+        break;
+      case 'lastPlayed':
       default:
-        // Sort by last played timestamp (most recent first)
-        // Never-played books use addedAt so they appear by add date, not buried at bottom
         sorted.sort((a, b) => {
           const aTime = a.lastPlayedAt || a.addedAt || 0;
           const bTime = b.lastPlayedAt || b.addedAt || 0;
-          return bTime - aTime;
+          return dir * (aTime - bTime);
         });
         break;
     }
     return sorted;
-  }, [filteredBooks, sortMode, isDataReady]);
+  }, [filteredBooks, sortMode, sortDirection, isDataReady]);
 
   // Handlers
   const handleBookPress = useCallback((book: LibraryBook | BookSpineVerticalData) => {
-    haptics.buttonPress();
-    navigation.navigate('BookDetail', { id: book.id });
-  }, [navigation]);
+    const item = cacheItemsById.get(book.id);
+    if (item) showMenu(item, activePlaylistId ? { playlistId: activePlaylistId } : undefined);
+  }, [cacheItemsById, showMenu, activePlaylistId]);
 
   // Extract active playlist ID when in playlist content mode
   const activePlaylistId = contentMode.startsWith('playlist:')
@@ -998,9 +1038,9 @@ export function LibraryScreen() {
     : undefined;
 
   const handleBookLongPress = useCallback((book: LibraryBook | BookSpineVerticalData) => {
-    const item = cacheItemsById.get(book.id);
-    if (item) showMenu(item, activePlaylistId ? { playlistId: activePlaylistId } : undefined);
-  }, [cacheItemsById, showMenu, activePlaylistId]);
+    haptics.selection();
+    navigation.navigate('BookDetail', { id: book.id });
+  }, [navigation]);
 
   const handleSearchPress = useCallback(() => {
     haptics.selection();
@@ -1020,6 +1060,8 @@ export function LibraryScreen() {
     if (isSyncing) return;
     haptics.selection();
     setIsSyncing(true);
+    useToastStore.getState().clearToasts();
+    useToastStore.getState().addToast({ type: 'info', message: 'Syncing Library…', duration: 8000 });
     try {
       // 1. Cloud sync — upload/download library changes
       await librarySyncService.fullSync();
@@ -1029,10 +1071,40 @@ export function LibraryScreen() {
       await refreshCache();
       // 4. Clear cached spine dimensions so fresh images load
       useSpineCacheStore.getState().clearServerSpineDimensions();
+      useToastStore.getState().clearToasts();
+      useToastStore.getState().addToast({ type: 'success', message: 'Library Synced', duration: 2000 });
+    } catch {
+      useToastStore.getState().clearToasts();
+      useToastStore.getState().addToast({ type: 'error', message: 'Sync Failed', duration: 3000 });
     } finally {
       setIsSyncing(false);
     }
   }, [isSyncing, refreshCache]);
+
+  const handleCreateNewPlaylist = useCallback(() => {
+    Alert.prompt(
+      'New Playlist',
+      'Enter a name for the playlist',
+      async (name) => {
+        if (!name?.trim()) return;
+        try {
+          const libraryId = useLibraryCache.getState().currentLibraryId;
+          if (!libraryId) return;
+          const { playlistsApi } = await import('@/core/api/endpoints/playlists');
+          await playlistsApi.create({ libraryId, name: name.trim(), items: [] });
+          const { queryClient } = await import('@/core/queryClient');
+          queryClient.invalidateQueries({ queryKey: ['playlists'] });
+          haptics.success();
+          useToastStore.getState().addToast({ type: 'success', message: `Created "${name.trim()}"`, duration: 2000 });
+        } catch {
+          useToastStore.getState().addToast({ type: 'error', message: 'Failed to create playlist', duration: 3000 });
+        }
+      },
+      'plain-text',
+      '',
+      'Playlist name',
+    );
+  }, []);
 
   const handleLogoLongPress = useCallback(() => {
     haptics.selection();
@@ -1051,9 +1123,17 @@ export function LibraryScreen() {
 
   const handleSortSelect = useCallback((mode: SortMode) => {
     haptics.selection();
-    setSortMode(mode);
+    if (mode === sortMode) {
+      // Same sort tapped — toggle direction
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New sort — use its default direction
+      const defaultDir = SORT_OPTIONS.find(o => o.key === mode)?.defaultDir || 'asc';
+      setSortMode(mode);
+      setSortDirection(defaultDir);
+    }
     setShowSortDropdown(false);
-  }, []);
+  }, [sortMode]);
 
   const handleContentPress = useCallback(() => {
     haptics.selection();
@@ -1062,24 +1142,20 @@ export function LibraryScreen() {
 
   const handleContentSelect = useCallback((mode: ContentMode) => {
     haptics.selection();
-    setContentMode(mode);
+    setContentMode(prev => {
+      // Save sort before entering My Series, restore when leaving
+      if (mode === 'mySeries' && prev !== 'mySeries') {
+        prevSortRef.current = { mode: sortMode, dir: sortDirection };
+        setSortMode('series');
+        setSortDirection('asc');
+      } else if (mode !== 'mySeries' && prev === 'mySeries') {
+        setSortMode(prevSortRef.current.mode);
+        setSortDirection(prevSortRef.current.dir);
+      }
+      return mode;
+    });
     setShowContentDropdown(false);
-    // Default to series sort when switching to My Series
-    if (mode === 'mySeries') {
-      setSortMode('series');
-    }
-  }, []);
-
-  const handleDownloadPress = useCallback(() => {
-    haptics.selection();
-    setShowDownloadDropdown(true);
-  }, []);
-
-  const handleDownloadSelect = useCallback((filter: DownloadFilter) => {
-    haptics.selection();
-    setDownloadFilter(filter);
-    setShowDownloadDropdown(false);
-  }, []);
+  }, [sortMode, sortDirection]);
 
   // Use pre-built cacheItemsById for quick lookup of library items by ID
   // PERF FIX: Removed creation of new Map - use cacheItemsById directly
@@ -1093,9 +1169,8 @@ export function LibraryScreen() {
   const buttonInactiveTextColor = colors.gray;
 
   // Get current labels for dropdowns
-  const currentSortLabel = SORT_OPTIONS.find(opt => opt.key === sortMode)?.label || 'Recent';
+  const currentSortLabel = SORT_OPTIONS.find(opt => opt.key === sortMode)?.label || 'Last Played';
   const currentContentLabel = contentOptions.find(opt => opt.key === contentMode)?.label || 'Library';
-  const currentDownloadLabel = DOWNLOAD_OPTIONS.find(opt => opt.key === downloadFilter)?.label || 'All';
 
   // PERF: Memoized row renderer for list view FlatList
   const renderListItem = useCallback(({ item: book }: { item: LibraryBook }) => {
@@ -1430,14 +1505,28 @@ export function LibraryScreen() {
         showLogo={true}
         onLogoLongPress={handleLogoLongPress}
         style={{ backgroundColor: 'transparent' }}
-        pills={isCollectionLinked ? [
+        pills={[
           {
-            key: 'sync',
-            label: isSyncing ? 'Syncing…' : 'Sync',
-            onPress: handleSyncPress,
-            outline: true,
+            key: 'content',
+            icon: <DownChevron color={showContentDropdown
+              ? (isDarkMode ? staticColors.black : staticColors.white)
+              : (isDarkMode ? staticColors.white : staticColors.black)
+            } />,
+            label: currentContentLabel,
+            onPress: handleContentPress,
+            active: showContentDropdown,
           },
-        ] : []}
+          {
+            key: 'sort',
+            icon: <SortArrow color={showSortDropdown
+              ? (isDarkMode ? staticColors.black : staticColors.white)
+              : (isDarkMode ? staticColors.white : staticColors.black)
+            } direction={sortDirection} />,
+            label: currentSortLabel,
+            onPress: handleSortPress,
+            active: showSortDropdown,
+          },
+        ]}
         circleButtons={[
           {
             key: 'viewMode',
@@ -1457,36 +1546,11 @@ export function LibraryScreen() {
           },
           {
             key: 'search',
-            icon: <TopNavSearchIcon color={colors.black} size={14} />,
+            icon: <TopNavSearchIcon color={colors.black} size={16} />,
             onPress: handleSearchPress,
           },
         ]}
       />
-
-      {/* Filter Row: Content Mode + Download Filter + Sort */}
-      <View style={styles.filterRow}>
-        {/* Content mode dropdown (Library / Last Played) */}
-        <TouchableOpacity style={styles.dropdownBtn} onPress={handleContentPress}>
-          <Text style={[styles.dropdownBtnText, { color: textColor }]}>
-            ⊙ {currentContentLabel}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Download filter dropdown */}
-        <TouchableOpacity style={styles.dropdownBtn} onPress={handleDownloadPress}>
-          <Text style={[styles.dropdownBtnText, { color: textColor }]}>
-            ↓ {currentDownloadLabel}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Sort dropdown button */}
-        <TouchableOpacity style={styles.dropdownBtn} onPress={handleSortPress}>
-          <Text style={[styles.dropdownBtnText, { color: textColor }]}>
-            ⇅ {currentSortLabel}
-          </Text>
-        </TouchableOpacity>
-
-      </View>
 
       {/* Sort Dropdown Modal */}
       <Modal
@@ -1499,34 +1563,32 @@ export function LibraryScreen() {
           style={styles.dropdownOverlay}
           onPress={() => setShowSortDropdown(false)}
         >
-          <View style={[styles.dropdownMenu, { backgroundColor: isDarkMode ? colors.shelfBg : colors.white }]}>
-            <Text style={[styles.dropdownTitle, { color: colors.black }]}>
-              Sort By
-            </Text>
-            {SORT_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.key}
-                style={[
-                  styles.dropdownItem,
-                  sortMode === option.key && styles.dropdownItemSelected,
-                  { borderBottomColor: isDarkMode ? colors.gray : colors.grayLine },
-                ]}
-                onPress={() => handleSortSelect(option.key)}
-              >
-                <Text
-                  style={[
-                    styles.dropdownItemText,
-                    { color: colors.black },
-                    sortMode === option.key && styles.dropdownItemTextSelected,
-                  ]}
+          <View style={[styles.dropdownMenuWide, { backgroundColor: isDarkMode ? colors.shelfBg : colors.white }]}>
+            {SORT_OPTIONS.map((option) => {
+              const isActive = sortMode === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={styles.contentDropdownItem}
+                  onPress={() => handleSortSelect(option.key)}
                 >
-                  {option.label}
-                </Text>
-                {sortMode === option.key && (
-                  <Text style={[styles.dropdownCheck, { color: colors.black }]}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.contentDropdownText,
+                      { color: colors.black },
+                      isActive && styles.contentDropdownTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {isActive && (
+                    <Text style={styles.contentDropdownCheck}>
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>
@@ -1543,83 +1605,72 @@ export function LibraryScreen() {
           onPress={() => setShowContentDropdown(false)}
         >
           <View style={[styles.dropdownMenuWide, { backgroundColor: isDarkMode ? colors.shelfBg : colors.white }]}>
-            <Text style={[styles.dropdownTitle, { color: colors.black }]}>
-              View
-            </Text>
+            {/* Sync at top */}
+            {isCollectionLinked && (
+              <TouchableOpacity
+                style={styles.contentDropdownSync}
+                onPress={() => { setShowContentDropdown(false); handleSyncPress(); }}
+              >
+                <RefreshIcon color={colors.black} />
+                <Text style={[styles.contentDropdownSyncText, { color: colors.black }]}>
+                  Sync Library
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Views list */}
             <ScrollView style={styles.dropdownScrollView} showsVerticalScrollIndicator={false}>
-              {contentOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[
-                    styles.dropdownItemTall,
-                    contentMode === option.key && styles.dropdownItemSelected,
-                    { borderBottomColor: isDarkMode ? colors.gray : colors.grayLine },
-                  ]}
-                  onPress={() => handleContentSelect(option.key)}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownItemText,
-                      { color: colors.black },
-                      contentMode === option.key && styles.dropdownItemTextSelected,
-                    ]}
-                    numberOfLines={1}
+              {contentOptions.map((option) => {
+                const isActive = contentMode === option.key;
+                const count = contentCounts[option.key];
+                return (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={styles.contentDropdownItem}
+                    onPress={() => handleContentSelect(option.key)}
                   >
-                    {option.label}
-                  </Text>
-                  {contentMode === option.key && (
-                    <Text style={[styles.dropdownCheck, { color: colors.black }]}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    <View style={styles.contentDropdownLeft}>
+                      <Text
+                        style={[
+                          styles.contentDropdownText,
+                          { color: colors.black },
+                          isActive && styles.contentDropdownTextActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {option.label}
+                      </Text>
+                      {count != null && (
+                        <Text style={[styles.contentDropdownCount, { color: colors.gray }]}>
+                          {count}
+                        </Text>
+                      )}
+                    </View>
+                    {isActive && (
+                      <Text style={styles.contentDropdownCheck}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
+
+            {/* Add Playlist at bottom */}
+            <TouchableOpacity
+              style={styles.contentDropdownAction}
+              onPress={() => {
+                setShowContentDropdown(false);
+                handleCreateNewPlaylist();
+              }}
+            >
+              <Text style={styles.contentDropdownActionText}>
+                + Add Playlist
+              </Text>
+            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
 
       {/* Download Filter Dropdown Modal */}
-      <Modal
-        visible={showDownloadDropdown}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDownloadDropdown(false)}
-      >
-        <Pressable
-          style={styles.dropdownOverlay}
-          onPress={() => setShowDownloadDropdown(false)}
-        >
-          <View style={[styles.dropdownMenu, { backgroundColor: isDarkMode ? colors.shelfBg : colors.white }]}>
-            <Text style={[styles.dropdownTitle, { color: colors.black }]}>
-              Download Status
-            </Text>
-            {DOWNLOAD_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.key}
-                style={[
-                  styles.dropdownItem,
-                  downloadFilter === option.key && styles.dropdownItemSelected,
-                  { borderBottomColor: isDarkMode ? colors.gray : colors.grayLine },
-                ]}
-                onPress={() => handleDownloadSelect(option.key)}
-              >
-                <Text
-                  style={[
-                    styles.dropdownItemText,
-                    { color: colors.black },
-                    downloadFilter === option.key && styles.dropdownItemTextSelected,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-                {downloadFilter === option.key && (
-                  <Text style={[styles.dropdownCheck, { color: colors.black }]}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-
       {/* Content */}
       <View style={styles.content}>
         {renderContent()}
@@ -1660,27 +1711,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Filter Row (aligned to right with search)
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: spacing.screenPaddingH,
-    paddingBottom: 16,
-    gap: 16,
-  },
-
-  // Dropdown buttons (filter & sort)
-  dropdownBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  dropdownBtnText: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
 
   // Dropdown Modal
   dropdownOverlay: {
@@ -1701,10 +1731,11 @@ const styles = StyleSheet.create({
   },
   // Wider dropdown for content mode (includes playlist names)
   dropdownMenuWide: {
-    width: 240,
-    maxHeight: 400,
-    borderRadius: 8,
-    paddingVertical: 8,
+    width: 260,
+    maxHeight: 420,
+    borderRadius: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1755,6 +1786,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+
+  // Content dropdown — no dividers, generous touch targets
+  contentDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    minHeight: 52,
+  } as ViewStyle,
+  contentDropdownLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  } as ViewStyle,
+  contentDropdownText: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  } as TextStyle,
+  contentDropdownTextActive: {
+    fontFamily: fonts.jetbrainsMono.bold,
+  } as TextStyle,
+  contentDropdownCount: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: 12,
+    opacity: 0.35,
+  } as TextStyle,
+  contentDropdownCheck: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F3B60C',
+  } as TextStyle,
+  contentDropdownSync: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  } as ViewStyle,
+  contentDropdownSyncText: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    opacity: 0.5,
+  } as TextStyle,
+  contentDropdownAction: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  } as ViewStyle,
+  contentDropdownActionText: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.35)',
+  } as TextStyle,
 
   // Content
   content: {

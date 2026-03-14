@@ -29,6 +29,7 @@ import { useSecretLibraryColors } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
 import { useSpineUrl, useLibraryCache } from '@/core/cache';
 import { useSpineCacheStore } from '../stores/spineCache';
+import { useStarPositionStore } from '@/features/book-detail/stores/starPositionStore';
 // MIGRATED: Core functions now using new system via adapter
 import {
   getSeriesStyle,
@@ -36,8 +37,6 @@ import {
   getSpineDimensions,
   calculateBookDimensions,
   MIN_TOUCH_TARGET,
-  generateSpineComposition,
-  SpineComposition,
   hashString,
 } from '../utils/spine/adapter';
 // TEMPLATE SYSTEM: Genre-specific spine templates with size-based configs
@@ -51,17 +50,10 @@ import {
 // TODO: Migrate these to new system
 import {
   SpineTypography,
-  resolveAuthorBox,
-  AuthorBoxConfig,
   getPlatformFont,
   getFontLineHeight,
   FONT_LINE_HEIGHTS,
 } from '../utils/spineCalculations';
-import {
-  solveTitleLayout,
-  solveAuthorLayout,
-  LayoutSolution,
-} from '../utils/layoutSolver';
 
 // =============================================================================
 // TYPES
@@ -126,7 +118,15 @@ const SECTION_GAP = 2; // Gap between sections (author/title) - very tight for p
 const ASCENDER_BUFFER = 3; // Extra space for font ascenders that extend above cap height
 
 const CORNER_RADIUS = 5; // Slight rounded corners on spine edges
+
+// Gold star sticker for rated books
+const STAR_STICKER_IMAGE = require('@assets/stars/star5.webp');
+
+// Cloth texture overlay for procedural spine backgrounds
+const SPINE_TEXTURE_IMAGE = require('@assets/textures/spine-cloth.png');
+
 const SPRING_CONFIG = { damping: 15, stiffness: 200 };
+const EMPTY_GENRES: string[] = []; // Stable reference for books without genres
 
 // Debug flag - set to true to show section boundaries
 const DEBUG_SECTIONS = __DEV__ && false; // Toggle to see section bounds
@@ -670,78 +670,6 @@ function TemplateSpineRenderer({
   );
 }
 
-// =============================================================================
-// COMPOSITION RENDERING HELPERS
-// =============================================================================
-
-// NOTE: Font size scaling was removed - it caused clipping issues.
-// The layout solver calculates optimal sizes; variation comes from weight, case, and spacing.
-
-/**
- * Process author text based on composition treatment.
- */
-function processAuthorText(author: string, treatment: string): string {
-  switch (treatment) {
-    case 'last-name-only': {
-      const parts = author.split(' ');
-      return parts[parts.length - 1] || author;
-    }
-    case 'initials': {
-      const parts = author.split(' ').filter(Boolean);
-      return parts.map(p => p[0]).join('.') + '.';
-    }
-    case 'first-initial-last': {
-      const parts = author.split(' ').filter(Boolean);
-      if (parts.length < 2) return author;
-      return `${parts[0][0]}. ${parts[parts.length - 1]}`;
-    }
-    case 'abbreviated': {
-      const parts = author.split(' ').filter(Boolean);
-      if (parts.length < 2) return author;
-      return `${parts[0][0]}. ${parts.slice(1).map(p => p[0]).join('.')}`;
-    }
-    case 'full':
-    default:
-      return author;
-  }
-}
-
-/**
- * Get font weight value for composition weight.
- */
-function getCompositionFontWeightValue(weight: string): string {
-  switch (weight) {
-    case 'light': return '300';
-    case 'regular': return '400';
-    case 'medium': return '500';
-    case 'semibold': return '600';
-    case 'bold': return '700';
-    case 'black': return '900';
-    default: return '500';
-  }
-}
-
-/**
- * Apply case transformation to text.
- */
-function applyTextCase(text: string, textCase: string): string {
-  switch (textCase) {
-    case 'uppercase': return text.toUpperCase();
-    case 'lowercase': return text.toLowerCase();
-    case 'title-case':
-      return text.replace(/\w\S*/g, t =>
-        t.charAt(0).toUpperCase() + t.substr(1).toLowerCase()
-      );
-    case 'sentence-case':
-      return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-    case 'mixed':
-    default:
-      return text;
-  }
-}
-
-// Decorative line rendering removed - using pure React Native
-
 // Default dimensions when metadata not available
 const DEFAULT_HEIGHT = 320;
 const DEFAULT_WIDTH = 45; // Default for unknown duration (matches MEDIAN_WIDTH)
@@ -756,68 +684,6 @@ const PROGRESS_PERCENT = 6;     // Progress percentage at bottom
 // =============================================================================
 // HELPERS
 // =============================================================================
-
-/**
- * Get rotation jitter for author text based on book ID hash.
- * Creates subtle rotation variety (±5°) while keeping text readable.
- *
- * @param bookId - Book ID to hash for deterministic randomness
- * @param baseRotation - Base rotation angle (e.g., -90 for vertical-up)
- * @returns Modified rotation with subtle jitter
- */
-function getRotationJitter(bookId: string, baseRotation: number): number {
-  // Simple hash function for deterministic randomness
-  let hash = 0;
-  for (let i = 0; i < bookId.length; i++) {
-    const char = bookId.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-
-  // Generate jitter range: -5 to +5 degrees
-  const jitter = ((hash % 11) - 5); // Results in -5 to +5
-
-  // For vertical text, add small jitter
-  // Don't add jitter to horizontal (0°) - keep horizontal crisp
-  if (Math.abs(baseRotation) > 45) {
-    return baseRotation + jitter;
-  }
-
-  return baseRotation;
-}
-
-/**
- * Determine author rotation direction based on book hash.
- * 70% vertical-up (-90°), 30% vertical-down (+90°) for variety.
- *
- * @param bookId - Book ID for hash
- * @param defaultRotation - Default rotation from layout solver
- * @returns Rotation angle with direction variety
- */
-function getAuthorRotationDirection(bookId: string, defaultRotation: number): number {
-  // Only vary vertical rotations
-  if (Math.abs(defaultRotation) < 45) {
-    return defaultRotation; // Keep horizontal as-is
-  }
-
-  // Hash the book ID to determine direction
-  let hash = 0;
-  for (let i = 0; i < bookId.length; i++) {
-    hash = ((hash << 3) - hash) + bookId.charCodeAt(i);
-  }
-
-  // 30% chance to flip direction (makes the shelf more visually interesting)
-  // Use different hash bits than jitter to avoid correlation
-  const flipDirection = (Math.abs(hash >> 4) % 10) < 3;
-
-  if (flipDirection && defaultRotation < 0) {
-    return 90; // Flip from vertical-up to vertical-down
-  } else if (flipDirection && defaultRotation > 0) {
-    return -90; // Flip from vertical-down to vertical-up
-  }
-
-  return defaultRotation;
-}
 
 /**
  * Format time ago in compact format (max 3 chars, except months which can be 4)
@@ -895,22 +761,19 @@ export function BookSpineVertical({
   const spineImageUrl = shouldTryServerSpine ? spineImageUrlRaw : null;
   const spinePlaceholderUrl = shouldTryServerSpine ? spinePlaceholderUrlRaw : null;
   const [spineImageFailed, setSpineImageFailed] = useState(false);
-  const [spineImageLoaded, setSpineImageLoaded] = useState(false);
 
-  // Reset image loaded state when URL changes or dimensions are cleared
+  // Reset failure state when URL changes
   useEffect(() => {
-    setSpineImageLoaded(false);
     setSpineImageFailed(false);
   }, [spineImageUrl]);
 
-  useEffect(() => {
-    if (!cachedDimEntry) {
-      setSpineImageLoaded(false);
-    }
-  }, [cachedDimEntry]);
+  // Gold star stickers
+  const bookStars = useStarPositionStore((s) => s.positions[book.id]);
+  const hasStars = Array.isArray(bookStars) && bookStars.length > 0;
 
   // Get genres and duration with fallbacks
-  const genres = book.genres || [];
+  // Stabilize genres reference — avoid creating new empty array every render
+  const genres = useMemo(() => book.genres || EMPTY_GENRES, [book.genres]);
   const duration = book.duration || DEFAULT_DURATION;
 
   // Determine if book is in a series
@@ -951,21 +814,12 @@ export function BookSpineVertical({
   // Dark mode: dark background with white text/stroke
   // Light mode: light grey background with black text/stroke
   const { spineBgColor, spineTextColor, spineStrokeColor } = useMemo(() => {
-    // Use book-specific colors if provided (from cache enrichment)
-    if (book.backgroundColor && book.textColor) {
-      return {
-        spineBgColor: book.backgroundColor,
-        spineTextColor: book.textColor,
-        spineStrokeColor: book.textColor,
-      };
-    }
-    // Fall back to theme colors
     return {
-      spineBgColor: colors.white,      // #F5F5F5 light, #1A1A1A dark
-      spineTextColor: colors.black,        // #000000 light, #FFFFFF dark
-      spineStrokeColor: colors.black,      // #000000 light, #FFFFFF dark
+      spineBgColor: 'transparent',
+      spineTextColor: '#FFFFFF',
+      spineStrokeColor: 'rgba(255,255,255,0.3)',
     };
-  }, [book.backgroundColor, book.textColor, colors.white, colors.black]);
+  }, []);
 
   // Calculate dimensions using genre-based system (includes touch padding for 44px minimum target)
   const dimensions = useMemo(() => {
@@ -974,7 +828,6 @@ export function BookSpineVertical({
     if (hasGenreData) {
       const calculated = calculateBookDimensions({
         id: book.id,
-        title: book.title,
         genres,
         tags: book.tags,
         duration,
@@ -1001,7 +854,7 @@ export function BookSpineVertical({
     }
 
     // Fallback to simple calculation
-    const simpleDims = getSpineDimensions(book.id, genres, duration, book.seriesName, book.title);
+    const simpleDims = getSpineDimensions(book.id, genres, duration, book.seriesName);
     return simpleDims;
   }, [book.id, book.title, genres, book.tags, duration, book.seriesName, propWidth, propHeight]);
 
@@ -1012,8 +865,9 @@ export function BookSpineVertical({
 
   // Render server spine when we have cached dimensions (for correct sizing)
   const shouldRenderServerSpine = isUsingServerSpine && cachedSpineDimensions;
-  // Only SHOW server spine after image has loaded (prevents flash of empty space)
-  const canDisplayServerSpine = shouldRenderServerSpine && spineImageLoaded;
+  // Show server spine as soon as dimensions are ready — transition={150} prevents flash
+  // (Previously waited for spineImageLoaded, causing an extra render cycle)
+  const canDisplayServerSpine = !!shouldRenderServerSpine;
 
   // Show procedural spine as fallback while server spine loads (empty spine is worse than flash)
   // Once server spine is ready, it will overlay the procedural content
@@ -1066,7 +920,7 @@ export function BookSpineVertical({
   // ═══════════════════════════════════════════════════════════════════════════
   const useTemplateSystem = shouldUseTemplates(genres);
   const baseTemplateConfig = useMemo(() => {
-    if (!useTemplateSystem || genres.length === 0) return null;
+    if (!useTemplateSystem) return null;
     // Pass book title for deterministic font selection from fontFamilies
     return applyTemplateConfig(genres, width, book.title);
   }, [useTemplateSystem, genres, width, book.title]);
@@ -1130,60 +984,39 @@ export function BookSpineVertical({
   // Generate the generative composition for editorial-style layouts
   // When templates are active, composition is generated FROM template config
   const composition = useMemo(() => {
-    if (genres.length === 0) return null;
+    if (!templateConfig) return null;
 
-    // Template system provides the base composition
-    if (templateConfig) {
-      // CRITICAL: When displaying horizontally (rotated in stack view), force vertical-up orientation
-      // Stacked-words and two-row orientations don't work well when the spine is lying flat
-      const titleOrientation = isHorizontalDisplay
-        ? 'vertical-up'
-        : templateConfig.title.orientation;
+    // When displaying horizontally (rotated in stack view), force vertical-up orientation
+    const titleOrientation = isHorizontalDisplay
+      ? 'vertical-up'
+      : templateConfig.title.orientation;
 
-      return {
-        title: {
-          text: book.title,
-          orientation: titleOrientation as any,
-          case: templateConfig.title.case,
-          weight: templateConfig.title.weight,
-          scale: 'normal', // Templates control size via fontSize directly
-          letterSpacing: templateConfig.title.letterSpacing,
-        },
-        author: {
-          text: book.author,
-          orientation: templateConfig.author.orientation as any,
-          case: templateConfig.author.case,
-          weight: templateConfig.author.weight,
-          treatment: templateConfig.author.treatment,
-          scale: 'normal', // Templates control size via fontSize directly
-          splitNames: false, // Templates don't use split names (yet)
-        },
-        layout: {
-          density: 'balanced' as any, // Templates handle density via heightPercent
-          alignment: 'centered' as any,
-          authorPosition: templateConfig.author.placement as 'top' | 'bottom', // Use template's author placement
-        },
-        decoration: templateConfig.decoration,
-      };
-    }
-
-    // Fallback to generative composition system
-    // Pass VISUAL width for smart layout constraints (horizontal only on wide spines)
-    // When isHorizontalDisplay is true, the visual width is actually the height prop
-    const visualWidth = isHorizontalDisplay ? height : width;
-    const generatedComp = generateSpineComposition(
-      book.id,
-      book.title,
-      book.author,
-      genres,
-      book.seriesName && book.seriesSequence
-        ? { name: book.seriesName, number: book.seriesSequence }
-        : undefined,
-      visualWidth  // Pass visual width for smart orientation constraints
-    );
-
-    return generatedComp;
-  }, [book.id, book.title, book.author, genres, book.seriesName, book.seriesSequence, templateConfig, width, height, typography.authorOrientationBias, isHorizontalDisplay]);
+    return {
+      title: {
+        text: book.title,
+        orientation: titleOrientation as any,
+        case: templateConfig.title.case,
+        weight: templateConfig.title.weight,
+        scale: 'normal',
+        letterSpacing: templateConfig.title.letterSpacing,
+      },
+      author: {
+        text: book.author,
+        orientation: templateConfig.author.orientation as any,
+        case: templateConfig.author.case,
+        weight: templateConfig.author.weight,
+        treatment: templateConfig.author.treatment,
+        scale: 'normal',
+        splitNames: false,
+      },
+      layout: {
+        density: 'balanced' as any,
+        alignment: 'centered' as any,
+        authorPosition: templateConfig.author.placement as 'top' | 'bottom',
+      },
+      decoration: templateConfig.decoration,
+    };
+  }, [book.title, book.author, templateConfig, isHorizontalDisplay]);
 
   // HitSlop for touch target compliance (44px minimum)
   const hitSlop = useMemo(() => ({
@@ -1222,27 +1055,6 @@ export function BookSpineVertical({
   const progressPercent = Math.round(progress * 100);
   const isFinished = progressPercent >= 100;
   const showProgress = progressPercent > 0;
-
-  // Get composition scale values EARLY (before layout calculations)
-  const compositionTitleScale = composition?.title.scale || 'normal';
-  const compositionAuthorScale = composition?.author.scale || 'small';
-
-  // Calculate scale multiplier from composition
-  // More dramatic range for visual interest: 0.5x to 2.5x (5x difference!)
-  const getScaleMultiplier = (scale: string): number => {
-    switch (scale) {
-      case 'whisper': return 0.5;   // Very subtle, minimal
-      case 'tiny': return 0.65;      // Small but readable
-      case 'small': return 0.8;      // Slightly reduced
-      case 'normal': return 1.0;     // Baseline
-      case 'balanced': return 1.2;   // Slightly emphasized
-      case 'statement': return 1.5;  // Bold, prominent
-      case 'shout': return 2.5;      // Maximum drama!
-      default: return 1.0;
-    }
-  };
-  const titleScaleMultiplier = getScaleMultiplier(compositionTitleScale);
-  const authorScaleMultiplier = getScaleMultiplier(compositionAuthorScale);
 
   // Calculate section percentages based on what's shown
   // IMPORTANT: Apply scale multipliers to HEIGHT ALLOCATION before layout solver runs
@@ -1294,42 +1106,13 @@ export function BookSpineVertical({
       };
     }
 
-    // Composition-driven heights: use scale multipliers
-    const baseTitlePercent = hasProgressSection
-      ? TITLE_PERCENT_BASE
-      : TITLE_PERCENT_BASE + (PROGRESS_PERCENT / 2);
-    const baseAuthorPercent = hasProgressSection
-      ? AUTHOR_PERCENT_BASE
-      : AUTHOR_PERCENT_BASE + (PROGRESS_PERCENT / 2);
-
-    const titleWeight = baseTitlePercent * titleScaleMultiplier;
-    const authorWeight = baseAuthorPercent * authorScaleMultiplier;
-    const progressWeight = hasProgressSection ? PROGRESS_PERCENT : 0;
-
-    // Normalize to 100% (redistribute space based on relative weights)
-    const totalWeight = titleWeight + authorWeight + progressWeight;
-
-    let rawTitlePct = (titleWeight / totalWeight) * 100;
-    let rawAuthorPct = (authorWeight / totalWeight) * 100;
-    const rawProgressPct = (progressWeight / totalWeight) * 100;
-
-    // GUARD: Title must always dominate — clamp to minimum 60% of non-progress space.
-    // Prevents author scale multipliers from squeezing the title into tiny font sizes.
-    const MIN_TITLE_RATIO = 0.60;
-    const nonProgressPct = rawTitlePct + rawAuthorPct;
-    if (rawTitlePct < nonProgressPct * MIN_TITLE_RATIO) {
-      rawTitlePct = nonProgressPct * MIN_TITLE_RATIO;
-      rawAuthorPct = nonProgressPct - rawTitlePct;
-    }
-
-    const result = {
-      titlePercent: rawTitlePct,
-      authorPercent: rawAuthorPct,
-      progressSectionPercent: rawProgressPct,
+    // Fallback for no template (shouldn't happen, but safe default)
+    return {
+      titlePercent: TITLE_PERCENT_BASE,
+      authorPercent: AUTHOR_PERCENT_BASE,
+      progressSectionPercent: showProgress ? PROGRESS_PERCENT : 0,
     };
-
-    return result;
-  }, [showProgress, titleScaleMultiplier, authorScaleMultiplier, compositionTitleScale, compositionAuthorScale, templateConfig]);
+  }, [showProgress, templateConfig, height]);
 
   // Calculate usable area (subtract gaps from total)
   const topOffset = (book.isDownloaded ? DOWNLOAD_INDICATOR_HEIGHT : 0) + TOP_PADDING;
@@ -1351,36 +1134,16 @@ export function BookSpineVertical({
 
   // Position sections based on author position
   // Priority: composition.layout.authorPosition > hasAuthorBox > typography.authorPosition
-  // CRITICAL SAFETY: NEVER put stacked authors at top (looks wrong - dominates the spine)
   const hasAuthorBox = typography.authorBox === 'horizontal-only' || typography.authorBox === 'always';
-  const authorHasStackedOrientation =
-    composition?.author?.orientation === 'stacked-words' ||
-    composition?.author?.orientation === 'stacked-letters';
-
-  // Check if auto-split-names will kick in (medium+ spine with multi-word author)
-  // This creates stacked rendering even without explicit composition orientation
-  const isExplicitlyHorizontalAuthor = typography.authorOrientationBias === 'horizontal';
-  const willAutoStackAuthor =
-    effectiveWidth > 60 &&
-    book.author.split(' ').length >= 2 &&
-    !isExplicitlyHorizontalAuthor;
-
-  // Calculate authorFirst WITHOUT stacked check first
-  // CRITICAL: Composition has HIGHEST priority - if it says 'bottom', don't override!
   const compositionSaysBottom = composition?.layout?.authorPosition === 'bottom';
   const compositionSaysTop = composition?.layout?.authorPosition === 'top';
 
-  const authorFirstBeforeSafetyCheck =
-    compositionSaysTop || // Composition says top - use it
-    (!compositionSaysBottom && hasAuthorBox) || // Only use authorBox if composition doesn't explicitly say bottom
-    (!compositionSaysBottom && !compositionSaysTop && typography.authorPosition === 'top') || // Typography is lowest priority
+  const authorFirst =
+    compositionSaysTop ||
+    (!compositionSaysBottom && hasAuthorBox) ||
+    (!compositionSaysBottom && !compositionSaysTop && typography.authorPosition === 'top') ||
     (!compositionSaysBottom && !compositionSaysTop && typography.authorPosition === 'top-horizontal') ||
     (!compositionSaysBottom && !compositionSaysTop && typography.authorPosition === 'top-vertical-down');
-
-  // SAFETY: Override authorFirst if author will render as stacked text
-  // (either from composition orientation OR auto-split-names on medium+ spines)
-  // Stacked authors at top dominate visually, pushing title into tiny vertical text
-  const authorFirst = authorFirstBeforeSafetyCheck && !authorHasStackedOrientation && !willAutoStackAuthor;
 
   let authorY: number, titleY: number, progressY: number;
   if (authorFirst) {
@@ -1406,69 +1169,22 @@ export function BookSpineVertical({
   const progressCenterX = effectiveWidth / 2;
   const progressCenterY = progressY + progressHeight / 2;
 
-  // Text content with transforms
-  // When composition is available, use composition-driven transforms
-  // Otherwise fall back to typography-based transforms
+  // Text content with case transforms from template
   const titleContent = useMemo(() => {
-    if (composition) {
-      return applyTextCase(composition.title.text, composition.title.case);
-    }
-    return typography.titleTransform === 'uppercase'
-      ? book.title.toUpperCase()
-      : book.title;
+    const textCase = composition?.title.case || (typography.titleTransform === 'uppercase' ? 'uppercase' : 'mixed');
+    const text = composition?.title.text || book.title;
+    if (textCase === 'uppercase') return text.toUpperCase();
+    if (textCase === 'lowercase') return text.toLowerCase();
+    return text;
   }, [composition, typography.titleTransform, book.title]);
 
   const authorContent = useMemo(() => {
-    if (composition) {
-      // Apply treatment first (abbreviation, initials, etc.)
-      const treatedAuthor = processAuthorText(composition.author.text, composition.author.treatment);
-      // Then apply case transformation
-      return applyTextCase(treatedAuthor, composition.author.case);
-    }
-    return typography.authorTransform === 'uppercase'
-      ? book.author.toUpperCase()
-      : book.author;
+    const text = composition?.author.text || book.author;
+    const textCase = composition?.author.case || (typography.authorTransform === 'uppercase' ? 'uppercase' : 'mixed');
+    if (textCase === 'uppercase') return text.toUpperCase();
+    if (textCase === 'lowercase') return text.toLowerCase();
+    return text;
   }, [composition, typography.authorTransform, book.author]);
-
-  // Get composition-driven styling overrides (weight only - don't scale font sizes!)
-  const compositionTitleWeight = composition ? getCompositionFontWeightValue(composition.title.weight) : null;
-  const compositionAuthorWeight = composition ? getCompositionFontWeightValue(composition.author.weight) : null;
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // COMPOSITION-DRIVEN RENDERING
-  // When composition specifies special orientations, use them instead of solver
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Safety check: Only use stacked-letters/words for appropriate title lengths
-  // This prevents clipping if a long title somehow gets these orientations
-  const titleLettersOnly = titleContent.replace(/\s+/g, '');
-  const titleWords = titleContent.trim().split(/\s+/);
-  const longestWord = titleWords.reduce((max, w) => Math.max(max, w.length), 0);
-
-  // CRITICAL: Skip stacked orientations when displaying horizontally (rotated in stack view)
-  // Stacked letters/words don't work well when the spine is lying flat
-  const useStackedLetters = composition?.title.orientation === 'stacked-letters'
-    && titleLettersOnly.length <= 8  // MAX 8 letters for stacking (like "WHY" or "DUNE")
-    && !isHorizontalDisplay;  // Never stack when horizontal
-  const useStackedWords = composition?.title.orientation === 'stacked-words'
-    && titleWords.length >= 2
-    && titleWords.length <= 4
-    && longestWord <= 12  // Each word must fit horizontally
-    && !isHorizontalDisplay;  // Never stack when horizontal
-  const compositionTitleOrientation = composition?.title.orientation;
-  const compositionAuthorOrientation = composition?.author.orientation;
-  const compositionLineStyle = composition?.decoration.lineStyle || 'none';
-  const compositionDecorElement = composition?.decoration.element || 'none';
-
-  // Author split names: stack first/last name vertically for editorial look
-  // DEFAULT: Enable for all medium/large spines (width > 60px, ~10+ hour audiobooks)
-  // EXCEPTION: Respect explicit horizontal orientation from genre profile
-  const baseSplitNames = composition?.author.splitNames || false;
-  const isMediumOrLargeSpine = effectiveWidth > 60;
-  const authorHasMultipleNames = book.author.split(' ').length >= 2;
-  // Only disable stacking if genre explicitly requests horizontal author orientation
-  const isExplicitlyHorizontal = typography.authorOrientationBias === 'horizontal';
-  const authorSplitNames = baseSplitNames ||
-    (isMediumOrLargeSpine && authorHasMultipleNames && !isExplicitlyHorizontal);
 
   // Available width after edge padding (uses effectiveWidth calculated earlier)
   const availableWidth = effectiveWidth - (EDGE_PADDING * 2);
@@ -1484,208 +1200,67 @@ export function BookSpineVertical({
   // ═══════════════════════════════════════════════════════════════════════════
   const titleLetterSpacing = typography.titleLetterSpacing ?? typography.letterSpacing ?? 0;
 
-  const titleLayout: LayoutSolution = useMemo(() => {
-    const titleBox = {
-      width: availableWidth - (INNER_MARGIN * 2),
-      height: titleHeight - (INNER_MARGIN * 2),
-    };
-
-    // CRITICAL FIX (v0.7.21): When templates active, SKIP SOLVER and use template fontSize directly
-    // The bug was: solver recalculated fontSize from section height, overriding template intent
-    // The fix: Apply template fontSize directly (like SpineTemplatePreviewScreen does)
-    if (templateConfig) {
-      const targetFontSize = templateConfig.title.fontSize;
-      const templateOrientation = templateConfig.title.orientation;
-
-      // Create a simple layout that uses template fontSize AS-IS
-      // IMPORTANT: Preserve exact orientation (vertical-up, vertical-down, etc.) for finalTitleOrientation logic
-      // Text component's adjustsFontSizeToFit will handle overflow (shrinks but doesn't grow)
+  const titleLayout = useMemo(() => {
+    if (!templateConfig) {
       return {
-        lines: [{
-          text: titleContent,
-          fontSize: targetFontSize,
-          x: 0,
-          y: titleHeight / 2, // Center vertically in the section
-        }],
-        orientation: templateOrientation, // PRESERVE EXACT ORIENTATION (don't convert!)
-        rotation: templateOrientation === 'vertical-up' ? -90 :
-                  templateOrientation === 'vertical-down' ? 90 : 0,
+        lines: [{ text: titleContent, fontSize: 14, x: 0, y: titleHeight / 2 }],
+        orientation: 'vertical-up',
+        rotation: -90,
         satisfiesHard: true,
         score: 100,
       };
     }
 
-    // Composition-driven: use layout solver as before
-    const scaledConstraints = {
-      minFontSize: Math.max(10, 10 * titleScaleMultiplier),
-      maxFontSize: 48 * titleScaleMultiplier,
-      maxOverflow: 0,
-      preferredFontRange: [Math.max(14, 24 * titleScaleMultiplier), 48 * titleScaleMultiplier] as [number, number],
-      preferredLineCount: [1, 2] as [number, number],
-      minBalanceRatio: 0.4,
-    };
-
-    const result = solveTitleLayout(
-      titleContent,
-      titleBox,
-      typography.fontFamily,
-      aspectRatio,
-      effectiveWidth,  // Use effective width for correct layout decisions when horizontal
-      scaledConstraints,
-      titleLetterSpacing // pass letter spacing for accurate width calculation
-    );
-
-    return result;
-  }, [titleContent, availableWidth, titleHeight, typography.fontFamily, aspectRatio, effectiveWidth, titleLetterSpacing, titleScaleMultiplier, templateConfig, compositionTitleScale]);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // COMPOSITION ORIENTATION OVERRIDE
-  // Use composition system's smart constraints if available
-  // ═══════════════════════════════════════════════════════════════════════════
-  const finalTitleOrientation = useMemo(() => {
-    if (!composition) return titleLayout.orientation;
-
-    const compositionOrientation = composition.title.orientation;
-
-    // Map composition orientations to layout solver's 'vertical' or 'horizontal'
-    let result: string;
-    if (compositionOrientation === 'vertical-up' || compositionOrientation === 'vertical-down') {
-      result = 'vertical';
-    } else if (compositionOrientation === 'vertical-two-row') {
-      result = 'vertical-two-row';
-    } else if (compositionOrientation === 'stacked-letters' || compositionOrientation === 'stacked-words') {
-      result = 'stacked';
-    } else {
-      result = 'horizontal';
-    }
-
-    return result;
-  }, [composition, titleLayout.orientation, book.title, titleLayout.lines]);
-
-  const finalTitleRotation = useMemo(() => {
-    if (!composition) return '-90deg'; // Default vertical-up
-
-    const compositionOrientation = composition.title.orientation;
-
-    if (compositionOrientation === 'vertical-down') {
-      return '90deg'; // Clockwise
-    } else if (compositionOrientation === 'vertical-up') {
-      return '-90deg'; // Counter-clockwise
-    } else {
-      return '0deg'; // Horizontal
-    }
-  }, [composition]);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // UNIFIED AUTHOR LAYOUT - Uses constraint satisfaction solver
-  // Tries: horizontal-single, horizontal-stacked, vertical-single, vertical-split
-  // Picks highest-scoring solution that meets constraints
-  // When typography prefers author boxes or has horizontal bias, prefer horizontal layouts
-  // Letter spacing is passed to solver for accurate width calculation
-  // ═══════════════════════════════════════════════════════════════════════════
-  const authorLetterSpacing = typography.authorLetterSpacing ?? (typography.letterSpacing ?? 0) * 0.5;
-
-  const preferHorizontalAuthor = useMemo(() => {
-    // Explicit box preference overrides bias
-    if (typography.authorBox === 'horizontal-only' || typography.authorBox === 'always') {
-      return true;
-    }
-    // Use authorOrientationBias from typography
-    if (typography.authorOrientationBias === 'horizontal') {
-      return true;
-    }
-    // Vertical bias explicitly prefers vertical (no horizontal boost)
-    if (typography.authorOrientationBias === 'vertical') {
-      return false;
-    }
-    // Neutral or undefined - let solver decide naturally
-    return false;
-  }, [typography.authorBox, typography.authorOrientationBias]);
-
-  const authorLayout: LayoutSolution = useMemo(() => {
-    const authorBox = {
-      width: availableWidth - (INNER_MARGIN * 2),
-      height: authorHeight * 0.90,
-    };
-
-    // CRITICAL FIX (v0.7.21): When templates active, SKIP SOLVER and use template fontSize directly
-    if (templateConfig) {
-      const targetFontSize = templateConfig.author.fontSize;
-      const templateOrientation = templateConfig.author.orientation;
-
-      // Create a simple layout that uses template fontSize AS-IS
-      // IMPORTANT: Preserve exact orientation for finalAuthorOrientation logic
-      return {
-        lines: [{
-          text: authorContent,
-          fontSize: targetFontSize,
-          x: 0,
-          y: authorHeight / 2, // Center vertically in the section
-        }],
-        orientation: templateOrientation, // PRESERVE EXACT ORIENTATION
-        rotation: templateOrientation === 'vertical-up' ? -90 :
-                  templateOrientation === 'vertical-down' ? 90 : 0,
-        satisfiesHard: true,
-        score: 100,
-      };
-    }
-
-    // Composition-driven: use layout solver as before
-    // Cap maxFontSize so author never visually overpowers the title
-    const scaledConstraints = {
-      minFontSize: Math.max(8, 10 * authorScaleMultiplier),
-      maxFontSize: Math.min(24, 24 * authorScaleMultiplier),
-      maxOverflow: 0,
-      preferredFontRange: [Math.max(10, 14 * authorScaleMultiplier), Math.min(20, 20 * authorScaleMultiplier)] as [number, number],
-      preferredLineCount: [1, 2] as [number, number],
-      minBalanceRatio: 0.4,
-    };
-
-    const result = solveAuthorLayout(
-      authorContent,
-      authorBox,
-      typography.fontFamily,
-      aspectRatio,
-      effectiveWidth,  // Use effective width for correct layout decisions when horizontal
-      scaledConstraints,
-      preferHorizontalAuthor,
-      authorLetterSpacing // pass letter spacing for accurate width calculation
-    );
-
-    return result;
-  }, [authorContent, availableWidth, authorHeight, typography.fontFamily, aspectRatio, effectiveWidth, preferHorizontalAuthor, authorLetterSpacing, authorScaleMultiplier, compositionAuthorScale, templateConfig]);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AUTHOR BOX - Optional box around author name (horizontal layouts only)
-  // Appears for commercial genres (thriller, crime, business, etc.)
-  // ═══════════════════════════════════════════════════════════════════════════
-  const authorBoxConfig: AuthorBoxConfig | null = useMemo(() => {
-    return resolveAuthorBox(typography, authorLayout.orientation, book.tags);
-  }, [typography, authorLayout.orientation, book.tags]);
-
-  // Calculate box position based on layout bounds
-  const authorBoxBounds = useMemo(() => {
-    if (!authorBoxConfig || !authorLayout.bounds) {
-      return null;
-    }
-
-    const bounds = authorLayout.bounds;
-    const padding = authorBoxConfig.padding;
-
-    // Translate bounds from layout coordinates to SVG coordinates
-    // Layout coordinates (0,0) = top-left of the solver box
-    // Solver box starts at x = EDGE_PADDING + INNER_MARGIN in SVG coords
-    // Solver box starts at y = authorY + INNER_MARGIN in SVG coords
-    const authorBoxOriginX = EDGE_PADDING + INNER_MARGIN;
-    const authorBoxOriginY = authorY + INNER_MARGIN;
+    const targetFontSize = templateConfig.title.fontSize;
+    const templateOrientation = templateConfig.title.orientation;
 
     return {
-      x: authorBoxOriginX + bounds.x - padding.x,
-      y: authorBoxOriginY + bounds.y - padding.y,
-      width: bounds.width + padding.x * 2,
-      height: bounds.height + padding.y * 2,
+      lines: [{
+        text: titleContent,
+        fontSize: targetFontSize,
+        x: 0,
+        y: titleHeight / 2,
+      }],
+      orientation: templateOrientation,
+      rotation: templateOrientation === 'vertical-up' ? -90 :
+                templateOrientation === 'vertical-down' ? 90 : 0,
+      satisfiesHard: true,
+      score: 100,
     };
-  }, [authorBoxConfig, authorLayout.bounds, authorY]);
+  }, [titleContent, titleHeight, templateConfig]);
+
+  const authorLetterSpacing = typography.authorLetterSpacing ?? (typography.letterSpacing ?? 0) * 0.5;
+
+  const authorLayout = useMemo(() => {
+    if (!templateConfig) {
+      return {
+        lines: [{ text: authorContent, fontSize: 10, x: 0, y: authorHeight / 2 }],
+        orientation: 'horizontal',
+        rotation: 0,
+        satisfiesHard: true,
+        score: 100,
+      };
+    }
+
+    const targetFontSize = templateConfig.author.fontSize;
+    const templateOrientation = templateConfig.author.orientation;
+
+    return {
+      lines: [{
+        text: authorContent,
+        fontSize: targetFontSize,
+        x: 0,
+        y: authorHeight / 2,
+      }],
+      orientation: templateOrientation,
+      rotation: templateOrientation === 'vertical-up' ? -90 :
+                templateOrientation === 'vertical-down' ? 90 : 0,
+      satisfiesHard: true,
+      score: 100,
+    };
+  }, [authorContent, authorHeight, templateConfig]);
+
+
 
   // Handlers
   const handlePressIn = useCallback(() => {
@@ -1775,10 +1350,10 @@ export function BookSpineVertical({
   const tightLineHeightMultiplier = fontLineHeights.tight;
 
   // Title font weight
-  const titleFontWeight = compositionTitleWeight || typography.titleWeight || typography.fontWeight || '600';
+  const titleFontWeight = typography.titleWeight || typography.fontWeight || '600';
 
   // Author font weight
-  const authorFontWeight = compositionAuthorWeight || typography.authorWeight || typography.fontWeight || '400';
+  const authorFontWeight = typography.authorWeight || typography.fontWeight || '400';
 
   return (
     <AnimatedPressable
@@ -1815,8 +1390,6 @@ export function BookSpineVertical({
           {
             width,
             height,
-            // Only hide background/border when server spine is actually displayed
-            // This fixes black spines when scrolling (component recycle resets spineImageLoaded)
             backgroundColor: canDisplayServerSpine ? 'transparent' : spineBgColor,
             borderColor: canDisplayServerSpine ? 'transparent' : spineStrokeColor,
             borderWidth: canDisplayServerSpine ? 0 : 1,
@@ -1833,9 +1406,8 @@ export function BookSpineVertical({
             Only render the visible Image after pre-loading is complete.
             This completely eliminates the black flash during loading.
             ═══════════════════════════════════════════════════════════════════════ */}
-        {/* Hidden image to prefetch server spine - gets dimensions AND pre-caches image */}
-        {/* Renders when: URL exists, not failed, AND (no dimensions OR not loaded yet) */}
-        {spineImageUrl && !spineImageFailed && (!cachedSpineDimensions || !spineImageLoaded) && (
+        {/* Hidden image for FIRST LOAD ONLY — captures dimensions when not yet cached */}
+        {spineImageUrl && !spineImageFailed && !cachedSpineDimensions && (
           <Image
             key={`prefetch-${spineImageUrl}`}
             source={{ uri: spineImageUrl }}
@@ -1845,23 +1417,15 @@ export function BookSpineVertical({
               const srcWidth = e.source?.width;
               const srcHeight = e.source?.height;
               if (srcWidth && srcHeight) {
-                // Always update dimensions - the store deduplicates unchanged values.
-                // Must NOT guard with !cachedSpineDimensions because after "Refresh Spines":
-                // old images can load from cache and set stale dims before the new URL loads.
-                // When the new image arrives with different dims, we need to update.
                 setServerSpineDimensions(book.id, srcWidth, srcHeight);
-                // Mark as loaded - image is now in expo-image cache
-                if (!spineImageLoaded) {
-                  setSpineImageLoaded(true);
-                }
               }
             }}
             onError={() => setSpineImageFailed(true)}
           />
         )}
-        {/* Server spine image - ONLY render when BOTH dimensions AND image are ready */}
-        {/* This ensures no black flash - image is already in cache when this renders */}
-        {shouldRenderServerSpine && spineImageLoaded && (
+        {/* Server spine image — renders when dimensions are cached.
+            transition={150} handles the visual fade-in (no black flash). */}
+        {shouldRenderServerSpine && (
           <Image
             key={spineImageUrl}
             source={{ uri: spineImageUrl }}
@@ -1876,6 +1440,15 @@ export function BookSpineVertical({
             contentFit="fill"
             cachePolicy="memory-disk"
             transition={150}
+            onLoad={(e) => {
+              // Update dimensions on load (handles spine refresh with new dims)
+              const srcWidth = e.source?.width;
+              const srcHeight = e.source?.height;
+              if (srcWidth && srcHeight) {
+                setServerSpineDimensions(book.id, srcWidth, srcHeight);
+              }
+            }}
+            onError={() => setSpineImageFailed(true)}
           />
         )}
         {/* Download indicator overlay - shown on top when server spine is displayed */}
@@ -1913,12 +1486,8 @@ export function BookSpineVertical({
           />
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════════════
-            TEMPLATE-DIRECT RENDERING PATH
-            When templates are active, use the clean SpinePreview-style renderer.
-            This bypasses all composition/solver complexity.
-            ═══════════════════════════════════════════════════════════════════════ */}
-        {templateConfig ? (
+        {/* Template-driven rendering */}
+        {templateConfig && (
           <TemplateSpineRenderer
             templateConfig={templateConfig}
             titleText={book.title}
@@ -1930,649 +1499,29 @@ export function BookSpineVertical({
             resolvedFontFamily={resolvedFontFamily}
             debugSections={DEBUG_SECTIONS}
           />
-        ) : (
-          /* ═══════════════════════════════════════════════════════════════════════
-             COMPOSITION-BASED RENDERING PATH (fallback for non-template books)
-             Uses layout solver for dynamic sizing
-             ═══════════════════════════════════════════════════════════════════════ */
-          <>
-        {/* Decorative top line - positioned at BOTTOM of first section (faces inward toward center)
-            Not at the very top edge of spine */}
-        {(compositionDecorElement === 'top-line' || compositionDecorElement === 'partial-border') && (
-          <View
-            style={{
-              position: 'absolute',
-              // Position at bottom of first section (authorFirst ? author : title)
-              top: authorFirst
-                ? (authorY + authorHeight - 2)  // Bottom of author section
-                : (titleY + titleHeight - 2),   // Bottom of title section
-              left: EDGE_PADDING + 4,
-              right: EDGE_PADDING + 4,
-              height: compositionLineStyle === 'thick' ? 2 : 1,
-              backgroundColor: spineTextColor,
-            }}
-          />
         )}
-
-        {/* Title section */}
-        <View
-          style={[
-            styles.titleSection,
-            {
-              position: 'absolute',
-              left: EDGE_PADDING,
-              top: titleY,
-              width: availableWidth,
-              height: titleHeight,
-            },
-          ]}
-        >
-          {useStackedLetters ? (
-            // ═══════════════════════════════════════════════════════════════
-            // STACKED LETTERS: W-H-Y style - each letter on its own line
-            // Creates dramatic, poster-like typography
-            // Only for titles ≤8 letters (safety checked above)
-            // ═══════════════════════════════════════════════════════════════
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingVertical: 2,
-              }}
-            >
-              {(() => {
-                const letters = titleLettersOnly.split('');
-                const letterCount = letters.length;
-                // Calculate font size: fit all letters in height, and each letter in width
-                // Use AGGRESSIVE sizing like publisher spines - fill nearly all available space
-                const maxLetterHeight = (titleHeight - 6) / letterCount;
-                const letterFontSize = Math.min(
-                  availableWidth * 0.92,  // Use 92% of width for bold impact
-                  maxLetterHeight * 0.96  // Use 96% of height per letter for dramatic stacking
-                );
-
-                // For stacked letters, lineHeight must be at least fontSize to prevent clipping
-                // Use Math.max to ensure minimum of 1.0x multiplier
-                const stackedLineHeight = letterFontSize * Math.max(1.0, tightLineHeightMultiplier);
-
-                return letters.map((letter, i) => (
-                  <Text
-                    key={i}
-                    style={{
-                      fontFamily: resolvedFontFamily,
-                      fontSize: letterFontSize,
-                      fontWeight: titleFontWeight as any,
-                      color: spineTextColor,
-                      lineHeight: stackedLineHeight,
-                      textAlign: 'center',
-                      includeFontPadding: false,
-                    }}
-                  >
-                    {letter}
-                  </Text>
-                ));
-              })()}
-            </View>
-          ) : useStackedWords ? (
-            // ═══════════════════════════════════════════════════════════════
-            // STACKED WORDS: Each word on its own line, horizontal
-            // Good for multi-word titles like "ERSTE LIEBE"
-            // Only for 2-4 words with each word ≤12 chars (safety checked above)
-            // ═══════════════════════════════════════════════════════════════
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingVertical: 2,
-              }}
-            >
-              {(() => {
-                const wordCount = titleWords.length;
-                // Calculate font size: fit all words in height, each word in width
-                const maxWordHeight = (titleHeight - 20) / wordCount;
-
-                return titleWords.map((word, i) => {
-                  // Size based on word length - longer words get smaller font
-                  const wordFontSize = Math.min(
-                    availableWidth * 0.85 / (word.length * 0.55),  // Fit width
-                    maxWordHeight * 0.8  // Fit height
-                  );
-
-                  return (
-                    <Text
-                      key={i}
-                      style={{
-                        fontFamily: resolvedFontFamily,
-                        fontSize: Math.max(8, wordFontSize),
-                        fontWeight: titleFontWeight as any,
-                        fontStyle: typography.fontStyle || 'normal',
-                        color: spineTextColor,
-                        textAlign: 'center',
-                        lineHeight: Math.max(10, wordFontSize * tightLineHeightMultiplier),  // Font-specific tight stacking
-                        includeFontPadding: false,
-                      }}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.4}
-                    >
-                      {word}
-                    </Text>
-                  );
-                });
-              })()}
-            </View>
-          ) : (finalTitleOrientation === 'vertical-two-row' ||
-               // FALLBACK: Force two-row for 4+ word titles on vertical spines
-               (book.title.split(' ').length >= 4 && !isHorizontalDisplay)) ? (
-            // ═══════════════════════════════════════════════════════════════
-            // VERTICAL TWO-ROW: Split title across two lines, rotated
-            // For long titles (4+ words) that need more room
-            // ═══════════════════════════════════════════════════════════════
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <View
-                style={{
-                  width: titleHeight * 0.95,
-                  transform: [{ rotate: '-90deg' }],
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {(() => {
-                  // Split title into two rows (50% of words each)
-                  const words = titleContent.split(' ');
-                  const splitPoint = Math.ceil(words.length / 2);
-                  const line1 = words.slice(0, splitPoint).join(' ');
-                  const line2 = words.slice(splitPoint).join(' ');
-                  const lines = line2 ? [line1, line2] : [line1];
-
-                  // Calculate font size to fit both lines
-                  const baseFontSize = templateConfig?.title.fontSize || 24;
-                  const twoRowFontSize = lines.length > 1 ? baseFontSize * 0.6 : baseFontSize;
-
-                  return lines.map((lineText, i) => (
-                    <Text
-                      key={i}
-                      style={{
-                        fontFamily: resolvedFontFamily,
-                        fontSize: twoRowFontSize,
-                        fontWeight: titleFontWeight as any,
-                        fontStyle: typography.fontStyle || 'normal',
-                        color: spineTextColor,
-                        textAlign: 'center',
-                        lineHeight: twoRowFontSize * 1.1,
-                        includeFontPadding: false,
-                      }}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.3}
-                    >
-                      {lineText}
-                    </Text>
-                  ));
-                })()}
-              </View>
-            </View>
-          ) : finalTitleOrientation === 'vertical' ? (
-            // ═══════════════════════════════════════════════════════════════
-            // VERTICAL TITLE: Traditional spine style, reads bottom-to-top
-            // ═══════════════════════════════════════════════════════════════
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <View
-                style={{
-                  // For horizontal display, use more space for title (full height minus padding)
-                  // For vertical display, use the title section height
-                  width: isHorizontalDisplay ? (height - 40) : (titleHeight * 0.97),
-                  transform: [{ rotate: finalTitleRotation }],
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'visible',
-                }}
-              >
-                {titleLayout.lines.map((line, i) => {
-                  const letterSpacingEm = composition?.title.letterSpacing ?? typography.letterSpacing ?? 0;
-                  const letterSpacingPx = letterSpacingEm * line.fontSize;
-
-                  return (
-                    <Text
-                      key={i}
-                      style={{
-                        fontFamily: resolvedFontFamily,
-                        fontSize: line.fontSize,
-                        fontWeight: titleFontWeight as any,
-                        fontStyle: typography.fontStyle || 'normal',
-                        color: spineTextColor,
-                        letterSpacing: letterSpacingPx > 0 ? letterSpacingPx : undefined,
-                        textAlign: 'center',
-                        // Vertical rotated text: use generous lineHeight to prevent clipping
-                        // After rotation, lineHeight determines the visual width of each text line
-                        // Tight multipliers (0.85) clip character edges after rotation
-                        lineHeight: line.fontSize * 1.3,
-                        includeFontPadding: false,
-                      }}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.3}
-                    >
-                      {line.text}
-                    </Text>
-                  );
-                })}
-              </View>
-            </View>
-          ) : (
-            // ═══════════════════════════════════════════════════════════════
-            // HORIZONTAL TITLE: Stack lines vertically
-            // ═══════════════════════════════════════════════════════════════
-            titleLayout.lines.map((line, i) => {
-              const letterSpacingEm = composition?.title.letterSpacing ?? typography.letterSpacing ?? 0;
-              const letterSpacingPx = letterSpacingEm * line.fontSize;
-              // Add extra height for ascenders (fonts extend ~15% above cap height)
-              const lineContainerHeight = line.fontSize * 1.2;
-
-              return (
-                <View
-                  key={i}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    // Center the container at line.y, but give it extra height for ascenders
-                    top: line.y - lineContainerHeight / 2,
-                    height: lineContainerHeight,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: resolvedFontFamily,
-                      fontSize: line.fontSize,
-                      fontWeight: titleFontWeight as any,
-                      fontStyle: typography.fontStyle || 'normal',
-                      color: spineTextColor,
-                      letterSpacing: letterSpacingPx > 0 ? letterSpacingPx : undefined,
-                      textAlign: 'center',
-                      lineHeight: line.fontSize * titleLineHeightMultiplier,  // Font-specific title line height
-                    }}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.3}
-                  >
-                    {line.text}
-                  </Text>
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        {/* Decorative divider line between title and author - always BETWEEN sections */}
-        {compositionDecorElement === 'divider-line' && (
-          <View
-            style={{
-              position: 'absolute',
-              // Position between first and second section (not at edges)
-              // authorFirst: divider at bottom of author section
-              // !authorFirst: divider at bottom of title section
-              top: authorFirst
-                ? (authorY + authorHeight + SECTION_GAP / 2)  // Between author and title
-                : (titleY + titleHeight + SECTION_GAP / 2),   // Between title and author
-              left: EDGE_PADDING + 8,
-              right: EDGE_PADDING + 8,
-              height: compositionLineStyle === 'thick' ? 2 : 1,
-              backgroundColor: spineTextColor,
-            }}
-          />
-        )}
-
-        {/* Author section */}
-        <View
-          style={[
-            styles.authorSection,
-            {
-              position: 'absolute',
-              left: EDGE_PADDING,
-              top: authorY,
-              width: availableWidth,
-              height: authorHeight,
-            },
-          ]}
-        >
-          {/* Author box border (if applicable)
-              Borders face INWARD toward center of spine:
-              - TOP position: no top border (only bottom, left, right)
-              - CENTER position: all borders allowed
-              - BOTTOM position: no bottom border (only top, left, right)
-
-              Uses the author box's ACTUAL position relative to spine edges
-          */}
-          {authorBoxConfig && authorBoxBounds && (() => {
-            // Check position of author box relative to spine boundaries
-            // Use a percentage of spine height as threshold (top 25% = near top, bottom 25% = near bottom)
-            const boxTop = authorBoxBounds.y;
-            const boxBottom = authorBoxBounds.y + authorBoxBounds.height;
-            const spineContentHeight = height - topOffset - BOTTOM_PADDING;
-            const topThreshold = topOffset + (spineContentHeight * 0.35);
-            const bottomThreshold = height - BOTTOM_PADDING - (spineContentHeight * 0.35);
-
-            const isNearTop = boxTop < topThreshold;
-            const isNearBottom = boxBottom > bottomThreshold;
-
-            // Calculate which borders to show (facing inward toward center)
-            // At top: no top border. At bottom: no bottom border.
-            const showTopBorder = !isNearTop;
-            const showBottomBorder = !isNearBottom;
-
-            return (
-              <View
-                style={{
-                  position: 'absolute',
-                  left: authorBoxBounds.x - EDGE_PADDING,
-                  top: authorBoxBounds.y - authorY,
-                  width: authorBoxBounds.width,
-                  height: authorBoxBounds.height,
-                  // Explicitly set all border widths (not using borderWidth shorthand)
-                  borderTopWidth: showTopBorder ? authorBoxConfig.strokeWidth : 0,
-                  borderBottomWidth: showBottomBorder ? authorBoxConfig.strokeWidth : 0,
-                  borderLeftWidth: authorBoxConfig.strokeWidth,
-                  borderRightWidth: authorBoxConfig.strokeWidth,
-                  borderTopColor: showTopBorder ? authorBoxConfig.strokeColor : 'transparent',
-                  borderBottomColor: showBottomBorder ? authorBoxConfig.strokeColor : 'transparent',
-                  borderLeftColor: authorBoxConfig.strokeColor,
-                  borderRightColor: authorBoxConfig.strokeColor,
-                  borderRadius: authorBoxConfig.borderRadius,
-                }}
-              />
-            );
-          })()}
-
-          {(authorSplitNames || composition?.author?.orientation === 'stacked-words') && authorContent.includes(' ') ? (
-            // ═══════════════════════════════════════════════════════════════
-            // SPLIT NAMES: "WALTER / SPACEY" style - each name stacked
-            // Creates the editorial book cover look
-            // Triggered by: authorSplitNames boolean OR composition orientation
-            // ═══════════════════════════════════════════════════════════════
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              {authorContent.split(' ').map((namePart, i, arr) => {
-                const nameFontSize = Math.min(
-                  availableWidth * 0.85 / (namePart.length * 0.55),
-                  (authorHeight - 8) / arr.length * 0.85
-                );
-                // Line height must accommodate ascenders/descenders to prevent clipping
-                const stackedLineHeight = Math.max(9, nameFontSize * 1.15);
-
-                return (
-                  <Text
-                    key={i}
-                    style={{
-                      fontFamily: resolvedFontFamily,
-                      fontSize: Math.max(7, nameFontSize),
-                      fontWeight: authorFontWeight as any,
-                      color: spineTextColor,
-                      textAlign: 'center',
-                      letterSpacing: 0.5,
-                      lineHeight: stackedLineHeight,
-                      // Negative margin to pull names closer together
-                      marginTop: i > 0 ? -2 : 0,
-                    }}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.4}
-                  >
-                    {namePart}
-                  </Text>
-                );
-              })}
-            </View>
-          ) : authorLayout.orientation === 'vertical' ? (
-            // ═══════════════════════════════════════════════════════════════
-            // VERTICAL AUTHOR: Rotated text reads bottom-to-top
-            // ═══════════════════════════════════════════════════════════════
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <View
-                style={{
-                  width: authorHeight * 0.97,
-                  transform: [{ rotate: '-90deg' }],
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'visible',
-                }}
-              >
-                {authorLayout.lines.map((line, i) => {
-                  const authorLetterSpacingPx = (typography.letterSpacing || 0) * line.fontSize * 0.5;
-
-                  return (
-                    <Text
-                      key={i}
-                      style={{
-                        fontFamily: resolvedFontFamily,
-                        fontSize: line.fontSize,
-                        fontWeight: authorFontWeight as any,
-                        fontStyle: typography.fontStyle || 'normal',
-                        color: spineTextColor,
-                        letterSpacing: authorLetterSpacingPx > 0 ? authorLetterSpacingPx : undefined,
-                        textAlign: 'center',
-                        // Vertical rotated: generous lineHeight to prevent clipping
-                        lineHeight: line.fontSize * 1.3,
-                        includeFontPadding: false,
-                      }}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.3}
-                    >
-                      {line.text}
-                    </Text>
-                  );
-                })}
-              </View>
-            </View>
-          ) : (
-            // ═══════════════════════════════════════════════════════════════
-            // HORIZONTAL AUTHOR: Standard stacked lines
-            // ═══════════════════════════════════════════════════════════════
-            authorLayout.lines.map((line, i) => {
-              const authorLetterSpacingPx = (typography.letterSpacing || 0) * line.fontSize * 0.5;
-              // Add extra height for ascenders (fonts extend ~15% above cap height)
-              const lineContainerHeight = line.fontSize * 1.2;
-
-              return (
-                <View
-                  key={i}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    // Center the container at line.y, but give it extra height for ascenders
-                    top: line.y - lineContainerHeight / 2,
-                    height: lineContainerHeight,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: resolvedFontFamily,
-                      fontSize: line.fontSize,
-                      fontWeight: authorFontWeight as any,
-                      fontStyle: typography.fontStyle || 'normal',
-                      color: spineTextColor,
-                      letterSpacing: authorLetterSpacingPx > 0 ? authorLetterSpacingPx : undefined,
-                      textAlign: 'center',
-                      lineHeight: line.fontSize * authorLineHeightMultiplier,  // Font-specific author line height
-                    }}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.3}
-                  >
-                    {line.text}
-                  </Text>
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        {/* Progress/Series section at bottom */}
-        <View
-          style={[
-            styles.progressSection,
-            {
-              position: 'absolute',
-              left: EDGE_PADDING,
-              top: progressY,
-              width: availableWidth,
-              height: progressHeight,
-              justifyContent: 'center',
-              alignItems: 'center',
-            },
-          ]}
-        >
-          {showProgress ? (
-            isFinished ? (
-              // Checkmark for finished books
-              <Text style={{ fontSize: checkmarkSize, color: spineTextColor }}>✓</Text>
-            ) : (
-              // Progress percentage
-              <Text
-                style={{
-                  fontFamily: resolvedFontFamily,
-                  fontSize: progressFontSize,
-                  fontWeight: '600',
-                  color: spineTextColor,
-                }}
-              >
-                {progressPercent}
-              </Text>
-            )
-          ) : null}
-        </View>
-
-        {/* Side line decorations (vertical bars) - span the CENTER section only
-            Not touching top or bottom edges of spine */}
-        {compositionDecorElement === 'side-line' && (() => {
-          // Calculate center section bounds (between first and last sections)
-          const centerTop = authorFirst
-            ? (authorY + authorHeight + SECTION_GAP)  // Below author when author is first
-            : (titleY + titleHeight + SECTION_GAP);   // Below title when title is first
-          const centerBottom = progressSectionPercent > 0
-            ? progressY - SECTION_GAP                  // Above progress section
-            : (authorFirst
-                ? (titleY + titleHeight)               // Bottom of title when author is first
-                : (authorY + authorHeight));           // Bottom of author when title is first
-
+        {/* Gold star sticker overlay — uses first star's position/rotation from cover */}
+        {hasStars && (() => {
+          const star = bookStars![0];
+          const starSize = Math.min(Math.max(width * 0.6, 16), 32);
+          const xOffset = ((star.x / 100) - 0.5) * width;
+          const yPos = (star.y / 100) * height;
           return (
-            <>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: centerTop,
-                  height: Math.max(0, centerBottom - centerTop),
-                  left: 2,
-                  width: compositionLineStyle === 'thick' ? 2 : 1,
-                  backgroundColor: spineTextColor,
-                }}
-              />
-              <View
-                style={{
-                  position: 'absolute',
-                  top: centerTop,
-                  height: Math.max(0, centerBottom - centerTop),
-                  right: 2,
-                  width: compositionLineStyle === 'thick' ? 2 : 1,
-                  backgroundColor: spineTextColor,
-                }}
-              />
-            </>
+            <Image
+              source={STAR_STICKER_IMAGE}
+              style={{
+                position: 'absolute',
+                width: starSize,
+                height: starSize,
+                top: yPos - starSize / 2,
+                left: (width - starSize) / 2 + xOffset,
+                transform: [{ rotate: `${star.rotation}deg` }],
+              }}
+              contentFit="contain"
+              pointerEvents="none"
+            />
           );
         })()}
-
-        {/* Corner marks decoration - facing INWARD toward center
-            Top corners: no horizontal top line, vertical lines point down
-            Bottom corners: no horizontal bottom line, vertical lines point up */}
-        {compositionDecorElement === 'corner-marks' && (() => {
-          // Calculate inward-facing corner positions
-          const topSectionBottom = authorFirst ? (authorY + authorHeight) : (titleY + titleHeight);
-          const bottomSectionTop = progressSectionPercent > 0
-            ? progressY
-            : (authorFirst ? titleY : authorY);
-
-          return (
-            <>
-              {/* Top-left corner - faces DOWN and RIGHT (inward) */}
-              <View style={{ position: 'absolute', top: topSectionBottom - 8, left: 3, width: 1, height: 8, backgroundColor: spineTextColor }} />
-              <View style={{ position: 'absolute', top: topSectionBottom - 1, left: 3, width: 8, height: 1, backgroundColor: spineTextColor }} />
-              {/* Top-right corner - faces DOWN and LEFT (inward) */}
-              <View style={{ position: 'absolute', top: topSectionBottom - 8, right: 3, width: 1, height: 8, backgroundColor: spineTextColor }} />
-              <View style={{ position: 'absolute', top: topSectionBottom - 1, right: 3, width: 8, height: 1, backgroundColor: spineTextColor }} />
-              {/* Bottom-left corner - faces UP and RIGHT (inward) */}
-              <View style={{ position: 'absolute', top: bottomSectionTop, left: 3, width: 1, height: 8, backgroundColor: spineTextColor }} />
-              <View style={{ position: 'absolute', top: bottomSectionTop, left: 3, width: 8, height: 1, backgroundColor: spineTextColor }} />
-              {/* Bottom-right corner - faces UP and LEFT (inward) */}
-              <View style={{ position: 'absolute', top: bottomSectionTop, right: 3, width: 1, height: 8, backgroundColor: spineTextColor }} />
-              <View style={{ position: 'absolute', top: bottomSectionTop, right: 3, width: 8, height: 1, backgroundColor: spineTextColor }} />
-            </>
-          );
-        })()}
-
-        {/* Bottom line decoration - positioned at TOP of last section (faces inward toward center)
-            Not at the very bottom edge of spine */}
-        {(compositionDecorElement === 'bottom-line' || compositionDecorElement === 'partial-border') && (
-          <View
-            style={{
-              position: 'absolute',
-              // Position at top of last section (progress if shown, otherwise author)
-              top: progressSectionPercent > 0
-                ? progressY + 2                    // Top of progress section
-                : (authorFirst
-                    ? titleY + 2                   // Top of title (when author is first)
-                    : authorY + 2),                // Top of author section
-              left: EDGE_PADDING + 4,
-              right: EDGE_PADDING + 4,
-              height: compositionLineStyle === 'thick' ? 2 : 1,
-              backgroundColor: spineTextColor,
-            }}
-          />
-        )}
-          </>
-        )}
           </>
         )}
       </View>
@@ -2596,7 +1545,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   spineContainer: {
-    borderWidth: 1,
     overflow: 'hidden',  // Keep this - clips at spine edges with rounded corners
   },
   downloadIndicator: {
@@ -2620,17 +1568,6 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  progressBelowContainer: {
-    position: 'absolute',
-    bottom: -18,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  progressBelowText: {
-    fontWeight: '600',
-    textAlign: 'center',
   },
   lastPlayedContainer: {
     position: 'absolute',

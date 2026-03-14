@@ -93,6 +93,7 @@ export const ShelfRow = React.memo(function ShelfRow({
 const styles = StyleSheet.create({
   shelfContent: {
     paddingVertical: 16,
+    paddingHorizontal: 24,
     gap: 8,
     alignItems: 'flex-end',
   },

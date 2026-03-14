@@ -10,7 +10,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { useSpineCacheStore, CachedSpineData } from '../stores/spineCache';
 import { BookSpineVerticalData } from '../components/BookSpineVertical';
 import { LibraryItem } from '@/core/types';
-import type { SpineComposition } from '../utils/spine/adapter';
 
 // =============================================================================
 // TYPES
@@ -27,8 +26,6 @@ export interface ScaledSpineData {
   hash: number;
   /** Touch padding for small books */
   touchPadding: number;
-  /** Pre-computed spine composition (title orientation, author treatment, etc.) */
-  composition?: SpineComposition;
   /** Pre-computed typography (font family, weight, transforms, etc.) for consistency across screens */
   typography?: {
     fontFamily: string;
@@ -111,7 +108,6 @@ export function useSpineCache(
         height,
         hash: cached.hash,
         touchPadding,
-        composition: cached.composition,
         typography: cached.typography,
       };
     });

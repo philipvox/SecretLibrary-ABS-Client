@@ -38,7 +38,7 @@ import { useContinueListening } from '@/shared/hooks/useContinueListening';
 
 // Type guard for FULL book media with audioFiles (needed for chapters)
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'audioFiles' in media && Array.isArray(media.audioFiles);
+  return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 
 // Helper to get book duration safely
@@ -270,7 +270,7 @@ export function useHomeData(): UseHomeDataReturn {
   useEffect(() => {
     if (!currentBook) return;
 
-    const bookChapters = isBookMedia(currentBook.media) ? currentBook.media.chapters : [];
+    const bookChapters = isBookMedia(currentBook.media) ? currentBook.media.chapters || [] : [];
     const bookDuration = getBookDuration(currentBook);
 
     if (bookDuration > 0 && bookChapters.length > 0) {
@@ -499,7 +499,7 @@ export function useHomeData(): UseHomeDataReturn {
     const currentPosition = userProgress?.currentTime || 0;
 
     // Calculate chapter info using existing utility
-    const bookChapters = isBookMedia(book.media) ? book.media.chapters : [];
+    const bookChapters = isBookMedia(book.media) ? book.media.chapters || [] : [];
     const chapters: Chapter[] = bookChapters.map((ch, idx) => ({
       id: ch.id || idx,
       start: ch.start || 0,

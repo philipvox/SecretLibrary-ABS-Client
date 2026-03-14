@@ -22,6 +22,8 @@ import {
   FontWeight,
 } from './profiles/types';
 
+import { matchBestGenre } from './genre/matcher';
+
 // =============================================================================
 // TYPE CONVERSIONS
 // =============================================================================
@@ -115,25 +117,14 @@ export function matchBookToTemplate(genres: string[]): GenreProfile {
     return getProfile('default');
   }
 
-  // Try each genre, looking for preferred matches first
-  for (const genre of genres) {
-    const normalizedGenre = genre.toLowerCase().trim();
-    const profile = GENRE_PROFILES.find(p =>
-      p.preferredFor?.includes(normalizedGenre)
-    );
+  // Use the unified genre matcher (priority-based with aliases)
+  const match = matchBestGenre(genres);
+  if (match) {
+    const profile = getProfile(match.profile);
     if (profile) return profile;
   }
 
-  // Try again for usedFor matches
-  for (const genre of genres) {
-    const normalizedGenre = genre.toLowerCase().trim();
-    const profile = GENRE_PROFILES.find(p =>
-      p.usedFor.includes(normalizedGenre)
-    );
-    if (profile) return profile;
-  }
-
-  // Use helper function as final fallback
+  // Fallback through profile system
   return getBestProfileForGenre(genres[0]?.toLowerCase() || 'fiction');
 }
 
@@ -268,22 +259,11 @@ export function applyTemplateConfig(
 }
 
 /**
- * Check if a book should use template-driven rendering.
- * Returns true if the book has genres that match our profile system.
+ * All books use template-driven rendering.
+ * Genre-less books use the DEFAULT profile.
  */
-export function shouldUseTemplates(genres: string[]): boolean {
-  if (!genres || genres.length === 0) return false;
-
-  // Try to find a matching profile
-  const hasMatch = genres.some(genre => {
-    const normalizedGenre = genre.toLowerCase().trim();
-    return GENRE_PROFILES.some(p =>
-      p.usedFor.includes(normalizedGenre) ||
-      p.preferredFor?.includes(normalizedGenre)
-    );
-  });
-
-  return hasMatch;
+export function shouldUseTemplates(_genres: string[]): boolean {
+  return true;
 }
 
 /**

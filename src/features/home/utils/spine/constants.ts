@@ -5,6 +5,7 @@
  * All magic numbers are defined here with clear documentation.
  */
 
+
 // =============================================================================
 // MASTER HEIGHT SCALE - CHANGE THIS TO MAKE ALL BOOKS TALLER/SHORTER
 // =============================================================================
@@ -24,9 +25,9 @@ export const HEIGHT_SCALE = 1.3;
 /** Base spine dimensions (scaled by HEIGHT_SCALE) */
 export const BASE_DIMENSIONS = {
   /** Default height for unknown genres (in pixels) */
-  HEIGHT: Math.round(250 * HEIGHT_SCALE),
+  HEIGHT: Math.round(325 * HEIGHT_SCALE),
   /** Minimum allowed height (lowered to accommodate children's books) */
-  MIN_HEIGHT: Math.round(160 * HEIGHT_SCALE),
+  MIN_HEIGHT: Math.round(200 * HEIGHT_SCALE),
   /** Maximum allowed height */
   MAX_HEIGHT: Math.round(550),
 } as const;
@@ -36,9 +37,9 @@ export const WIDTH_CALCULATION = {
   /** Minimum width for very short audiobooks (<1hr) */
   MIN: 58,
   /** Maximum width for epic audiobooks (>50hr) */
-  MAX: 300,
+  MAX: 150,
   /** Median fallback when duration is unknown */
-  MEDIAN: 206,
+  MEDIAN: 150,
   /** Minimum duration in hours (books under this get MIN width) */
   MIN_DURATION_HOURS: 1,
   /** Maximum duration in hours (books over this get MAX width) */
@@ -57,7 +58,7 @@ export const SERVER_SPINE_BOX = {
 
 /** Procedural spine bounding box — the only two tuning knobs for procedural spine size */
 export const PROCEDURAL_SPINE_BOX = {
-  MAX_WIDTH: 150,
+  MAX_WIDTH: 175,
   MAX_HEIGHT: 400,
 } as const;
 
@@ -168,30 +169,6 @@ export const SPINE_COLORS = {
   DEFAULT_TEXT: '#000000',
   /** Download indicator accent color */
   DOWNLOAD_ACCENT: '#FF6B35',
-} as const;
-
-// =============================================================================
-// FONT LINE HEIGHT MULTIPLIERS
-// =============================================================================
-
-/**
- * Font-specific line height ratios
- * Different fonts need different spacing for optimal readability
- */
-export const FONT_LINE_HEIGHTS = {
-  // Display fonts - can be tighter (no descenders in caps)
-  'BebasNeue-Regular': { title: 0.85, author: 0.9, tight: 0.8 },
-  'Oswald-Regular': { title: 0.9, author: 0.95, tight: 0.85 },
-  'Oswald-Bold': { title: 0.9, author: 0.95, tight: 0.85 },
-
-  // Serif fonts - need breathing room
-  'Lora-Regular': { title: 0.95, author: 1.0, tight: 0.9 },
-  'Lora-Bold': { title: 0.95, author: 1.0, tight: 0.9 },
-  'PlayfairDisplay-Regular': { title: 1.0, author: 1.0, tight: 0.95 },
-  'PlayfairDisplay-Bold': { title: 1.0, author: 1.0, tight: 0.95 },
-
-  // Default fallback
-  'default': { title: 0.95, author: 1.0, tight: 0.9 },
 } as const;
 
 // =============================================================================

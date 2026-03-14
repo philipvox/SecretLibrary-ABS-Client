@@ -26,7 +26,7 @@ const log = createLogger('SpineCache');
 const DIMENSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // MIGRATED: Now using new spine system via adapter
-import { calculateBookDimensions, hashString, getSpineColorForGenres, generateSpineComposition, SpineComposition, getTypographyForGenres } from '../utils/spine/adapter';
+import { calculateBookDimensions, hashString, getSpineColorForGenres, getTypographyForGenres } from '../utils/spine/adapter';
 // Template system - spines use this when available, so cache must too
 import { shouldUseTemplates, applyTemplateConfig } from '../utils/spine/templateAdapter';
 // getPlatformFont resolves custom fonts to available fonts (same as BookSpineVertical)
@@ -82,8 +82,6 @@ export interface CachedSpineData {
   backgroundColor: string;
   /** Text color for spine (contrast-based) */
   textColor: string;
-  /** Pre-computed spine composition (title orientation, author treatment, etc.) */
-  composition?: SpineComposition;
   /** Pre-computed typography (font family, weight, transform, etc.) - ensures consistency across all screens */
   typography?: {
     fontFamily: string;
@@ -126,8 +124,6 @@ export interface SpineCacheState {
   serverSpineDimensions: Record<string, SpineDimensionEntry>;
   /** Whether persisted state has been hydrated from AsyncStorage */
   isHydrated: boolean;
-  /** Whether expo-image disk cache has been cleared (prevents stale image flash) */
-  imageCacheCleared: boolean;
   /** Version counter for serverSpineDimensions - increments on any change.
    *  Subscribe to this instead of the full object to avoid mass re-renders. */
   serverSpineDimensionsVersion: number;
@@ -205,13 +201,7 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
 
   // Calculate spine colors based on genres
   const colors = getSpineColorForGenres(genres, item.id);
-
-  // Pre-compute spine composition (title orientation, author treatment, etc.)
-  // This ensures consistent styling across home, book detail, and player screens
-  const title = metadata?.title || 'Unknown';
   const author = metadata?.authorName || 'Unknown Author';
-  // Pass spine width for smart layout constraints (horizontal only on wide spines)
-  const composition = generateSpineComposition(item.id, title, author, genres, seriesName ? { name: seriesName, number: 1 } : undefined, calculated.width);
 
   // Pre-compute typography (font family, weight, transforms, etc.)
   // CRITICAL: Must match EXACTLY what BookSpineVertical uses!
@@ -220,7 +210,7 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
   const useTemplates = shouldUseTemplates(genres);
   let typography: any;
 
-  if (useTemplates && genres.length > 0) {
+  if (useTemplates) {
     // Use template system - same as BookSpineVertical line 977-981
     const templateConfig = applyTemplateConfig(genres, calculated.width, title);
 
@@ -282,7 +272,6 @@ function extractSpineData(item: LibraryItem): CachedSpineData {
     progress,
     backgroundColor: colors.backgroundColor,
     textColor: colors.textColor,
-    composition,
     typography,
   };
 }
@@ -302,7 +291,6 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
       useServerSpines: true, // Default to server spines when available
       serverSpineDimensions: {}, // Cache for server spine image dimensions (persisted)
       isHydrated: false, // Set to true once AsyncStorage hydration completes
-      imageCacheCleared: false, // Set to true once expo-image disk cache is cleared
       serverSpineDimensionsVersion: 0,
       colorVersion: 0,
       cachedManifestBookIds: [],
@@ -314,80 +302,21 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
        * Call this during app initialization to pre-load spine data.
        * Returns the number of items loaded.
        */
-      hydrateFromSQLite: async (libraryId: string): Promise<number> => {
-        if (!libraryId) return 0;
-
-        // Skip spine generation caching if server spines are enabled
-        // (procedural spine calculations not needed when using server images)
-        if (get().useServerSpines) {
-          log.debug('Server spines enabled, skipping procedural spine hydration');
-          return 0;
-        }
-
-        // Skip if already populated (avoid duplicate work)
-        if (get().isPopulated && get().cache.size > 0) {
-          log.debug('Already populated, skipping hydration');
-          return get().cache.size;
-        }
-
-        const startTime = Date.now();
-
-        try {
-          const sqliteData = await sqliteCache.getSpineCache(libraryId);
-
-          if (sqliteData.size > 0) {
-            set({
-              cache: sqliteData,
-              isPopulated: true,
-              lastPopulatedAt: Date.now(),
-            });
-
-            const elapsed = Date.now() - startTime;
-            log.debug(`Hydrated ${sqliteData.size} items from SQLite in ${elapsed}ms`);
-            return sqliteData.size;
-          }
-        } catch (error) {
-          log.warn('Hydration from SQLite failed:', error);
-        }
-
+      hydrateFromSQLite: async (_libraryId: string): Promise<number> => {
+        // Skip SQLite hydration — always compute fresh to ensure correct colors
+        log.debug('Skipping SQLite hydration (colors computed fresh each launch)');
         return 0;
       },
 
       populateFromLibrary: async (items: LibraryItem[], libraryId?: string) => {
-        // Skip procedural spine caching entirely if server spines are enabled
-        // (server images don't need pre-computed dimensions)
-        if (get().useServerSpines) {
-          log.debug('Server spines enabled, skipping procedural spine population');
-          set({ isPopulated: true, lastPopulatedAt: Date.now() });
-          return;
-        }
 
         const startTime = Date.now();
         const newCache = new Map<string, CachedSpineData>();
         const itemIds = new Set(items.map(i => i.id));
-        let loadedFromSQLite = 0;
         let computed = 0;
 
-        // Try to load from SQLite first (if libraryId provided)
-        if (libraryId) {
-          try {
-            const sqliteData = await sqliteCache.getSpineCache(libraryId);
-
-            // Use SQLite data for items that still exist
-            for (const [bookId, data] of sqliteData.entries()) {
-              if (itemIds.has(bookId)) {
-                newCache.set(bookId, data);
-                loadedFromSQLite++;
-              }
-            }
-
-            if (loadedFromSQLite > 0) {
-              log.debug(`Loaded ${loadedFromSQLite} items from SQLite`);
-            }
-          } catch (error) {
-            log.warn('Failed to load from SQLite:', error);
-          }
-        }
+        // Always compute fresh — ensures colors match current palette
+        log.debug('Computing spine data for all items');
 
         // Compute only for items not in cache
         for (const item of items) {
@@ -411,10 +340,10 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
         });
 
         const elapsed = Date.now() - startTime;
-        log.debug(`Populated ${newCache.size} items (${loadedFromSQLite} from SQLite, ${computed} computed) in ${elapsed}ms`);
+        log.debug(`Computed ${computed} spine entries in ${elapsed}ms`);
 
-        // Save back to SQLite if we computed new items
-        if (libraryId && computed > 0) {
+        // Save to SQLite as write-through cache
+        if (libraryId) {
           // Run in background, don't block
           sqliteCache.setSpineCache(libraryId, newCache).catch(err => {
             log.warn('Failed to save to SQLite:', err);
@@ -511,13 +440,6 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
     },
 
     saveToSQLite: async (libraryId: string) => {
-      // Skip saving procedural spine data if server spines are enabled
-      // (no need to persist calculations we won't use)
-      if (get().useServerSpines) {
-        log.debug('Server spines enabled, skipping procedural spine save');
-        return;
-      }
-
       const { cache } = get();
       if (cache.size === 0) return;
 
@@ -532,7 +454,7 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
   }),
     {
       name: 'spine-settings',
-      version: 6, // v6: Persist spine manifest book IDs for instant server spine lookup
+      version: 9, // v9: Vibrant genre color palette
       storage: createJSONStorage(() => AsyncStorage),
       // Persist settings, serverSpineDimensions, and manifest book IDs
       partialize: (state) => ({
@@ -596,6 +518,27 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
             cachedManifestBookIds: [],
           };
         }
+        if (version < 7) {
+          // Force full recompute to pick up genre-based colors (SQLite has stale #F5F5F5)
+          return {
+            ...persistedState,
+            _forceRecompute: true,
+          };
+        }
+        if (version < 8) {
+          // Force recompute: removed useServerSpines guard, need fresh genre colors
+          return {
+            ...persistedState,
+            _forceRecompute: true,
+          };
+        }
+        if (version < 9) {
+          // Force recompute: vibrant color palette
+          return {
+            ...persistedState,
+            _forceRecompute: true,
+          };
+        }
         return persistedState;
       },
       onRehydrateStorage: () => (state) => {
@@ -604,8 +547,10 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
           const dimCount = Object.keys(state.serverSpineDimensions || {}).length;
           const manifestCount = state.cachedManifestBookIds?.length || 0;
           console.log(`[SpineCache] Hydrated from AsyncStorage: ${dimCount} server spine dimensions, ${manifestCount} manifest entries`);
+
+
           // Mark as hydrated so components know persisted data is available
-          useSpineCacheStore.setState({ isHydrated: true, imageCacheCleared: true });
+          useSpineCacheStore.setState({ isHydrated: true });
 
           // Pre-populate libraryCache with persisted manifest for instant server spine lookup.
           // This runs BEFORE components render, eliminating the flash of generative spines.

@@ -3954,102 +3954,102 @@ const GENRE_TO_COLOR_PERSONALITY: Record<string, SpinePersonality> = {
  */
 export const GENRE_BASE_COLORS: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════
-  // WARM REDS & CORALS - Muted, vintage feel
+  // WARM REDS & CORALS
   // ═══════════════════════════════════════════════════════════════
-  'Romance': '#C1666B',           // Dusty rose
-  'Action': '#9E5A5A',            // Muted terracotta
-  'Sports': '#8B4049',            // Faded brick
-  'Politics': '#7D4E57',          // Dusty mauve-red
-  'True Crime': '#6B3A3A',        // Deep burgundy
+  'Romance': '#D94F5C',           // Vibrant rose
+  'Action': '#C0392B',            // Bold red
+  'Sports': '#A93226',            // Athletic crimson
+  'Politics': '#943243',          // Rich garnet
+  'True Crime': '#7B2D3B',        // Deep wine
 
   // ═══════════════════════════════════════════════════════════════
-  // WARM ORANGES & TERRACOTTA - Earthy, cozy tones
+  // WARM ORANGES & TERRACOTTA
   // ═══════════════════════════════════════════════════════════════
-  'Self-Help': '#C08552',         // Warm caramel
-  'Business': '#9A7B4F',          // Antique brass
-  'Food & Cooking': '#D4A574',    // Soft peach
-  'Personal Finance': '#B8860B',  // Dark goldenrod
-  'Western': '#A0522D',           // Sienna
+  'Self-Help': '#D68036',         // Warm amber
+  'Business': '#B5742D',          // Rich bronze
+  'Food & Cooking': '#E08A4A',    // Tangerine
+  'Personal Finance': '#D4960A',  // Bold gold
+  'Western': '#C45D2A',           // Burnt orange
 
   // ═══════════════════════════════════════════════════════════════
-  // WARM YELLOWS & OCHRES - Soft, mustard tones
+  // WARM YELLOWS & OCHRES
   // ═══════════════════════════════════════════════════════════════
-  "Children's 0-2": '#E8C872',    // Soft gold
-  "Children's 3-5": '#D4A84B',    // Warm mustard
-  "Children's 6-8": '#C9A227',    // Antique gold
-  "Children's 9-12": '#B8963E',   // Old gold
-  'Humor': '#DEB841',             // Harvest yellow
-  'Satire': '#C4A35A',            // Muted ochre
+  "Children's 0-2": '#F2C94C',    // Bright sunshine
+  "Children's 3-5": '#E5A833',    // Warm marigold
+  "Children's 6-8": '#D4A017',    // Rich gold
+  "Children's 9-12": '#C99A2E',   // Deep amber
+  'Humor': '#F0C040',             // Bright yellow
+  'Satire': '#D4A22A',            // Bold ochre
 
   // ═══════════════════════════════════════════════════════════════
-  // SAGE & OLIVE GREENS - Muted, natural tones
+  // GREENS - Rich, natural tones
   // ═══════════════════════════════════════════════════════════════
-  'Fantasy': '#5F7161',           // Sage green
-  'Nature': '#6B7B3E',            // Olive
-  'Health & Wellness': '#7D8C6E', // Dusty sage
+  'Fantasy': '#2D8659',           // Emerald
+  'Nature': '#4A8C3F',            // Forest green
+  'Health & Wellness': '#5B9E4D', // Vibrant sage
 
   // ═══════════════════════════════════════════════════════════════
-  // LITERARY GENRES - Spread across spectrum
+  // LITERARY GENRES
   // ═══════════════════════════════════════════════════════════════
-  'Adventure': '#8B7355',         // Warm khaki
-  'Classics': '#6B4423',          // Antique brown
-  'Literary Fiction': '#5B6178',  // Slate blue-gray
-  'Fiction': '#7B8B8B',           // Warm gray
+  'Adventure': '#A67C42',         // Rich camel
+  'Classics': '#8B5A2B',          // Warm mahogany
+  'Literary Fiction': '#4D5E8C',  // Rich slate blue
+  'Fiction': '#5C7A7A',           // Deep sea glass
 
   // ═══════════════════════════════════════════════════════════════
-  // DUSTY TEALS - Muted, calm tones
+  // TEALS & CYANS
   // ═══════════════════════════════════════════════════════════════
-  'Young Adult': '#5D8A8E',       // Dusty teal
-  'New Adult': '#6B9A9E',         // Soft teal
-  'Teen 13-17': '#7BA3A4',        // Faded seafoam
-  'Travel': '#4D7C7F',            // Deep dusty teal
-  'Contemporary Fiction': '#5A7F7E', // Muted cyan
+  'Young Adult': '#2A9D8F',       // Vibrant teal
+  'New Adult': '#38AFA9',         // Bright teal
+  'Teen 13-17': '#48B5A4',        // Seafoam
+  'Travel': '#1E8C8A',            // Deep teal
+  'Contemporary Fiction': '#2E8E8A', // Ocean teal
 
   // ═══════════════════════════════════════════════════════════════
-  // DUSTY BLUES - Powder blues, slate tones
+  // BLUES
   // ═══════════════════════════════════════════════════════════════
-  'Science Fiction': '#4A5D7A',   // Slate blue
-  'Science': '#5B7B9A',           // Dusty steel blue
-  'Popular Science': '#8BA4B5',   // Powder blue
-  'Education': '#6B8299',         // Muted periwinkle
-  'Mystery': '#3D4F5F',           // Deep slate
-  'Technology': '#7A99AC',        // Soft steel
-  'Journalism': '#5A7A8C',        // Dusty blue
-  'Historical Fiction': '#4A6670', // Dark teal-blue
+  'Science Fiction': '#2E5FA1',   // Bold blue
+  'Science': '#3A78B5',           // Bright steel
+  'Popular Science': '#5A9CC5',   // Sky blue
+  'Education': '#4078A5',         // Vivid blue
+  'Mystery': '#2C4A6E',           // Deep navy
+  'Technology': '#4A8AB5',        // Tech blue
+  'Journalism': '#3470A0',        // Press blue
+  'Historical Fiction': '#2A6478', // Deep ocean
 
   // ═══════════════════════════════════════════════════════════════
-  // MUTED PURPLES & MAUVES - Soft, dusty tones
+  // PURPLES & MAUVES
   // ═══════════════════════════════════════════════════════════════
-  'Horror': '#4A3F55',            // Deep dusty purple
-  'Philosophy': '#5D4E6D',        // Muted grape
-  'Religion & Spirituality': '#7A6B8A', // Dusty lavender
-  'Art': '#8B7B9B',               // Soft mauve
-  'Psychology': '#6B5B7B',        // Muted violet
-  'Memoir': '#9A8BA8',            // Pale dusty purple
+  'Horror': '#4A2D6B',            // Deep purple
+  'Philosophy': '#6B4D90',        // Rich grape
+  'Religion & Spirituality': '#7E60A8', // Amethyst
+  'Art': '#8E6BAE',               // Vivid lavender
+  'Psychology': '#6E4E9E',        // Bold violet
+  'Memoir': '#9A7DB8',            // Orchid purple
 
   // ═══════════════════════════════════════════════════════════════
-  // DUSTY PINKS & ROSES - Warm, muted tones
+  // PINKS & ROSES
   // ═══════════════════════════════════════════════════════════════
-  "Women's Fiction": '#B07B8E',   // Dusty rose
-  'LGBTQ+ Fiction': '#C49CA4',    // Soft pink
-  'Parenting & Family': '#D4B5B8', // Pale blush
-  'Music': '#8B6B75',             // Muted mauve
+  "Women's Fiction": '#C46080',   // Vibrant rose
+  'LGBTQ+ Fiction': '#D87FA0',    // Bright pink
+  'Parenting & Family': '#D98FA0', // Warm pink
+  'Music': '#A8507A',             // Rich magenta
 
   // ═══════════════════════════════════════════════════════════════
-  // WARM NEUTRALS - Sophisticated grays with warmth
+  // EARTHY & DARK TONES
   // ═══════════════════════════════════════════════════════════════
-  'Thriller': '#2F2F2F',          // Charcoal
-  'Crime': '#3D3D3D',             // Dark charcoal
-  'Suspense': '#4A4A4A',          // Medium charcoal
-  'History': '#5C5347',           // Warm gray-brown
-  'Biography': '#7A7265',         // Taupe
-  'Autobiography': '#9A9285',     // Light taupe
-  'Non-Fiction': '#6B6560',       // Warm gray
-  'Essays': '#5A5650',            // Stone gray
-  'Anthology': '#8A857D',         // Greige
-  'Short Stories': '#ADA8A0',     // Pale stone
-  'Adult': '#6A6A6A',             // Neutral gray
-  'Literature & Fiction': '#5B5F70', // Cool slate
+  'Thriller': '#1E3A4F',          // Midnight blue
+  'Crime': '#2B3D4F',             // Dark steel
+  'Suspense': '#354B60',          // Storm blue
+  'History': '#7A5C3A',           // Rich umber
+  'Biography': '#8A6E48',         // Warm bronze
+  'Autobiography': '#9E8258',     // Amber tan
+  'Non-Fiction': '#5E7055',       // Forest moss
+  'Essays': '#4E6A5A',            // Deep sage
+  'Anthology': '#6B7E5A',         // Olive green
+  'Short Stories': '#7A9070',     // Fern green
+  'Adult': '#5A6878',             // Cool steel
+  'Literature & Fiction': '#3E5478', // Rich navy
 };
 
 // Fallback palette for unknown genres

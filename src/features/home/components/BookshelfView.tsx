@@ -26,7 +26,7 @@ import { useResponsive } from '@/shared/hooks/useResponsive';
 // MIGRATED: Now using new spine system via adapter
 import { getSpineDimensions, calculateBookDimensions, hashString, MIN_TOUCH_TARGET, isLightColor, darkenColorForDisplay } from '../utils/spine/adapter';
 import { HEIGHT_SCALE, SERVER_SPINE_BOX, PROCEDURAL_SPINE_BOX } from '../utils/spine/constants';
-import { fitToBoundingBox } from '../utils/spine/core/dimensions';
+import { fitToBoundingBox, getDurationScale, DURATION_SCALE_LONG_MAX } from '../utils/spine/core/dimensions';
 import { useSpineCacheStore } from '../stores/spineCache';
 import { haptics } from '@/core/native/haptics';
 
@@ -76,46 +76,6 @@ const BASE_BOOK_GAP = 8;
 const LEAN_ANGLE = 3;
 const STACK_GAP = 8;
 
-// Duration-based scaling using smooth ease-out curve
-// Range: 0.70 (0 hours) to 1.15 (30 hours), then linear ramp to 1.40 (60+ hours)
-const DURATION_SCALE_MIN = 0.70;
-const DURATION_SCALE_MAX = 1.15;
-const DURATION_MAX_HOURS = 30;
-// Books longer than 30 hours continue scaling up to this cap
-const DURATION_SCALE_LONG_MAX = 1.40;
-const DURATION_LONG_CAP_HOURS = 60;
-
-/**
- * Calculate a continuous scale factor based on book duration.
- * Uses ease-out curve (square root) for smooth, natural distribution.
- * Books over 30 hours continue scaling linearly up to 1.40 at 60+ hours.
- *
- * Example values:
- * - 0 hours: 0.70
- * - 5 hours: 0.88
- * - 10 hours: 0.96
- * - 20 hours: 1.07
- * - 30 hours: 1.15
- * - 50 hours: 1.32
- * - 60+ hours: 1.40
- *
- * @param durationSeconds - Book duration in seconds
- * @returns Scale multiplier (0.70 to 1.40)
- */
-function getDurationScale(durationSeconds: number): number {
-  const hours = Math.max(0, durationSeconds / 3600);
-
-  if (hours <= DURATION_MAX_HOURS) {
-    // Ease-out curve using square root
-    const t = Math.sqrt(hours / DURATION_MAX_HOURS);
-    return DURATION_SCALE_MIN + (DURATION_SCALE_MAX - DURATION_SCALE_MIN) * t;
-  }
-
-  // Linear ramp from 1.15 to 1.40 for 30-60hr books, capped at 60hr
-  const extraHours = Math.min(hours, DURATION_LONG_CAP_HOURS) - DURATION_MAX_HOURS;
-  const extraRange = DURATION_LONG_CAP_HOURS - DURATION_MAX_HOURS;
-  return DURATION_SCALE_MAX + (DURATION_SCALE_LONG_MAX - DURATION_SCALE_MAX) * (extraHours / extraRange);
-}
 
 // Animation timing
 const DOMINO_DELAY = 25;      // ms between each book
@@ -424,6 +384,7 @@ export function BookshelfView({
   const useServerSpines = useSpineCacheStore((state) => state.useServerSpines);
   const serverDimsVersion = useSpineCacheStore((state) => state.serverSpineDimensionsVersion);
   const isHydrated = useSpineCacheStore((state) => state.isHydrated);
+  const colorVersion = useSpineCacheStore((state) => state.colorVersion);
 
   // Calculate book dimensions - uses cache when available
   // Re-calculates when responsive scale changes (iPad vs phone)
@@ -462,12 +423,14 @@ export function BookshelfView({
         dims = { width, height, touchPadding };
 
       } else if (cached) {
-        // Use cached procedural dimensions — bounding-box fit preserves aspect ratio
+        // Procedural spines: clamp width and height independently
+        // Width driven by duration, height driven by genre — no aspect ratio coupling
         bookHash = cached.hash;
 
         const maxW = PROCEDURAL_SPINE_BOX.MAX_WIDTH * shelfScale * durationScale * fillScale;
         const maxH = PROCEDURAL_SPINE_BOX.MAX_HEIGHT * shelfScale * durationScale * fillScale;
-        const { width, height } = fitToBoundingBox(cached.baseWidth, cached.baseHeight, maxW, maxH);
+        const width = Math.round(Math.min(cached.baseWidth * shelfScale * durationScale * fillScale, maxW));
+        const height = Math.round(Math.min(cached.baseHeight * shelfScale * durationScale * fillScale, maxH));
         const touchPadding = Math.max(0, Math.ceil((MIN_TOUCH_TARGET - width) / 2));
 
         dims = { width, height, touchPadding };
@@ -498,7 +461,8 @@ export function BookshelfView({
 
         const maxW = PROCEDURAL_SPINE_BOX.MAX_WIDTH * shelfScale * durationScale * fillScale;
         const maxH = PROCEDURAL_SPINE_BOX.MAX_HEIGHT * shelfScale * durationScale * fillScale;
-        const { width, height } = fitToBoundingBox(baseWidth, baseHeight, maxW, maxH);
+        const width = Math.round(Math.min(baseWidth * shelfScale * durationScale * fillScale, maxW));
+        const height = Math.round(Math.min(baseHeight * shelfScale * durationScale * fillScale, maxH));
         const touchPadding = Math.max(0, Math.ceil((MIN_TOUCH_TARGET - width) / 2));
 
         dims = { width, height, touchPadding };
@@ -521,45 +485,26 @@ export function BookshelfView({
     });
   }, [books, getSpineData, shelfScale, fillScale, useServerSpines, serverDimsVersion, isHydrated]);
 
-  // Enrich books with cached colors for efficient rendering
-  // Apply darkening to light colors for the grey background theme
+  // Enrich books with cached colors from spine cache
   const enrichedBooks = useMemo(() => {
     return books.map((book) => {
       // Skip if already has colors
       if (book.backgroundColor && book.textColor) {
-        // Still need to darken if light
-        if (isLightColor(book.backgroundColor)) {
-          const darkened = darkenColorForDisplay(book.backgroundColor);
-          return {
-            ...book,
-            backgroundColor: darkened,
-            textColor: staticColors.white, // Light text on dark background
-          };
-        }
         return book;
       }
 
       // Get colors from cache
       const cached = getSpineData(book.id);
-      if (cached) {
-        let bgColor = cached.backgroundColor;
-        let txtColor = cached.textColor;
-
-        // If cached color is light, darken it for grey background
-        if (isLightColor(bgColor)) {
-          bgColor = darkenColorForDisplay(bgColor);
-          txtColor = staticColors.white; // Light text on dark background
-        }
-
+      if (cached && cached.backgroundColor) {
         return {
           ...book,
-          backgroundColor: bgColor,
-          textColor: txtColor,
+          backgroundColor: cached.backgroundColor,
+          textColor: cached.textColor,
         };
       }
       return book;
     });
-  }, [books, getSpineData]);
+  }, [books, getSpineData, colorVersion]);
 
   const handlePressIn = useCallback((index: number) => setActiveIndex(index), []);
   const handlePressOut = useCallback(() => setActiveIndex(null), []);
@@ -593,7 +538,9 @@ export function BookshelfView({
     if (cached) {
       const maxW = PROCEDURAL_SPINE_BOX.MAX_WIDTH * shelfScale * durationScale;
       const maxH = PROCEDURAL_SPINE_BOX.MAX_HEIGHT * shelfScale * durationScale;
-      return fitToBoundingBox(cached.baseWidth, cached.baseHeight, maxW, maxH);
+      const width = Math.round(Math.min(cached.baseWidth * shelfScale * durationScale, maxW));
+      const height = Math.round(Math.min(cached.baseHeight * shelfScale * durationScale, maxH));
+      return { width, height, scaleFactor: 1 };
     }
     // Default fallback
     return { width: 40, height: 300, scaleFactor: 1 };
