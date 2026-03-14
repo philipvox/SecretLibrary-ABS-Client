@@ -218,7 +218,9 @@ class BufferRecoveryService {
     if (this.monitorInterval) return;
 
     this.monitorInterval = setInterval(() => {
-      this.checkForStall();
+      this.checkForStall().catch(err => {
+        log.warn('checkForStall error:', err);
+      });
     }, BUFFER_MONITOR_INTERVAL_MS);
   }
 

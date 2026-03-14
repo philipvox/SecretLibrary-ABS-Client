@@ -45,8 +45,8 @@ export function extractChaptersFromBook(book: LibraryItem): Chapter[] {
 
   return bookChapters.map((ch, i) => ({
     id: i,
-    start: ch.start || 0,
-    end: ch.end || bookChapters[i + 1]?.start || book.media?.duration || 0,
+    start: ch.start ?? 0,
+    end: ch.end ?? bookChapters[i + 1]?.start ?? book.media?.duration ?? 0,
     title: ch.title ? getCleanChapterName(ch.title) : `Chapter ${i + 1}`,
   }));
 }

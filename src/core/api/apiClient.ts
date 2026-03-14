@@ -120,6 +120,15 @@ class ApiClient extends BaseApiClient {
   }
 
   /**
+   * Get item with expanded=1 query param (includes duration, size, tracks, audioFiles).
+   * Different from include=expanded which doesn't add duration/size to media.
+   */
+  async getItemExpanded(itemId: string): Promise<LibraryItem> {
+    const url = `${endpoints.items.get(itemId)}?expanded=1`;
+    return this.get<LibraryItem>(url);
+  }
+
+  /**
    * Get cover URL with automatic cache busting.
    * Uses a global cache version that increments on library refresh.
    * Initialize to Date.now() so fresh installs always get cache-busted URLs

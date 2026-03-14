@@ -12,10 +12,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   StatusBar,
   Animated,
-  PanResponder,
-  Dimensions,
   BackHandler,
   Platform,
   Modal,
@@ -23,17 +22,35 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
+import RAnimated, {
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
+import { CoverStars } from '@/shared/components/CoverStars';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { PlayIcon, PauseIcon } from '../components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
 import Slider from '@react-native-community/slider';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { TopNav, TopNavCloseIcon } from '@/shared/components';
 import {
+  playerTransitionProgress,
+  SPRING_CONFIG,
+  SNAP_THRESHOLD,
+  VELOCITY_THRESHOLD,
+} from '../stores/playerTransition';
+import {
   usePlayerStore,
+  useSeekingStore,
   useCurrentChapterIndex,
   useSleepTimerStore,
   useBookmarksStore,
@@ -248,8 +265,6 @@ export function SecretLibraryPlayerScreen() {
     return { paddingHorizontal: scale(20) };
   }, [isTablet, screenWidth]);
 
-  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
-
   // Theme-aware colors
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
@@ -312,10 +327,12 @@ export function SecretLibraryPlayerScreen() {
   // Sleep timer subscription - real-time countdown (1 sec updates)
   const sleepTimer = useSleepTimerStore((s) => s.sleepTimer);
 
-  // Position
-  const position = usePlayerStore(
-    (s) => Math.floor(s.isSeeking ? s.seekPosition : s.position)
-  );
+  // Position - read isSeeking/seekPosition from seekingStore (single source of truth)
+  // playerStore.isSeeking is a dead leftover from Phase 7 refactor and is always false
+  const storePosition = usePlayerStore((s) => s.position);
+  const seekingIsSeeking = useSeekingStore((s) => s.isSeeking);
+  const seekingPosition = useSeekingStore((s) => s.seekPosition);
+  const position = Math.floor(seekingIsSeeking ? seekingPosition : storePosition);
 
   // Bookmarks
   const bookmarks = useBookmarks();
@@ -410,8 +427,13 @@ export function SecretLibraryPlayerScreen() {
   const chapter = chapters[chapterIndex];
   const chapterStart = chapter?.start ?? 0;
   const chapterEnd = chapter?.end ?? 0;
-  const chapterPosition = chapter ? Math.max(0, position - chapterStart) : 0;
-  const chapterDuration = chapterEnd > chapterStart ? chapterEnd - chapterStart : 0;
+  const rawChapterPosition = chapter ? Math.max(0, position - chapterStart) : 0;
+  const rawChapterDuration = chapterEnd > chapterStart ? chapterEnd - chapterStart : 0;
+  // Fallback: when no real chapter data (0 chapters or single chapterless book),
+  // use book-level values so the time display isn't stuck at 00:00:00
+  const hasChapterData = rawChapterDuration > 0;
+  const chapterPosition = hasChapterData ? rawChapterPosition : position;
+  const chapterDuration = hasChapterData ? rawChapterDuration : duration;
   const chapterProgress = chapterDuration > 0 ? chapterPosition / chapterDuration : 0;
 
   // Book progress
@@ -457,23 +479,133 @@ export function SecretLibraryPlayerScreen() {
   // Display title as-is (no uppercase transform - that's for spines only)
   const displayTitle = title;
 
-  // Animation for slide in/out
-  useEffect(() => {
-    if (isPlayerVisible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: screenHeight,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isPlayerVisible, slideAnim, screenHeight]);
+  // Reanimated: outer container slides based on shared transition progress
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateY: interpolate(
+        playerTransitionProgress.value,
+        [0, 1],
+        [screenHeight, 0],
+      ),
+    }],
+  }));
+
+  // Gradient background fades in early — feathered edge from transparent top to solid bottom
+  const bgAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.05, 0.35],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Solid background fills in fully at the end of the transition
+  const bgSolidAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.5, 0.8],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Cover: grows from mini player cover position/size to full player cover
+  //
+  // Geometry:
+  //   At progress=0, the container is at translateY=screenHeight (off-screen below).
+  //   The cover sits near the TOP of the player container (~insets.top + topNav).
+  //   The mini player cover sits near the BOTTOM of the screen.
+  //   We offset the cover within the container so its screen position matches
+  //   the mini player cover, then animate that offset to 0 as progress → 1.
+  //
+  const miniCoverSize = scale(40);       // mini player cover dimensions
+  const miniPlayerPadH = scale(20);      // mini player paddingHorizontal
+  const fullContentPad = isTablet && screenWidth > MAX_CONTENT_WIDTH
+    ? (screenWidth - MAX_CONTENT_WIDTH) / 2
+    : scale(20);
+  const fullCoverWidth = screenWidth - 2 * fullContentPad;
+  const scaleRatio = miniCoverSize / fullCoverWidth;
+  const bottomPad = insets.bottom > 0 ? insets.bottom : scale(12);
+
+  // Distance from container top to cover center Y (safe area + topNav + margin + half cover)
+  const coverTopInPlayer = insets.top + scale(79);
+  const coverCenterYInPlayer = coverTopInPlayer + fullCoverWidth / 2;
+
+  // Mini player cover center in screen coordinates
+  const miniCoverCenterX = miniPlayerPadH + miniCoverSize / 2;
+  const miniCoverCenterY = screenHeight - bottomPad - miniCoverSize / 2;
+
+  // Full player cover center in screen coordinates (at progress=0, container at screenHeight)
+  const fullCoverCenterX = screenWidth / 2;
+  const fullCoverCenterYAtP0 = screenHeight + coverCenterYInPlayer;
+
+  // Offsets needed at progress=0 to align cover with mini player
+  const targetTX = miniCoverCenterX - fullCoverCenterX;
+  const targetTY = miniCoverCenterY - fullCoverCenterYAtP0;
+
+  const coverAnimStyle = useAnimatedStyle(() => {
+    const p = playerTransitionProgress.value;
+    const coverScale = interpolate(p, [0, 0.7], [scaleRatio, 1], Extrapolation.CLAMP);
+
+    // Position: slide from mini player cover position to natural position
+    const offsetX = interpolate(p, [0, 0.7], [targetTX, 0], Extrapolation.CLAMP);
+    const offsetY = interpolate(p, [0, 0.7], [targetTY, 0], Extrapolation.CLAMP);
+
+    return {
+      transform: [
+        { translateX: offsetX },
+        { translateY: offsetY },
+        { scale: coverScale },
+      ],
+    };
+  });
+
+  // Controls (byline, progress bar, buttons) fade in late
+  const controlsAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.65, 0.9],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // TopNav fade in
+  const topNavAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.7, 0.95],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Swipe-down gesture on full player to dismiss
+  const dismissGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      'worklet';
+      if (event.translationY > 0) {
+        // Convert downward drag to 1→0 progress
+        const progress = 1 - Math.min(event.translationY / screenHeight, 1);
+        playerTransitionProgress.value = progress;
+      }
+    })
+    .onEnd((event) => {
+      'worklet';
+      const progress = playerTransitionProgress.value;
+      const velocity = event.velocityY; // positive = downward
+
+      // Quick swipe down or past threshold = dismiss
+      const shouldDismiss = velocity > VELOCITY_THRESHOLD || (velocity > -VELOCITY_THRESHOLD && progress < (1 - SNAP_THRESHOLD));
+
+      if (shouldDismiss) {
+        playerTransitionProgress.value = withSpring(0, SPRING_CONFIG);
+        runOnJS(closePlayer)();
+      } else {
+        playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
+      }
+    });
 
   // Back handler
   useEffect(() => {
@@ -496,34 +628,6 @@ export function SecretLibraryPlayerScreen() {
       }
     };
   }, []);
-
-  // Pan responder for swipe down - needs to be memoized with screenHeight
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return gestureState.dy > 30 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
-        },
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dy > 0) {
-            slideAnim.setValue(gestureState.dy);
-          }
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dy > screenHeight * 0.3 || gestureState.vy > 0.5) {
-            closePlayer();
-          } else {
-            Animated.spring(slideAnim, {
-              toValue: 0,
-              useNativeDriver: true,
-              tension: 65,
-              friction: 11,
-            }).start();
-          }
-        },
-      }),
-    [screenHeight, slideAnim, closePlayer]
-  );
 
   // Update slider value when position changes (but not while scrubbing)
   useEffect(() => {
@@ -632,10 +736,7 @@ export function SecretLibraryPlayerScreen() {
     animateDeltaFontSize(delta);
   }, [progressMode, duration, chapters, chapterIndex, animateDeltaFontSize]);
 
-  const handleSliderComplete = useCallback((value: number) => {
-    setIsScrubbing(false);
-    // Fix 2: Clear scrubbing state in audioService
-    audioService.setScrubbing(false);
+  const handleSliderComplete = useCallback(async (value: number) => {
     haptics.selection();
 
     let newPosition: number;
@@ -649,7 +750,13 @@ export function SecretLibraryPlayerScreen() {
       const chapterLen = chapterEnd - chapterStart;
       newPosition = Math.round((chapterStart + value * chapterLen) * 10) / 10;
     }
-    seekTo(newPosition);
+
+    // IMPORTANT: Seek FIRST and AWAIT it, then clear scrubbing state.
+    // If we clear scrubbing before seek completes, the 100ms polling picks up
+    // the old native position and snaps the UI back before the seek takes effect.
+    await seekTo(newPosition);
+    setIsScrubbing(false);
+    audioService.setScrubbing(false);
 
     // Hide delta after a short delay
     if (deltaHideTimer.current) {
@@ -746,7 +853,10 @@ export function SecretLibraryPlayerScreen() {
 
   const handleClose = useCallback(() => {
     haptics.selection();
-    closePlayer();
+    // Animate transition progress to 0, then set store state
+    playerTransitionProgress.value = withTiming(0, { duration: 250 });
+    // Small delay to let animation start before store update
+    setTimeout(() => closePlayer(), 260);
   }, [closePlayer]);
 
   // Download handler - supports pause/resume
@@ -801,6 +911,67 @@ export function SecretLibraryPlayerScreen() {
     skipForward(skipForwardInterval);
     showDeltaPopup(skipForwardInterval);
   }, [skipForward, skipForwardInterval, showDeltaPopup]);
+
+  // Double-tap on cover: left half = rewind, right half = fast-forward
+  const lastCoverTap = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
+  const coverRef = useRef<View>(null);
+  const coverTapCircleLeft = useRef(new Animated.Value(0)).current;
+  const coverTapCircleRight = useRef(new Animated.Value(0)).current;
+  const coverTapScaleLeft = useRef(new Animated.Value(0)).current;
+  const coverTapScaleRight = useRef(new Animated.Value(0)).current;
+  const coverTapOffsetLeft = useRef(new Animated.Value(0)).current;
+  const coverTapOffsetRight = useRef(new Animated.Value(0)).current;
+
+  const flashCircle = useCallback((side: 'left' | 'right', tapY: number, coverHeight: number) => {
+    const opacityAnim = side === 'left' ? coverTapCircleLeft : coverTapCircleRight;
+    const scaleAnim = side === 'left' ? coverTapScaleLeft : coverTapScaleRight;
+    const offsetAnim = side === 'left' ? coverTapOffsetLeft : coverTapOffsetRight;
+
+    // Center the oval on the tap Y position
+    // The oval is height=100% of cover, so offset = tapY - coverHeight/2
+    offsetAnim.setValue(tapY - coverHeight / 2);
+
+    // Reset to start state: visible and small
+    opacityAnim.setValue(1);
+    scaleAnim.setValue(0.3);
+
+    // Ripple out: scale up while fading
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [coverTapCircleLeft, coverTapCircleRight, coverTapScaleLeft, coverTapScaleRight, coverTapOffsetLeft, coverTapOffsetRight]);
+
+  const handleCoverPress = useCallback((evt: any) => {
+    const now = Date.now();
+    const tapX = evt.nativeEvent.locationX;
+    const tapY = evt.nativeEvent.locationY;
+    const prev = lastCoverTap.current;
+
+    if (now - prev.time < 300) {
+      // Double-tap detected — measure which half
+      coverRef.current?.measure((_x, _y, width, height) => {
+        if (tapX < width / 2) {
+          flashCircle('left', tapY, height);
+          handleSkipBack();
+        } else {
+          flashCircle('right', tapY, height);
+          handleSkipForward();
+        }
+      });
+      lastCoverTap.current = { time: 0, x: 0 }; // Reset to avoid triple-tap
+    } else {
+      lastCoverTap.current = { time: now, x: tapX };
+    }
+  }, [handleSkipBack, handleSkipForward, flashCircle]);
 
   // Sheet handlers - overlay fades in, panel slides up
   const openSheet = useCallback((sheet: ActiveSheet) => {
@@ -912,27 +1083,42 @@ export function SecretLibraryPlayerScreen() {
     haptics.selection();
   }, [duration]);
 
-  // Don't render if not visible
-  // Return empty View on Android to prevent SafeAreaProvider crash
-  if (!isPlayerVisible || !currentBook) {
+  // Only bail out if no book loaded — the player renders off-screen (translateY = screenHeight)
+  // when transition progress = 0, so no visual difference but hooks stay alive
+  if (!currentBook) {
     return Platform.OS === 'android' ? <View /> : null;
   }
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { backgroundColor: colors.white, transform: [{ translateY: slideAnim }] },
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.creamGray} />
+    <GestureDetector gesture={dismissGesture}>
+      <RAnimated.View
+        style={[
+          styles.container,
+          containerAnimStyle,
+        ]}
+      >
+        {/* Background: gradient feather (transparent top → solid bottom), then full solid */}
+        <RAnimated.View style={[StyleSheet.absoluteFill, bgAnimStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={['transparent', colors.white]}
+            locations={[0, 0.45]}
+            style={StyleSheet.absoluteFill}
+          />
+        </RAnimated.View>
+        {/* Solid background layer that fills in fully at the end of the transition */}
+        <RAnimated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.white }, bgSolidAnimStyle]}
+          pointerEvents="none"
+        />
 
-      {/* Safe Area Top */}
-      <View style={{ height: insets.top, backgroundColor: colors.white }} />
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.creamGray} />
 
-      {/* Header - outside screen padding for proper alignment */}
-      <TopNav
+        {/* Safe Area Top */}
+        <View style={{ height: insets.top }} />
+
+        {/* Header - fades in during transition */}
+        <RAnimated.View style={topNavAnimStyle}>
+          <TopNav
         variant={isDarkMode ? 'dark' : 'light'}
         showLogo={true}
         onLogoPress={handleLogoPress}
@@ -947,34 +1133,41 @@ export function SecretLibraryPlayerScreen() {
           {
             key: 'queue',
             label: 'Queue',
-            icon: <ListIcon color={activeSheet === 'queue' ? colors.white : colors.black} size={14} />,
+            icon: <ListIcon color={activeSheet === 'queue' ? colors.white : colors.black} size={16} />,
             active: activeSheet === 'queue',
             onPress: () => openSheet('queue'),
           },
           {
             key: 'bookmark',
             label: 'Bookmark',
-            icon: <BookmarkIcon color={bookmarks.length > 0 ? colors.orange : (activeSheet === 'bookmarks' ? colors.white : colors.black)} size={14} />,
+            icon: <BookmarkIcon color={bookmarks.length > 0 ? colors.orange : (activeSheet === 'bookmarks' ? colors.white : colors.black)} size={16} />,
             active: activeSheet === 'bookmarks',
             onPress: handleBookmark,
             onLongPress: () => openSheet('bookmarks'),
           },
         ]}
-        circleButtons={[
-          {
-            key: 'close',
-            icon: <TopNavCloseIcon color={colors.black} size={14} />,
-            onPress: handleClose,
-          },
-        ]}
-      />
+          circleButtons={[
+            {
+              key: 'close',
+              icon: <TopNavCloseIcon color={colors.black} size={16} />,
+              onPress: handleClose,
+            },
+          ]}
+        />
+        </RAnimated.View>
 
-      <View style={[styles.screen, contentStyle]}>
-        {/* Main Content - New Layout */}
-        <View style={styles.mainContent}>
-          {/* 1. Cover Image - Full width, larger */}
-          {/* Dims to 60% opacity when scrubbing time is displayed over it */}
-          <View style={styles.coverWrapper}>
+        <View style={[styles.screen, contentStyle]}>
+          {/* Main Content - New Layout */}
+          <View style={styles.mainContent}>
+            {/* 1. Cover Image - Full width, larger — scales up during transition */}
+            <RAnimated.View style={coverAnimStyle}>
+              {/* Double-tap left half = rewind, right half = fast-forward */}
+              {/* Dims to 60% opacity when scrubbing time is displayed over it */}
+              <Pressable
+                ref={coverRef}
+                style={styles.coverWrapper}
+                onPress={handleCoverPress}
+              >
             <View style={[styles.coverContainer, showDelta && { opacity: 0.6 }]}>
               {coverUrl ? (
                 <Image
@@ -989,6 +1182,7 @@ export function SecretLibraryPlayerScreen() {
                   </Text>
                 </View>
               )}
+              {bookId && <CoverStars bookId={bookId} starSize={scale(48)} />}
             </View>
 
             {/* Time Delta Popup - overlays cover */}
@@ -999,10 +1193,29 @@ export function SecretLibraryPlayerScreen() {
                 </Animated.Text>
               </Animated.View>
             )}
-          </View>
 
-          {/* 2. Byline - By Author (left) · Narrated by Narrator (right) - justified to cover width */}
-          <View style={styles.byline}>
+            {/* Double-tap ripple ovals — flash in small, ripple outward while fading */}
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.tapCircle, styles.tapCircleLeft, {
+                opacity: coverTapCircleLeft,
+                transform: [{ translateY: coverTapOffsetLeft }, { scaleX: 0.5 }, { scale: coverTapScaleLeft }],
+              }]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.tapCircle, styles.tapCircleRight, {
+                opacity: coverTapCircleRight,
+                transform: [{ translateY: coverTapOffsetRight }, { scaleX: 0.5 }, { scale: coverTapScaleRight }],
+              }]}
+            />
+          </Pressable>
+            </RAnimated.View>
+
+          {/* Controls section: byline, title — fades in during transition */}
+          <RAnimated.View style={controlsAnimStyle}>
+            {/* 2. Byline - By Author (left) · Narrated by Narrator (right) - justified to cover width */}
+            <View style={styles.byline}>
             {/* Left side: By Author */}
             <View style={styles.bylineLeft}>
               <Text style={[styles.bylineText, { color: colors.gray }]}>By </Text>
@@ -1053,23 +1266,25 @@ export function SecretLibraryPlayerScreen() {
                 {chapterTitle}
               </Text>
             </TouchableOpacity>
+            </View>
+          </RAnimated.View>
           </View>
-        </View>
 
-        {/* Bottom Controls Section */}
-        <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + scale(20) }]}>
+          {/* Bottom Controls Section — also fades in with transition */}
+          <RAnimated.View style={controlsAnimStyle}>
+            <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + scale(20) }]}>
           {/* Progress Bar - Slider with Bookmark Markers */}
           <View style={styles.progressBarContainer}>
             {/* Bookmark Markers (below slider, clickable) */}
             <View style={styles.bookmarkMarkersContainer} pointerEvents="box-none">
               {bookmarks.map((bookmark) => {
                 const bmProgress = progressMode === 'book'
-                  ? bookmark.time / duration
-                  : chapter
-                    ? (bookmark.time - chapter.start) / chapterDuration
-                    : 0;
-                // Only show markers that are within the current view
-                if (bmProgress < 0 || bmProgress > 1) return null;
+                  ? (duration > 0 ? bookmark.time / duration : 0)
+                  : (chapterDuration > 0
+                    ? (bookmark.time - (chapter?.start ?? 0)) / chapterDuration
+                    : 0);
+                // Only show markers that are within the current view (also filter NaN)
+                if (!Number.isFinite(bmProgress) || bmProgress < 0 || bmProgress > 1) return null;
                 return (
                   <TouchableOpacity
                     key={bookmark.id}
@@ -1250,11 +1465,12 @@ export function SecretLibraryPlayerScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-          </View>
+            </View>
+            </View>
+          </RAnimated.View>
         </View>
-      </View>
 
-      {/* Sheet Overlay - Centered popup */}
+        {/* Sheet Overlay - Centered popup */}
       {sheetVisible && (
         <View style={styles.sheetOverlay} pointerEvents="box-none">
           {/* Backdrop - fades in */}
@@ -1435,7 +1651,8 @@ export function SecretLibraryPlayerScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </Animated.View>
+      </RAnimated.View>
+    </GestureDetector>
   );
 }
 
@@ -1450,8 +1667,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: staticColors.creamGray,
-    zIndex: 100,
+    zIndex: 9999,
   },
   screen: {
     flex: 1,
@@ -1469,6 +1685,21 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     position: 'relative',
     marginBottom: scale(16),
+    overflow: 'hidden',
+  },
+  tapCircle: {
+    position: 'absolute',
+    height: '60%',
+    aspectRatio: 1,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    top: '20%',
+  },
+  tapCircleLeft: {
+    left: '-30%',
+  },
+  tapCircleRight: {
+    right: '-30%',
   },
   coverContainer: {
     width: '100%',

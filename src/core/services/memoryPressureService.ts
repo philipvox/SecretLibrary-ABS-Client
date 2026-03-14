@@ -128,16 +128,26 @@ class MemoryPressureService {
       const info = await MemoryModule.getMemoryInfo();
 
       const usedMb = info.usedMb || 0;
-      const availableMb = info.availableMb || 0;
+      const availableMb = info.availableMb != null ? info.availableMb : -1;
       const isLowMemory = info.lowMemory || false;
       const usedPercent = info.usedPercent || 0;
 
+      // Use available memory for pressure detection when available (both iOS and Android)
+      // Fall back to used-memory thresholds only when availableMb is unknown
+      const hasAvailableInfo = availableMb >= 0;
+      const isWarning = hasAvailableInfo
+        ? availableMb < 200  // Less than 200MB available
+        : usedMb > WARNING_THRESHOLD_MB;
+      const isCritical = hasAvailableInfo
+        ? availableMb < 100  // Less than 100MB available
+        : usedMb > CRITICAL_THRESHOLD_MB;
+
       const status: MemoryStatus = {
         usedMb,
-        availableMb,
+        availableMb: Math.max(availableMb, 0),
         isLowMemory: isLowMemory || usedPercent > LOW_MEMORY_PERCENT,
-        isWarning: usedMb > WARNING_THRESHOLD_MB,
-        isCritical: usedMb > CRITICAL_THRESHOLD_MB,
+        isWarning,
+        isCritical,
       };
 
       return status;

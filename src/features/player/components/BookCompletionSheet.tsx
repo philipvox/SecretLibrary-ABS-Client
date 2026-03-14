@@ -17,8 +17,9 @@ import {
   Platform,
 } from 'react-native';
 import { BookOpen, CheckCircle, Check, RotateCcw } from 'lucide-react-native';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePlayerStore } from '../stores';
+import { useCompletionSheetStore } from '../stores/completionSheetStore';
 import { getCoverUrl } from '@/core/cache';
 import { scale, spacing, useTheme } from '@/shared/theme';
 
@@ -26,14 +27,15 @@ export function BookCompletionSheet() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
-  const showCompletionSheet = usePlayerStore((s) => s.showCompletionSheet);
-  const completionSheetBook = usePlayerStore((s) => s.completionSheetBook);
-  const markBookFinished = usePlayerStore((s) => s.markBookFinished);
-  const dismissCompletionSheet = usePlayerStore((s) => s.dismissCompletionSheet);
+  const showCompletionSheet = useCompletionSheetStore((s) => s.showCompletionSheet);
+  const completionSheetBook = useCompletionSheetStore((s) => s.completionSheetBook);
+  const markBookFinished = useCompletionSheetStore((s) => s.markBookFinished);
+  const dismissCompletionSheet = useCompletionSheetStore((s) => s.dismissCompletionSheet);
 
   const handleMarkFinished = useCallback(async () => {
     if (completionSheetBook) {
-      await markBookFinished(completionSheetBook.id);
+      const duration = completionSheetBook.media?.duration || 0;
+      await markBookFinished(completionSheetBook.id, duration, completionSheetBook);
     }
   }, [completionSheetBook, markBookFinished]);
 
@@ -71,13 +73,16 @@ export function BookCompletionSheet() {
 
           {/* Book Info */}
           <View style={styles.bookInfo}>
-            {coverUrl ? (
-              <Image source={{ uri: coverUrl }} style={[styles.cover, { backgroundColor: colors.background.secondary }]} />
-            ) : (
-              <View style={[styles.cover, styles.coverPlaceholder, { backgroundColor: colors.background.secondary }]}>
-                <BookOpen size={scale(32)} color={colors.text.tertiary} strokeWidth={1.5} />
-              </View>
-            )}
+            <View style={{ width: scale(72), height: scale(72), borderRadius: scale(8), overflow: 'hidden' }}>
+              {coverUrl ? (
+                <Image source={{ uri: coverUrl }} style={[styles.cover, { backgroundColor: colors.background.secondary }]} />
+              ) : (
+                <View style={[styles.cover, styles.coverPlaceholder, { backgroundColor: colors.background.secondary }]}>
+                  <BookOpen size={scale(32)} color={colors.text.tertiary} strokeWidth={1.5} />
+                </View>
+              )}
+              <CoverStars bookId={completionSheetBook.id} starSize={scale(16)} />
+            </View>
             <View style={styles.titleContainer}>
               <Text style={[styles.congrats, { color: colors.accent.primary }]}>You finished</Text>
               <Text style={[styles.title, { color: colors.text.primary }]} numberOfLines={2}>{title}</Text>

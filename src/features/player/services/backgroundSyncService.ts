@@ -56,10 +56,16 @@ class BackgroundSyncService {
   private readonly PROCESS_MAX_DELAY = 30000; // Max 30 seconds before forced processing
   private readonly BACKGROUND_SYNC_TIMEOUT = 4000; // 4 seconds - iOS gives ~5s before suspension
 
+  private isInitialized = false;
+
   /**
    * Initialize background sync service
    */
   async init(): Promise<void> {
+    // Guard: prevent AppState listener stacking on repeated init calls
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
     await sqliteCache.init();
 
     // Listen for app state changes
@@ -98,11 +104,11 @@ class BackgroundSyncService {
   }
 
   /**
-   * Save progress locally only (SQLite) - FAST PATH
-   * Use this during active playback for instant saves without network overhead.
+   * Save progress locally only (SQLite + memory cache) - FAST PATH
+   * Use this during active playback for crash-safe saves without network overhead.
+   * Does NOT update progressStore to avoid triggering React re-renders during playback.
    * Progress will be synced to server at key moments (pause, background, finish).
    *
-   * UNIFIED PROGRESS: Also updates progressStore for instant UI reactivity.
    * FIX: Added position validation to prevent corrupted data from being saved.
    */
   async saveProgressLocal(
@@ -120,10 +126,8 @@ class BackgroundSyncService {
     // SQLite write only - no network, no queue processing
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
 
-    // FIX: Keep playbackCache in sync during playback so progressService.getProgressData()
-    // returns current position instead of stale startup-time value. Without this,
-    // the memory cache (populated once at startup by finishedBooksSync) goes stale
-    // and loadBook() could resume 2+ minutes behind the actual position.
+    // Keep playbackCache in sync so progressService.getProgressData()
+    // returns current position instead of stale startup-time value.
     playbackCache.setProgress(itemId, {
       currentTime: position,
       duration,
@@ -131,21 +135,10 @@ class BackgroundSyncService {
       updatedAt: Date.now(),
     });
 
-    // UNIFIED PROGRESS: Update progressStore for instant UI updates
-    // This makes spine progress bars, continue listening, etc. update immediately
-    try {
-      const { useProgressStore } = await import('@/core/stores/progressStore');
-      const progressStore = useProgressStore.getState();
-      // Check if store is ready before updating
-      if (progressStore.isLoaded) {
-        // Don't write to SQLite again - we just did that above
-        await progressStore.updateProgress(itemId, position, duration, false);
-      }
-    } catch (error) {
-      // FIX: Log error instead of silently ignoring - helps debug progress sync issues
-      // This can happen during app startup before progressStore is initialized
-      audioLog.debug(`saveProgressLocal: progressStore update skipped - ${getErrorMessage(error)}`);
-    }
+    // NOTE: We intentionally skip progressStore.updateProgress() here.
+    // Updating it every 5s causes React re-renders that interfere with
+    // scrubbing gestures and make FF/RW feel sluggish.
+    // progressStore is updated at key moments via saveProgress() instead.
   }
 
   /**
@@ -274,11 +267,29 @@ class BackgroundSyncService {
     log('Force sync complete');
   }
 
+  // FIX: Concurrency guard to prevent overlapping processSyncQueue executions
+  private processingQueue = false;
+
   /**
    * Process the sync queue - called periodically
    * Uses parallel processing with concurrency limit for better performance.
    */
   private async processSyncQueue(): Promise<void> {
+    // FIX: Prevent concurrent executions causing duplicate API calls
+    if (this.processingQueue) {
+      log('processSyncQueue already running - skipping');
+      return;
+    }
+    this.processingQueue = true;
+
+    try {
+      return await this._processSyncQueueInner();
+    } finally {
+      this.processingQueue = false;
+    }
+  }
+
+  private async _processSyncQueueInner(): Promise<void> {
     // Skip sync if offline - don't waste retry counts
     if (!networkMonitor.isConnected()) {
       log('Offline - skipping sync');
@@ -393,8 +404,18 @@ class BackgroundSyncService {
     const isCurrentBook = playerState.currentBook?.id === item.itemId;
 
     if (isActivelyPlaying || (isInTransition && isCurrentBook)) {
-      log(`  Skipping - user active with this book`);
-      // Don't remove from queue - will sync when user pauses
+      log(`  Skipping server sync - user active with this book`);
+      // FIX: Still save to SQLite locally so progress isn't lost if app crashes
+      // Only skip the server sync (will happen on pause)
+      await sqliteCache.setPlaybackProgress(item.itemId, item.position, item.duration, false);
+      playbackCache.setProgress(item.itemId, {
+        currentTime: item.position,
+        duration: item.duration,
+        progress: item.duration > 0 ? item.position / item.duration : 0,
+        updatedAt: Date.now(),
+      });
+      log(`  Saved locally: ${item.itemId} @ ${formatDuration(item.position)}`);
+      // Don't remove from queue - will sync to server when user pauses
       return false;
     }
 
@@ -566,7 +587,26 @@ class BackgroundSyncService {
       // Use IIFE to handle async in callback
       (async () => {
         try {
-          // Race forceSyncAll against timeout
+          // FIX: Save current playing position to SQLite FIRST (instant, guaranteed)
+          // This ensures progress is durably saved even if the 4s server timeout fires
+          try {
+            const { usePlayerStore } = require('../stores/playerStore');
+            const { currentBook, position, duration } = usePlayerStore.getState();
+            if (currentBook && position > 0) {
+              await sqliteCache.setPlaybackProgress(currentBook.id, position, duration, false);
+              playbackCache.setProgress(currentBook.id, {
+                currentTime: position,
+                duration,
+                progress: duration > 0 ? position / duration : 0,
+                updatedAt: Date.now(),
+              });
+              log(`Saved position locally before background sync: ${currentBook.id} @ ${formatDuration(position)}`);
+            }
+          } catch (localSaveError) {
+            audioLog.warn('Pre-background local save failed:', getErrorMessage(localSaveError));
+          }
+
+          // Race forceSyncAll against timeout (server sync - best effort)
           const timeoutPromise = new Promise<'timeout'>((resolve) =>
             setTimeout(() => resolve('timeout'), this.BACKGROUND_SYNC_TIMEOUT)
           );
@@ -577,7 +617,7 @@ class BackgroundSyncService {
           ]);
 
           if (result === 'timeout') {
-            audioLog.warn('Background sync timed out - some progress may not be saved');
+            audioLog.warn('Background server sync timed out - progress saved locally');
             trackEvent('background_sync_timeout', {
               queue_size: this.syncQueue.size,
               timeout_ms: this.BACKGROUND_SYNC_TIMEOUT,
@@ -624,6 +664,9 @@ class BackgroundSyncService {
     // Reset state
     this.backgroundSyncInProgress = false;
     this.firstUnprocessedTime = 0;
+    this.processingQueue = false;
+    // FIX: Reset isInitialized so service can be re-initialized after destroy
+    this.isInitialized = false;
 
     log('Destroyed');
   }

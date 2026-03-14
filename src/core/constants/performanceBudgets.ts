@@ -45,8 +45,6 @@ export const PERFORMANCE_BUDGETS = {
     CollectionDetailScreen: { warn: 350, error: 600 },
 
     // Feature screens
-    MoodDiscoveryScreen: { warn: 300, error: 500 },
-    MoodResultsScreen: { warn: 350, error: 600 },
     DownloadsScreen: { warn: 250, error: 450 },
     QueueScreen: { warn: 250, error: 400 },
   } as Record<string, { warn: number; error: number }>,

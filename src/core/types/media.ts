@@ -15,8 +15,11 @@ export interface BookMedia {
   metadata: BookMetadata;
   coverPath?: string;
   tags: string[];
-  audioFiles: AudioFile[];
-  chapters: BookChapter[];
+  audioFiles?: AudioFile[];   // Optional: not included in library items list API
+  chapters?: BookChapter[];   // Optional: not included in library items list API
+  numTracks?: number;         // Included in library items list API instead of audioFiles
+  numAudioFiles?: number;     // Included in library items list API instead of audioFiles
+  numChapters?: number;       // Included in library items list API instead of chapters
   ebookFile?: EbookFile;
   duration: number;
   size: number;

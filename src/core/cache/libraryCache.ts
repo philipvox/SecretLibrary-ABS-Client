@@ -22,7 +22,7 @@ const log = createLogger('LibraryCache');
 
 // Type guard for book media
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'audioFiles' in media && Array.isArray(media.audioFiles);
+  return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 
 // Extended metadata interface with optional narrator field

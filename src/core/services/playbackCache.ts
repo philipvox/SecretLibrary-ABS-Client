@@ -75,6 +75,16 @@ class PlaybackCache {
   }
 
   /**
+   * Cache progress without logging (for bulk operations like importFromServer)
+   */
+  setProgressSilent(itemId: string, data: Omit<CachedProgress, 'itemId'>): void {
+    this.progressCache.set(itemId, {
+      itemId,
+      ...data,
+    });
+  }
+
+  /**
    * Get cached progress (instant - no SQLite read)
    */
   getProgress(itemId: string): CachedProgress | null {

@@ -117,6 +117,10 @@ import { useCompletionSheetStore } from './completionSheetStore';
 // Import seeking store (Phase 7 refactor)
 import { useSeekingStore, type SeekDirection as SeekDirectionImport } from './seekingStore';
 
+// Import transition progress for continuous mini→full player animation
+import { playerTransitionProgress, SPRING_CONFIG } from './playerTransition';
+import { withSpring, withTiming } from 'react-native-reanimated';
+
 const DEBUG = __DEV__;
 const log = (msg: string, ...args: unknown[]) => audioLog.store(msg, ...args);
 const logError = (msg: string, ...args: unknown[]) => audioLog.error(msg, ...args);
@@ -126,7 +130,7 @@ const logError = (msg: string, ...args: unknown[]) => audioLog.error(msg, ...arg
 // =============================================================================
 
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'audioFiles' in media && Array.isArray(media.audioFiles);
+  return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 
 function getBookMetadata(item: LibraryItem | null | undefined): BookMetadata | null {
@@ -314,6 +318,7 @@ interface PlayerActions {
   // ---------------------------------------------------------------------------
   togglePlayer: () => void;
   closePlayer: () => void;
+  setPlayerVisible: (visible: boolean) => void;
   clearPlaybackError: () => void;
   handleAudioError: (error: AudioError) => Promise<void>;
 
@@ -356,7 +361,7 @@ const SMART_REWIND_PAUSE_TIMESTAMP_KEY = 'smartRewindPauseTimestamp';
 const SMART_REWIND_PAUSE_BOOK_ID_KEY = 'smartRewindPauseBookId';
 const SMART_REWIND_PAUSE_POSITION_KEY = 'smartRewindPausePosition';
 // SHOW_COMPLETION_PROMPT_KEY and AUTO_MARK_FINISHED_KEY moved to completionStore (Phase 6)
-const PROGRESS_SAVE_INTERVAL = 30000; // Save progress every 30 seconds
+const PROGRESS_SAVE_INTERVAL = 5000; // Save progress every 5 seconds (SQLite only, no UI updates)
 const MIN_PAUSE_FOR_REWIND_MS = 3000; // Minimum pause before smart rewind applies
 const PREV_CHAPTER_THRESHOLD = 3;     // Seconds before going to prev vs restart
 const SLEEP_TIMER_SHAKE_THRESHOLD = 60; // Start shake detection when < 60 seconds remaining
@@ -495,6 +500,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         log(`[LOAD ${debugTs}] Same book already loaded and playing, resuming without reload`);
         if (showPlayer) {
           set({ isPlayerVisible: true });
+          playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
         }
         if (autoPlay && !get().isPlaying) {
           await get().play();
@@ -554,6 +560,10 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         // Set position early to avoid jarring jump from stale/0 to resume position
         position: earlyPosition,
       });
+      // Animate transition when showing player
+      if (showPlayer) {
+        playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
+      }
       // Reset seeking state in seekingStore (single source of truth)
       useSeekingStore.getState().resetSeekingState();
       timing('State set');
@@ -757,7 +767,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
             // Build track infos from downloaded files and book metadata
             // Priority for duration/offset: cached session tracks > book.media.audioFiles
-            const bookAudioFiles = isBookMedia(book.media) ? book.media.audioFiles : [];
+            const bookAudioFiles = isBookMedia(book.media) ? book.media.audioFiles || [] : [];
             const sessionTracks = cachedSession?.audioTracks || [];
             let currentOffset = 0;
 
@@ -1049,10 +1059,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         });
 
         // SAFEGUARD: Clamp position to prevent loading at or near end of book
-        // If position is within 5 seconds of duration, set to 30s before end
-        // so user can hear the ending rather than restarting from the beginning
+        // If position is within 5 seconds of duration, rewind proportionally:
+        // - Long books (>60s): rewind 30s from end
+        // - Short books: rewind 10% of duration (so a 30s book goes to 27s, not 0)
         if (totalDuration > 0 && resumePosition >= totalDuration - 5) {
-          const clampedPosition = Math.max(0, totalDuration - 30);
+          const rewindAmount = Math.min(30, totalDuration * 0.1);
+          const clampedPosition = Math.max(0, totalDuration - rewindAmount);
           log(`[POSITION_CLAMP] Position ${resumePosition.toFixed(1)}s is near end (${totalDuration.toFixed(1)}s), clamping to ${clampedPosition.toFixed(1)}s`);
           resumePosition = clampedPosition;
         }
@@ -1142,12 +1154,16 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         // Set current book ID for error reporting
         audioService.setCurrentBookId(book.id);
 
-        // Set up remote command callback for chapter navigation
+        // Set up remote command callback for media control delegation
         audioService.setRemoteCommandCallback((command) => {
           if (command === 'nextChapter') {
             get().nextChapter();
           } else if (command === 'prevChapter') {
             get().prevChapter();
+          } else if (command === 'skipForward') {
+            get().skipForward();
+          } else if (command === 'skipBackward') {
+            get().skipBackward();
           }
         });
 
@@ -1298,7 +1314,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
           set({
             isLoading: false,
             isBuffering: false,
-            isSeeking: false,
             // Preserve chapters on error to prevent disappearance
             chapters: preservedChapters,
             viewingChapters: preservedChapters,
@@ -1326,7 +1341,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     },
 
     cleanup: async () => {
-      const { currentBook, position, duration, sleepTimerInterval } = get();
+      const { currentBook, position, duration } = get();
 
       // Reset guards
       lastFinishedBookId = null;
@@ -1360,6 +1375,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Force sync all pending progress
       await backgroundSyncService.forceSyncAll();
 
+      // Stop background sync loop to prevent it from running after cleanup
+      backgroundSyncService.stop();
+
       // Close session
       await sessionService.closeSession(position);
 
@@ -1368,6 +1386,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       // Clear bookmarks via bookmarks store (Phase 3)
       useBookmarksStore.getState().clearBookmarks();
+
+      // Reset transition to collapsed
+      playerTransitionProgress.value = 0;
 
       set({
         currentBook: null,
@@ -1378,14 +1399,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         position: 0,
         duration: 0,
         isPlayerVisible: false,
-        sleepTimer: null,
-        sleepTimerInterval: null,
-        bookmarks: [], // Keep for backward compatibility (will be synced from bookmarksStore)
-        // Reset seeking state
-        isSeeking: false,
-        seekPosition: 0,
-        seekStartPosition: 0,
-        seekDirection: null,
       });
     },
 
@@ -1409,7 +1422,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       const chapters = chapterResult.chapters;
       log(`preloadBookState chapters: ${chapters.length} from ${chapterResult.source}`);
 
-      const bookDuration = isBookMedia(book.media) ? book.media.duration || 0 : 0;
+      const bookDuration = getBookDuration(book);
 
       // Get progress from cache (instant) or SQLite
       const progressData = await progressService.getProgressData(book.id);
@@ -1444,17 +1457,42 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       const viewingChapters = chapterResult.chapters;
       log(`viewBook chapters: ${viewingChapters.length} from ${chapterResult.source}`);
 
+      // Get duration and progress for display
+      const bookDuration = getBookDuration(book);
+      const progressData = await progressService.getProgressData(book.id);
+      const viewDuration = progressData?.duration || bookDuration;
+      const viewPosition = progressData?.currentTime || 0;
+
+      // Always set duration/position for the viewed book so the player UI is correct.
+      // If audio is actively playing, the status callback will overwrite these values
+      // for the playing book. But when no audio is loaded (just browsing), these ensure
+      // the time display shows the viewed book's data instead of 00:00:00.
+      const isAudioLoaded = audioService.getIsLoaded();
+
       // Set viewing book and open player
       set({
         viewingBook: book,
         viewingChapters,
         isPlayerVisible: true,
+        // Set duration/position when audio isn't actively loaded
+        ...(!isAudioLoaded && {
+          duration: viewDuration,
+          position: viewPosition,
+          chapters: viewingChapters,
+        }),
       });
+      // Animate transition to expanded
+      playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
 
       // If no book is currently playing, also set as current book (without loading audio)
       const { currentBook } = get();
       if (!currentBook) {
-        set({ currentBook: book, chapters: viewingChapters });
+        set({
+          currentBook: book,
+          chapters: viewingChapters,
+          duration: viewDuration,
+          position: viewPosition,
+        });
       }
     },
 
@@ -1696,7 +1734,18 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // End listening session tracking (fire and forget)
       endListeningSession(storePosition).catch(() => {});
 
-      // Sync progress on pause (fire and forget)
+      // Save progress locally (fire-and-forget — don't block pause return).
+      // Previously awaited, but this blocked the Android Auto command queue
+      // for 50-200ms (SQLite write + dynamic import), causing delayed responses
+      // and play-pause stuttering. Local save is still durable — it just completes
+      // asynchronously now.
+      backgroundSyncService.saveProgressLocal(
+        currentBook.id,
+        storePosition,
+        duration
+      ).catch(() => {});
+
+      // Queue server sync (fire and forget — local save is already durable)
       const session = sessionService.getCurrentSession();
       backgroundSyncService.saveProgress(
         currentBook.id,
@@ -1781,7 +1830,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
     // Fix 4: Simplified - seekTo now handles its own isSeeking protection
     skipForward: async (seconds = 30) => {
-      const { position, duration, isPlaying } = get();
+      const { position, duration } = get();
       // Guard: don't skip if duration is not yet known
       if (!duration || duration <= 0) {
         audioLog.warn('[skipForward] Duration not available yet');
@@ -1792,14 +1841,13 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // seekTo handles seeking flag internally now
       await get().seekTo(newPosition);
 
-      // Ensure playback continues if it was playing
-      if (isPlaying && !audioService.getIsPlaying()) {
-        await audioService.play();
-      }
+      // The native player resumes automatically after seek if it was already playing.
+      // Do NOT call audioService.play() here — it races with the native seek completion
+      // and causes the glitch where audio plays briefly from the old position, then stops.
     },
 
     skipBackward: async (seconds = 30) => {
-      const { position, duration, isPlaying } = get();
+      const { position, duration } = get();
       // Guard: don't skip if duration is not yet known
       if (!duration || duration <= 0) {
         audioLog.warn('[skipBackward] Duration not available yet');
@@ -1809,11 +1857,6 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       // seekTo handles seeking flag internally now
       await get().seekTo(newPosition);
-
-      // Ensure playback continues if it was playing
-      if (isPlaying && !audioService.getIsPlaying()) {
-        await audioService.play();
-      }
     },
 
     // =========================================================================
@@ -2014,11 +2057,20 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     // =========================================================================
 
     togglePlayer: () => {
-      set((state) => ({ isPlayerVisible: !state.isPlayerVisible }));
+      const wasVisible = get().isPlayerVisible;
+      set({ isPlayerVisible: !wasVisible });
+      // Animate transition progress to match
+      playerTransitionProgress.value = withSpring(wasVisible ? 0 : 1, SPRING_CONFIG);
     },
 
     closePlayer: () => {
+      // Animate transition to collapsed, then update store
+      playerTransitionProgress.value = withTiming(0, { duration: 250 });
       set({ isPlayerVisible: false });
+    },
+
+    setPlayerVisible: (visible: boolean) => {
+      set({ isPlayerVisible: visible });
     },
 
     clearPlaybackError: () => {
@@ -2055,11 +2107,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             // Clear any cached session to force a fresh one
             playbackCache.clearSession(currentBook.id);
 
-            // Reload the book at the same position
-            await get().loadBook(currentBook, { startPosition: resumePosition, autoPlay: false });
-
-            // Resume playing automatically since user was already listening
-            await get().play();
+            // Reload the book at the same position with autoPlay
+            // (Don't use autoPlay:false + play() — that can trigger double loadBook)
+            await get().loadBook(currentBook, { startPosition: resumePosition, autoPlay: true });
 
             set({ playbackError: null });
             playerLogger.info('[URL_EXPIRED] Session refresh successful');

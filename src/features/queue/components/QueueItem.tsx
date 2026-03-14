@@ -9,6 +9,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { useCoverUrl } from '@/core/cache';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem } from '@/core/types';
 import { scale, useTheme } from '@/shared/theme';
 
@@ -70,7 +71,10 @@ export function QueueItem({ book, position, onRemove, onDragStart }: QueueItemPr
       </View>
 
       {/* Cover */}
-      <Image source={coverUrl} style={[styles.cover, { backgroundColor: colors.background.secondary }]} contentFit="cover" />
+      <View style={{ width: scale(50), height: scale(50), borderRadius: scale(6), overflow: 'hidden' }}>
+        <Image source={coverUrl} style={[styles.cover, { backgroundColor: colors.background.secondary }]} contentFit="cover" />
+        <CoverStars bookId={book.id} starSize={scale(14)} />
+      </View>
 
       {/* Info */}
       <View style={styles.info}>

@@ -231,6 +231,16 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
 
       log.debug(`seekTo: ${clampedPos.toFixed(1)}`);
 
+      // CRITICAL: Set isSeeking BEFORE the seek so the 100ms polling in playerStore
+      // doesn't overwrite position/isPlaying with stale native values during the seek window.
+      // Without this, skipForward/skipBackward/jumpToChapter cause a glitch where the
+      // native player briefly reports the OLD position and isPlaying=false, which gets
+      // pushed to the UI causing a play-stop-play stutter.
+      set({
+        isSeeking: true,
+        seekPosition: clampedPos,
+      });
+
       // AWAIT seek to prevent race condition where playback continues
       // while seeking is still in progress (caused skip back bug)
       await audioService.seekTo(clampedPos).catch((err) => {
@@ -246,8 +256,11 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
         ).catch(() => {});
       }
 
-      // Record seek time for debouncing progress saves in playerStore
-      set({ lastSeekTime: Date.now() });
+      // Clear isSeeking and record seek time
+      set({
+        isSeeking: false,
+        lastSeekTime: Date.now(),
+      });
 
       // Return the clamped position for callers that need it
       return clampedPos;

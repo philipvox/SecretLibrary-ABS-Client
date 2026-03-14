@@ -63,7 +63,10 @@ class ProgressService {
 
   /**
    * Get full progress data for a book
-   * Checks memory cache first (instant), then falls back to SQLite
+   * Memory cache first (instant), falls back to SQLite.
+   * After a crash, finishedBooksSync populates memory cache from the newer of
+   * local SQLite vs server, so the memory cache is reliable on startup.
+   * During playback, saveProgressLocal keeps memory cache current.
    */
   async getProgressData(itemId: string): Promise<LocalProgress | null> {
     log('getProgressData for:', itemId);
@@ -83,6 +86,28 @@ class ProgressService {
       log('    Position:', formatDuration(result.currentTime));
       log('    Duration:', formatDuration(result.duration));
       log('    Progress:', (result.progress * 100).toFixed(1) + '%');
+
+      // Cross-check: if SQLite has a newer position (crash recovery), prefer it
+      try {
+        const sqliteProgress = await sqliteCache.getPlaybackProgress(itemId);
+        if (sqliteProgress && sqliteProgress.updatedAt && (result.updatedAt || 0) > 0) {
+          const sqliteTime = typeof sqliteProgress.updatedAt === 'number' ? sqliteProgress.updatedAt : new Date(sqliteProgress.updatedAt).getTime();
+          if (sqliteTime > (result.updatedAt || 0) && Math.abs(sqliteProgress.position - result.currentTime) > 10) {
+            log(`  SQLite has newer position: ${formatDuration(sqliteProgress.position)} vs cache ${formatDuration(result.currentTime)}`);
+            return {
+              itemId: sqliteProgress.itemId,
+              currentTime: sqliteProgress.position,
+              duration: sqliteProgress.duration,
+              progress: sqliteProgress.duration > 0 ? sqliteProgress.position / sqliteProgress.duration : 0,
+              isFinished: sqliteProgress.duration > 0 && sqliteProgress.position >= sqliteProgress.duration * 0.95,
+              updatedAt: sqliteTime,
+            };
+          }
+        }
+      } catch (e: any) {
+        // Non-critical — memory cache result is still valid
+      }
+
       return result;
     }
 
@@ -95,7 +120,7 @@ class ProgressService {
           currentTime: progress.position,
           duration: progress.duration,
           progress: progress.duration > 0 ? progress.position / progress.duration : 0,
-          isFinished: progress.position >= progress.duration * 0.95,
+          isFinished: progress.duration > 0 && progress.position >= progress.duration * 0.95,
           updatedAt: progress.updatedAt,
         };
         log('  Found in SQLite:');

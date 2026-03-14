@@ -276,6 +276,13 @@ export async function prefetchMainTabData(): Promise<void> {
         staleTime: 5 * 60 * 1000, // 5 minutes
       }),
 
+      // Collections (for Browse Collections tab)
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.collections.all,
+        queryFn: () => apiClient.getCollections(),
+        staleTime: 10 * 60 * 1000, // 10 minutes
+      }),
+
       // Library cache load (loads all items, series, authors)
       // Uses SQLite cache if valid (<30 days), only fetches from server if expired
       useLibraryCache.getState().loadCache(defaultLibraryId),
