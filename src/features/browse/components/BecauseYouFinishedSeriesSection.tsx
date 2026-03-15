@@ -18,7 +18,7 @@ import { SectionHeader } from './SectionHeader';
 import { useRecentlyCompletedSeries } from '../hooks/useRecentlyCompletedSeries';
 
 // Layout constants for 2-row horizontal scroll
-const PADDING = 16;
+const PADDING = 24;
 const GAP = 10;
 const CARD_WIDTH = Math.floor(wp(100) * 0.32);
 const COVER_HEIGHT = CARD_WIDTH;

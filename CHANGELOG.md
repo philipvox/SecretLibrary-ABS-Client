@@ -9,6 +9,52 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.210] - 2026-03-14
+
+### Fixed — CodeRabbit Review Issues
+
+**Critical Fixes:**
+- audioService: Reattach `playbackStatusSubscription` in `loadAudio()`/`loadTracks()` after `unloadAudio()` removes it — without this, `didJustFinish` never fires and auto-advance breaks
+- LibraryScreen: Move `activePlaylistId` declaration above `handleBookPress` callback — fixes temporal dead zone crash
+- ForYouTabContent: Pass missing `items` prop to `MostCollectedAuthorSection` — section was rendering empty
+- SeriesSwipeContainer: Add `null` initial value to `useRef<any>()` — fixes React 19 strict TS compile error
+
+**Major Fixes:**
+- audioService: Remote SEEK now delegates through `playerStore.seekTo()` via callback pattern — prevents seeking state management bypass from lock screen/notification controls
+- backgroundSyncService: Move `isInitialized = true` after `sqliteCache.init()` succeeds; add `initPromise` guard against concurrent init — prevents permanently broken state on init failure
+- progressService: Remove 10-second position diff threshold from SQLite cross-check — was too strict and could miss valid crash recovery data
+- LibraryScreen: Platform-guard `Alert.prompt()` (iOS-only); add Modal+TextInput fallback for Android playlist name input
+- spine constants: Fix `WIDTH_CALCULATION.MEDIAN` from 150 (same as MAX) to 104 (midpoint) — books with unknown duration were getting max width
+- AllBooksScreen: Replace `scrollToIndex` with `scrollToOffset` — `getItemLayout` was removed making index-based scrolling unreliable
+- ProfileScreen: Guard `CLEANING_LEVEL_INFO[chapterLevel]` with fallback to 'standard' — prevents crash on invalid persisted value
+- ToastContainer: Change fixed `height` to `minHeight` for accessibility font scaling; add `flexShrink: 1` to prevent message overflow
+- BrowseGridItem: Use `colors.text` instead of `colors.black` for dark mode contrast
+- RecentlyAddedSection: Accept books with `audioFiles` or `duration` (was requiring `duration` only)
+- parseBookDNA: Validate tag values against union type arrays before casting — silently drops unrecognized values instead of accepting invalid strings
+- FilteredBooksScreen: Move `require()` to static `import` at top of file
+- FeaturedCollectionCard: Fix "1 books" → "1 book" pluralization
+
+### Files Modified
+- `src/features/player/services/audioService.ts`
+- `src/features/player/stores/playerStore.ts`
+- `src/features/player/services/backgroundSyncService.ts`
+- `src/features/player/services/progressService.ts`
+- `src/features/home/screens/LibraryScreen.tsx`
+- `src/features/home/utils/spine/constants.ts`
+- `src/features/browse/components/ForYouTabContent.tsx`
+- `src/features/browse/components/BrowseGridItem.tsx`
+- `src/features/browse/components/FeaturedCollectionCard.tsx`
+- `src/features/browse/components/RecentlyAddedSection.tsx`
+- `src/features/book-detail/components/SeriesSwipeContainer.tsx`
+- `src/features/library/screens/AllBooksScreen.tsx`
+- `src/features/library/screens/FilteredBooksScreen.tsx`
+- `src/features/profile/screens/ProfileScreen.tsx`
+- `src/shared/components/ToastContainer.tsx`
+- `src/shared/utils/bookDNA/parseBookDNA.ts`
+- `src/constants/version.ts`
+
+---
+
 ## [0.9.209] - 2026-03-14
 
 ### Fixed — Playback Stability (Audit Round 2)

@@ -79,7 +79,7 @@ export const AwardWinnersSection = React.memo(function AwardWinnersSection({ onC
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>
       <SectionHeader
-        label="Award Winners"
+        label="Collections"
         count={awardCollections.length}
         onViewAll={onViewAll}
       />

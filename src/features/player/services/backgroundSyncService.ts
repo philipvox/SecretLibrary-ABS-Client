@@ -57,6 +57,7 @@ class BackgroundSyncService {
   private readonly BACKGROUND_SYNC_TIMEOUT = 4000; // 4 seconds - iOS gives ~5s before suspension
 
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   /**
    * Initialize background sync service
@@ -64,17 +65,29 @@ class BackgroundSyncService {
   async init(): Promise<void> {
     // Guard: prevent AppState listener stacking on repeated init calls
     if (this.isInitialized) return;
-    this.isInitialized = true;
 
-    await sqliteCache.init();
+    // Guard: if already initializing, wait for the in-flight init to complete
+    if (this.initPromise) return this.initPromise;
 
-    // Listen for app state changes
-    this.appStateSubscription = AppState.addEventListener(
-      'change',
-      this.handleAppStateChange.bind(this)
-    );
+    this.initPromise = (async () => {
+      await sqliteCache.init();
 
-    log('Initialized');
+      this.isInitialized = true;
+
+      // Listen for app state changes
+      this.appStateSubscription = AppState.addEventListener(
+        'change',
+        this.handleAppStateChange.bind(this)
+      );
+
+      log('Initialized');
+    })();
+
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
   }
 
   /**

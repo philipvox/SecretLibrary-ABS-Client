@@ -35,7 +35,7 @@ import {
   X,
   Image as ImageIcon,
   Heart,
-  Library,
+  ChevronRight,
 } from 'lucide-react-native';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { useDownloads } from '@/core/hooks/useDownloads';
@@ -53,7 +53,6 @@ import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { SettingsHeader } from '../components/SettingsHeader';
 import { SettingsRow } from '../components/SettingsRow';
 import { SectionHeader } from '../components/SectionHeader';
-import { AccordionSection } from '../components/AccordionSection';
 import { logger } from '@/shared/utils/logger';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
 
@@ -197,10 +196,6 @@ export function DataStorageSettingsScreen() {
 
   // Network settings
   const [wifiOnlyEnabled, setWifiOnlyEnabled] = useState(networkMonitor.isWifiOnlyEnabled());
-  const [autoDownloadSeriesEnabled, setAutoDownloadSeriesEnabled] = useState(
-    networkMonitor.isAutoDownloadSeriesEnabled()
-  );
-
   // Cloud sync
   const libraryPlaylistId = useLibrarySyncStore(s => s.libraryPlaylistId);
   const seriesPlaylistId = useLibrarySyncStore(s => s.seriesPlaylistId);
@@ -286,11 +281,6 @@ export function DataStorageSettingsScreen() {
       setIsRefreshingSpines(false);
     }
   }, [isRefreshingSpines, refreshCache]);
-
-  const handleAutoDownloadSeriesToggle = useCallback(async (enabled: boolean) => {
-    setAutoDownloadSeriesEnabled(enabled);
-    await networkMonitor.setAutoDownloadSeriesEnabled(enabled);
-  }, []);
 
   const handleOpenPlaylistPicker = useCallback(() => {
     loadPlaylists();
@@ -558,14 +548,6 @@ export function DataStorageSettingsScreen() {
     return new Date(lastSyncAt).toLocaleDateString();
   };
 
-  // Accordion single-open state
-  const [expandedSection, setExpandedSection] = useState<string>('downloads');
-  const toggleSection = (section: string) => {
-    setExpandedSection(prev => prev === section ? '' : section);
-  };
-
-  // Accordion status text
-  const cloudSyncStatus = isCloudSyncEnabled ? 'Synced' : 'Off';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
@@ -577,8 +559,12 @@ export function DataStorageSettingsScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Storage Overview */}
-        <View style={[styles.storageOverview, { backgroundColor: colors.white }]}>
+        {/* Storage Overview — tap to manage downloads */}
+        <TouchableOpacity
+          style={[styles.storageOverview, { backgroundColor: colors.white }]}
+          onPress={handleManageDownloads}
+          activeOpacity={0.7}
+        >
           <View style={[styles.storageIcon, { backgroundColor: colors.grayLight }]}>
             <Folder size={scale(24)} color={colors.black} strokeWidth={1.5} />
           </View>
@@ -588,154 +574,127 @@ export function DataStorageSettingsScreen() {
               {downloadCount} book{downloadCount !== 1 ? 's' : ''} downloaded
             </Text>
           </View>
-        </View>
+          <View style={styles.storageChevron}>
+            <ChevronRight size={scale(18)} color={colors.gray} strokeWidth={1.5} />
+          </View>
+        </TouchableOpacity>
 
-        {/* Downloads Accordion */}
-        <AccordionSection
-          title="Downloads"
-          status={`${downloadCount}`}
-          isExpanded={expandedSection === 'downloads'}
-          onToggle={() => toggleSection('downloads')}
-        >
-          <SettingsRow
-            Icon={Download}
-            label="View Downloaded Books"
-            value={`${downloadCount}`}
-            onPress={handleManageDownloads}
-            description="See and manage your offline books"
-          />
-          <SettingsRow
-            Icon={Wifi}
-            label="Download Only on WiFi"
-            switchValue={wifiOnlyEnabled}
-            onSwitchChange={handleWifiOnlyToggle}
-            description="Restricts downloads to Wi-Fi networks"
-          />
-          <SettingsRow
-            Icon={Library}
-            label="Auto-Download Series"
-            switchValue={autoDownloadSeriesEnabled}
-            onSwitchChange={handleAutoDownloadSeriesToggle}
-            description="Downloads next book in series at 80%"
-          />
-        </AccordionSection>
-
-        {/* Cloud Sync Accordion */}
-        <AccordionSection
-          title="Cloud Sync"
-          status={cloudSyncStatus}
-          isExpanded={expandedSection === 'cloudSync'}
-          onToggle={() => toggleSection('cloudSync')}
-        >
-          {isCloudSyncEnabled ? (
-            <>
-              <SettingsRow
-                Icon={List}
-                label="Synced My Library"
-                value={linkedPlaylistName || 'Unknown'}
-                onPress={handleOpenPlaylistPicker}
-                description="Tap to change which playlist syncs"
-              />
-              <SettingsRow
-                Icon={Heart}
-                label="Synced My Series"
-                value={linkedSeriesPlaylistName || 'Not set'}
-                onPress={handleOpenSeriesPlaylistPicker}
-                description="Tap to change which playlist syncs series"
-              />
-              <SettingsRow
-                Icon={Cloud}
-                label="Sync Status"
-                value={formatLastSync()}
-                description={`${libraryCount} books in library`}
-              />
-              <SettingsRow
-                Icon={RefreshCw}
-                label="Sync Now"
-                onPress={handleSyncNow}
-                loading={isSyncing}
-                description="Upload and download library changes"
-              />
-              <SettingsRow
-                Icon={CloudOff}
-                label="Turn Off Cloud Sync"
-                onPress={handleDisableCloudSync}
-                description="Stop syncing to other devices"
-                danger
-              />
-            </>
-          ) : (
+        {/* Downloads */}
+        <SectionHeader title="Downloads" />
+        <SettingsRow
+          Icon={Download}
+          label="View Downloaded Books"
+          value={`${downloadCount}`}
+          onPress={handleManageDownloads}
+          description="See and manage your offline books"
+        />
+        <SettingsRow
+          Icon={Wifi}
+          label="Download Only on WiFi"
+          switchValue={wifiOnlyEnabled}
+          onSwitchChange={handleWifiOnlyToggle}
+          description="Restricts downloads to Wi-Fi networks"
+        />
+        {/* Cloud Sync */}
+        <SectionHeader title="Cloud Sync" />
+        {isCloudSyncEnabled ? (
+          <>
+            <SettingsRow
+              Icon={List}
+              label="Synced My Library"
+              value={linkedPlaylistName || 'Unknown'}
+              onPress={handleOpenPlaylistPicker}
+              description="Tap to change which playlist syncs"
+            />
+            <SettingsRow
+              Icon={Heart}
+              label="Synced My Series"
+              value={linkedSeriesPlaylistName || 'Not set'}
+              onPress={handleOpenSeriesPlaylistPicker}
+              description="Tap to change which playlist syncs series"
+            />
             <SettingsRow
               Icon={Cloud}
-              label="Turn On Cloud Sync"
-              onPress={handleOpenPlaylistPicker}
-              loading={isEnablingSync}
-              description={`Sync your ${libraryCount} books across devices`}
+              label="Sync Status"
+              value={formatLastSync()}
+              description={`${libraryCount} books in library`}
             />
-          )}
-        </AccordionSection>
-
-        {/* Troubleshooting Accordion */}
-        <AccordionSection
-          title="Troubleshooting"
-          isExpanded={expandedSection === 'troubleshooting'}
-          onToggle={() => toggleSection('troubleshooting')}
-        >
-          <SettingsRow
-            Icon={RefreshCw}
-            label="Reload Library from Server"
-            onPress={handleReloadLibrary}
-            loading={isRefreshingCache}
-            description="Re-download your book list and covers"
-          />
-          <SettingsRow
-            Icon={ImageIcon}
-            label="Refresh Spines"
-            onPress={isRefreshingSpines ? undefined : handleRefreshSpines}
-            loading={isRefreshingSpines}
-            description="Reload spine images from server"
-          />
-          {isCloudSyncEnabled && (
             <SettingsRow
               Icon={RefreshCw}
-              label="Reset from Server"
-              onPress={handleResetFromServer}
-              description="Replace local library with server version"
-              danger
+              label="Sync Now"
+              onPress={handleSyncNow}
               loading={isSyncing}
+              description="Upload and download library changes"
             />
-          )}
-        </AccordionSection>
+            <SettingsRow
+              Icon={CloudOff}
+              label="Turn Off Cloud Sync"
+              onPress={handleDisableCloudSync}
+              description="Stop syncing to other devices"
+              danger
+            />
+          </>
+        ) : (
+          <SettingsRow
+            Icon={Cloud}
+            label="Turn On Cloud Sync"
+            onPress={handleOpenPlaylistPicker}
+            loading={isEnablingSync}
+            description={`Sync your ${libraryCount} books across devices`}
+          />
+        )}
 
-        {/* Clear Data Accordion */}
-        <AccordionSection
-          title="Clear Data"
-          isExpanded={expandedSection === 'clearData'}
-          onToggle={() => toggleSection('clearData')}
-        >
+        {/* Troubleshooting */}
+        <SectionHeader title="Troubleshooting" />
+        <SettingsRow
+          Icon={RefreshCw}
+          label="Reload Library from Server"
+          onPress={handleReloadLibrary}
+          loading={isRefreshingCache}
+          description="Re-download your book list and covers"
+        />
+        <SettingsRow
+          Icon={ImageIcon}
+          label="Refresh Spines"
+          onPress={isRefreshingSpines ? undefined : handleRefreshSpines}
+          loading={isRefreshingSpines}
+          description="Reload spine images from server"
+        />
+        {isCloudSyncEnabled && (
           <SettingsRow
-            Icon={Trash2}
-            label="Clear Temporary Files"
-            onPress={handleClearTempFiles}
-            loading={isClearingCache}
-            description="Frees space without deleting books"
-          />
-          <SettingsRow
-            Icon={Trash2}
-            label="Remove All Downloads"
-            onPress={handleRemoveAllDownloads}
-            loading={isClearingDownloads}
-            description={downloadCount > 0 ? `Delete ${downloadCount} books (${formatBytes(totalStorage)})` : 'No downloads to remove'}
+            Icon={RefreshCw}
+            label="Reset from Server"
+            onPress={handleResetFromServer}
+            description="Replace local library with server version"
             danger
+            loading={isSyncing}
           />
-          <SettingsRow
-            Icon={Trash2}
-            label="Empty My Library"
-            onPress={handleEmptyLibrary}
-            description={libraryCount > 0 ? `Remove all ${libraryCount} books from list` : 'Library is empty'}
-            danger
-          />
-        </AccordionSection>
+        )}
+
+        {/* Clear Data */}
+        <SectionHeader title="Clear Data" />
+        <SettingsRow
+          Icon={Trash2}
+          label="Clear Temporary Files"
+          onPress={handleClearTempFiles}
+          loading={isClearingCache}
+          description="Frees space without deleting books"
+        />
+        <SettingsRow
+          Icon={Trash2}
+          label="Remove All Downloads"
+          onPress={handleRemoveAllDownloads}
+          loading={isClearingDownloads}
+          description={downloadCount > 0 ? `Delete ${downloadCount} books (${formatBytes(totalStorage)})` : 'No downloads to remove'}
+          danger
+        />
+        <SettingsRow
+          Icon={Trash2}
+          label="Empty My Library"
+          onPress={handleEmptyLibrary}
+          description={libraryCount > 0 ? `Remove all ${libraryCount} books from list` : 'Library is empty'}
+          danger
+        />
 
         {/* Info Note */}
         <View style={styles.infoSection}>
@@ -809,6 +768,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(10),
     marginTop: 2,
+  },
+  storageChevron: {
+    marginLeft: 'auto',
   },
   // Info Section
   infoSection: {

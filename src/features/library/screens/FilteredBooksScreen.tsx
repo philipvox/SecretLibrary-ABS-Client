@@ -31,6 +31,7 @@ import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLi
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { DURATION_RANGES } from '@/features/browse/hooks/useBrowseCounts';
 import { ShelfRow, BookSpineVerticalData } from '@/shared/spine';
+import { filterByFeeling } from '@/shared/utils/bookDNA/feelingScoring';
 
 // Type guard for book media
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
@@ -233,7 +234,6 @@ export function FilteredBooksScreen() {
 
       case 'feeling': {
         // Filter by feeling chip scoring
-        const { filterByFeeling } = require('@/shared/utils/bookDNA/feelingScoring');
         const feelingKey = route.params?.feeling;
         if (feelingKey) {
           result = filterByFeeling(libraryItems, feelingKey);

@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   rowContent: {
     flex: 1,
     marginLeft: 12,
-    marginRight: 12,
+    marginRight: 8,
   },
   rowLabel: {
     fontFamily: fonts.playfair.regular,
@@ -182,13 +182,16 @@ const styles = StyleSheet.create({
   },
   rowDescription: {
     fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    marginTop: 2,
+    fontSize: scale(10.5),
+    lineHeight: scale(15),
+    marginTop: 4,
   },
   rowRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
+    maxWidth: '35%',
   },
   rowValue: {
     fontFamily: fonts.jetbrainsMono.regular,

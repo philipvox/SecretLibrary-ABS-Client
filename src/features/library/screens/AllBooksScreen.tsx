@@ -247,12 +247,18 @@ export function AllBooksScreen() {
     setIsRefreshing(false);
   }, [refreshCache]);
 
+  // Estimated row height: cover height (scale(56)) + vertical padding (24) + border (1)
+  const ESTIMATED_ITEM_HEIGHT = scale(56) + 25;
+
   const handleLetterSelect = useCallback((letter: string) => {
     const index = letterIndexMap.get(letter);
     if (index !== undefined) {
-      flatListRef.current?.scrollToIndex({ index, animated: true });
+      flatListRef.current?.scrollToOffset({
+        offset: index * ESTIMATED_ITEM_HEIGHT,
+        animated: true,
+      });
     }
-  }, [letterIndexMap]);
+  }, [letterIndexMap, ESTIMATED_ITEM_HEIGHT]);
 
   const renderItem = useCallback(({ item }: { item: LibraryItem }) => (
     <ListBookItem
@@ -383,7 +389,6 @@ export function AllBooksScreen() {
             initialNumToRender={12}
             maxToRenderPerBatch={8}
             windowSize={7}
-            getItemLayout={undefined}
           />
         </SkullRefreshControl>
 

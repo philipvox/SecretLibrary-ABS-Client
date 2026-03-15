@@ -152,13 +152,14 @@ export function ProfileScreen() {
 
   // Display Settings subtitle
   const useServerSpines = useSpineCacheStore((s) => s.useServerSpines);
-  const displaySubtitle = `${useServerSpines ? 'Server spines' : 'Generated'} · ${CLEANING_LEVEL_INFO[chapterLevel].label}`;
+  const cleaningLevelInfo = CLEANING_LEVEL_INFO[chapterLevel] ?? CLEANING_LEVEL_INFO['standard'];
+  const displaySubtitle = `${useServerSpines ? 'Server spines' : 'Generated'} · ${cleaningLevelInfo.label}`;
 
   // Data & Storage subtitle
   const libraryPlaylistId = useLibrarySyncStore((s) => s.libraryPlaylistId);
   const dataStorageSubtitle = `${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}${libraryPlaylistId ? ' · Synced' : ''}`;
 
-  const playbackSubtitle = `${globalDefaultRate}x · ${skipForwardInterval}s/${skipBackInterval}s`;
+  const playbackSubtitle = `${globalDefaultRate ?? 1}x · ${skipForwardInterval}s/${skipBackInterval}s`;
   const hapticsSubtitle = hapticsEnabled ? `On · ${enabledHapticCount} of 8` : 'Off';
 
   const handleLogout = useCallback(() => {
@@ -214,10 +215,11 @@ export function ProfileScreen() {
       <View style={[styles.safeAreaTop, { height: insets.top, backgroundColor: colors.white }]} />
 
       {/* Top Navigation with User Info */}
-      <View style={[styles.topNav, { backgroundColor: colors.grayLight }]}>
+      <View style={[styles.topNav, { backgroundColor: colors.white }]}>
         {/* Skull logo - tap to go home */}
-        <Pressable onPress={handleLogoPress}>
-          <SkullLogo size={48} color={colors.black} />
+        <Pressable onPress={handleLogoPress} style={styles.topNavLeft}>
+          <SkullLogo size={36} color={colors.black} />
+          <Text style={[styles.topNavTitle, { color: colors.black }]}>Settings</Text>
         </Pressable>
         <View style={styles.topNavRight}>
           <View style={styles.topNavUser}>
@@ -227,12 +229,13 @@ export function ProfileScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.signOutIconButton, { backgroundColor: colors.white }]}
+            style={[styles.signOutPill, { borderColor: colors.borderLight }]}
             onPress={handleLogout}
             disabled={isLoading}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <LogOut size={scale(18)} color={colors.gray} strokeWidth={1.5} />
+            <LogOut size={scale(14)} color={colors.gray} strokeWidth={1.5} />
+            <Text style={[styles.signOutText, { color: colors.gray }]}>Log out</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -245,8 +248,6 @@ export function ProfileScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Page Title */}
-        <Text style={[styles.pageTitle, { color: colors.black }]}>Settings</Text>
 
         {/* All Settings */}
         <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
@@ -282,16 +283,17 @@ export function ProfileScreen() {
           />
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <SkullLogo size={64} color={colors.black} />
-          <Text style={[styles.appName, { color: colors.gray }]}>Secret Library</Text>
-          <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
-            <Text style={[styles.versionText, { color: colors.gray }]}>v{APP_VERSION} ({BUILD_NUMBER})</Text>
-          </TouchableOpacity>
-          <Text style={[styles.buildDate, { color: colors.gray }]}>{VERSION_DATE}</Text>
-        </View>
       </ScrollView>
+
+      {/* Footer — pinned to bottom */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={{ opacity: 0.3 }}>
+          <SkullLogo size={40} color={colors.gray} />
+        </View>
+        <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
+          <Text style={[styles.versionText, { color: colors.gray }]}>Secret Library · v{APP_VERSION}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -314,10 +316,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  topNavLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  topNavTitle: {
+    fontFamily: fonts.playfair.regular,
+    fontSize: scale(22),
+  },
   topNavRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   topNavUser: {
     alignItems: 'flex-end',
@@ -331,23 +342,24 @@ const styles = StyleSheet.create({
     fontSize: scale(9),
     marginTop: 1,
   },
-  signOutIconButton: {
-    width: scale(36),
-    height: scale(36),
-    justifyContent: 'center',
+  signOutPill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  signOutText: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-  },
-  pageTitle: {
-    fontFamily: fonts.playfair.regular,
-    fontSize: scale(42),
-    marginBottom: 24,
-    marginTop: 8,
   },
   sectionContent: {
     marginBottom: 28,
@@ -378,7 +390,9 @@ const styles = StyleSheet.create({
   },
   linkSubtitle: {
     fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(9),
+    fontSize: scale(10.5),
+    lineHeight: scale(15),
+    marginTop: 2,
   },
   badge: {
     paddingHorizontal: 8,
@@ -395,21 +409,11 @@ const styles = StyleSheet.create({
   // Footer
   footer: {
     alignItems: 'center',
-    paddingVertical: 32,
-  },
-  appName: {
-    fontFamily: fonts.playfair.regular,
-    fontSize: scale(16),
-    marginTop: 12,
-    marginBottom: 4,
+    paddingTop: 12,
+    gap: 6,
   },
   versionText: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-  },
-  buildDate: {
-    fontFamily: fonts.jetbrainsMono.regular,
-    fontSize: scale(8),
-    marginTop: 2,
   },
 });

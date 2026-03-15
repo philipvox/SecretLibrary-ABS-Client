@@ -174,13 +174,15 @@ interface FilterSectionProps {
   title: string;
   items: FilterOption[];
   selectedKeys: string[];
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   expanded: boolean;
   onToggleExpanded: () => void;
   onToggle: (key: string) => void;
   formatLabel?: (name: string) => string;
 }
 
-function FilterSection({ title, items, selectedKeys, expanded, onToggleExpanded, onToggle, formatLabel }: FilterSectionProps) {
+function FilterSection({ title, items, selectedKeys, collapsed, onToggleCollapsed, expanded, onToggleExpanded, onToggle, formatLabel }: FilterSectionProps) {
   const colors = useSecretLibraryColors();
   const selectedCount = useMemo(
     () => items.filter((i) => selectedKeys.includes(i.key)).length,
@@ -195,10 +197,10 @@ function FilterSection({ title, items, selectedKeys, expanded, onToggleExpanded,
 
   return (
     <View style={styles.section}>
-      {/* Section header — tappable to expand/collapse */}
+      {/* Section header — tappable to collapse/expand entire section */}
       <Pressable
         style={styles.sectionHeaderRow}
-        onPress={needsExpand ? onToggleExpanded : undefined}
+        onPress={onToggleCollapsed}
       >
         <View style={styles.sectionHeaderLeft}>
           <Text style={[styles.sectionHeader, { color: colors.gray }]}>{title}</Text>
@@ -208,56 +210,58 @@ function FilterSection({ title, items, selectedKeys, expanded, onToggleExpanded,
             </View>
           )}
         </View>
-        {needsExpand && (
-          expanded ? (
-            <ChevronUp size={14} color={colors.gray} />
-          ) : (
-            <ChevronDown size={14} color={colors.gray} />
-          )
+        {collapsed ? (
+          <ChevronDown size={14} color={colors.gray} />
+        ) : (
+          <ChevronUp size={14} color={colors.gray} />
         )}
       </Pressable>
 
-      {/* List rows */}
-      {visibleItems.map((item, index) => {
-        const isSelected = selectedKeys.includes(item.key);
-        const isLast = index === visibleItems.length - 1 && (expanded || !needsExpand);
-        return (
-          <Pressable
-            key={item.key}
-            style={[
-              styles.listRow,
-              !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.grayLine },
-              isSelected && { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
-            ]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onToggle(item.key);
-            }}
-          >
-            <View style={styles.listRowLeft}>
-              {isSelected && (
-                <View style={[styles.checkmark, { backgroundColor: colors.black }]}>
-                  <Icon name="Check" size={10} color={colors.white} />
+      {/* List rows — only shown when section is expanded */}
+      {!collapsed && (
+        <>
+          {visibleItems.map((item, index) => {
+            const isSelected = selectedKeys.includes(item.key);
+            const isLast = index === visibleItems.length - 1 && (expanded || !needsExpand);
+            return (
+              <Pressable
+                key={item.key}
+                style={[
+                  styles.listRow,
+                  !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.grayLine },
+                  isSelected && { backgroundColor: 'rgba(0, 0, 0, 0.06)' },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  onToggle(item.key);
+                }}
+              >
+                <View style={styles.listRowLeft}>
+                  {isSelected && (
+                    <View style={[styles.checkmark, { backgroundColor: colors.black }]}>
+                      <Icon name="Check" size={10} color={colors.white} />
+                    </View>
+                  )}
+                  <Text style={[styles.listRowLabel, { color: colors.black }]}>
+                    {formatLabel ? formatLabel(item.name) : item.name.toUpperCase()}
+                  </Text>
                 </View>
-              )}
-              <Text style={[styles.listRowLabel, { color: colors.black }]}>
-                {formatLabel ? formatLabel(item.name) : item.name.toUpperCase()}
-              </Text>
-            </View>
-            <Text style={[styles.listRowCount, { color: colors.black }]}>
-              {item.count}
-            </Text>
-          </Pressable>
-        );
-      })}
+                <Text style={[styles.listRowCount, { color: colors.black }]}>
+                  {item.count}
+                </Text>
+              </Pressable>
+            );
+          })}
 
-      {/* Show All / Show Less toggle */}
-      {needsExpand && (
-        <Pressable style={styles.expandButton} onPress={onToggleExpanded}>
-          <Text style={[styles.expandText, { color: colors.gray }]}>
-            {expanded ? 'SHOW LESS' : `SHOW ALL (${hiddenCount} MORE)`}
-          </Text>
-        </Pressable>
+          {/* Show All / Show Less toggle */}
+          {needsExpand && (
+            <Pressable style={styles.expandButton} onPress={onToggleExpanded}>
+              <Text style={[styles.expandText, { color: colors.gray }]}>
+                {expanded ? 'SHOW LESS' : `SHOW ALL (${hiddenCount} MORE)`}
+              </Text>
+            </Pressable>
+          )}
+        </>
       )}
     </View>
   );
@@ -271,9 +275,21 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
   const colors = useSecretLibraryColors();
   const { genres, tags } = useDynamicFilters();
 
-  // Accordion state — owned here so it survives child re-renders
+  // Accordion state — collapsed controls section visibility, expanded controls show all
+  const [genresCollapsed, setGenresCollapsed] = useState(false);
+  const [tagsCollapsed, setTagsCollapsed] = useState(true);
   const [genresExpanded, setGenresExpanded] = useState(false);
   const [tagsExpanded, setTagsExpanded] = useState(false);
+
+  const handleToggleGenresCollapsed = useCallback(() => {
+    Haptics.selectionAsync();
+    setGenresCollapsed((prev) => !prev);
+  }, []);
+
+  const handleToggleTagsCollapsed = useCallback(() => {
+    Haptics.selectionAsync();
+    setTagsCollapsed((prev) => !prev);
+  }, []);
 
   const handleToggleGenresExpanded = useCallback(() => {
     Haptics.selectionAsync();
@@ -405,6 +421,8 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
               title="GENRES"
               items={genres}
               selectedKeys={selectedGenres}
+              collapsed={genresCollapsed}
+              onToggleCollapsed={handleToggleGenresCollapsed}
               expanded={genresExpanded}
               onToggleExpanded={handleToggleGenresExpanded}
               onToggle={toggleGenre}
@@ -413,6 +431,8 @@ export function TagFilterSheet({ visible, onClose }: TagFilterSheetProps) {
               title="TAGS"
               items={tags}
               selectedKeys={selectedTags}
+              collapsed={tagsCollapsed}
+              onToggleCollapsed={handleToggleTagsCollapsed}
               expanded={tagsExpanded}
               onToggleExpanded={handleToggleTagsExpanded}
               onToggle={toggleTag}

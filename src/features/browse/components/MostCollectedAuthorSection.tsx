@@ -2,7 +2,7 @@
  * src/features/browse/components/MostCollectedAuthorSection.tsx
  *
  * "More [Author]" — finds authors where the user has read/started some books
- * but has unread books remaining. 2-row cover carousel with VIEW ALL.
+ * but has unread books remaining. Single-row cover carousel with VIEW ALL.
  * Session-rotates among qualifying authors.
  */
 
@@ -18,14 +18,13 @@ import { CompleteBadgeOverlay } from '@/features/completion';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { SectionHeader } from './SectionHeader';
 
-// Layout constants for 2-row horizontal scroll
-const PADDING = 16;
+// Layout constants for single-row horizontal scroll
+const PADDING = 24;
 const GAP = 10;
 const CARD_WIDTH = Math.floor(wp(100) * 0.32);
 const COVER_HEIGHT = CARD_WIDTH;
 const TEXT_HEIGHT = scale(20);
 const ROW_HEIGHT = COVER_HEIGHT + scale(6) + TEXT_HEIGHT; // cover + margin + title
-const SCROLL_HEIGHT = ROW_HEIGHT * 2 + GAP; // 2 rows + gap between
 
 // Session-stable seed for rotation
 const SESSION_SEED = Math.floor(Date.now() / 1000);
@@ -188,15 +187,10 @@ export const MostCollectedAuthorSection = React.memo(function MostCollectedAutho
     return candidates[index];
   }, [items, progressMap]);
 
-  // Pair books into columns of 2 for the 2-row layout
-  const columns = useMemo(() => {
+  // Flat list of books for single-row horizontal scroll
+  const displayBooks = useMemo(() => {
     if (!authorData) return [];
-    const books = authorData.unreadBooks.slice(0, 20);
-    const cols: LibraryItem[][] = [];
-    for (let i = 0; i < books.length; i += 2) {
-      cols.push(books.slice(i, Math.min(i + 2, books.length)));
-    }
-    return cols;
+    return authorData.unreadBooks.slice(0, 20);
   }, [authorData]);
 
   const handleBookPress = useCallback(
@@ -209,7 +203,7 @@ export const MostCollectedAuthorSection = React.memo(function MostCollectedAutho
     [onBookLongPress],
   );
 
-  if (!authorData || columns.length === 0) return null;
+  if (!authorData || displayBooks.length === 0) return null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>
@@ -224,20 +218,16 @@ export const MostCollectedAuthorSection = React.memo(function MostCollectedAutho
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.carousel}
-        style={{ height: authorData.unreadBooks.length > 1 ? SCROLL_HEIGHT : ROW_HEIGHT }}
+        style={{ height: ROW_HEIGHT }}
         decelerationRate="fast"
       >
-        {columns.map((col, colIndex) => (
-          <View key={colIndex} style={styles.column}>
-            {col.map((item) => (
-              <CoverCard
-                key={item.id}
-                item={item}
-                onPress={() => handleBookPress(item.id)}
-                onLongPress={() => handleBookLongPress(item.id)}
-              />
-            ))}
-          </View>
+        {displayBooks.map((item) => (
+          <CoverCard
+            key={item.id}
+            item={item}
+            onPress={() => handleBookPress(item.id)}
+            onLongPress={() => handleBookLongPress(item.id)}
+          />
         ))}
       </ScrollView>
     </View>
@@ -252,9 +242,8 @@ const styles = StyleSheet.create({
     paddingLeft: PADDING,
     paddingRight: PADDING / 2,
     gap: GAP,
-  },
-  column: {
-    gap: GAP,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   card: {
     width: CARD_WIDTH,

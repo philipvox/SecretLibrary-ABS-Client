@@ -68,7 +68,7 @@ export function BrowseGrid({ onItemPress }: BrowseGridProps) {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: scale(8),
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   row: {
     flexDirection: 'row',

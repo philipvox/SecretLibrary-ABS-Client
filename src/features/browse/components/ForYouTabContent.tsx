@@ -67,6 +67,7 @@ export function ForYouTabContent({
 
       {/* Most Collected Author — session-rotating author spine row */}
       <MostCollectedAuthorSection
+        items={filteredItems}
         onBookPress={onBookPress}
         onBookLongPress={onBookLongPress}
         onAuthorPress={onAuthorPress}

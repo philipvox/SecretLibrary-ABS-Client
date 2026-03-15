@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: scale(32),
+    minHeight: scale(32),
     paddingHorizontal: scale(14),
     borderRadius: scale(16),
     borderWidth: 1,
@@ -183,6 +183,7 @@ const styles = StyleSheet.create({
     fontSize: scale(10),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
   undoButton: {
     paddingVertical: spacing.xs,
