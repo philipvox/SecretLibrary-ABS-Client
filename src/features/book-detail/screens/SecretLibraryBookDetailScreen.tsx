@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 
 import { useBookDetails } from '../hooks/useBookDetails';
-import { ErrorView, BookDetailSkeleton, Loading, SkullRefreshControl, TopNav, TopNavCloseIcon, TopNavShareIcon } from '@/shared/components';
+import { ErrorView, BookDetailSkeleton, Loading, SkullRefreshControl, TopNav, TopNavBackIcon, TopNavShareIcon } from '@/shared/components';
 import { useCoverUrl, useLibraryCache } from '@/core/cache';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 
@@ -416,9 +416,11 @@ export function SecretLibraryBookDetailScreen() {
     const tap = Gesture.Tap()
       .numberOfTaps(2)
       .maxDelay(300)
-      .onEnd((e) => {
+      .onEnd((e, success) => {
         'worklet';
-        runOnJS(handleDoubleTap)(e.x, e.y);
+        if (success) {
+          runOnJS(handleDoubleTap)(e.x, e.y);
+        }
       });
     // Tell RNGH this Tap can coexist with the series Pan gesture
     if (panGestureRef) {
@@ -1018,8 +1020,8 @@ export function SecretLibraryBookDetailScreen() {
             onPress: handleShare,
           },
           {
-            key: 'close',
-            icon: <TopNavCloseIcon color={colors.black} size={14} />,
+            key: 'back',
+            icon: <TopNavBackIcon color={colors.black} size={14} />,
             onPress: handleClose,
           },
         ]}
