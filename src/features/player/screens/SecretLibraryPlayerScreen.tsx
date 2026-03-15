@@ -41,7 +41,7 @@ import Slider from '@react-native-community/slider';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { TopNav, TopNavCloseIcon } from '@/shared/components';
+import { TopNav, TopNavBackIcon } from '@/shared/components';
 import {
   playerTransitionProgress,
   SPRING_CONFIG,
@@ -1148,8 +1148,8 @@ export function SecretLibraryPlayerScreen() {
         ]}
           circleButtons={[
             {
-              key: 'close',
-              icon: <TopNavCloseIcon color={colors.black} size={16} />,
+              key: 'back',
+              icon: <TopNavBackIcon color={colors.black} size={16} />,
               onPress: handleClose,
             },
           ]}

@@ -52,6 +52,7 @@ const styles = StyleSheet.create({
     fontSize: scale(9),
     textTransform: 'uppercase',
     letterSpacing: 1,
+    marginTop: 24,
     marginBottom: 12,
     paddingLeft: 4,
   },

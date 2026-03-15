@@ -178,141 +178,118 @@ export function PlaybackSettingsScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Display & Speed Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Display & Speed" />
-          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-            <SettingsRow
-              Icon={Clock}
-              label="Time Display"
-              value={showTimeRemaining ? 'Remaining' : 'Elapsed'}
-              onPress={() => setShowTimeRemaining(!showTimeRemaining)}
-            />
-            <SettingsRow
-              Icon={Gauge}
-              label="Default Speed"
-              value={formatSpeed(globalDefaultRate)}
-              onPress={() => setShowSpeedPicker(true)}
-              description="Applied to books without a saved speed"
-            />
-          </View>
-        </View>
+        {/* Display & Speed */}
+        <SectionHeader title="Display & Speed" />
+        <SettingsRow
+          Icon={Clock}
+          label="Time Display"
+          value={showTimeRemaining ? 'Time Left' : 'Time Played'}
+          onPress={() => setShowTimeRemaining(!showTimeRemaining)}
+          description={showTimeRemaining ? 'Shows how much time remains' : 'Shows how much you\'ve listened'}
+        />
+        <SettingsRow
+          Icon={Gauge}
+          label="Default Speed"
+          value={formatSpeed(globalDefaultRate ?? 1)}
+          onPress={() => setShowSpeedPicker(true)}
+          description="Applied to books without a saved speed"
+        />
 
-        {/* Skip Intervals Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Skip Intervals" />
-          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-            <SettingsRow
-              Icon={SkipForward}
-              label="Skip Forward"
-              value={`${skipForwardInterval}s`}
-              onPress={() => setShowForwardPicker(true)}
-            />
-            <SettingsRow
-              Icon={SkipBack}
-              label="Skip Back"
-              value={`${skipBackInterval}s`}
-              onPress={() => setShowBackPicker(true)}
-            />
-          </View>
-        </View>
+        {/* Skip Intervals */}
+        <SectionHeader title="Skip Intervals" />
+        <SettingsRow
+          Icon={SkipForward}
+          label="Skip Forward"
+          value={`${skipForwardInterval}s`}
+          onPress={() => setShowForwardPicker(true)}
+        />
+        <SettingsRow
+          Icon={SkipBack}
+          label="Skip Back"
+          value={`${skipBackInterval}s`}
+          onPress={() => setShowBackPicker(true)}
+        />
 
-        {/* Sleep Timer Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Sleep Timer" />
-          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-            <SettingsRow
-              Icon={Smartphone}
-              label="Shake to Extend"
-              switchValue={shakeToExtendEnabled}
-              onSwitchChange={setShakeToExtendEnabled}
-              description="Adds 15 minutes when you shake near expiry"
-            />
-          </View>
-        </View>
+        {/* Sleep Timer */}
+        <SectionHeader title="Sleep Timer" />
+        <SettingsRow
+          Icon={Smartphone}
+          label="Shake to Extend"
+          switchValue={shakeToExtendEnabled}
+          onSwitchChange={setShakeToExtendEnabled}
+          description="Adds 15 minutes when you shake near expiry"
+        />
 
-        {/* Bluetooth Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Bluetooth" />
-          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-            <SettingsRow
-              Icon={Bluetooth}
-              label="Auto-Resume on Connect"
-              switchValue={bluetoothAutoResume}
-              onSwitchChange={setBluetoothAutoResume}
-              description="Resumes playback when Bluetooth connects"
-            />
-          </View>
-        </View>
+        {/* Bluetooth */}
+        <SectionHeader title="Bluetooth" />
+        <SettingsRow
+          Icon={Bluetooth}
+          label="Auto-Resume on Connect"
+          switchValue={bluetoothAutoResume}
+          onSwitchChange={setBluetoothAutoResume}
+          description="Resumes playback when Bluetooth connects"
+        />
 
-        {/* Smart Rewind Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Smart Rewind" />
-          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-            <SettingsRow
-              Icon={RefreshCw}
-              label="Smart Rewind"
-              switchValue={smartRewindEnabled}
-              onSwitchChange={setSmartRewindEnabled}
-              description="Rewinds a few seconds after a pause"
-            />
-            {smartRewindEnabled && (
-              <View style={[styles.maxRewindContainer, { borderTopColor: colors.borderLight }]}>
-                <Text style={[styles.maxRewindLabel, { color: colors.gray }]}>Maximum Rewind</Text>
-                <View style={styles.maxRewindOptions}>
-                  {SMART_REWIND_MAX_OPTIONS.map((seconds) => (
-                    <TouchableOpacity
-                      key={seconds}
-                      style={[
-                        styles.maxRewindOption,
-                        { backgroundColor: colors.grayLight },
-                        smartRewindMaxSeconds === seconds && { backgroundColor: colors.black },
-                      ]}
-                      onPress={() => setSmartRewindMaxSeconds(seconds)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.maxRewindOptionText,
-                          { color: colors.gray },
-                          smartRewindMaxSeconds === seconds && { color: colors.white },
-                        ]}
-                      >
-                        {seconds}s
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={[styles.maxRewindNote, { color: colors.gray }]}>
-                  Rewind amount increases with pause duration
-                </Text>
-              </View>
-            )}
+        {/* Smart Rewind */}
+        <SectionHeader title="Smart Rewind" />
+        <SettingsRow
+          Icon={RefreshCw}
+          label="Smart Rewind"
+          switchValue={smartRewindEnabled}
+          onSwitchChange={setSmartRewindEnabled}
+          description="Rewinds a few seconds after a pause"
+        />
+        {smartRewindEnabled && (
+          <View style={[styles.maxRewindContainer, { borderTopColor: colors.borderLight }]}>
+            <Text style={[styles.maxRewindLabel, { color: colors.gray }]}>Maximum Rewind</Text>
+            <View style={styles.maxRewindOptions}>
+              {SMART_REWIND_MAX_OPTIONS.map((seconds) => (
+                <TouchableOpacity
+                  key={seconds}
+                  style={[
+                    styles.maxRewindOption,
+                    { backgroundColor: colors.grayLight },
+                    smartRewindMaxSeconds === seconds && { backgroundColor: colors.black },
+                  ]}
+                  onPress={() => setSmartRewindMaxSeconds(seconds)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.maxRewindOptionText,
+                      { color: colors.gray },
+                      smartRewindMaxSeconds === seconds && { color: colors.white },
+                    ]}
+                  >
+                    {seconds}s
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.maxRewindNote, { color: colors.gray }]}>
+              Rewind amount increases with pause duration
+            </Text>
           </View>
-        </View>
+        )}
 
-        {/* Completion Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Book Completion" />
-          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-            <SettingsRow
-              Icon={CheckCircle}
-              label="Completion Prompt"
-              switchValue={showCompletionPrompt}
-              onSwitchChange={setShowCompletionPrompt}
-              description="Shows options when a book finishes"
-            />
-            {!showCompletionPrompt && (
-              <SettingsRow
-                Icon={CheckSquare}
-                label="Auto-Mark Finished"
-                switchValue={autoMarkFinished}
-                onSwitchChange={setAutoMarkFinished}
-                description="Marks books as finished automatically"
-              />
-            )}
-          </View>
-        </View>
+        {/* Book Completion */}
+        <SectionHeader title="Book Completion" />
+        <SettingsRow
+          Icon={CheckCircle}
+          label="Completion Prompt"
+          switchValue={showCompletionPrompt}
+          onSwitchChange={setShowCompletionPrompt}
+          description="Shows options when a book finishes"
+        />
+        {!showCompletionPrompt && (
+          <SettingsRow
+            Icon={CheckSquare}
+            label="Auto-Mark Finished"
+            switchValue={autoMarkFinished}
+            onSwitchChange={setAutoMarkFinished}
+            description="Marks books as finished automatically"
+          />
+        )}
 
         {/* Info Note */}
         <View style={styles.infoSection}>
@@ -329,7 +306,7 @@ export function PlaybackSettingsScreen() {
         title="Default Playback Speed"
         subtitle="Used for new books"
         options={SPEED_OPTIONS}
-        selectedValue={globalDefaultRate}
+        selectedValue={globalDefaultRate ?? 1}
         formatOption={formatSpeed}
         onSelect={handleSpeedSelect}
         onClose={() => setShowSpeedPicker(false)}
@@ -373,11 +350,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  sectionCard: {
   },
   // Smart Rewind max selector
   maxRewindContainer: {

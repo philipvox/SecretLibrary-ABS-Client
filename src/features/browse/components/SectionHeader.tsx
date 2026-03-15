@@ -49,8 +49,8 @@ export const SectionHeader = React.memo(function SectionHeader({ label, heading,
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 24,
-    paddingTop: scale(24),
-    paddingBottom: scale(12),
+    paddingTop: scale(36),
+    paddingBottom: scale(16),
   },
   topRow: {
     flexDirection: 'row',

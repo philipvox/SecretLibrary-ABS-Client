@@ -19,7 +19,7 @@ import { ShelfRow, BookSpineVerticalData } from '@/shared/spine';
 import { SectionHeader } from './SectionHeader';
 
 // Carousel layout constants
-const PADDING = 16;
+const PADDING = 24;
 const GAP = 12;
 const CARD_WIDTH = Math.floor((wp(100) - PADDING - GAP) * 0.42);
 const COVER_HEIGHT = CARD_WIDTH;
@@ -32,7 +32,7 @@ function getMetadata(item: LibraryItem): BookMetadata | Record<string, never> {
 }
 
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'metadata' in media && 'duration' in media;
+  return media !== undefined && 'metadata' in media && ('audioFiles' in media || 'duration' in media);
 }
 
 function getBookDuration(item: LibraryItem): number {

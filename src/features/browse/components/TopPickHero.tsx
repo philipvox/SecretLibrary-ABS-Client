@@ -15,10 +15,11 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { PlayIcon, PauseIcon } from '@/features/player/components/PlayerIcons';
 import { useNavigation } from '@react-navigation/native';
-import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
+import { secretLibraryColors, secretLibraryDarkColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale } from '@/shared/theme';
 import { apiClient } from '@/core/api';
 import { CoverStars } from '@/shared/components/CoverStars';
@@ -133,9 +134,11 @@ interface TopPickHeroProps {
   onBookPress?: (bookId: string) => void;
   onBookLongPress?: (bookId: string) => void;
   variant?: 'forYou' | 'discover';
+  headerHeight?: number;
+  onCoverUrl?: (url: string | null) => void;
 }
 
-export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'forYou' }: TopPickHeroProps) {
+export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'forYou', headerHeight, onCoverUrl }: TopPickHeroProps) {
   const renderStart = useRef(Date.now());
   const navigation = useNavigation<any>();
 
@@ -257,6 +260,12 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
   const bookId = book?.id || '';
   const metadata = book ? getBookMetadata(book) : null;
   const coverUrl = book ? apiClient.getItemCoverUrl(book.id, { width: 400, height: 400 }) : null;
+
+  // Report cover URL to parent for fixed blur background
+  useEffect(() => {
+    onCoverUrl?.(coverUrl);
+  }, [coverUrl, onCoverUrl]);
+
   const duration = book ? getBookDuration(book) : 0;
   const progress = book?.userMediaProgress?.progress || 0;
   const chapterCount = book ? getChapterCount(book) : 0;
@@ -444,13 +453,15 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
 
   return (
     <View style={styles.container}>
-      {/* Section Label */}
-      <View style={styles.header}>
-        <Text style={styles.sectionLabel}>{variant === 'discover' ? 'Hidden Gem' : 'Fresh Release'}</Text>
-      </View>
+      {/* Feathered bottom — fades blur into background, behind content */}
+      <LinearGradient
+        colors={['transparent', secretLibraryDarkColors.white]}
+        style={styles.bottomFade}
+        pointerEvents="none"
+      />
 
       {/* Hero Section - Centered like book detail */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, headerHeight ? { paddingTop: headerHeight + scale(20) } : undefined]}>
         {/* Centered Cover */}
         <TouchableOpacity style={styles.heroCover} onPress={handleCoverPress} onLongPress={handleCoverLongPress} activeOpacity={0.9}>
           <Image source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" />
@@ -460,32 +471,20 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
         {/* Title + Author */}
         <View style={styles.titleSection}>
           <Text
-            style={[
-              styles.titleText,
-              {
-                fontFamily: titleFontFamily,
-                fontWeight: titleFontWeight as any,
-              }
-            ]}
-            numberOfLines={3}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            style={styles.titleText}
+            numberOfLines={2}
           >
             {displayLine1}{displayLine2 ? ` ${displayLine2}` : ''}
           </Text>
-          <View style={styles.authorNarratorRow}>
-            <TouchableOpacity onPress={handleAuthorPress} activeOpacity={0.7}>
-              <Text style={styles.authorText}>{author}</Text>
-            </TouchableOpacity>
-            {narrator && (
+          <Text style={styles.authorNarratorText} numberOfLines={1}>
+            <Text style={styles.authorText} onPress={handleAuthorPress}>{author}</Text>
+            {narrator ? (
               <>
-                <Text style={styles.authorSeparator}>•</Text>
-                <TouchableOpacity onPress={() => handleNarratorPress(narrator)} activeOpacity={0.7}>
-                  <Text style={styles.narratorText}>{narrator}</Text>
-                </TouchableOpacity>
+                <Text style={styles.authorSeparator}>  •  </Text>
+                <Text style={styles.narratorText} onPress={() => handleNarratorPress(narrator)}>{narrator}</Text>
               </>
-            )}
-          </View>
+            ) : null}
+          </Text>
           {/* Series Link */}
           {seriesInfo && (
             <TouchableOpacity onPress={handleSeriesPress} activeOpacity={0.7}>
@@ -542,8 +541,6 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
         </View>
       </View>
 
-      {/* Divider */}
-      <View style={styles.divider} />
     </View>
   );
 }
@@ -554,20 +551,34 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: secretLibraryColors.black,
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
+    backgroundColor: 'transparent',
     paddingBottom: scale(8),
+  },
+  bottomFade: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '65%',
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: scale(24),
+    paddingTop: scale(12),
     marginBottom: scale(4),
+    alignItems: 'center' as const,
   },
   sectionLabel: {
     fontFamily: secretLibraryFonts.jetbrainsMono.medium,
     fontSize: scale(11),
-    color: secretLibraryColors.gray,
+    color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
+    textAlign: 'center' as const,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
 
   // Hero - Centered cover, left-aligned text
@@ -578,15 +589,10 @@ const styles = StyleSheet.create({
     paddingBottom: scale(20),
   },
   heroCover: {
-    width: scale(280),
-    height: scale(280),
+    width: '85%',
+    aspectRatio: 1,
     marginTop: scale(8),
     marginBottom: scale(24),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
   },
   coverImage: {
     width: '100%',
@@ -596,21 +602,23 @@ const styles = StyleSheet.create({
   // Title section - centered
   titleSection: {
     alignItems: 'center',
-    width: '100%',
+    width: '80%',
   },
   titleText: {
-    fontSize: scale(24),
+    fontFamily: secretLibraryFonts.playfair.bold,
+    fontSize: scale(22),
+    fontWeight: '700',
     letterSpacing: 0.3,
     color: secretLibraryColors.white,
     lineHeight: scale(28),
     marginBottom: scale(6),
     textAlign: 'center',
   },
-  authorNarratorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+  authorNarratorText: {
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+    fontSize: scale(14),
+    color: secretLibraryColors.gray,
+    textAlign: 'center' as const,
     marginBottom: scale(4),
   },
   authorText: {
@@ -622,7 +630,6 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
     fontSize: scale(14),
     color: secretLibraryColors.gray,
-    marginHorizontal: scale(8),
   },
   narratorText: {
     fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
@@ -723,14 +730,6 @@ const styles = StyleSheet.create({
     width: 1,
     height: scale(32),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginHorizontal: 16,
-    marginTop: scale(16),
   },
 
   // Match percent

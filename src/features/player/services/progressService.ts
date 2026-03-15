@@ -90,9 +90,10 @@ class ProgressService {
       // Cross-check: if SQLite has a newer position (crash recovery), prefer it
       try {
         const sqliteProgress = await sqliteCache.getPlaybackProgress(itemId);
-        if (sqliteProgress && sqliteProgress.updatedAt && (result.updatedAt || 0) > 0) {
+        if (sqliteProgress && sqliteProgress.updatedAt) {
           const sqliteTime = typeof sqliteProgress.updatedAt === 'number' ? sqliteProgress.updatedAt : new Date(sqliteProgress.updatedAt).getTime();
-          if (sqliteTime > (result.updatedAt || 0) && Math.abs(sqliteProgress.position - result.currentTime) > 10) {
+          const cacheTime = result.updatedAt || 0;
+          if (sqliteTime > cacheTime) {
             log(`  SQLite has newer position: ${formatDuration(sqliteProgress.position)} vs cache ${formatDuration(result.currentTime)}`);
             return {
               itemId: sqliteProgress.itemId,

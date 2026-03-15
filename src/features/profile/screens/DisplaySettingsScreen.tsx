@@ -9,7 +9,7 @@
  * - Chapter Names (links to full chapter cleaning editor)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ import { usePlaylistSettingsStore, type DefaultViewType } from '@/features/playl
 import { useChapterCleaningStore, CLEANING_LEVEL_INFO } from '../stores/chapterCleaningStore';
 import { SettingsHeader } from '../components/SettingsHeader';
 import { SettingsRow } from '../components/SettingsRow';
-import { AccordionSection } from '../components/AccordionSection';
+import { SectionHeader } from '../components/SectionHeader';
 
 // =============================================================================
 // HELPERS
@@ -64,12 +64,6 @@ export function DisplaySettingsScreen() {
   const navigation = useNavigation();
   const colors = useSecretLibraryColors();
 
-  // Accordion state — first section expanded by default
-  const [expandedSection, setExpandedSection] = useState<string>('homeScreen');
-  const toggleSection = (section: string) => {
-    setExpandedSection((prev) => (prev === section ? '' : section));
-  };
-
   // Spine settings
   const useServerSpines = useSpineCacheStore((s) => s.useServerSpines);
   const setUseServerSpines = useSpineCacheStore((s) => s.setUseServerSpines);
@@ -85,12 +79,6 @@ export function DisplaySettingsScreen() {
 
   // Chapter cleaning — for status text
   const cleaningLevel = useChapterCleaningStore((s) => s.level);
-
-  // Status strings
-  const homeScreenStatus = `${getDefaultViewLabel(defaultView)} · ${visibleViews} views`;
-  const spineStatus = useServerSpines ? 'Server spines' : 'Generated';
-  const seriesStatus = hideSingleBookSeries ? 'Multi-book only' : 'All series';
-  const chapterStatus = CLEANING_LEVEL_INFO[cleaningLevel]?.label || 'Standard';
 
   // Handlers
   const handleServerSpinesToggle = useCallback(
@@ -120,68 +108,44 @@ export function DisplaySettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Home Screen Views */}
-        <AccordionSection
-          title="Home Screen Views"
-          status={homeScreenStatus}
-          isExpanded={expandedSection === 'homeScreen'}
-          onToggle={() => toggleSection('homeScreen')}
-        >
-          <SettingsRow
-            Icon={ListMusic}
-            label="Edit View Settings"
-            description="Reorder views, set default, toggle visibility"
-            value={getDefaultViewLabel(defaultView)}
-            onPress={() => navigation.navigate('PlaylistSettings' as never)}
-          />
-        </AccordionSection>
+        <SectionHeader title="Home Screen Views" />
+        <SettingsRow
+          Icon={ListMusic}
+          label="Edit View Settings"
+          description="Reorder views, set default, toggle visibility"
+          value={getDefaultViewLabel(defaultView)}
+          onPress={() => navigation.navigate('PlaylistSettings' as never)}
+        />
 
         {/* Spine Appearance */}
-        <AccordionSection
-          title="Spine Appearance"
-          status={spineStatus}
-          isExpanded={expandedSection === 'spine'}
-          onToggle={() => toggleSection('spine')}
-        >
-          <SettingsRow
-            Icon={ImageIcon}
-            label="Server Spines"
-            switchValue={useServerSpines}
-            onSwitchChange={handleServerSpinesToggle}
-            description="Uses pre-generated spine images from your server"
-          />
-        </AccordionSection>
+        <SectionHeader title="Spine Appearance" />
+        <SettingsRow
+          Icon={ImageIcon}
+          label="Server Spines"
+          switchValue={useServerSpines}
+          onSwitchChange={handleServerSpinesToggle}
+          description="Uses pre-generated spine images from your server"
+        />
 
         {/* Series Display */}
-        <AccordionSection
-          title="Series Display"
-          status={seriesStatus}
-          isExpanded={expandedSection === 'series'}
-          onToggle={() => toggleSection('series')}
-        >
-          <SettingsRow
-            Icon={Library}
-            label="Hide Single-Book Series"
-            switchValue={hideSingleBookSeries}
-            onSwitchChange={handleHideSingleSeriesToggle}
-            description="Hides series that only contain one book"
-          />
-        </AccordionSection>
+        <SectionHeader title="Series Display" />
+        <SettingsRow
+          Icon={Library}
+          label="Hide Single-Book Series"
+          switchValue={hideSingleBookSeries}
+          onSwitchChange={handleHideSingleSeriesToggle}
+          description="Hides series that only contain one book"
+        />
 
         {/* Chapter Names */}
-        <AccordionSection
-          title="Chapter Names"
-          status={chapterStatus}
-          isExpanded={expandedSection === 'chapters'}
-          onToggle={() => toggleSection('chapters')}
-        >
-          <SettingsRow
-            Icon={Type}
-            label="Chapter Cleaning"
-            description="Clean up inconsistent chapter names"
-            value={CLEANING_LEVEL_INFO[cleaningLevel]?.label}
-            onPress={() => navigation.navigate('ChapterCleaningSettings' as never)}
-          />
-        </AccordionSection>
+        <SectionHeader title="Chapter Names" />
+        <SettingsRow
+          Icon={Type}
+          label="Chapter Cleaning"
+          description="Clean up inconsistent chapter names"
+          value={(CLEANING_LEVEL_INFO[cleaningLevel] ?? CLEANING_LEVEL_INFO['standard']).label}
+          onPress={() => navigation.navigate('ChapterCleaningSettings' as never)}
+        />
 
         {/* Info Note */}
         <View style={styles.infoSection}>

@@ -40,7 +40,7 @@ try {
 }
 
 // Remote command callback type for media control delegation
-type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForward' | 'skipBackward') => void;
+type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForward' | 'skipBackward' | 'seek', position?: number) => void;
 let remoteCommandCallback: RemoteCommandCallback | null = null;
 
 import {
@@ -444,7 +444,11 @@ class AudioService {
         break;
       case Command.SEEK:
         if (event.data?.position !== undefined) {
-          this.seekTo(event.data.position).catch(err => audioLog.warn('Media SEEK failed:', err));
+          if (remoteCommandCallback) {
+            remoteCommandCallback('seek', event.data.position);
+          } else {
+            this.seekTo(event.data.position).catch(err => audioLog.warn('Media SEEK failed:', err));
+          }
         }
         break;
       case Command.NEXT_TRACK:
@@ -1080,6 +1084,12 @@ class AudioService {
     // Reset buffer recovery for new playback session
     bufferRecoveryService.resetStatus();
 
+    // FIX CRITICAL: Reattach event listener if removed by unloadAudio()
+    if (!this.playbackStatusSubscription && this.player) {
+      log('Reattaching playback status listener after unload');
+      this.setupEventListeners();
+    }
+
     try {
       this.metadata = metadata || {};
       this.tracks = [];
@@ -1360,6 +1370,12 @@ class AudioService {
 
     // Reset buffer recovery for new playback session
     bufferRecoveryService.resetStatus();
+
+    // FIX CRITICAL: Reattach event listener if removed by unloadAudio()
+    if (!this.playbackStatusSubscription && this.player) {
+      log('Reattaching playback status listener after unload');
+      this.setupEventListeners();
+    }
 
     // FIX: Clear stale duration timeout from previous load
     if (this.durationUpdateTimeout) {

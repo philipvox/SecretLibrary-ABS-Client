@@ -30,7 +30,7 @@ export function BrowseFooter() {
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 24,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     alignItems: 'center',
   },
   separator: {

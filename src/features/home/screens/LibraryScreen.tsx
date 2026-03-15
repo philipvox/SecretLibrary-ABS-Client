@@ -22,12 +22,16 @@ import {
   GestureResponderEvent,
   Animated,
   Alert,
+  Platform,
+  TextInput,
   ViewStyle,
   TextStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
 // Note: Safe area is handled by TopNav component
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
+import ReAnimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import { Gyroscope } from 'expo-sensors';
 
 import { apiClient } from '@/core/api';
 import { librarySyncService } from '@/core/services/librarySyncService';
@@ -180,6 +184,14 @@ const GridIcon = ({ color = '#000' }: IconProps) => (
     <Rect x={13} y={3} width={8} height={8} rx={1.5} />
     <Rect x={3} y={13} width={8} height={8} rx={1.5} />
     <Rect x={13} y={13} width={8} height={8} rx={1.5} />
+  </Svg>
+);
+
+// Globe icon — discover/browse navigation
+const GlobeIcon = ({ color = '#000', size = 16 }: IconProps & { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5}>
+    <Circle cx={12} cy={12} r={10} />
+    <Path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </Svg>
 );
 
@@ -573,6 +585,8 @@ export function LibraryScreen() {
   const prevSortRef = useRef<{ mode: SortMode; dir: SortDirection }>({ mode: 'lastPlayed', dir: 'desc' });
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showContentDropdown, setShowContentDropdown] = useState(false);
+  const [showPlaylistNameModal, setShowPlaylistNameModal] = useState(false);
+  const [playlistNameInput, setPlaylistNameInput] = useState('');
 
   // Playlist settings from store
   const defaultView = usePlaylistSettingsStore((s) => s.defaultView);
@@ -687,6 +701,24 @@ export function LibraryScreen() {
     haptics.buttonPress();
     jumpToTabWithLoading('DiscoverTab');
   }, [jumpToTabWithLoading]);
+
+  // Gyroscope-driven rotation for discover ring
+  const discoverRotation = useSharedValue(0);
+  useEffect(() => {
+    Gyroscope.setUpdateInterval(32);
+    let prev = Date.now();
+    const sub = Gyroscope.addListener((data) => {
+      const now = Date.now();
+      const dt = (now - prev) / 1000;
+      prev = now;
+      discoverRotation.value += (data.y / 2) * dt * (180 / Math.PI) * 3;
+    });
+    return () => sub.remove();
+  }, [discoverRotation]);
+
+  const discoverRingStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${discoverRotation.value}deg` }],
+  }));
 
   // Handler for recommendation book spine press - navigate to book detail
   const handleRecommendationPress = useCallback((book: RecommendedBook) => {
@@ -1026,16 +1058,16 @@ export function LibraryScreen() {
     return sorted;
   }, [filteredBooks, sortMode, sortDirection, isDataReady]);
 
+  // Extract active playlist ID when in playlist content mode
+  const activePlaylistId = contentMode.startsWith('playlist:')
+    ? contentMode.replace('playlist:', '')
+    : undefined;
+
   // Handlers
   const handleBookPress = useCallback((book: LibraryBook | BookSpineVerticalData) => {
     const item = cacheItemsById.get(book.id);
     if (item) showMenu(item, activePlaylistId ? { playlistId: activePlaylistId } : undefined);
   }, [cacheItemsById, showMenu, activePlaylistId]);
-
-  // Extract active playlist ID when in playlist content mode
-  const activePlaylistId = contentMode.startsWith('playlist:')
-    ? contentMode.replace('playlist:', '')
-    : undefined;
 
   const handleBookLongPress = useCallback((book: LibraryBook | BookSpineVerticalData) => {
     haptics.selection();
@@ -1081,30 +1113,44 @@ export function LibraryScreen() {
     }
   }, [isSyncing, refreshCache]);
 
-  const handleCreateNewPlaylist = useCallback(() => {
-    Alert.prompt(
-      'New Playlist',
-      'Enter a name for the playlist',
-      async (name) => {
-        if (!name?.trim()) return;
-        try {
-          const libraryId = useLibraryCache.getState().currentLibraryId;
-          if (!libraryId) return;
-          const { playlistsApi } = await import('@/core/api/endpoints/playlists');
-          await playlistsApi.create({ libraryId, name: name.trim(), items: [] });
-          const { queryClient } = await import('@/core/queryClient');
-          queryClient.invalidateQueries({ queryKey: ['playlists'] });
-          haptics.success();
-          useToastStore.getState().addToast({ type: 'success', message: `Created "${name.trim()}"`, duration: 2000 });
-        } catch {
-          useToastStore.getState().addToast({ type: 'error', message: 'Failed to create playlist', duration: 3000 });
-        }
-      },
-      'plain-text',
-      '',
-      'Playlist name',
-    );
+  const createPlaylistWithName = useCallback(async (name: string) => {
+    if (!name?.trim()) return;
+    try {
+      const libraryId = useLibraryCache.getState().currentLibraryId;
+      if (!libraryId) return;
+      const { playlistsApi } = await import('@/core/api/endpoints/playlists');
+      await playlistsApi.create({ libraryId, name: name.trim(), items: [] });
+      const { queryClient } = await import('@/core/queryClient');
+      queryClient.invalidateQueries({ queryKey: ['playlists'] });
+      haptics.success();
+      useToastStore.getState().addToast({ type: 'success', message: `Created "${name.trim()}"`, duration: 2000 });
+    } catch {
+      useToastStore.getState().addToast({ type: 'error', message: 'Failed to create playlist', duration: 3000 });
+    }
   }, []);
+
+  const handleCreateNewPlaylist = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      // Alert.prompt is iOS-only
+      Alert.prompt(
+        'New Playlist',
+        'Enter a name for the playlist',
+        (name) => { createPlaylistWithName(name); },
+        'plain-text',
+        '',
+        'Playlist name',
+      );
+    } else {
+      // On Android, show a Modal with a TextInput instead
+      setPlaylistNameInput('');
+      setShowPlaylistNameModal(true);
+    }
+  }, [createPlaylistWithName]);
+
+  const handlePlaylistNameSubmit = useCallback(() => {
+    setShowPlaylistNameModal(false);
+    createPlaylistWithName(playlistNameInput);
+  }, [createPlaylistWithName, playlistNameInput]);
 
   const handleLogoLongPress = useCallback(() => {
     haptics.selection();
@@ -1552,6 +1598,28 @@ export function LibraryScreen() {
         ]}
       />
 
+      {/* Discover sticker — right-aligned below nav */}
+      {/* Discover button — globe with rotating "DISCOVER" ring */}
+      <Pressable
+        style={{ alignSelf: 'flex-end', marginRight: 16, marginTop: scale(4), width: scale(72), height: scale(72) }}
+        onPress={handleDiscoverPress}
+      >
+        {/* Static globe */}
+        <Image
+          source={require('../../../../assets/discover-world.png')}
+          style={{ width: scale(72), height: scale(72), position: 'absolute' }}
+          contentFit="contain"
+        />
+        {/* Rotating "DISCOVER" text ring */}
+        <ReAnimated.View style={[{ width: scale(72), height: scale(72) }, discoverRingStyle]}>
+          <Image
+            source={require('../../../../assets/discover-ring.png')}
+            style={{ width: scale(72), height: scale(72) }}
+            contentFit="contain"
+          />
+        </ReAnimated.View>
+      </Pressable>
+
       {/* Sort Dropdown Modal */}
       <Modal
         visible={showSortDropdown}
@@ -1670,7 +1738,51 @@ export function LibraryScreen() {
         </Pressable>
       </Modal>
 
-      {/* Download Filter Dropdown Modal */}
+      {/* Playlist Name Input Modal (Android only - Alert.prompt is iOS-only) */}
+      <Modal
+        visible={showPlaylistNameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPlaylistNameModal(false)}
+      >
+        <Pressable
+          style={styles.dropdownOverlay}
+          onPress={() => setShowPlaylistNameModal(false)}
+        >
+          <Pressable
+            style={[styles.playlistNameModalContent, { backgroundColor: isDarkMode ? colors.shelfBg : colors.white }]}
+            onPress={() => {/* prevent dismiss when tapping inside */}}
+          >
+            <Text style={[styles.playlistNameModalTitle, { color: colors.black }]}>New Playlist</Text>
+            <Text style={[styles.playlistNameModalSubtitle, { color: colors.black, opacity: 0.6 }]}>Enter a name for the playlist</Text>
+            <TextInput
+              style={[styles.playlistNameInput, { color: colors.black, borderColor: 'rgba(0,0,0,0.2)' }]}
+              value={playlistNameInput}
+              onChangeText={setPlaylistNameInput}
+              placeholder="Playlist name"
+              placeholderTextColor="rgba(0,0,0,0.35)"
+              autoFocus
+              onSubmitEditing={handlePlaylistNameSubmit}
+              returnKeyType="done"
+            />
+            <View style={styles.playlistNameModalButtons}>
+              <TouchableOpacity
+                style={styles.playlistNameModalButton}
+                onPress={() => setShowPlaylistNameModal(false)}
+              >
+                <Text style={[styles.playlistNameModalButtonText, { color: colors.black, opacity: 0.5 }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.playlistNameModalButton}
+                onPress={handlePlaylistNameSubmit}
+              >
+                <Text style={[styles.playlistNameModalButtonText, { color: '#F3B60C' }]}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Content */}
       <View style={styles.content}>
         {renderContent()}
@@ -1686,6 +1798,19 @@ export function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  discoverSticker: {
+    alignSelf: 'flex-end',
+    marginRight: 16,
+    marginTop: scale(4),
+  },
+  discoverStickerImage: {
+    width: scale(220),
+    height: scale(220),
+  },
+  discoverStickerImage: {
+    width: scale(36),
+    height: scale(36),
   },
 
   // Series section header (for series-sorted shelf view)
@@ -1988,6 +2113,51 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+
+  // Playlist Name Modal (Android)
+  playlistNameModalContent: {
+    width: '80%',
+    borderRadius: 14,
+    padding: 24,
+    alignSelf: 'center',
+  } as ViewStyle,
+  playlistNameModalTitle: {
+    fontFamily: fonts.playfair.bold,
+    fontSize: 18,
+    marginBottom: 4,
+  } as TextStyle,
+  playlistNameModalSubtitle: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: 13,
+    marginBottom: 16,
+  } as TextStyle,
+  playlistNameInput: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: 15,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: scale(44),
+    marginBottom: 20,
+  } as TextStyle,
+  playlistNameModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 16,
+  } as ViewStyle,
+  playlistNameModalButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minHeight: scale(44),
+    justifyContent: 'center',
+  } as ViewStyle,
+  playlistNameModalButtonText: {
+    fontFamily: fonts.jetbrainsMono.bold,
+    fontSize: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  } as TextStyle,
 });
 
 export default LibraryScreen;

@@ -39,7 +39,7 @@ export const WIDTH_CALCULATION = {
   /** Maximum width for epic audiobooks (>50hr) */
   MAX: 150,
   /** Median fallback when duration is unknown */
-  MEDIAN: 150,
+  MEDIAN: 104,
   /** Minimum duration in hours (books under this get MIN width) */
   MIN_DURATION_HOURS: 1,
   /** Maximum duration in hours (books over this get MAX width) */

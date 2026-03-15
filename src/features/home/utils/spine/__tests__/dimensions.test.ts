@@ -43,15 +43,15 @@ describe('Spine Dimensions', () => {
     });
 
     it('returns median for undefined duration', () => {
-      expect(calculateWidth(undefined)).toBe(44);  // MEDIAN = 44
+      expect(calculateWidth(undefined)).toBe(104);  // MEDIAN = 104
     });
 
     it('returns median for null duration', () => {
-      expect(calculateWidth(null as any)).toBe(44);  // MEDIAN = 44
+      expect(calculateWidth(null as any)).toBe(104);  // MEDIAN = 104
     });
 
     it('returns median for zero duration', () => {
-      expect(calculateWidth(0)).toBe(44);  // MEDIAN = 44
+      expect(calculateWidth(0)).toBe(104);  // MEDIAN = 104
     });
 
     it('produces realistic widths for common audiobook lengths', () => {

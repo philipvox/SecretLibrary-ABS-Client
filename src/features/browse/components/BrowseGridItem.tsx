@@ -41,8 +41,8 @@ function BrowseGridItemComponent({
       ]}
       onPress={onPress}
     >
-      <Icon name={iconName} size={24} color={colors.black} strokeWidth={1.5} />
-      <Text style={[styles.title, { color: colors.black }]}>{title}</Text>
+      <Icon name={iconName} size={24} color={colors.text} strokeWidth={1.5} />
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
     </Pressable>
   );
 }

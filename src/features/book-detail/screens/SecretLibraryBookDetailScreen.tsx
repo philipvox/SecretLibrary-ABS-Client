@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 
 import { useBookDetails } from '../hooks/useBookDetails';
-import { ErrorView, BookDetailSkeleton, Loading, SkullRefreshControl, TopNav, TopNavCloseIcon, TopNavShareIcon } from '@/shared/components';
+import { ErrorView, BookDetailSkeleton, Loading, SkullRefreshControl, TopNav, TopNavBackIcon, TopNavShareIcon } from '@/shared/components';
 import { useCoverUrl, useLibraryCache } from '@/core/cache';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 
@@ -1018,8 +1018,8 @@ export function SecretLibraryBookDetailScreen() {
             onPress: handleShare,
           },
           {
-            key: 'close',
-            icon: <TopNavCloseIcon color={colors.black} size={14} />,
+            key: 'back',
+            icon: <TopNavBackIcon color={colors.black} size={14} />,
             onPress: handleClose,
           },
         ]}

@@ -85,7 +85,7 @@ export function FeaturedCollectionCard({ collection, onPress }: FeaturedCollecti
         <Text style={styles.name} numberOfLines={1}>{collection.name}</Text>
         <View style={styles.countRow}>
           <BookOpen size={scale(12)} color={colors.gray} strokeWidth={2} />
-          <Text style={styles.countText}>{bookCount} books</Text>
+          <Text style={styles.countText}>{bookCount} {bookCount === 1 ? 'book' : 'books'}</Text>
         </View>
       </View>
     </Pressable>

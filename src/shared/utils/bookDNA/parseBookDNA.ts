@@ -136,6 +136,22 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
     return parts[2]?.toLowerCase() || null;
   };
 
+  // Helper to validate a value against allowed options, returning null if invalid
+  const validate = <T extends string>(value: string | null, allowed: readonly T[]): T | null => {
+    if (value === null) return null;
+    return (allowed as readonly string[]).includes(value) ? (value as T) : null;
+  };
+
+  // Valid values for union-typed fields
+  const VALID_LENGTH = ['short', 'medium', 'long', 'epic'] as const;
+  const VALID_PACING = ['slow', 'moderate', 'fast', 'variable'] as const;
+  const VALID_STRUCTURE = ['linear', 'flashback', 'multi-pov', 'frame-narrative', 'epistolary'] as const;
+  const VALID_POV = ['first', 'close-third', 'omniscient', 'multi-first'] as const;
+  const VALID_SERIES_POSITION = ['standalone', 'series-start', 'mid-series', 'finale'] as const;
+  const VALID_PUB_ERA = ['classic', 'modern-classic', 'contemporary'] as const;
+  const VALID_NARRATOR_STYLE = ['theatrical', 'subtle', 'warm', 'dry', 'intense'] as const;
+  const VALID_PRODUCTION = ['full-cast', 'single-voice', 'duet', 'soundscape'] as const;
+
   // Helper to get a spectrum value (-10 to 10 in tag, normalized to -1 to 1)
   const getSpectrum = (name: string): number | null => {
     const tag = dnaTags.find(t =>
@@ -174,12 +190,12 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
   };
 
   return {
-    length: getSimple('length') as BookDNA['length'],
-    pacing: getSimple('pacing') as BookDNA['pacing'],
-    structure: getSimple('structure') as BookDNA['structure'],
-    pov: getSimple('pov') as BookDNA['pov'],
-    seriesPosition: getSimple('series-position') as BookDNA['seriesPosition'],
-    pubEra: getSimple('pub-era') as BookDNA['pubEra'],
+    length: validate(getSimple('length'), VALID_LENGTH),
+    pacing: validate(getSimple('pacing'), VALID_PACING),
+    structure: validate(getSimple('structure'), VALID_STRUCTURE),
+    pov: validate(getSimple('pov'), VALID_POV),
+    seriesPosition: validate(getSimple('series-position'), VALID_SERIES_POSITION),
+    pubEra: validate(getSimple('pub-era'), VALID_PUB_ERA),
 
     spectrums: {
       darkLight: getSpectrum('dark-light'),
@@ -194,8 +210,8 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
     themes: getArray('theme'),
     settings: getArray('setting'),
 
-    narratorStyle: getSimple('narrator-style') as BookDNA['narratorStyle'],
-    production: getSimple('production') as BookDNA['production'],
+    narratorStyle: validate(getSimple('narrator-style'), VALID_NARRATOR_STYLE),
+    production: validate(getSimple('production'), VALID_PRODUCTION),
 
     moodScores: {
       thrills: getMood('thrills'),

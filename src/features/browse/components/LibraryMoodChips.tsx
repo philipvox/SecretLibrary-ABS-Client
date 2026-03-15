@@ -10,7 +10,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -50,11 +50,16 @@ export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items, on
     <View style={[styles.container, { backgroundColor: colors.white }]}>
       <SectionHeader label="What are you in the mood for" />
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      {/* Active chip result summary — shown under header, before chips */}
+      {activeChip && activeCount > 0 && (
+        <View style={styles.resultSummary}>
+          <Text style={[styles.resultText, { color: colors.black }]}>
+            SHOWING {activeLabel} TITLES FROM YOUR LIBRARY · {activeCount} BOOKS MATCH
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.chipsWrap}>
         {moods.map(({ key, label, count }) => {
           const isActive = activeChip === key;
           return (
@@ -80,16 +85,7 @@ export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items, on
             </Pressable>
           );
         })}
-      </ScrollView>
-
-      {/* Active chip result summary */}
-      {activeChip && activeCount > 0 && (
-        <View style={styles.resultSummary}>
-          <Text style={[styles.resultText, { color: colors.black }]}>
-            SHOWING {activeLabel} TITLES FROM YOUR LIBRARY · {activeCount} BOOKS MATCH
-          </Text>
-        </View>
-      )}
+      </View>
     </View>
   );
 });
@@ -98,7 +94,9 @@ const styles = StyleSheet.create({
   container: {
     paddingBottom: scale(16),
   },
-  scrollContent: {
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 24,
     gap: scale(8),
   },
@@ -124,7 +122,7 @@ const styles = StyleSheet.create({
   },
   resultSummary: {
     paddingHorizontal: 24,
-    paddingTop: scale(12),
+    paddingBottom: scale(12),
   },
   resultText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,

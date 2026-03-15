@@ -508,7 +508,7 @@ export function SeriesSwipeContainer({ book, children }: SeriesSwipeContainerPro
     if (nextBook) navigateToBook(nextBook);
   }, [nextBook, navigateToBook]);
 
-  const panGestureRef = useRef<any>();
+  const panGestureRef = useRef<any>(null);
   const panGesture = useMemo(() => Gesture.Pan()
     .withRef(panGestureRef)
     .activeOffsetX([-20, 20])

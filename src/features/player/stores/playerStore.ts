@@ -1155,7 +1155,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         audioService.setCurrentBookId(book.id);
 
         // Set up remote command callback for media control delegation
-        audioService.setRemoteCommandCallback((command) => {
+        audioService.setRemoteCommandCallback((command, position) => {
           if (command === 'nextChapter') {
             get().nextChapter();
           } else if (command === 'prevChapter') {
@@ -1164,6 +1164,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             get().skipForward();
           } else if (command === 'skipBackward') {
             get().skipBackward();
+          } else if (command === 'seek' && position !== undefined) {
+            get().seekTo(position);
           }
         });
 
