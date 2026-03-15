@@ -64,7 +64,7 @@ export function DurationFilterScreen() {
         circleButtons={[
           {
             key: 'close',
-            icon: <TopNavCloseIcon color={colors.black} size={14} />,
+            icon: <TopNavCloseIcon color={colors.black} size={16} />,
             onPress: handleBack,
           },
         ]}

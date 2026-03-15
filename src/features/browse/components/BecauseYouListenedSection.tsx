@@ -3,11 +3,11 @@
  *
  * "Because you listened to X" section for Browse page.
  * Shows recommendations based on a recently listened book.
- * Single row horizontal scrolling carousel with peeking content.
+ * 2×2 grid layout showing 4 books with "View More" link.
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { ChevronRight } from 'lucide-react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
@@ -15,14 +15,16 @@ import { useCoverUrl } from '@/core/cache';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { scale, wp } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/features/completion';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { useReadingHistory } from '@/features/reading-history-wizard';
-import { useInProgressBooks } from '@/core/hooks/useUserBooks';
+import { useProgressStore } from '@/core/stores/progressStore';
 
-// Carousel layout constants
+// Grid layout: 2 columns
 const PADDING = 16;
 const GAP = 12;
-const CARD_WIDTH = Math.floor((wp(100) - PADDING - GAP) * 0.42);
+const CARD_WIDTH = Math.floor((wp(100) - PADDING * 2 - GAP) / 2);
 const COVER_HEIGHT = CARD_WIDTH;
+const DISPLAY_LIMIT = 4;
 
 // Helper to get book metadata safely
 function getMetadata(item: LibraryItem): BookMetadata | Record<string, never> {
@@ -34,7 +36,7 @@ interface BecauseYouListenedSectionProps {
   items: LibraryItem[];
   onBookPress?: (bookId: string) => void;
   onBookLongPress?: (bookId: string) => void;
-  onViewAll?: () => void;
+  onViewMore?: (sourceBookId: string, sourceTitle: string) => void;
   limit?: number;
   /** Which source book index to use (0 = most recent, 1 = second most recent, etc.) */
   sourceIndex?: number;
@@ -48,8 +50,8 @@ interface CardProps {
 
 const colors = secretLibraryColors;
 
-const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, onLongPress }: CardProps) {
-  const coverUrl = useCoverUrl(item.id, { width: 200 });
+const GridBookCard = React.memo(function GridBookCard({ item, onPress, onLongPress }: CardProps) {
+  const coverUrl = useCoverUrl(item.id, { width: 300 });
   const metadata = getMetadata(item);
   const title = metadata.title || 'Untitled';
   const author = metadata.authorName || metadata.authors?.[0]?.name || '';
@@ -64,6 +66,7 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, o
           cachePolicy="memory-disk"
           transition={200}
         />
+        <CoverStars bookId={item.id} />
         <CompleteBadgeOverlay bookId={item.id} size="small" />
       </View>
       <Text style={[styles.cardTitle, { color: colors.white }]} numberOfLines={1}>
@@ -82,25 +85,15 @@ export function BecauseYouListenedSection({
   items,
   onBookPress,
   onBookLongPress,
-  onViewAll,
-  limit = 12,
+  onViewMore,
+  limit = 30,
   sourceIndex = 0
 }: BecauseYouListenedSectionProps) {
   const { isFinished, hasBeenStarted } = useReadingHistory();
 
-  // FIX: Use SQLite lastPlayedAt for sorting instead of server's userMediaProgress.lastUpdate.
-  // Server timestamps get corrupted by bulk metadata updates (all books get same timestamp).
-  // SQLite lastPlayedAt is only set when the user actually plays a book.
-  const { data: sqliteInProgressBooks = [] } = useInProgressBooks();
-  const lastPlayedMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const book of sqliteInProgressBooks) {
-      if (book.lastPlayedAt) {
-        map.set(book.bookId, new Date(book.lastPlayedAt).getTime());
-      }
-    }
-    return map;
-  }, [sqliteInProgressBooks]);
+  // Use progressStore for lastPlayedAt — covers all books (in-progress AND finished).
+  // Server's userMediaProgress.lastUpdate gets corrupted by bulk metadata updates.
+  const getProgress = useProgressStore((s) => s.getProgress);
 
   // Find a recently listened book to base recommendations on
   const { sourceBook, recommendations } = useMemo(() => {
@@ -114,9 +107,10 @@ export function BecauseYouListenedSection({
         return progress > 0.1 || isFinished(item.id) || hasBeenStarted(item.id);
       })
       .sort((a, b) => {
-        // Prefer SQLite lastPlayedAt (real play timestamps), fall back to server lastUpdate
-        const aTime = lastPlayedMap.get(a.id) || a.userMediaProgress?.lastUpdate || 0;
-        const bTime = lastPlayedMap.get(b.id) || b.userMediaProgress?.lastUpdate || 0;
+        // Use progressStore lastPlayedAt (real play timestamps from SQLite)
+        // Falls back to server lastUpdate only if no local data exists
+        const aTime = getProgress(a.id)?.lastPlayedAt || a.userMediaProgress?.lastUpdate || 0;
+        const bTime = getProgress(b.id)?.lastPlayedAt || b.userMediaProgress?.lastUpdate || 0;
         return bTime - aTime;
       });
 
@@ -161,7 +155,7 @@ export function BecauseYouListenedSection({
       .slice(0, limit);
 
     return { sourceBook: source, recommendations: similar };
-  }, [items, limit, isFinished, hasBeenStarted, sourceIndex, lastPlayedMap]);
+  }, [items, limit, isFinished, hasBeenStarted, sourceIndex, getProgress]);
 
   const handleBookPress = useCallback((bookId: string) => {
     onBookPress?.(bookId);
@@ -188,31 +182,25 @@ export function BecauseYouListenedSection({
             {sourceTitle}
           </Text>
         </View>
-        {onViewAll && (
-          <TouchableOpacity style={styles.viewAllButton} onPress={onViewAll}>
+        {onViewMore && recommendations.length > DISPLAY_LIMIT && (
+          <TouchableOpacity style={styles.viewAllButton} onPress={() => onViewMore(sourceBook.id, sourceTitle)}>
             <Text style={[styles.viewAllText, { color: colors.gray }]}>View All</Text>
             <ChevronRight size={16} color={colors.gray} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Horizontal Scrolling Carousel - Single Row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.carousel}
-        decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + GAP}
-      >
-        {recommendations.map((item) => (
-          <CarouselBookCard
+      {/* 2×2 Grid */}
+      <View style={styles.grid}>
+        {recommendations.slice(0, DISPLAY_LIMIT).map((item) => (
+          <GridBookCard
             key={item.id}
             item={item}
             onPress={() => handleBookPress(item.id)}
             onLongPress={() => handleBookLongPress(item.id)}
           />
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -226,7 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: PADDING,
-    marginBottom: scale(16),
+    marginBottom: scale(4),
   },
   headerTextContainer: {
     flex: 1,
@@ -234,15 +222,17 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(10),
+    fontSize: scale(9),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 2,
+    opacity: 0.5,
   },
   title: {
-    fontFamily: secretLibraryFonts.playfair.bold,
-    fontSize: scale(20),
-    fontWeight: '700',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -256,9 +246,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  carousel: {
-    paddingLeft: PADDING,
-    paddingRight: PADDING / 2,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: PADDING,
     gap: GAP,
   },
   card: {

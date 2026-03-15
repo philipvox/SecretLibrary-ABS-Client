@@ -2,6 +2,7 @@
  * src/features/browse/components/BrowseGridItem.tsx
  *
  * Individual item in the browse category grid.
+ * Matches the search page's browse recovery card style.
  */
 
 import React, { memo } from 'react';
@@ -34,16 +35,14 @@ function BrowseGridItemComponent({
     <Pressable
       style={({ pressed }) => [
         styles.container,
-        { backgroundColor: colors.white },
-        pressed && { backgroundColor: colors.cream },
+        { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream },
+        { borderColor: colors.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
+        pressed && { opacity: 0.7 },
       ]}
       onPress={onPress}
     >
-      <View style={styles.iconContainer}>
-        <Icon name={iconName} size={24} color={colors.black} strokeWidth={1.5} />
-      </View>
+      <Icon name={iconName} size={24} color={colors.black} strokeWidth={1.5} />
       <Text style={[styles.title, { color: colors.black }]}>{title}</Text>
-      <Text style={[styles.count, { color: colors.gray }]}>{count}</Text>
     </Pressable>
   );
 }
@@ -53,25 +52,18 @@ export const BrowseGridItem = memo(BrowseGridItemComponent);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: staticColors.white,
-    padding: 24,
-    paddingHorizontal: 16,
-    minHeight: scale(100),
-  },
-  iconContainer: {
-    width: 24,
-    height: 24,
-    marginBottom: 16,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
   },
   title: {
-    fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(15),
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 1,
     color: staticColors.black,
-    marginBottom: 4,
-  },
-  count: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(9),
-    color: staticColors.gray,
   },
 });

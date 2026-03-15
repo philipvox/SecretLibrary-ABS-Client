@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { ChevronRight } from 'lucide-react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useLibraryCache, useCoverUrl } from '@/core/cache';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { scale, wp } from '@/shared/theme';
 import { useContentFilterStore, filterByAudience } from '../stores/contentFilterStore';
@@ -64,6 +65,7 @@ const SeriesCard = React.memo(function SeriesCard({ series, onPress }: SeriesCar
           cachePolicy="memory-disk"
           transition={200}
         />
+        <CoverStars bookId={series.coverBookId} />
         {/* Book count badge */}
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{bookCount}</Text>
@@ -93,6 +95,7 @@ export function RecentSeriesSection({
   const selectedAges = useContentFilterStore((s) => s.selectedAges);
   const selectedRatings = useContentFilterStore((s) => s.selectedRatings);
   const selectedTags = useContentFilterStore((s) => s.selectedTags);
+  const selectedGenres = useContentFilterStore((s) => s.selectedGenres);
   const lengthRange = useContentFilterStore((s) => s.lengthRange);
 
   // Get recently listened series
@@ -100,7 +103,7 @@ export function RecentSeriesSection({
     if (!libraryItems?.length) return [];
 
     // Apply content filter
-    const filteredItems = filterByAudience(libraryItems, audience, selectedAges, selectedRatings, selectedTags, lengthRange);
+    const filteredItems = filterByAudience(libraryItems, audience, selectedAges, selectedRatings, selectedTags, lengthRange, selectedGenres);
 
     // Group books by series
     const seriesMap = new Map<string, SeriesInfo>();
@@ -146,7 +149,7 @@ export function RecentSeriesSection({
       })
       .sort((a, b) => b.lastListenedTime - a.lastListenedTime)
       .slice(0, limit);
-  }, [libraryItems, limit, audience, selectedAges, selectedRatings, selectedTags, lengthRange, isFinished, hasBeenStarted]);
+  }, [libraryItems, limit, audience, selectedAges, selectedRatings, selectedTags, selectedGenres, lengthRange, isFinished, hasBeenStarted]);
 
   const handleSeriesPress = useCallback((seriesName: string) => {
     onSeriesPress?.(seriesName);
@@ -198,12 +201,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: PADDING,
-    marginBottom: scale(16),
+    marginBottom: scale(4),
   },
   title: {
-    fontFamily: secretLibraryFonts.playfair.bold,
-    fontSize: scale(22),
-    fontWeight: '700',
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
   viewAllButton: {
     flexDirection: 'row',

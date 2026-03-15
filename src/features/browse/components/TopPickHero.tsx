@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale } from '@/shared/theme';
 import { apiClient } from '@/core/api';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { haptics } from '@/core/native/haptics';
 import { usePlayerStore } from '@/features/player';
 import { usePersonalizedContent } from '@/features/discover/hooks/usePersonalizedContent';
@@ -30,7 +31,6 @@ import { downloadManager } from '@/core/services/downloadManager';
 import { createSeriesFilter } from '@/shared/utils/seriesFilter';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { useSpineCacheStore, getTypographyForGenres, getSeriesStyle } from '@/shared/spine';
-import { useActiveSession } from '@/features/mood-discovery/stores/moodSessionStore';
 import { useProgressStore, useIsInLibrary } from '@/core/stores/progressStore';
 
 // Extended metadata interface with narrator
@@ -132,15 +132,12 @@ interface TopPickHeroProps {
   items: LibraryItem[];
   onBookPress?: (bookId: string) => void;
   onBookLongPress?: (bookId: string) => void;
+  variant?: 'forYou' | 'discover';
 }
 
-export function TopPickHero({ items, onBookPress, onBookLongPress }: TopPickHeroProps) {
+export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'forYou' }: TopPickHeroProps) {
   const renderStart = useRef(Date.now());
   const navigation = useNavigation<any>();
-
-  // Mood session - determines title
-  const activeSession = useActiveSession();
-  const hasMoodSession = !!activeSession?.mood;
 
   // Library data
   const cacheStart = Date.now();
@@ -195,8 +192,13 @@ export function TopPickHero({ items, onBookPress, onBookLongPress }: TopPickHero
 
   // Get the top pick book from personalized recommendations (same as "Your Taste")
   const topPickData = useMemo(() => {
+    // For discover variant: pick an unstarted book from deeper in recommendations
+    // to surface a "hidden gem" rather than the obvious top pick
+    const startIndex = variant === 'discover' ? 2 : 0;
+
     // Find first valid book from recommendation rows
-    for (const row of recommendationRows) {
+    for (let rowIdx = startIndex; rowIdx < recommendationRows.length; rowIdx++) {
+      const row = recommendationRows[rowIdx];
       for (const book of row.items) {
         const fullItem = items.find((i) => i.id === book.id);
         if (!fullItem) continue;
@@ -248,7 +250,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress }: TopPickHero
     }
 
     return null;
-  }, [recommendationRows, items, isFinished]);
+  }, [recommendationRows, items, isFinished, variant]);
 
   // Get book details
   const book = topPickData?.item;
@@ -442,11 +444,9 @@ export function TopPickHero({ items, onBookPress, onBookLongPress }: TopPickHero
 
   return (
     <View style={styles.container}>
-      {/* Section Label - matches Your Taste styling */}
+      {/* Section Label */}
       <View style={styles.header}>
-        <Text style={styles.title}>
-          <Text style={styles.titleItalic}>{hasMoodSession ? 'Top Pick' : 'Fresh Release'}</Text>
-        </Text>
+        <Text style={styles.sectionLabel}>{variant === 'discover' ? 'Hidden Gem' : 'Fresh Release'}</Text>
       </View>
 
       {/* Hero Section - Centered like book detail */}
@@ -454,6 +454,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress }: TopPickHero
         {/* Centered Cover */}
         <TouchableOpacity style={styles.heroCover} onPress={handleCoverPress} onLongPress={handleCoverLongPress} activeOpacity={0.9}>
           <Image source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" />
+          <CoverStars bookId={bookId} starSize={scale(28)} />
         </TouchableOpacity>
 
         {/* Title + Author */}
@@ -495,56 +496,47 @@ export function TopPickHero({ items, onBookPress, onBookLongPress }: TopPickHero
           )}
         </View>
 
-        {/* Action Buttons - Pill shaped like book detail page */}
+        {/* Action Buttons — clear hierarchy: Play primary, Download secondary, Library tertiary */}
         <View style={styles.actionButtons}>
-          {/* Play Button - Filled */}
-          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnFilled]} onPress={handlePlay}>
+          {/* Play Button — Primary (solid fill) */}
+          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={handlePlay}>
             {isCurrentlyPlaying ? (
-              <PauseIcon color={secretLibraryColors.black} size={16} />
+              <PauseIcon color={secretLibraryColors.black} size={14} />
             ) : (
-              <PlayIcon color={secretLibraryColors.black} size={16} />
+              <PlayIcon color={secretLibraryColors.black} size={14} />
             )}
-            <Text style={styles.actionBtnTextDark}>
+            <Text style={styles.actionBtnPrimaryText}>
               {isCurrentlyPlaying ? 'Pause' : 'Play'}
             </Text>
           </TouchableOpacity>
 
-          {/* Download Button - Outline */}
+          {/* Download Button — Secondary (outline) */}
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              styles.actionBtnOutline,
-              isDownloaded && styles.actionBtnFilled,
+              styles.actionBtnSecondary,
+              isDownloaded && styles.actionBtnPrimary,
             ]}
             onPress={handleDownload}
             disabled={isDownloaded}
           >
             {isDownloaded ? (
-              <CheckIcon color={secretLibraryColors.black} size={16} />
+              <CheckIcon color={secretLibraryColors.black} size={14} />
             ) : (
-              <DownloadIcon color={secretLibraryColors.white} size={16} />
+              <DownloadIcon color={secretLibraryColors.white} size={14} />
             )}
-            <Text style={[styles.actionBtnText, isDownloaded && styles.actionBtnTextDark]}>
-              {isDownloaded ? 'Downloaded' : 'Download'}
+            <Text style={[styles.actionBtnSecondaryText, isDownloaded && styles.actionBtnPrimaryText]}>
+              {isDownloaded ? 'Saved' : 'Download'}
             </Text>
           </TouchableOpacity>
 
-          {/* Library Button - Outline */}
+          {/* Library Button — Tertiary (text only) */}
           <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              styles.actionBtnOutline,
-              isInLibrary && styles.actionBtnFilled,
-            ]}
+            style={[styles.actionBtn, styles.actionBtnTertiary]}
             onPress={handleLibraryToggle}
           >
-            {isInLibrary ? (
-              <LibraryCheckIcon color={secretLibraryColors.black} size={16} />
-            ) : (
-              <LibraryPlusIcon color={secretLibraryColors.white} size={14} />
-            )}
-            <Text style={[styles.actionBtnText, isInLibrary && styles.actionBtnTextDark]}>
-              {isInLibrary ? 'Library' : 'Add'}
+            <Text style={[styles.actionBtnTertiaryText, isInLibrary && { color: secretLibraryColors.gold }]}>
+              {isInLibrary ? 'In Library' : '+ Library'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -565,29 +557,24 @@ const styles = StyleSheet.create({
     backgroundColor: secretLibraryColors.black,
     paddingBottom: scale(8),
   },
-  // Header - matches TasteTextList
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: scale(24),
+    marginBottom: scale(4),
   },
-  title: {
-    fontFamily: secretLibraryFonts.playfair.regular,
-    fontSize: scale(32),
-    color: secretLibraryColors.white,
-  },
-  titleItalic: {
-    fontStyle: 'italic',
+  sectionLabel: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    color: secretLibraryColors.gray,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
 
   // Hero - Centered cover, left-aligned text
   hero: {
     alignItems: 'center',
     paddingTop: scale(8),
-    paddingHorizontal: scale(24),
+    paddingHorizontal: 16,
     paddingBottom: scale(20),
   },
   heroCover: {
@@ -651,17 +638,17 @@ const styles = StyleSheet.create({
     marginTop: scale(4),
   },
 
-  // Action buttons - pill shaped like book detail page
+  // Action buttons — hierarchy: primary (solid), secondary (outline), tertiary (text)
   actionButtons: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(8),
+    gap: scale(10),
     marginTop: scale(20),
     width: '100%',
     paddingHorizontal: scale(16),
   },
   actionBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -669,26 +656,39 @@ const styles = StyleSheet.create({
     borderRadius: scale(6),
     gap: scale(6),
   },
-  actionBtnOutline: {
+  actionBtnPrimary: {
+    flex: 1.2,
+    backgroundColor: secretLibraryColors.white,
+  },
+  actionBtnPrimaryText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(12),
+    color: secretLibraryColors.black,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  actionBtnSecondary: {
+    flex: 1,
     borderWidth: 1,
-    borderColor: secretLibraryColors.white,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     backgroundColor: 'transparent',
   },
-  actionBtnFilled: {
-    backgroundColor: secretLibraryColors.white,
-    borderWidth: 0,
-  },
-  actionBtnText: {
+  actionBtnSecondaryText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(13),
+    fontSize: scale(11),
     color: secretLibraryColors.white,
-    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  actionBtnTextDark: {
+  actionBtnTertiary: {
+    paddingHorizontal: scale(8),
+  },
+  actionBtnTertiaryText: {
     fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(13),
-    color: secretLibraryColors.black,
-    fontWeight: '500',
+    fontSize: scale(11),
+    color: 'rgba(255, 255, 255, 0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   // Stats Row
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginHorizontal: scale(24),
+    marginHorizontal: 16,
     marginTop: scale(16),
   },
 
@@ -769,7 +769,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: secretLibraryColors.gray,
-    marginHorizontal: scale(24),
+    marginHorizontal: 16,
   },
   metaItem: {
     flex: 2,

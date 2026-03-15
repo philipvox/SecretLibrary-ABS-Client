@@ -1,50 +1,72 @@
 /**
  * src/features/browse/components/RecentlyAddedSection.tsx
  *
- * Recently Added section for Browse page with horizontal scrolling carousel.
- * Single row with peeking content on the right.
+ * Recently Added section for Browse page.
+ * Supports two display modes: 'covers' (cover art cards) and 'spines' (ShelfRow).
+ * Uses SectionHeader for consistent two-level typography.
  */
 
 import React, { useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
-import { ChevronRight } from 'lucide-react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useCoverUrl } from '@/core/cache';
-import { LibraryItem, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata, BookMedia } from '@/core/types';
 import { scale, wp } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/features/completion';
+import { CoverStars } from '@/shared/components/CoverStars';
+import { ShelfRow, BookSpineVerticalData } from '@/shared/spine';
+import { SectionHeader } from './SectionHeader';
 
 // Carousel layout constants
 const PADDING = 16;
 const GAP = 12;
-// Card width: Show 2 full cards + peek of 3rd
 const CARD_WIDTH = Math.floor((wp(100) - PADDING - GAP) * 0.42);
 const COVER_HEIGHT = CARD_WIDTH;
 
-// Helper to get book metadata safely
+const colors = secretLibraryColors;
+
 function getMetadata(item: LibraryItem): BookMetadata | Record<string, never> {
   if (item.mediaType !== 'book' || !item.media?.metadata) return {};
   return item.media.metadata as BookMetadata;
 }
 
-interface RecentlyAddedSectionProps {
-  items: LibraryItem[];
-  onBookPress?: (bookId: string) => void;
-  onBookLongPress?: (bookId: string) => void;
-  onViewAll?: () => void;
-  limit?: number;
+function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
+  return media !== undefined && 'metadata' in media && 'duration' in media;
 }
 
-interface CardProps {
+function getBookDuration(item: LibraryItem): number {
+  if (!isBookMedia(item.media)) return 0;
+  return item.media.duration || 0;
+}
+
+function toSpineData(item: LibraryItem, cachedData?: { backgroundColor?: string; textColor?: string }): BookSpineVerticalData {
+  const metadata = getMetadata(item);
+  const progress = item.userMediaProgress?.progress || 0;
+
+  const base: BookSpineVerticalData = {
+    id: item.id,
+    title: metadata?.title || 'Unknown',
+    author: metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author',
+    progress,
+    genres: metadata?.genres || [],
+    tags: isBookMedia(item.media) ? item.media.tags || [] : [],
+    duration: getBookDuration(item),
+    seriesName: metadata?.seriesName?.replace(/\s*#[\d.]+$/, '') || metadata?.series?.[0]?.name,
+  };
+
+  if (cachedData?.backgroundColor && cachedData?.textColor) {
+    return { ...base, backgroundColor: cachedData.backgroundColor, textColor: cachedData.textColor };
+  }
+  return base;
+}
+
+// Cover card for 'covers' mode
+const CoverCard = React.memo(function CoverCard({ item, onPress, onLongPress }: {
   item: LibraryItem;
   onPress: () => void;
   onLongPress?: () => void;
-}
-
-const colors = secretLibraryColors;
-
-const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, onLongPress }: CardProps) {
+}) {
   const coverUrl = useCoverUrl(item.id, { width: 200 });
   const metadata = getMetadata(item);
   const title = metadata.title || 'Untitled';
@@ -60,6 +82,7 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, o
           cachePolicy="memory-disk"
           transition={200}
         />
+        <CoverStars bookId={item.id} />
         <CompleteBadgeOverlay bookId={item.id} size="small" />
       </View>
       <Text style={[styles.cardTitle, { color: colors.white }]} numberOfLines={1}>
@@ -74,22 +97,63 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, o
   );
 });
 
+/** Parse publication year from metadata into a sortable number */
+function getPublishedYear(item: LibraryItem): number {
+  const metadata = getMetadata(item) as BookMetadata;
+  // Try publishedDate first (YYYY-MM-DD), then publishedYear
+  if (metadata.publishedDate) {
+    const y = parseInt(metadata.publishedDate.slice(0, 4), 10);
+    if (!isNaN(y)) return y;
+  }
+  if (metadata.publishedYear) {
+    const y = parseInt(metadata.publishedYear, 10);
+    if (!isNaN(y)) return y;
+  }
+  return 0;
+}
+
+interface RecentlyAddedSectionProps {
+  items: LibraryItem[];
+  onBookPress?: (bookId: string) => void;
+  onBookLongPress?: (bookId: string) => void;
+  onViewAll?: () => void;
+  limit?: number;
+  title?: string;
+  /** Display mode: 'covers' for cover art cards, 'spines' for ShelfRow */
+  displayMode?: 'covers' | 'spines';
+  /** Sort by: 'added' (default, addedAt) or 'published' (publishedYear/publishedDate) */
+  sortBy?: 'added' | 'published';
+}
+
 export function RecentlyAddedSection({
   items,
   onBookPress,
   onBookLongPress,
   onViewAll,
-  limit = 12
+  limit = 12,
+  title: sectionTitle = 'Recently Added',
+  displayMode = 'covers',
+  sortBy = 'added',
 }: RecentlyAddedSectionProps) {
-  // Get recently added books sorted by addedAt (items are pre-filtered by parent)
   const recentBooks = useMemo(() => {
     if (!items?.length) return [];
 
-    return [...items]
-      .filter(item => item.mediaType === 'book')
+    const books = [...items].filter(item => item.mediaType === 'book');
+
+    if (sortBy === 'published') {
+      // Sort by publication year descending, exclude books with no year
+      return books
+        .map((item) => ({ item, year: getPublishedYear(item) }))
+        .filter(({ year }) => year > 0)
+        .sort((a, b) => b.year - a.year)
+        .slice(0, limit)
+        .map(({ item }) => item);
+    }
+
+    return books
       .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
       .slice(0, limit);
-  }, [items, limit]);
+  }, [items, limit, sortBy]);
 
   const handleBookPress = useCallback((bookId: string) => {
     onBookPress?.(bookId);
@@ -99,70 +163,57 @@ export function RecentlyAddedSection({
     onBookLongPress?.(bookId);
   }, [onBookLongPress]);
 
+  const handleSpinePress = useCallback((spine: BookSpineVerticalData) => {
+    onBookPress?.(spine.id);
+  }, [onBookPress]);
+
+  const handleSpineLongPress = useCallback((spine: BookSpineVerticalData) => {
+    onBookLongPress?.(spine.id);
+  }, [onBookLongPress]);
+
   if (recentBooks.length === 0) {
     return null;
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.black }]}>
-      {/* Section Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.white }]}>Recently Added</Text>
-        {onViewAll && (
-          <TouchableOpacity style={styles.viewAllButton} onPress={onViewAll}>
-            <Text style={[styles.viewAllText, { color: colors.gray }]}>View All</Text>
-            <ChevronRight size={16} color={colors.gray} />
-          </TouchableOpacity>
-        )}
-      </View>
+      <SectionHeader
+        label={sectionTitle}
+        onViewAll={onViewAll}
+      />
 
-      {/* Horizontal Scrolling Carousel - Single Row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.carousel}
-        decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + GAP}
-      >
-        {recentBooks.map((item) => (
-          <CarouselBookCard
-            key={item.id}
-            item={item}
-            onPress={() => handleBookPress(item.id)}
-            onLongPress={() => handleBookLongPress(item.id)}
-          />
-        ))}
-      </ScrollView>
+      {displayMode === 'spines' ? (
+        <ShelfRow
+          books={recentBooks}
+          toSpineData={toSpineData}
+          onSpinePress={handleSpinePress}
+          onSpineLongPress={handleSpineLongPress}
+        />
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carousel}
+          decelerationRate="fast"
+          snapToInterval={CARD_WIDTH + GAP}
+        >
+          {recentBooks.map((item) => (
+            <CoverCard
+              key={item.id}
+              item={item}
+              onPress={() => handleBookPress(item.id)}
+              onLongPress={() => handleBookLongPress(item.id)}
+            />
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: scale(24),
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: PADDING,
-    marginBottom: scale(16),
-  },
-  title: {
-    fontFamily: secretLibraryFonts.playfair.bold,
-    fontSize: scale(22),
-    fontWeight: '700',
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  viewAllText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
-    fontSize: scale(12),
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    paddingBottom: scale(8),
   },
   carousel: {
     paddingLeft: PADDING,
