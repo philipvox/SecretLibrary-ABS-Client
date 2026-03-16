@@ -14,6 +14,27 @@ if (typeof global.__DEV__ === 'undefined') {
 jest.mock('expo/src/winter/runtime.native', () => ({}), { virtual: true });
 jest.mock('expo/src/winter/installGlobal', () => ({}), { virtual: true });
 
+// Mock expo-modules-core to prevent EventEmitter errors in tests
+jest.mock('expo-modules-core', () => {
+  class NativeModule {
+    constructor() {}
+    addListener() { return { remove: jest.fn() }; }
+    removeListeners() {}
+  }
+
+  return {
+    requireNativeModule: jest.fn(() => ({})),
+    requireOptionalNativeModule: jest.fn(() => null),
+    EventEmitter: jest.fn(() => ({
+      addListener: jest.fn(() => ({ remove: jest.fn() })),
+      removeAllListeners: jest.fn(),
+      emit: jest.fn(),
+    })),
+    NativeModule,
+    NativeModulesProxy: {},
+  };
+}, { virtual: true });
+
 // =============================================================================
 // React Native Core Mocks
 // =============================================================================
@@ -183,6 +204,20 @@ jest.mock('expo-file-system', () => ({
   downloadAsync: jest.fn().mockResolvedValue({ uri: '/mock/path' }),
 }));
 
+jest.mock('expo-file-system/legacy', () => ({
+  documentDirectory: '/mock/document/directory/',
+  cacheDirectory: '/mock/cache/directory/',
+  getInfoAsync: jest.fn().mockResolvedValue({ exists: false }),
+  readAsStringAsync: jest.fn().mockResolvedValue(''),
+  writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
+  deleteAsync: jest.fn().mockResolvedValue(undefined),
+  makeDirectoryAsync: jest.fn().mockResolvedValue(undefined),
+  copyAsync: jest.fn().mockResolvedValue(undefined),
+  moveAsync: jest.fn().mockResolvedValue(undefined),
+  downloadAsync: jest.fn().mockResolvedValue({ uri: '/mock/path' }),
+  EncodingType: { UTF8: 'utf8', Base64: 'base64' },
+}), { virtual: true });
+
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn().mockResolvedValue(null),
   setItemAsync: jest.fn().mockResolvedValue(undefined),
@@ -201,6 +236,25 @@ jest.mock('expo-crypto', () => ({
 
 jest.mock('expo-image', () => ({
   Image: 'Image',
+}));
+
+jest.mock('expo-sqlite', () => ({
+  openDatabaseSync: jest.fn(() => ({
+    execSync: jest.fn(),
+    runSync: jest.fn(),
+    getFirstSync: jest.fn(),
+    getAllSync: jest.fn(() => []),
+    prepareSync: jest.fn(() => ({
+      executeSync: jest.fn(),
+      getColumnNames: jest.fn(() => []),
+      step: jest.fn(() => false),
+      reset: jest.fn(),
+      finalize: jest.fn(),
+    })),
+    closeSync: jest.fn(),
+    withTransactionSync: jest.fn((fn) => fn()),
+  })),
+  openDatabaseAsync: jest.fn(),
 }));
 
 jest.mock('expo-blur', () => ({
@@ -421,9 +475,9 @@ jest.mock('react-native-image-colors', () => ({
     muted: '#000000',
     platform: 'ios',
   }),
-}));
+}), { virtual: true });
 
-jest.mock('@react-native-masked-view/masked-view', () => 'MaskedView');
+jest.mock('@react-native-masked-view/masked-view', () => 'MaskedView', { virtual: true });
 
 jest.mock('@react-native-community/netinfo', () => ({
   addEventListener: jest.fn(() => jest.fn()),

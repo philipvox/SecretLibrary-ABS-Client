@@ -29,7 +29,7 @@ import { TopNav, TopNavBackIcon, MicIcon, CollapsibleSection, useBookContextMenu
 import { useLibraryCache } from '@/core/cache';
 import { apiClient } from '@/core/api';
 import { CoverStars } from '@/shared/components/CoverStars';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { BookSpineVerticalData, ShelfRow } from '@/shared/spine';
@@ -122,7 +122,7 @@ export function SecretLibraryNarratorDetailScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const colors = useSecretLibraryColors();
-  const isDarkMode = colors.isDark;
+  const _isDarkMode = colors.isDark;
   const { showMenu } = useBookContextMenu();
 
   // Handle both param formats
@@ -292,7 +292,7 @@ export function SecretLibraryNarratorDetailScreen() {
   }, [navigation]);
 
   // Render inline book list with cover images (paragraph style)
-  const renderBookList = (books: LibraryItem[]) => {
+  const _renderBookList = (books: LibraryItem[]) => {
     return (
       <Text style={styles.flowingText}>
         {books.map((book, index) => {

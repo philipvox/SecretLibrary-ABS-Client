@@ -20,7 +20,7 @@ import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Folder } from 'lucide-react-native';
 import { useCollectionDetails } from '../hooks/useCollectionDetails';
-import { BookIcon, TopNav, TopNavSearchIcon, TopNavCloseIcon, CollapsibleSection } from '@/shared/components';
+import { TopNav, TopNavSearchIcon, TopNavCloseIcon, CollapsibleSection } from '@/shared/components';
 import { apiClient } from '@/core/api';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
@@ -93,7 +93,7 @@ export function CollectionDetailScreen() {
   const colors = useSecretLibraryColors();
 
   const { collectionId } = route.params;
-  const { collection, isLoading, error } = useCollectionDetails(collectionId);
+  const { collection, isLoading, _error } = useCollectionDetails(collectionId);
 
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('book');

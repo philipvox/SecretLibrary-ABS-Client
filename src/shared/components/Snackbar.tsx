@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, radius, scale, useTheme, ThemeColors } from '@/shared/theme';
 import { BOTTOM_NAV_HEIGHT, MINI_PLAYER_HEIGHT } from '@/constants/layout';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: _SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================================================
 // TYPES

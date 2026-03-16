@@ -29,20 +29,20 @@ export interface CachedSession {
   duration: number;
   currentTime: number;
   updatedAt?: number;
-  audioTracks: Array<{
+  audioTracks: {
     index: number;
     startOffset: number;
     duration: number;
     title: string;
     contentUrl: string;
     mimeType: string;
-  }>;
-  chapters: Array<{
+  }[];
+  chapters: {
     id: number;
     start: number;
     end: number;
     title: string;
-  }>;
+  }[];
   mediaMetadata?: {
     title?: string;
     authorName?: string;

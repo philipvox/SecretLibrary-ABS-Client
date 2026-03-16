@@ -17,8 +17,7 @@
  * - Series books share consistent height
  */
 
-import { Platform } from 'react-native';
-import { HEIGHT_SCALE, BASE_DIMENSIONS } from './spine/constants';
+import { BASE_DIMENSIONS } from './spine/constants';
 
 // =============================================================================
 // TYPES
@@ -910,8 +909,8 @@ const MIN_TOUCH_TARGET = 44;  // Apple HIG minimum (use hitSlop for thin books)
 
 // Duration constants for width calculation
 // Logarithmic: fast growth early, slows for very long books
-const MIN_DURATION_HOURS = 1;    // Books under 1hr get MIN_WIDTH
-const MAX_DURATION_HOURS = 50;   // Books over 50hr get MAX_WIDTH
+const _MIN_DURATION_HOURS = 1;    // Books under 1hr get MIN_WIDTH
+const _MAX_DURATION_HOURS = 50;   // Books over 50hr get MAX_WIDTH
 
 // =============================================================================
 // COMPREHENSIVE GENRE TYPOGRAPHY PROFILES
@@ -1494,7 +1493,7 @@ interface TypographyModifier {
   priority?: number;
 }
 
-const TAG_TYPOGRAPHY_MODIFIERS: Record<string, TypographyModifier> = {
+const _TAG_TYPOGRAPHY_MODIFIERS: Record<string, TypographyModifier> = {
   // Epic/Grand subgenres
   'epic-fantasy': {
     title: { fontFamily: 'serif', fontWeight: 700, textTransform: 'none' },
@@ -2856,7 +2855,7 @@ export function clearSeriesCache(): void {
  * Genre detection priority (higher = checked first)
  * More specific genres take precedence
  */
-const GENRE_PRIORITY: Array<{ keywords: string[]; category: string }> = [
+const GENRE_PRIORITY: { keywords: string[]; category: string }[] = [
   // Most specific first - commercial genres with boxes
   { keywords: ['thriller', 'suspense'], category: 'thriller' },
   { keywords: ['crime', 'detective', 'noir', 'police'], category: 'crime' },
@@ -2918,13 +2917,13 @@ export function getTypographyForGenres(
 ): SpineTypography {
   // Get base typography from genre or fallback
   let typography: SpineTypography;
-  let fromCombo = false;
+  let _fromCombo = false;
 
   // 1. First, check for combo genre match (e.g., "Fantasy + Thriller")
   const comboProfile = findComboGenreProfile(genres || []);
   if (comboProfile) {
     typography = profileToLegacy(comboProfile);
-    fromCombo = true;
+    _fromCombo = true;
     if (__DEV__) {
       const key = genres && genres.length >= 2 ? getComboGenreKey(genres[0], genres[1]) : 'unknown';
       console.log(`[GenreCombo] Using combo profile: ${key}`);
@@ -3428,7 +3427,7 @@ function seededRandomFloat(seed: number, min: number, max: number): number {
 /**
  * Calculate duration factor (0.6 = short, 1.0 = average, 1.6 = epic)
  */
-function calculateDurationFactor(durationSeconds: number | undefined, _profile: GenreDimensionProfile): number {
+function _calculateDurationFactor(durationSeconds: number | undefined, _profile: GenreDimensionProfile): number {
   if (!durationSeconds || durationSeconds <= 0) {
     return 1.0; // Default to average
   }
@@ -3684,7 +3683,7 @@ export function calculateBatchDimensions(books: BookDimensionInput[]): Map<strin
   }
 
   // Process series groups first (first book in each series sets the height)
-  for (const [_, seriesBooks] of seriesGroups) {
+  for (const [__, seriesBooks] of seriesGroups) {
     // Sort by some deterministic order (id) to ensure consistent "first" book
     seriesBooks.sort((a, b) => a.id.localeCompare(b.id));
 
@@ -3792,7 +3791,7 @@ export function resolveAuthorBox(
  * Color palette for spine backgrounds based on genre personality
  * Each personality has multiple color options for variety within genre
  */
-const PERSONALITY_COLORS: Record<SpinePersonality, string[]> = {
+const _PERSONALITY_COLORS: Record<SpinePersonality, string[]> = {
   // Playful - Bright, cheerful colors (children's, humor)
   playful: [
     '#FF6B6B', // Coral red
@@ -3876,7 +3875,7 @@ const PERSONALITY_COLORS: Record<SpinePersonality, string[]> = {
  * Map genres to personalities for color selection
  * This supplements the typography personality for color choices
  */
-const GENRE_TO_COLOR_PERSONALITY: Record<string, SpinePersonality> = {
+const _GENRE_TO_COLOR_PERSONALITY: Record<string, SpinePersonality> = {
   // Children's
   "Children's 0-2": 'playful',
   "Children's 3-5": 'playful',
@@ -4189,7 +4188,7 @@ export function getSpineColorForGenres(genres: string[], bookId: string): SpineC
  * Calculate relative luminance and return appropriate text color
  * Uses WCAG contrast ratio guidelines
  */
-function getContrastTextColor(backgroundColor: string): string {
+function _getContrastTextColor(backgroundColor: string): string {
   // Parse hex color
   const hex = backgroundColor.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16);

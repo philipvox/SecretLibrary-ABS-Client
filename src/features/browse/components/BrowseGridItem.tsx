@@ -6,7 +6,7 @@
  */
 
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Text, StyleSheet, Pressable } from 'react-native';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { Icon } from '@/shared/components/Icon';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -22,9 +22,9 @@ interface BrowseGridItemProps {
 }
 
 function BrowseGridItemComponent({
-  type,
+  _type,
   title,
-  count,
+  _count,
   iconName,
   onPress,
 }: BrowseGridItemProps) {

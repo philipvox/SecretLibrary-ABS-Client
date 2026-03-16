@@ -93,7 +93,7 @@ export class BaseApiClient {
       });
       // If we get here, token is valid - the original 401 was transient
       return true;
-    } catch (verifyError) {
+    } catch {
       // Token is definitely invalid
       return false;
     } finally {

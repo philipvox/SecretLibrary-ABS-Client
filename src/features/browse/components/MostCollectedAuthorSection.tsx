@@ -12,7 +12,7 @@ import { Image } from 'expo-image';
 import { scale, wp, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useCoverUrl } from '@/core/cache';
-import { useProgressStore, ProgressData } from '@/core/stores/progressStore';
+import { useProgressStore } from '@/core/stores/progressStore';
 import { LibraryItem, BookMetadata, BookMedia } from '@/core/types';
 import { CompleteBadgeOverlay } from '@/features/completion';
 import { CoverStars } from '@/shared/components/CoverStars';
@@ -36,7 +36,7 @@ interface MoreToReadSectionProps {
   onAuthorPress: (authorName: string) => void;
 }
 
-function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
+function _isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
   return media !== undefined && 'metadata' in media && 'duration' in media;
 }
 

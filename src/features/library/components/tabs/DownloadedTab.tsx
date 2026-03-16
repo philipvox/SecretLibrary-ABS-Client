@@ -47,12 +47,12 @@ export function DownloadedTab({
   onDownloadPause,
   onDownloadResume,
   onDownloadDelete,
-  onPauseAll,
-  onResumeAll,
+  _onPauseAll,
+  _onResumeAll,
   onManageStorage,
   isMarkedFinished,
-  hasDownloading,
-  hasPaused,
+  _hasDownloading,
+  _hasPaused,
   onBrowse,
 }: DownloadedTabProps) {
   const hasContent = books.length > 0 || activeDownloads.length > 0;

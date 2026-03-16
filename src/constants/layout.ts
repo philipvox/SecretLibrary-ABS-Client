@@ -4,11 +4,11 @@
  * Layout constants for consistent spacing across the app.
  */
 
-import { Platform, Dimensions } from 'react-native';
+import { Dimensions } from 'react-native';
 import { scale } from '@/shared/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const hp = (percentage: number) => (percentage / 100) * SCREEN_HEIGHT;
+const _hp = (percentage: number) => (percentage / 100) * SCREEN_HEIGHT;
 
 // Top navigation is an overlay with gradient, so screens only need
 // a small buffer below safe area insets (not the full nav height)

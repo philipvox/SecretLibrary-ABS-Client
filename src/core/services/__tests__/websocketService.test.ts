@@ -6,6 +6,9 @@ import { AppState } from 'react-native';
 import { eventBus } from '../../events';
 import { authService } from '../../auth/authService';
 
+// Import after mocks are set up
+import { WebSocketService } from '../websocketService';
+
 // Mock socket.io-client
 const mockSocket = {
   on: jest.fn(),
@@ -37,9 +40,6 @@ jest.mock('../../events', () => ({
     on: jest.fn(() => jest.fn()),
   },
 }));
-
-// Import after mocks are set up
-import { WebSocketService } from '../websocketService';
 
 const mockAuthService = authService as jest.Mocked<typeof authService>;
 const mockEventBus = eventBus as jest.Mocked<typeof eventBus>;
@@ -449,7 +449,7 @@ describe('WebSocketService', () => {
       connectErrorHandler?.(new Error('Connection failed'));
 
       // After max attempts, no more reconnects should be scheduled
-      const callCount = mockIo.mock.calls.length;
+      const _callCount = mockIo.mock.calls.length;
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
 

@@ -25,7 +25,7 @@ interface LibraryMoodChipsProps {
   onBookPress: (bookId: string) => void;
 }
 
-export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items, onBookPress }: LibraryMoodChipsProps) {
+export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items, _onBookPress }: LibraryMoodChipsProps) {
   const colors = useSecretLibraryColors();
   const { moods } = useLibraryMoods(items);
   const activeChip = useFeelingChipStore((s) => s.activeChip);

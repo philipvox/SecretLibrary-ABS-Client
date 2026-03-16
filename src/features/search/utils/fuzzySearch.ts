@@ -127,7 +127,7 @@ function allWordsMatch(queryWords: string[], targetLower: string): boolean {
  * Check if query matches target with space-insensitive comparison.
  * "earth sea" matches "earthsea" and vice versa.
  */
-function spaceInsensitiveMatch(queryNorm: string, targetNorm: string): boolean {
+function _spaceInsensitiveMatch(queryNorm: string, targetNorm: string): boolean {
   // Direct substring match without spaces
   if (targetNorm.includes(queryNorm)) return true;
   if (queryNorm.includes(targetNorm) && targetNorm.length >= 4) return true;
@@ -138,7 +138,7 @@ function spaceInsensitiveMatch(queryNorm: string, targetNorm: string): boolean {
  * Check if query fuzzy matches target string with word reordering.
  * "sea eart" should match "earthsea"
  */
-function reorderedMatch(queryWords: string[], targetNorm: string, threshold: number): boolean {
+function _reorderedMatch(queryWords: string[], targetNorm: string, threshold: number): boolean {
   const permutations = getWordPermutations(queryWords);
   for (const perm of permutations) {
     // Check substring match
@@ -263,7 +263,7 @@ export function findSuggestions(
   candidates: string[],
   maxSuggestions = 3,
   minScore = 0.5
-): Array<{ text: string; score: number }> {
+): { text: string; score: number }[] {
   const queryLower = query.toLowerCase().trim();
   if (!queryLower) return [];
 

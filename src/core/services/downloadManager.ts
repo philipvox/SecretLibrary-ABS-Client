@@ -22,7 +22,6 @@ import {
   quickValidate,
   verifyFileIntegrity,
   getIntegrityStatusSummary,
-  type FileIntegrityInfo,
 } from './downloadIntegrity';
 
 // Type guard for book media
@@ -800,7 +799,7 @@ class DownloadManager {
       log(`Cancelling active download: ${itemId}`);
       try {
         await download.cancelAsync();
-      } catch (e) {
+      } catch {
         // Ignore cancel errors
       }
       await sqliteCache.failDownload(itemId, 'Cancelled by user');

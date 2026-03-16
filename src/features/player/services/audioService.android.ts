@@ -9,7 +9,7 @@
  * so playerStore.ts sees no difference.
  */
 
-import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
+import { NativeModules, NativeEventEmitter } from 'react-native';
 import {
   audioLog,
   createTimer,
@@ -94,7 +94,7 @@ class AndroidAudioService {
       try {
         await this.setupPromise;
         return;
-      } catch (error) {
+      } catch {
         audioLog.warn('Previous setup failed, retrying...');
       }
     }
@@ -548,7 +548,7 @@ class AndroidAudioService {
 
     try {
       await ExoPlayerModule.cleanup();
-    } catch (e) {
+    } catch {
       // Ignore errors during cleanup
     }
   }

@@ -21,7 +21,7 @@ import { CoverStars } from '@/shared/components/CoverStars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCompletionSheetStore } from '../stores/completionSheetStore';
 import { getCoverUrl } from '@/core/cache';
-import { scale, spacing, useTheme } from '@/shared/theme';
+import { scale, useTheme } from '@/shared/theme';
 
 export function BookCompletionSheet() {
   const insets = useSafeAreaInsets();

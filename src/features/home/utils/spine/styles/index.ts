@@ -8,7 +8,7 @@
 
 import { BASE_STYLES, BaseTypographyStyle, BaseStyleName } from './baseStyles';
 import { COMPOSITION_PRESETS, CompositionPreset, CompositionPresetName } from './compositionPresets';
-import { GENRE_TO_STYLE, getGenreMapping, normalizeGenre, GenreStyleMapping } from './genreMap';
+import { GENRE_TO_STYLE, normalizeGenre } from './genreMap';
 
 // Re-export types and constants
 export { BASE_STYLES, BaseTypographyStyle, BaseStyleName } from './baseStyles';

@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
+import { secretLibraryColors as secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 
 interface SectionHeaderProps {

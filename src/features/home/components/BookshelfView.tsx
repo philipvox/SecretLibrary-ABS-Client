@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, FlatList, Dimensions, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, FlatList, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -24,7 +24,7 @@ import { secretLibraryColors as staticColors } from '@/shared/theme/secretLibrar
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { useResponsive } from '@/shared/hooks/useResponsive';
 // MIGRATED: Now using new spine system via adapter
-import { getSpineDimensions, calculateBookDimensions, hashString, MIN_TOUCH_TARGET, isLightColor, darkenColorForDisplay } from '../utils/spine/adapter';
+import { getSpineDimensions, calculateBookDimensions, hashString, MIN_TOUCH_TARGET } from '../utils/spine/adapter';
 import { HEIGHT_SCALE, SERVER_SPINE_BOX, PROCEDURAL_SPINE_BOX } from '../utils/spine/constants';
 import { fitToBoundingBox, getDurationScale, DURATION_SCALE_LONG_MAX } from '../utils/spine/core/dimensions';
 import { useSpineCacheStore } from '../stores/spineCache';

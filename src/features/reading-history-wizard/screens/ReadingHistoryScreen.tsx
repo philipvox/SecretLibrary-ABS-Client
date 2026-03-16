@@ -27,7 +27,6 @@ import {
   Book,
   CloudCheck,
   CloudUpload,
-  CloudOff,
   CheckSquare,
   Square,
   ArrowLeft,
@@ -40,7 +39,7 @@ import {
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useGalleryStore, FilterState, DurationFilter } from '../stores/galleryStore';
+import { useGalleryStore, DurationFilter } from '../stores/galleryStore';
 import { useFinishedBooks, useBulkMarkFinished } from '@/core/hooks/useUserBooks';
 import { finishedBooksSync } from '@/core/services/finishedBooksSync';
 import { FilterSheet } from '../components/FilterSheet';
@@ -48,7 +47,7 @@ import { SortSheet, SortOption } from '../components/SortSheet';
 import { useLibraryCache } from '@/core/cache/libraryCache';
 import { getCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
-import { useTheme, accentColors, wp, hp, moderateScale, spacing, colors } from '@/shared/theme';
+import { useTheme, wp, hp, moderateScale, spacing, colors } from '@/shared/theme';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/hooks/useToast';
 
@@ -119,7 +118,7 @@ function getSeriesName(item: LibraryItem): string {
   return name.replace(/\s*#[\d.]+$/, '').trim();
 }
 
-function getSeriesSequence(item: LibraryItem): string {
+function _getSeriesSequence(item: LibraryItem): string {
   const name = getMetadata(item).seriesName || '';
   const match = name.match(/#([\d.]+)$/);
   return match ? match[1] : '';
@@ -142,7 +141,7 @@ function formatDuration(seconds: number): string {
   return `${minutes}m`;
 }
 
-function formatTotalHours(seconds: number): string {
+function _formatTotalHours(seconds: number): string {
   const hours = Math.round(seconds / 3600);
   return `~${hours} hours`;
 }
@@ -380,7 +379,7 @@ interface SectionHeaderProps {
   styles: ReturnType<typeof createStyles>;
 }
 
-function SectionHeader({ title, styles }: SectionHeaderProps) {
+function _SectionHeader({ title, styles }: SectionHeaderProps) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionHeaderText}>{title}</Text>
@@ -900,7 +899,7 @@ export function ReadingHistoryScreen() {
   }, [filters, availableFilters]);
 
   // Group books by date for section headers
-  const groupedBooks = useMemo(() => {
+  const _groupedBooks = useMemo(() => {
     if (sortBy !== 'recent') {
       return [{ title: null, data: historyBooks }];
     }

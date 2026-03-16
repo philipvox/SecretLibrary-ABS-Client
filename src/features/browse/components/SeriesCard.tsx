@@ -23,7 +23,7 @@ import { getSpineUrl } from '@/core/cache';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
 import { SeriesHeartButton } from '@/shared/components/SeriesHeartButton';
 import { fitToBoundingBox } from '@/features/home/utils/spine/core/dimensions';
-import { SERVER_SPINE_BOX } from '@/features/home/utils/spine/constants';
+
 
 // Re-export for backwards compatibility
 export const SERIES_DOT_COLORS = SPINE_COLOR_PALETTE;
@@ -84,7 +84,7 @@ export function SeriesCard({
   author,
   bookCount,
   bookIds,
-  variant = 'light',
+  _variant = 'light',
   layout = 'list',
   maxDots = 12,
   onPress,

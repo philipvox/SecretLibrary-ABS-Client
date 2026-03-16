@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Folder } from 'lucide-react-native';
 import { useCollections } from '@/features/collections';
 import { CollectionSquareCard } from '../components/CollectionSquareCard';
-import { TopNav, TopNavBackIcon, ScreenLoadingOverlay, SkullRefreshControl, EmptyState } from '@/shared/components';
+import { TopNav, TopNavBackIcon, ScreenLoadingOverlay, SkullRefreshControl } from '@/shared/components';
 import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { scale, spacing } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';

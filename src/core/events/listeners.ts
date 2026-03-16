@@ -154,7 +154,7 @@ export function initializeEventListeners(): () => void {
 
   // === WEBSOCKET: PROGRESS UPDATES FROM OTHER DEVICES ===
   unsubscribers.push(
-    eventBus.on('websocket:progress_updated', async ({ libraryItemId, currentTime, progress, isFinished }) => {
+    eventBus.on('websocket:progress_updated', async ({ libraryItemId, _currentTime, _progress, isFinished }) => {
       logger.debug('[EventListeners] WebSocket progress update:', libraryItemId);
 
       // Track for analytics

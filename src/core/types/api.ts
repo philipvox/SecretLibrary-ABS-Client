@@ -6,7 +6,6 @@
 
 import { User } from './user';
 import { Library, LibraryItem, Collection, Playlist } from './library';
-import { MediaProgress, PlaybackSession } from './media';
 import { Series, Author } from './metadata';
 
 /**

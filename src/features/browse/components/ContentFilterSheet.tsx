@@ -6,7 +6,7 @@
  * Matches SearchFilterSheet styling (centered popup, white/black only).
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,

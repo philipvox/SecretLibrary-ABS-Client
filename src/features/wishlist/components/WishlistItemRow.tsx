@@ -17,7 +17,6 @@ import { Image } from 'expo-image';
 import {
   Bookmark,
   Star,
-  MoreVertical,
   Clock,
   User,
   Trash2,
@@ -27,7 +26,7 @@ import * as Haptics from 'expo-haptics';
 import { WishlistItem, WishlistPriority } from '../types';
 import { useWishlistStore } from '../stores/wishlistStore';
 import { useCoverUrl, useLibraryCache } from '@/core/cache';
-import { scale, spacing, radius, accentColors, useTheme, ACCENT } from '@/shared/theme';
+import { scale, useTheme, ACCENT } from '@/shared/theme';
 
 interface WishlistItemRowProps {
   item: WishlistItem;

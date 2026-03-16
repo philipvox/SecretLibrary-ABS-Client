@@ -9,11 +9,10 @@
  */
 
 import { useEffect } from 'react';
-import { View, Pressable, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
@@ -75,7 +74,7 @@ interface HolographicStickerProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+const _AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 let gyroscopeIntervalConfigured = false;
 

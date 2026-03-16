@@ -8,7 +8,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { User, Mic } from 'lucide-react-native';
-import { scale, spacing, useTheme } from '@/shared/theme';
+import { scale, useTheme } from '@/shared/theme';
 
 interface PersonCardProps {
   name: string;

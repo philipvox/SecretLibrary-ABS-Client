@@ -8,13 +8,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { nanoid } from 'nanoid';
 import {
   WishlistItem,
   FollowedAuthor,
   TrackedSeries,
   WishlistPriority,
-  WishlistSource,
   WishlistStatus,
   WishlistSortOption,
   WishlistFilters,

@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { View, TouchableOpacity, StyleSheet, ActivityIndicator, StyleProp, ViewStyle } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SkipBackIcon, SkipForwardIcon, PlayIcon, PauseIcon } from '@/shared/components';
 import { haptics } from '@/core/native/haptics';
 import {
@@ -14,7 +14,6 @@ import {
   scale,
   layout,
   useTheme,
-  accentColors,
 } from '@/shared/theme';
 
 interface PlaybackControlsProps {

@@ -15,7 +15,7 @@ const log = createLogger('MemoryPressure');
 let MemoryModule: any = null;
 try {
   MemoryModule = require('@modules/memory-module');
-} catch (e) {
+} catch {
   // Module may not be available in Expo Go
 }
 

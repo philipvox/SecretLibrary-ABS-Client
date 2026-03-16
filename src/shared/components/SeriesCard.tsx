@@ -11,7 +11,6 @@ import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'r
 import { Image } from 'expo-image';
 import { apiClient } from '@/core/api';
 import {
-  scale,
   spacing,
   radius,
   typography,

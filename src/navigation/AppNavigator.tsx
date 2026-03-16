@@ -47,7 +47,6 @@ import { downloadManager } from '@/core/services/downloadManager';
 import { networkMonitor } from '@/core/services/networkMonitor';
 import { imageCacheService } from '@/core/services/imageCacheService';
 import { navigationMonitor } from '@/utils/runtimeMonitor';
-import { NavigationBar } from './components/NavigationBar';
 import { GlobalMiniPlayer } from './components/GlobalMiniPlayer';
 import { NetworkStatusBar, ToastContainer, LocalStorageNoticeModal, GlobalCacheProgressBar, BookContextMenuProvider } from '@/shared/components';
 import { ErrorBoundary } from '@/core/errors/ErrorBoundary';
@@ -435,7 +434,7 @@ function AuthenticatedApp() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, _isLoading } = useAuth();
 
   // No loading state - App.tsx handles splash screen via AnimatedSplash
   // isLoading should be false when using initialSession from AppInitializer

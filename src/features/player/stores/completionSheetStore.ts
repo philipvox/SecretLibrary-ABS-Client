@@ -20,6 +20,12 @@ import { haptics } from '@/core/native/haptics';
 import type { LibraryItem } from '@/core/types';
 
 // =============================================================================
+// LOGGING
+// =============================================================================
+
+import { createLogger } from '@/shared/utils/logger';
+
+// =============================================================================
 // CONSTANTS
 // =============================================================================
 
@@ -76,12 +82,6 @@ interface CompletionActions {
   loadCompletionSettings: () => Promise<void>;
 }
 
-// =============================================================================
-// LOGGING
-// =============================================================================
-
-import { createLogger } from '@/shared/utils/logger';
-
 const log = createLogger('CompletionSheetStore');
 
 // =============================================================================
@@ -89,7 +89,7 @@ const log = createLogger('CompletionSheetStore');
 // =============================================================================
 
 export const useCompletionSheetStore = create<CompletionState & CompletionActions>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector((set, _get) => ({
     // =========================================================================
     // INITIAL STATE
     // =========================================================================

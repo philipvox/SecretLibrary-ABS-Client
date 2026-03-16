@@ -7,7 +7,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { FloatingTabBar } from '../FloatingTabBar';
-import { Platform } from 'react-native';
 
 // Mock Platform to return ios for consistent testing
 jest.mock('react-native/Libraries/Utilities/Platform', () => ({

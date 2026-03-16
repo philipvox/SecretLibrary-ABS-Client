@@ -34,22 +34,34 @@ import { apiClient } from '@/core/api';
 import { librarySyncService } from '@/core/services/librarySyncService';
 import { useLibrarySyncStore } from '@/shared/stores/librarySyncStore';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 import { haptics } from '@/core/native/haptics';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { useLibraryCache } from '@/core/cache';
 import { useToastStore } from '@/shared/hooks/useToast';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
-import { TopNav, TopNavSearchIcon, SkullRefreshControl, SkeletonBox, useBookContextMenu } from '@/shared/components';
+import { TopNav, TopNavSearchIcon, SkeletonBox, useBookContextMenu } from '@/shared/components';
 import { useNavigationWithLoading } from '@/shared/hooks';
 import {
   secretLibraryColors as staticColors,
-  secretLibraryTypography as typography,
   secretLibrarySpacing as spacing,
-  secretLibrarySizes as sizes,
   secretLibraryFonts as fonts,
 } from '@/shared/theme/secretLibrary';
 import { getTitle, getAuthorName, getNarratorName } from '@/shared/utils/metadata';
+
+import { BookshelfView } from '../components/BookshelfView';
+import { BookSpineVerticalData } from '../components/BookSpineVertical';
+import { RecommendedBook } from '../components/DiscoverMoreCard';
+import { useHomeData } from '../hooks/useHomeData';
+import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
+import { useInProgressBooks, useFinishedBooks } from '@/core/hooks/useUserBooks';
+import { useShallow } from 'zustand/react/shallow';
+import { useProgressStore } from '@/core/stores/progressStore';
+import { usePlayerStore } from '@/features/player/stores';
+import { GLOBAL_MINI_PLAYER_HEIGHT } from '@/navigation/components/GlobalMiniPlayer';
+import { useAppReadyStore } from '@/core/stores/appReadyStore';
+import { useSpineCacheStore } from '../stores/spineCache';
+import { usePlaylists, usePlaylistSettingsStore } from '@/features/playlists';
 
 // Extended metadata with tags
 interface ExtendedBookMetadata extends BookMetadata {
@@ -68,20 +80,6 @@ function getBookMetadata(item: LibraryItem | null | undefined): ExtendedBookMeta
 function getBookDuration(item: LibraryItem | null | undefined): number {
   return item?.media?.duration || 0;
 }
-
-import { BookshelfView, LayoutMode } from '../components/BookshelfView';
-import { BookSpineVerticalData } from '../components/BookSpineVertical';
-import { DiscoverMoreCard, RecommendedBook } from '../components/DiscoverMoreCard';
-import { useHomeData } from '../hooks/useHomeData';
-import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
-import { useInProgressBooks, useFinishedBooks } from '@/core/hooks/useUserBooks';
-import { useShallow } from 'zustand/react/shallow';
-import { useProgressStore } from '@/core/stores/progressStore';
-import { usePlayerStore } from '@/features/player/stores';
-import { GLOBAL_MINI_PLAYER_HEIGHT } from '@/navigation/components/GlobalMiniPlayer';
-import { useAppReadyStore } from '@/core/stores/appReadyStore';
-import { useSpineCacheStore } from '../stores/spineCache';
-import { usePlaylists, usePlaylistSettingsStore } from '@/features/playlists';
 
 // =============================================================================
 // BOTTOM PADDING CONSTANTS - Edit these to adjust shelf/stack/list positioning
@@ -185,7 +183,7 @@ const GridIcon = ({ color = '#000' }: IconProps) => (
 );
 
 // Globe icon — discover/browse navigation
-const GlobeIcon = ({ color = '#000', size = 16 }: IconProps & { size?: number }) => (
+const _GlobeIcon = ({ color = '#000', size = 16 }: IconProps & { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5}>
     <Circle cx={12} cy={12} r={10} />
     <Path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
@@ -414,7 +412,7 @@ function ViewModePicker({ mode, onModeChange, iconColor, activeIconColor, inacti
     };
   }, []);
 
-  const handlePressIn = useCallback((e: GestureResponderEvent) => {
+  const handlePressIn = useCallback((_e: GestureResponderEvent) => {
     didOpen.current = false;
     containerRef.current?.measureInWindow((_x, y) => {
       containerLayout.current = { y };
@@ -564,7 +562,7 @@ const viewPickerStyles = StyleSheet.create({
 // =============================================================================
 
 export function LibraryScreen() {
-  const { navigateWithLoading, jumpToTabWithLoading, navigation } = useNavigationWithLoading();
+  const { _navigateWithLoading, jumpToTabWithLoading, navigation } = useNavigationWithLoading();
   // Note: Safe area is handled by TopNav component (includeSafeArea={true} by default)
 
   // Book context menu (long-press actions)
@@ -877,7 +875,7 @@ export function LibraryScreen() {
   }
 
   // Get all completed downloads as LibraryItems
-  const downloadedLibraryItems = useMemo(() => {
+  const _downloadedLibraryItems = useMemo(() => {
     return downloads
       .filter((d) => d.status === 'complete' && d.libraryItem)
       .map((d) => d.libraryItem as LibraryItem);
@@ -1190,8 +1188,8 @@ export function LibraryScreen() {
 
   // Dynamic styles based on mode - using white/black background
   const screenBg = colors.white;
-  const textColor = colors.black;
-  const buttonInactiveColor = colors.grayLine;
+  const _textColor = colors.black;
+  const _buttonInactiveColor = colors.grayLine;
   const buttonInactiveTextColor = colors.gray;
 
   // Get current labels for dropdowns

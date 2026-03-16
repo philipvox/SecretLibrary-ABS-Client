@@ -16,7 +16,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { Alert } from 'react-native';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { sessionService, SessionChapter, AudioTrack, PlaybackSession } from '../services/sessionService';
+import { sessionService, AudioTrack, PlaybackSession } from '../services/sessionService';
 import { chapterCacheService } from '../services/chapterCacheService';
 import { progressService } from '../services/progressService';
 import { backgroundSyncService } from '../services/backgroundSyncService';
@@ -67,7 +67,6 @@ import { trackEvent } from '@/core/monitoring';
 import { isAudioFile } from '@/constants/audio';
 
 // Import haptics for sleep timer feedback
-import { haptics } from '@/core/native/haptics';
 
 // Import event bus for cross-store communication
 import { eventBus } from '@/core/events';
@@ -88,11 +87,8 @@ import {
 import {
   setupDownloadCompletionListener,
   cleanupDownloadCompletionListener,
-  PlayerStateSnapshot,
 } from '../utils/downloadListener';
 import {
-  mapSessionChapters,
-  extractChaptersFromBook,
   findChapterIndex,
   getBookDuration,
   getDownloadPath,
@@ -115,13 +111,13 @@ import { useSpeedStore } from './speedStore';
 import { useCompletionSheetStore } from './completionSheetStore';
 
 // Import seeking store (Phase 7 refactor)
-import { useSeekingStore, type SeekDirection as SeekDirectionImport } from './seekingStore';
+import { useSeekingStore } from './seekingStore';
 
 // Import transition progress for continuous mini→full player animation
 import { playerTransitionProgress, SPRING_CONFIG } from './playerTransition';
 import { withSpring, withTiming } from 'react-native-reanimated';
 
-const DEBUG = __DEV__;
+const _DEBUG = __DEV__;
 const log = (msg: string, ...args: unknown[]) => audioLog.store(msg, ...args);
 const logError = (msg: string, ...args: unknown[]) => audioLog.error(msg, ...args);
 
@@ -359,8 +355,8 @@ const LAST_PLAYED_BOOK_ID_KEY = 'playerLastPlayedBookId';
 const PROGRESS_SAVE_INTERVAL = 5000; // Save progress every 5 seconds (SQLite only, no UI updates)
 const MIN_PAUSE_FOR_REWIND_MS = 3000; // Minimum pause before smart rewind applies
 const PREV_CHAPTER_THRESHOLD = 3;     // Seconds before going to prev vs restart
-const SLEEP_TIMER_SHAKE_THRESHOLD = 60; // Start shake detection when < 60 seconds remaining
-const SLEEP_TIMER_EXTEND_MINUTES = 15;  // Add 15 minutes on shake
+const _SLEEP_TIMER_SHAKE_THRESHOLD = 60; // Start shake detection when < 60 seconds remaining
+const _SLEEP_TIMER_EXTEND_MINUTES = 15;  // Add 15 minutes on shake
 const AUTO_DOWNLOAD_THRESHOLD = 0.8;  // Trigger auto-download at 80% progress
 
 // =============================================================================
@@ -2094,7 +2090,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Unload audio (cancels ExoPlayer prepare, clears media items)
       try {
         await audioService.cleanup();
-      } catch (e) {
+      } catch {
         // Ignore cleanup errors
       }
 
@@ -2177,7 +2173,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       const {
         currentBook,
         duration: storeDuration,
-        isLoading,
+        _isLoading,
         isPlaying: wasPlaying,
         position: prevPosition,
       } = get();

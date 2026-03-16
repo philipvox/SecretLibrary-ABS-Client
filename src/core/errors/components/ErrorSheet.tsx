@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
-  Platform,
 } from 'react-native';
 import { AlertCircle, RefreshCw, CloudOff, LogIn, type LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

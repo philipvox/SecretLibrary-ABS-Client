@@ -25,7 +25,7 @@ import {
   Play,
   type LucideIcon,
 } from 'lucide-react-native';
-import { scale, spacing } from '@/shared/theme';
+import { scale } from '@/shared/theme';
 import { useColors } from '@/shared/theme/themeStore';
 
 type TabType = 'all' | 'downloaded' | 'in-progress' | 'not-started' | 'completed' | 'favorites';

@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from 'react';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
 import { ContentRow, BookSummary, SourceAttribution } from '../types';
 import { MAX_RECOMMENDATION_GROUPS } from './discoverUtils';

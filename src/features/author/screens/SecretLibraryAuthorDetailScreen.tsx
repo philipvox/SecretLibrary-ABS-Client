@@ -29,7 +29,7 @@ import * as Haptics from 'expo-haptics';
 import { useLibraryCache } from '@/core/cache';
 import { apiClient } from '@/core/api';
 import { CoverStars } from '@/shared/components/CoverStars';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 import { useWishlistStore, useIsAuthorFollowed } from '@/features/wishlist';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -336,7 +336,7 @@ export function SecretLibraryAuthorDetailScreen() {
   // ShelfView replaced by shared ShelfRow component (proper React component, not useCallback)
 
   // Render inline book list with cover images (paragraph style)
-  const renderBookList = (books: LibraryItem[]) => {
+  const _renderBookList = (books: LibraryItem[]) => {
     return (
       <Text style={styles.flowingText}>
         {books.map((book, index) => {

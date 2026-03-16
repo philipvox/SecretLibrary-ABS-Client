@@ -33,7 +33,7 @@ import { useAuth } from '@/core/auth';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { haptics } from '@/core/native/haptics';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { APP_VERSION, BUILD_NUMBER, VERSION_DATE } from '@/constants/version';
+import { APP_VERSION } from '@/constants/version';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import {
   secretLibraryColors as staticColors,

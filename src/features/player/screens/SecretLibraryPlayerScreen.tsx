@@ -33,7 +33,7 @@ import RAnimated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { CoverStars } from '@/shared/components/CoverStars';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { PlayIcon, PauseIcon, StopIcon } from '../components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
@@ -68,7 +68,6 @@ import { haptics } from '@/core/native/haptics';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import {
   secretLibraryColors as staticColors,
-  secretLibraryFonts as fonts,
 } from '@/shared/theme/secretLibrary';
 import { useResponsive } from '@/shared/hooks/useResponsive';
 import { useSpineCacheStore, getTypographyForGenres, getSeriesStyle } from '@/shared/spine';
@@ -111,7 +110,7 @@ const ListIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
   </Svg>
 );
 
-const DownloadIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
+const _DownloadIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5}>
     <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <Path d="M7 10l5 5 5-5" />
@@ -138,13 +137,13 @@ const BookmarkIcon = ({ color = staticColors.black, size = 13 }: IconProps) => (
   </Svg>
 );
 
-const PrevIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
+const _PrevIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
   </Svg>
 );
 
-const NextIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
+const _NextIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
   </Svg>
@@ -181,7 +180,7 @@ const SkipPrevIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
 );
 
 // Chevron down icon (for other uses)
-const ChevronDownIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
+const _ChevronDownIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
     <Path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
@@ -372,7 +371,7 @@ export function SecretLibraryPlayerScreen() {
 
   const chapterIndex = useCurrentChapterIndex();
   const coverUrl = useCoverUrl(currentBook?.id || '', { width: 1024 });
-  const { isDownloaded, isDownloading, isPaused, isPending, progress: downloadProgress } = useDownloadStatus(currentBook?.id || '');
+  const { isDownloaded, isDownloading, isPaused, isPending, progress: _downloadProgress } = useDownloadStatus(currentBook?.id || '');
   const { queueDownload } = useDownloads();
 
   // Book metadata
@@ -380,7 +379,7 @@ export function SecretLibraryPlayerScreen() {
   const title = metadata?.title || 'Unknown Title';
   const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
   const authorId = metadata?.authors?.[0]?.id || null;
-  const publishedYear = metadata?.publishedYear || '';
+  const _publishedYear = metadata?.publishedYear || '';
 
   // Parse series name - handle multiple formats
   const seriesName = useMemo(() => {
@@ -447,7 +446,7 @@ export function SecretLibraryPlayerScreen() {
 
   // Get spine typography - USE CACHED TYPOGRAPHY for consistency
   // This ensures player shows the EXACT same font as the book spine on home screen
-  const spineTypography = useMemo(() => {
+  const _spineTypography = useMemo(() => {
     if (!currentBook?.id) return null;
 
     // FIRST: Use pre-computed typography from spine cache (computed at app startup)
@@ -814,7 +813,7 @@ export function SecretLibraryPlayerScreen() {
   }, [currentBook?.id, closePlayer, navigation]);
 
   // Navigate to series detail
-  const handleSeriesPress = useCallback(() => {
+  const _handleSeriesPress = useCallback(() => {
     if (seriesName) {
       haptics.selection();
       closePlayer();
@@ -869,7 +868,7 @@ export function SecretLibraryPlayerScreen() {
   }, [closePlayer]);
 
   // Download handler - supports pause/resume
-  const handleDownload = useCallback(async () => {
+  const _handleDownload = useCallback(async () => {
     if (!currentBook) return;
 
     // If downloading, pause it
@@ -901,7 +900,7 @@ export function SecretLibraryPlayerScreen() {
   }, [currentBook, isDownloaded, isDownloading, isPaused, isPending, queueDownload]);
 
   // Progress bar seek handler
-  const handleSeek = useCallback((progress: number) => {
+  const _handleSeek = useCallback((progress: number) => {
     if (duration > 0) {
       const newPosition = progress * duration;
       seekTo(newPosition);
@@ -1072,7 +1071,7 @@ export function SecretLibraryPlayerScreen() {
     setEditTime(0);
   }, []);
 
-  const handleDeleteBookmark = useCallback((bookmark: Bookmark) => {
+  const _handleDeleteBookmark = useCallback((bookmark: Bookmark) => {
     removeBookmark(bookmark.id);
   }, [removeBookmark]);
 

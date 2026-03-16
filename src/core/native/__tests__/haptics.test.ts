@@ -3,9 +3,12 @@
  */
 
 // Unmock the haptics module so we can test the real implementation
-jest.unmock('@/core/native/haptics');
-
 import * as ExpoHaptics from 'expo-haptics';
+
+// Import haptics after mocks are set up
+import { haptics } from '../haptics';
+
+jest.unmock('@/core/native/haptics');
 
 // Mock haptic settings store BEFORE importing haptics
 const mockSettings = {
@@ -25,9 +28,6 @@ jest.mock('@/features/profile/stores/hapticSettingsStore', () => ({
     getState: jest.fn(() => mockSettings),
   },
 }));
-
-// Import haptics after mocks are set up
-import { haptics } from '../haptics';
 
 describe('HapticService', () => {
   beforeEach(() => {

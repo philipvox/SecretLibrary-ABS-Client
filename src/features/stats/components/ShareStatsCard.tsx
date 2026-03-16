@@ -16,7 +16,7 @@ import {
 import { Icon } from '@/shared/components/Icon';
 import { formatDuration } from '@/shared/utils/format';
 import { shareWeeklyStats, shareStreak, shareMilestone } from '../services/shareService';
-import { wp, accentColors, useTheme } from '@/shared/theme';
+import { wp, useTheme } from '@/shared/theme';
 
 const SCREEN_WIDTH = wp(100);
 
@@ -89,7 +89,7 @@ export function ShareStatsCard({
       if (success && onClose) {
         onClose();
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Share Failed', 'Could not share your stats. Please try again.');
     }
   }, [type, streakStats, allTimeStats, onClose]);

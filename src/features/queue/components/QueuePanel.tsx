@@ -17,7 +17,6 @@ import {
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
 import { usePlayerStore } from '@/features/player/stores';

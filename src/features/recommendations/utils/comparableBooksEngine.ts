@@ -11,7 +11,7 @@
  */
 
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { COMPARABLE_WEIGHTS, COMPARABLE_WEIGHTS_BYL, TEMPORAL_DECAY, getTemporalDecay } from './scoreWeights';
+import { COMPARABLE_WEIGHTS, COMPARABLE_WEIGHTS_BYL, getTemporalDecay } from './scoreWeights';
 import { parseBookDNA, BookDNA } from '@/shared/utils/bookDNA';
 import { getPublicationEra, PublicationEra } from './publicationEra';
 

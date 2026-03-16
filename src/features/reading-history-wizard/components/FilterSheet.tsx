@@ -15,7 +15,7 @@ import {
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { FilterState, DurationFilter, SyncStatusFilter } from '../stores/galleryStore';

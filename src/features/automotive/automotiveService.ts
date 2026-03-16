@@ -19,7 +19,6 @@ import {
   AutomotiveConnectionState,
   AutomotivePlatform,
   AutomotiveNowPlaying,
-  AutomotiveAction,
   AutomotiveCallbacks,
   AutomotiveConfig,
   BrowseSection,
@@ -164,7 +163,7 @@ class AutomotiveService {
 
   // Command execution lock to prevent concurrent commands from racing
   private isCommandExecuting: boolean = false;
-  private commandQueue: Array<{ command: string; param?: string }> = [];
+  private commandQueue: { command: string; param?: string }[] = [];
 
   // Callback set by setupPlayerStateSync to notify command cooldown
   private _notifyCommandExecuted: (() => void) | null = null;
@@ -711,7 +710,7 @@ class AutomotiveService {
           title: `Bookmark at ${this.formatTime(position)}`,
         });
         log(`Bookmark added at ${position}s for "${bookTitle}"`);
-      } catch (bookmarkError) {
+      } catch {
         // Fallback: just log that we would add a bookmark
         log(`Would add bookmark at ${position}s for "${bookTitle}" (store not available)`);
       }
@@ -1022,7 +1021,7 @@ class AutomotiveService {
   private async setupCarPlayTemplates(): Promise<void> {
     if (!this.carPlayModule) return;
 
-    const { TabBarTemplate, ListTemplate, NowPlayingTemplate } = this.carPlayModule;
+    const { TabBarTemplate, ListTemplate, _NowPlayingTemplate } = this.carPlayModule;
 
     // Get initial data
     const sections = await this.getBrowseSections();
@@ -1337,7 +1336,7 @@ class AutomotiveService {
   /**
    * Update now playing information for automotive displays
    */
-  async updateNowPlaying(nowPlaying: AutomotiveNowPlaying): Promise<void> {
+  async updateNowPlaying(_nowPlaying: AutomotiveNowPlaying): Promise<void> {
     if (this.connectionState !== 'connected') return;
 
     // CarPlay Now Playing is automatically handled by MPNowPlayingInfoCenter

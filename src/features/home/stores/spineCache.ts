@@ -13,17 +13,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-import { Image } from 'expo-image';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { createLogger } from '@/shared/utils/logger';
-
-const log = createLogger('SpineCache');
-
-// Dimension cache TTL: 24 hours
-// Ensures stale dimensions are refreshed if server spine images change
-const DIMENSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // MIGRATED: Now using new spine system via adapter
 import { calculateBookDimensions, hashString, getSpineColorForGenres, getTypographyForGenres } from '../utils/spine/adapter';
@@ -31,6 +23,12 @@ import { calculateBookDimensions, hashString, getSpineColorForGenres, getTypogra
 import { shouldUseTemplates, applyTemplateConfig } from '../utils/spine/templateAdapter';
 // getPlatformFont resolves custom fonts to available fonts (same as BookSpineVertical)
 import { getPlatformFont } from '../utils/spineCalculations';
+
+const log = createLogger('SpineCache');
+
+// Dimension cache TTL: 24 hours
+// Ensures stale dimensions are refreshed if server spine images change
+const DIMENSION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // =============================================================================
 // TYPE GUARDS
@@ -312,7 +310,7 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
 
         const startTime = Date.now();
         const newCache = new Map<string, CachedSpineData>();
-        const itemIds = new Set(items.map(i => i.id));
+        const _itemIds = new Set(items.map(i => i.id));
         let computed = 0;
 
         // Always compute fresh — ensures colors match current palette

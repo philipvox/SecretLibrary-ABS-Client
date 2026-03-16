@@ -12,7 +12,6 @@ import { AppState, AppStateStatus } from 'react-native';
 import { apiClient } from '@/core/api';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { playbackCache } from '@/core/services/playbackCache';
-import { sessionService } from './sessionService';
 import { audioService } from './audioService';
 import { audioLog, formatDuration, logSection } from '@/shared/utils/audioDebug';
 import { trackEvent } from '@/core/monitoring';
@@ -23,7 +22,7 @@ import { getErrorMessage } from '@/shared/utils/errorUtils';
 import { useToastStore } from '@/shared/hooks/useToast';
 import { validatePositionForSync } from '../utils/progressCalculator';
 
-const DEBUG = __DEV__;
+const _DEBUG = __DEV__;
 const log = (...args: any[]) => audioLog.sync(args.join(' '));
 
 interface SyncQueueItem {
@@ -318,7 +317,7 @@ class BackgroundSyncService {
     const now = Date.now();
     const itemsToSync: SyncQueueItem[] = [];
 
-    for (const [itemId, item] of this.syncQueue.entries()) {
+    for (const [_itemId, item] of this.syncQueue.entries()) {
       // Check if enough time has passed since last attempt
       const timeSinceAttempt = now - item.lastAttempt;
       const requiredDelay = item.retryCount > 0

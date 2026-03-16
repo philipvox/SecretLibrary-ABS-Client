@@ -8,7 +8,7 @@
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { scale, spacing, useTheme } from '@/shared/theme';
+import { scale, useTheme } from '@/shared/theme';
 import { TabType, TAB_ORDER, TAB_LABELS } from '../types';
 
 interface LibraryTabBarProps {

@@ -7,8 +7,6 @@
 import { BaseApiClient } from './baseClient';
 import { endpoints, buildQueryString } from './endpoints';
 import { createLogger } from '@/shared/utils/logger';
-
-const apiLogger = createLogger('API');
 import {
   LoginResponse,
   LibrariesResponse,
@@ -18,7 +16,6 @@ import {
   CreateSessionRequest,
   SearchQuery,
   SearchResults,
-  SeriesResponse,
   AuthorsResponse,
   CollectionsResponse,
   PlaylistsResponse,
@@ -30,6 +27,8 @@ import { User } from '../types/user';
 import { Library, LibraryItem, Collection, Playlist } from '../types/library';
 import { MediaProgress, PlaybackSession } from '../types/media';
 import { Series, Author } from '../types/metadata';
+
+const apiLogger = createLogger('API');
 
 /**
  * Main API Client class with all AudiobookShelf API operations

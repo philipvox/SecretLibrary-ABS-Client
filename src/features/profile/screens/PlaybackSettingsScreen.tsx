@@ -126,7 +126,7 @@ function OptionPicker<T>({
 
 export function PlaybackSettingsScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const _navigation = useNavigation();
   const colors = useSecretLibraryColors();
 
   // Player settings from store

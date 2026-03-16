@@ -6,8 +6,6 @@
  */
 
 // Export types
-export * from './types';
-
 // Import all genre profiles
 import { ADVENTURE } from './genres/adventure';
 import { ANTHOLOGY } from './genres/anthology';
@@ -52,6 +50,20 @@ import { WESTERN } from './genres/western';
 import { YOUNG_ADULT } from './genres/young-adult';
 
 import { GenreProfile } from './types';
+
+// =============================================================================
+// BACKWARDS COMPATIBILITY LAYER
+// =============================================================================
+
+// Import old typography types for compatibility
+import {
+  SpineTypography,
+  GenreTypographyProfile,
+  FontWeight as OldFontWeight,
+  TextTransform,
+} from '../typography/types';
+
+export * from './types';
 
 // =============================================================================
 // PROFILE EXPORTS
@@ -238,18 +250,6 @@ export function getPersonalityFlags(profileId: string) {
   const profile = getProfile(profileId);
   return profile.personality;
 }
-
-// =============================================================================
-// BACKWARDS COMPATIBILITY LAYER
-// =============================================================================
-
-// Import old typography types for compatibility
-import {
-  SpineTypography,
-  GenreTypographyProfile,
-  FontWeight as OldFontWeight,
-  TextTransform,
-} from '../typography/types';
 
 /**
  * Convert new profile format to old SpineTypography format.

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -114,7 +114,7 @@ const SeriesFannedCard = memo(function SeriesFannedCard({ series }: SeriesFanned
 export function SeriesListContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const { colors } = useTheme();
-  const accent = colors.accent.primary;
+  const _accent = colors.accent.primary;
   const { library, isLoading: isLoadingLibrary } = useDefaultLibrary();
   const { series, seriesCount, isLoading, error, refetch } = useSeries(
     library?.id || '',

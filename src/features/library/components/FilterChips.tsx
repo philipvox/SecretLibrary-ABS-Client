@@ -7,7 +7,6 @@
 
 import React, { useCallback } from 'react';
 import {
-  View,
   Text,
   TouchableOpacity,
   ScrollView,

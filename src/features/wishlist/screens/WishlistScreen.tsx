@@ -18,15 +18,13 @@ import { useNavigation } from '@react-navigation/native';
 import {
   Plus,
   Bookmark,
-  Filter,
   SortAsc,
   Star,
-  BookOpen,
   User,
   Library,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { WishlistItem, WishlistSortOption, WishlistPriority, FollowedAuthor, TrackedSeries } from '../types';
+import { WishlistItem, WishlistSortOption, FollowedAuthor, TrackedSeries } from '../types';
 import {
   useWishlistStore,
   useWishlistCount,
@@ -70,7 +68,7 @@ export function WishlistScreen() {
   const items = useWishlistStore((s) => s.items);
   const sortBy = useWishlistStore((s) => s.sortBy);
   const setSortBy = useWishlistStore((s) => s.setSortBy);
-  const getFilteredItems = useWishlistStore((s) => s.getFilteredItems);
+  const _getFilteredItems = useWishlistStore((s) => s.getFilteredItems);
   const getSortedItems = useWishlistStore((s) => s.getSortedItems);
   const followedAuthors = useWishlistStore((s) => s.followedAuthors);
   const trackedSeries = useWishlistStore((s) => s.trackedSeries);

@@ -84,7 +84,7 @@ function UnifiedViewRow({
   const colors = useSecretLibraryColors();
 
   const handleToggle = useCallback(
-    (newValue: boolean) => {
+    (_newValue: boolean) => {
       haptics.selection();
       onToggleVisibility();
     },

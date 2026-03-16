@@ -27,29 +27,17 @@ import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { useLibraryCache, getAllGenres, getAllAuthors, getAllSeries, getAllNarrators, useCoverUrl, type FilterOptions } from '@/core/cache';
+import { useLibraryCache, getAllGenres, getAllAuthors, getAllSeries, getAllNarrators, type FilterOptions } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
 import { apiClient } from '@/core/api';
 import { downloadManager, DownloadTask } from '@/core/services/downloadManager';
 import { Icon } from '@/shared/components/Icon';
-import { HeartButton, SearchResultsSkeleton, AuthorRowSkeleton, TopNav, TopNavBackIcon, useBookContextMenu } from '@/shared/components';
+import { SearchResultsSkeleton, AuthorRowSkeleton, TopNav, TopNavBackIcon, useBookContextMenu } from '@/shared/components';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
-
-// Type guard for book media
-function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'duration' in media;
-}
-
-// Helper to get book metadata safely
-function getBookMetadata(item: LibraryItem): BookMetadata | null {
-  if (item.mediaType !== 'book' || !item.media?.metadata) return null;
-  return item.media.metadata as BookMetadata;
-}
-import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { fuzzyMatch, findSuggestions, expandAbbreviations } from '../utils/fuzzySearch';
 import { wp, spacing, radius, scale, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { useIsDarkMode } from '@/shared/theme/themeStore';
 import { useKidModeStore } from '@/shared/stores/kidModeStore';
 import { filterForKidMode } from '@/shared/utils/kidModeFilter';
@@ -61,6 +49,17 @@ import { BookSimpleRow } from '../components/BookSimpleRow';
 import { SearchFilterSheet, type SearchFilterState, type AvailableFilters, type AgeRange } from '../components/SearchFilterSheet';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import { DURATION_RANGES, type DurationRangeId } from '@/features/browse/hooks/useBrowseCounts';
+
+// Type guard for book media
+function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
+  return media !== undefined && 'duration' in media;
+}
+
+// Helper to get book metadata safely
+function getBookMetadata(item: LibraryItem): BookMetadata | null {
+  if (item.mediaType !== 'book' || !item.media?.metadata) return null;
+  return item.media.metadata as BookMetadata;
+}
 
 const SCREEN_WIDTH = wp(100);
 const GAP = spacing.sm;
@@ -86,8 +85,8 @@ function useDebounce<T>(value: T, delay: number): T {
 
 // Series card constants
 const SERIES_CARD_WIDTH = (SCREEN_WIDTH - PADDING * 2 - GAP) / 2;
-const SERIES_COVER_WIDTH = 65;
-const SERIES_COVER_HEIGHT = 95;
+const _SERIES_COVER_WIDTH = 65;
+const _SERIES_COVER_HEIGHT = 95;
 const COVER_SIZE = 60;
 
 type SortOption = 'title' | 'author' | 'dateAdded' | 'duration';
@@ -106,10 +105,10 @@ export function SearchScreen() {
   const route = useRoute<RouteProp<{ Search: SearchScreenParams }, 'Search'>>();
   const inputRef = useRef<TextInput>(null);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { loadBook, isLoading: isPlayerLoading, currentBook } = usePlayerStore();
+  const { loadBook, isLoading: _isPlayerLoading, _currentBook } = usePlayerStore();
 
   // Book context menu
-  const { showMenu } = useBookContextMenu();
+  const { _showMenu } = useBookContextMenu();
 
   // Theme-aware colors (Secret Library design system)
   const colors = useSecretLibraryColors();
@@ -127,7 +126,7 @@ export function SearchScreen() {
   const BORDER_DEFAULT = colors.grayLine; // Default border
 
   // Browse counts for Quick Browse section
-  const browseCounts = useBrowseCounts();
+  const _browseCounts = useBrowseCounts();
 
   // Theme-aware styles
   const styles = useMemo(() => createStyles({
@@ -202,7 +201,7 @@ export function SearchScreen() {
   const allSeries = useMemo(() => getAllSeries(), [isLoaded]);
 
   // Download status tracking
-  const [downloadTasks, setDownloadTasks] = useState<Map<string, DownloadTask>>(new Map());
+  const [_downloadTasks, setDownloadTasks] = useState<Map<string, DownloadTask>>(new Map());
 
   // Subscribe to download status changes
   useEffect(() => {
@@ -375,7 +374,7 @@ export function SearchScreen() {
   const autocompleteSuggestions = useMemo(() => {
     if (!query.trim() || query.length < 2) return { books: [], authors: [], series: [], narrators: [] };
 
-    const lowerQuery = query.toLowerCase();
+    const _lowerQuery = query.toLowerCase();
 
     // Books - simple text, max 2 (per research: 4-6 total suggestions)
     // Apply Kid Mode filter to autocomplete results
@@ -550,7 +549,7 @@ export function SearchScreen() {
   };
 
   // Handle Quick Browse category press
-  const handleQuickBrowseCategory = useCallback((category: QuickBrowseCategory) => {
+  const _handleQuickBrowseCategory = useCallback((category: QuickBrowseCategory) => {
     switch (category) {
       case 'genres':
         navigation.navigate('GenresList');
@@ -655,7 +654,7 @@ export function SearchScreen() {
     navigation.navigate('BookDetail', { id: book.id });
   }, [navigation, query]);
 
-  const handlePlayBook = useCallback(async (book: LibraryItem) => {
+  const _handlePlayBook = useCallback(async (book: LibraryItem) => {
     Keyboard.dismiss();
     if (query.trim()) saveSearch(query.trim());
     try {
@@ -692,7 +691,7 @@ export function SearchScreen() {
     authorResults.length > 0 || narratorResults.length > 0;
 
   // Header colors based on theme — match page bg for seamless look
-  const headerBg = colors.white; // Same as page background
+  const _headerBg = colors.white; // Same as page background
   const headerIconColor = colors.isDark ? staticColors.white : staticColors.black;
   const headerBorderColor = colors.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
 

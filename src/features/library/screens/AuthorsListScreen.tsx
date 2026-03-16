@@ -26,10 +26,10 @@ import { useLibraryCache } from '@/core/cache';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { apiClient } from '@/core/api';
 import { Icon } from '@/shared/components/Icon';
-import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, UserIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { SkullRefreshControl, TopNav, TopNavBackIcon, UserIcon, ScreenLoadingOverlay } from '@/shared/components';
 import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { spacing, radius, useTheme, scale } from '@/shared/theme';
+import { useTheme } from '@/shared/theme';
 import {
   META_CATEGORIES,
   MetaCategory,
@@ -41,7 +41,6 @@ import {
   PopularPersonsSection,
   MetaCategoryPersonSection,
 } from '../components/PersonSections';
-import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 
 type ViewMode = 'grouped' | 'flat';
 
@@ -182,7 +181,7 @@ export function AuthorsListScreen() {
     });
 
     // Sort authors within each category by book count
-    grouped.forEach((authors, category) => {
+    grouped.forEach((authors, _category) => {
       authors.sort((a, b) => b.bookCount - a.bookCount);
     });
 

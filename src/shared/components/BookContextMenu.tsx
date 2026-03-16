@@ -44,7 +44,6 @@ import {
   Download,
   Play,
   ListPlus,
-  BookOpen,
   Check,
   Trash2,
   Library,
@@ -76,7 +75,7 @@ import { playlistsApi } from '@/core/api/endpoints/playlists';
 import { useLibraryCache } from '@/core/cache';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '@/shared/hooks/useToast';
-import { scale, spacing, radius, useTheme, type ThemeColors } from '@/shared/theme';
+import { scale, useTheme } from '@/shared/theme';
 import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import type { LibraryItem, Playlist } from '@/core/types';
 
@@ -364,7 +363,7 @@ export function BookContextMenu({
   onViewDetails,
   playlistId,
 }: BookContextMenuProps) {
-  const { colors } = useTheme();
+  const { _colors } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { height: screenHeight } = useWindowDimensions();

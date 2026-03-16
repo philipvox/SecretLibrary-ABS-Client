@@ -128,7 +128,7 @@ export function AllBooksScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  const { items: libraryItems, refreshCache, isLoaded } = useLibraryCache();
+  const { items: libraryItems, refreshCache, _isLoaded } = useLibraryCache();
 
   // Wait for navigation animation to complete before showing content
   useEffect(() => {

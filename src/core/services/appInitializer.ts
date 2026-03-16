@@ -505,7 +505,7 @@ class AppInitializer {
   private async initBackgroundTaskService(): Promise<void> {
     try {
       const { backgroundTaskService, TaskPriority } = await import('@/core/services/backgroundTaskService');
-      const { useProgressStore } = await import('@/core/stores/progressStore');
+      const { _useProgressStore } = await import('@/core/stores/progressStore');
 
       // Start the background task service
       backgroundTaskService.start();
@@ -748,7 +748,7 @@ class AppInitializer {
   async hideSplash(): Promise<void> {
     try {
       await SplashScreen.hideAsync();
-    } catch (err) {
+    } catch {
       // Already hidden or not available
     }
   }

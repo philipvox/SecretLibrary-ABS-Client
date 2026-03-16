@@ -42,14 +42,8 @@ import { haptics } from '@/core/native/haptics';
 import { PinInput } from '@/shared/components/PinInput';
 import {
   useKidModeStore,
-  DEFAULT_ALLOWED_GENRES,
-  DEFAULT_ALLOWED_TAGS,
-  DEFAULT_BLOCKED_GENRES,
-  DEFAULT_BLOCKED_TAGS,
-  AgeCategory,
   AGE_CATEGORY_ORDER,
   AGE_CATEGORY_LABELS,
-  ContentRating,
   RATING_ORDER,
   RATING_LABELS,
   MAX_PIN_ATTEMPTS,
@@ -176,7 +170,7 @@ function SectionHeader({ title, subtitle, Icon }: SectionHeaderProps) {
 export function KidModeSettingsScreen() {
   const colors = useSecretLibraryColors();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const _navigation = useNavigation();
 
   // Kid Mode settings from store
   const enabled = useKidModeStore((s) => s.enabled);
@@ -213,7 +207,7 @@ export function KidModeSettingsScreen() {
   const setPin = useKidModeStore((s) => s.setPin);
   const removePin = useKidModeStore((s) => s.removePin);
   const verifyPin = useKidModeStore((s) => s.verifyPin);
-  const disableKidMode = useKidModeStore((s) => s.disableKidMode);
+  const _disableKidMode = useKidModeStore((s) => s.disableKidMode);
   const isLockedOut = useKidModeStore((s) => s.isLockedOut);
   const getLockoutRemaining = useKidModeStore((s) => s.getLockoutRemaining);
 

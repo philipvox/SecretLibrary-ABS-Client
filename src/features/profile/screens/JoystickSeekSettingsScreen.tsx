@@ -40,7 +40,6 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   useJoystickSeekStore,
-  CURVE_PRESETS,
   calculateSeekSpeed,
   formatSpeedLabel,
   formatSpeedShort,
@@ -453,7 +452,7 @@ function TestArea({ settings, onTestPositionChange, colors }: TestAreaProps) {
   const translateY = useSharedValue(0);
   const buttonScale = useSharedValue(1);
 
-  const TEST_RADIUS = scale(80);
+  const _TEST_RADIUS = scale(80);
   const MAX_DISPLACEMENT = scale(100);
 
   // Wrapper functions for haptics (can't access haptics object in worklet)

@@ -124,7 +124,7 @@ export function createLoadingLogger(scope: string) {
  * Call after initialization to print a formatted table.
  */
 export function logInitTimings(
-  stepTimings: Array<{ step: string; duration: number; status: string }>,
+  stepTimings: { step: string; duration: number; status: string }[],
   totalTime: number
 ): void {
   if (!LOADING_DEBUG) return;

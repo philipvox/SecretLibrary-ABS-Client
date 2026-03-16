@@ -436,7 +436,7 @@ function AdjacentBookPage({ book, seriesName: parentSeriesName, bookSequence }: 
 
 export function SeriesSwipeContainer({ book, children }: SeriesSwipeContainerProps) {
   const navigation = useNavigation<any>();
-  const colors = useSecretLibraryColors();
+  const _colors = useSecretLibraryColors();
 
   const navInfo = useMemo(() => getSeriesNavigationInfo(book), [book]);
 

@@ -309,7 +309,7 @@ class PrefetchService {
       try {
         await Image.prefetch(batch);
         cached += batch.length;
-      } catch (err) {
+      } catch {
         // Continue with next batch even if one fails
         logger.debug(`[Prefetch] Thumbnail batch ${Math.floor(i / BATCH_SIZE) + 1} partial failure`);
       }

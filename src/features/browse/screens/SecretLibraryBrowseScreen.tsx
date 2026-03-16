@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { scale } from '@/shared/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { secretLibraryColors as staticColors, secretLibraryDarkColors } from '@/shared/theme/secretLibrary';
+import { secretLibraryColors as secretLibraryDarkColors } from '@/shared/theme/secretLibrary';
 import { useSecretLibraryColors } from '@/shared/theme';
 import { useLibraryCache } from '@/core/cache';
 import { useSpineCacheStatus } from '@/features/home';
@@ -57,10 +57,10 @@ export function SecretLibraryBrowseScreen() {
   const { navigateWithLoading, navigation } = useNavigationWithLoading();
 
   // Book context menu
-  const { showMenu } = useBookContextMenu();
+  const { _showMenu } = useBookContextMenu();
 
   // Theme-aware colors
-  const colors = useSecretLibraryColors();
+  const _colors = useSecretLibraryColors();
 
   // Data hooks — filter library once, pass to sections as props
   const { refreshCache, isLoading: cacheLoading, getItem } = useLibraryCache();

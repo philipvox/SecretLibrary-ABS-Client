@@ -8,10 +8,9 @@
 
 import { generateSpineStyle } from './generator';
 import { SpineConfigBuilder } from './config';
-import { calculateWidth, calculateHeight, GENRE_HEIGHT_PROFILES } from './core/dimensions';
-import { hashString, seededRandom, hashToPick } from './core/hashing';
+import { calculateWidth, calculateHeight } from './core/dimensions';
+import { hashString, seededRandom } from './core/hashing';
 import { matchBestGenre } from './genre/matcher';
-import { getGenreProfile } from './profiles';
 import { BASE_DIMENSIONS, WIDTH_CALCULATION, TOUCH_TARGETS } from './constants';
 import { getTypographyForGenres as getTypographyFromOldSystem, getSpineColorForGenres as getSpineColorFromOldSystem } from '../spineCalculations';
 

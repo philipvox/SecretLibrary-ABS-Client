@@ -27,17 +27,20 @@ jest.mock('react-native-svg', () => {
   };
 });
 
-// Mock myLibraryStore
+// Mock progressStore (HeartButton uses useProgressStore)
 const mockIsInLibrary = jest.fn();
 const mockAddToLibrary = jest.fn();
 const mockRemoveFromLibrary = jest.fn();
 
-jest.mock('@/shared/stores/myLibraryStore', () => ({
-  useMyLibraryStore: () => ({
-    isInLibrary: mockIsInLibrary,
-    addToLibrary: mockAddToLibrary,
-    removeFromLibrary: mockRemoveFromLibrary,
-  }),
+jest.mock('@/core/stores/progressStore', () => ({
+  useProgressStore: (selector: Function) => {
+    const state = {
+      isInLibrary: mockIsInLibrary,
+      addToLibrary: mockAddToLibrary,
+      removeFromLibrary: mockRemoveFromLibrary,
+    };
+    return selector(state);
+  },
 }));
 
 describe('HeartButton', () => {

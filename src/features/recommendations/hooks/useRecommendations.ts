@@ -20,7 +20,7 @@ import { useMyLibraryStore } from '@/features/library';
 import { getGenres, getAuthorName, getNarratorName, getSeriesName, getDuration, getTags } from '@/shared/utils/metadata';
 import { createSeriesFilter } from '@/shared/utils/seriesFilter';
 import { useDismissedIds } from '../stores/dismissedItemsStore';
-import { parseBookDNA, BookDNA, getDNAMoodScore, Mood } from '@/shared/utils/bookDNA';
+import { parseBookDNA, getDNAMoodScore, Mood } from '@/shared/utils/bookDNA';
 import { ABANDONMENT_PENALTIES } from '../utils/scoreWeights';
 import {
   useRecommendationsCacheStore,
@@ -33,7 +33,7 @@ import {
 
 // === TYPES ===
 
-interface ReadHistoryStats {
+interface _ReadHistoryStats {
   totalBooksRead: number;
   favoriteAuthors: { name: string; count: number; weightedCount: number }[];
   favoriteNarrators: { name: string; count: number; weightedCount: number }[];
@@ -44,14 +44,14 @@ interface ReadHistoryStats {
     author: string;
     finishedAt: number;
   };
-  currentlyListening?: Array<{
+  currentlyListening?: {
     id: string;
     title: string;
     progress: number;
-  }>;
+  }[];
 }
 
-interface AbandonedBook {
+interface _AbandonedBook {
   bookId: string;
   author: string;
   progress: number;

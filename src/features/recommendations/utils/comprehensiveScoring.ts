@@ -19,7 +19,6 @@ import {
   MISMATCH_PENALTIES,
   ABANDONMENT_PENALTIES,
   DIVERSITY,
-  getTemporalDecay,
   calculateMetadataRichness,
   getConfidenceLevel,
 } from './scoreWeights';
@@ -230,7 +229,7 @@ function getDurationHours(item: LibraryItem): number {
 function scoreAuthorAffinity(
   author: string | null,
   affinities: AffinityData,
-  knownAuthors: Set<string>
+  _knownAuthors: Set<string>
 ): { score: number; reason: string | null } {
   if (!author) return { score: 0, reason: null };
 
@@ -251,7 +250,7 @@ function scoreAuthorAffinity(
 function scoreNarratorAffinity(
   narrator: string | null,
   affinities: AffinityData,
-  knownNarrators: Set<string>
+  _knownNarrators: Set<string>
 ): { score: number; reason: string | null } {
   if (!narrator) return { score: 0, reason: null };
 

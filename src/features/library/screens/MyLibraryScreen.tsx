@@ -23,11 +23,11 @@ import { useNavigation } from '@react-navigation/native';
 import { apiClient } from '@/core/api';
 import { useLibraryCache } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
-import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 import { scale, spacing, useTheme } from '@/shared/theme';
 import { SectionSkeleton, BookCardSkeleton, SkullRefreshControl, useBookContextMenu } from '@/shared/components';
-import { SortPicker, SortOption } from '../components/SortPicker';
+import { SortPicker } from '../components/SortPicker';
 import { useLibraryViewStore } from '../stores/libraryViewStore';
 import { LibraryTabBar } from '../components/LibraryTabBar';
 import { LibraryEmptyState } from '../components/LibraryEmptyState';
@@ -73,7 +73,7 @@ export function MyLibraryScreen() {
 
   // Get all library data from hook
   const {
-    enrichedBooks,
+    _enrichedBooks,
     filteredBooks,
     favoritedBooks,
     serverInProgressBooks,
@@ -84,7 +84,7 @@ export function MyLibraryScreen() {
     activeDownloads,
     continueListeningItems,
     totalStorageUsed,
-    isLoaded,
+    _isLoaded,
     isLoading,
     hasDownloading,
     hasPaused,

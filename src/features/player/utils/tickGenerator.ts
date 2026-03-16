@@ -26,7 +26,7 @@ export interface ChapterInput {
 
 // Constants for tick generation logic
 // Note: These are for spacing calculations only, not for stored positions
-const MINUTES_PER_SCREEN = 5;
+const _MINUTES_PER_SCREEN = 5;
 const PIXELS_PER_SECOND_REF = 1; // Reference for spacing (300px / 300sec)
 const MIN_LABEL_SPACING_SECONDS = scale(55) / PIXELS_PER_SECOND_REF; // ~55 seconds
 const MIN_CHAPTER_DURATION = 60;

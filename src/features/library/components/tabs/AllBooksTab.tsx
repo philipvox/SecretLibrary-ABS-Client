@@ -16,8 +16,7 @@ import { BookRow } from '../BookRow';
 import { FannedSeriesCard } from '../FannedSeriesCard';
 import { PersonCard } from '../PersonCard';
 import { DownloadItem } from '@/features/downloads/components/DownloadItem';
-import { apiClient } from '@/core/api';
-import { scale, spacing } from '@/shared/theme';
+import { scale } from '@/shared/theme';
 import { EnrichedBook, FannedSeriesCardData } from '../../types';
 
 interface AllBooksTabProps {
@@ -60,14 +59,14 @@ export function AllBooksTab({
   onDownloadPause,
   onDownloadResume,
   onDownloadDelete,
-  onPauseAll,
-  onResumeAll,
+  _onPauseAll,
+  _onResumeAll,
   isMarkedFinished,
-  hasDownloading,
-  hasPaused,
+  _hasDownloading,
+  _hasPaused,
   onBrowse,
 }: AllBooksTabProps) {
-  const { showMenu } = useBookContextMenu();
+  const { _showMenu } = useBookContextMenu();
   const navigation = useNavigation<any>();
 
   const hasContent = books.length > 0 || activeDownloads.length > 0 ||

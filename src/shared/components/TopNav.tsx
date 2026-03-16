@@ -9,8 +9,8 @@
  * - Flexible action configuration
  */
 
-import React, { ReactNode, useCallback, forwardRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ViewStyle, TextInput, TextInputProps, Platform, TouchableOpacity } from 'react-native';
+import React, { ReactNode, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, ViewStyle, TextInput, Platform, TouchableOpacity } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -225,7 +225,7 @@ export function TopNav({
   // Theme colors
   const bgColor = isDark ? colors.black : colors.cream;
   const textColor = isDark ? colors.white : colors.black;
-  const secondaryColor = isDark ? colors.gray : colors.gray;
+  const _secondaryColor = isDark ? colors.gray : colors.gray;
   const pillBorderColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.4)';
   const pillActiveBg = isDark ? colors.white : colors.black;
   const pillActiveBorder = isDark ? colors.white : colors.white; // White stroke when active
@@ -319,7 +319,7 @@ export function TopNav({
           {pills.map((pill) => {
             const hasLabel = pill.label && pill.label.length > 0;
             // Determine pill styling
-            const isOutline = pill.outline && !pill.active;
+            const _isOutline = pill.outline && !pill.active;
             const pillBgColor = pill.active ? pillActiveBg : 'transparent';
             const pillBorder = pill.active ? pillActiveBorder : pillBorderColor;
             const pillTextColor = pill.active ? pillActiveText : textColor;

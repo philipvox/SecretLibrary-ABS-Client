@@ -21,8 +21,8 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
-import Svg, { Path, Circle, Line, G } from 'react-native-svg';
+import { View, ViewStyle } from 'react-native';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { scale, useTheme } from '@/shared/theme';
 
 // Re-export Icon component and types for convenience
@@ -38,7 +38,7 @@ interface IconBaseProps {
   color?: string;
 }
 
-interface IconButtonProps extends IconBaseProps {
+interface _IconButtonProps extends IconBaseProps {
   /** Show circular border around icon */
   bordered?: boolean;
   /** Background color for button style */
@@ -790,7 +790,7 @@ export function IconButton({
   size = 36,
   bordered = true,
   backgroundColor,
-  onPress,
+  _onPress,
   style,
 }: {
   children: React.ReactNode;

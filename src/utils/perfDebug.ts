@@ -10,7 +10,7 @@
  * - Add useLifecycleTracker('ComponentName') to track mount/unmount
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AppState, InteractionManager } from 'react-native';
 
 // ============================================

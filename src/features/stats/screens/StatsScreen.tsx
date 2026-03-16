@@ -73,7 +73,7 @@ function StatCard({ icon, label, value, subtitle, accentColor, colors }: StatCar
 
 // Weekly bar chart component
 interface WeeklyChartProps {
-  dailyBreakdown: Array<{ date: string; totalSeconds: number }>;
+  dailyBreakdown: { date: string; totalSeconds: number }[];
   colors: ReturnType<typeof createColors>;
 }
 
@@ -84,7 +84,7 @@ function WeeklyChart({ dailyBreakdown, colors }: WeeklyChartProps) {
 
   // Create array for last 7 days (most recent on right)
   const last7Days = useMemo(() => {
-    const days: Array<{ date: string; totalSeconds: number; weekday: string }> = [];
+    const days: { date: string; totalSeconds: number; weekday: string }[] = [];
     const now = new Date();
 
     for (let i = 6; i >= 0; i--) {
@@ -136,7 +136,7 @@ function WeeklyChart({ dailyBreakdown, colors }: WeeklyChartProps) {
 
 // Hour heatmap component
 interface HourHeatmapProps {
-  byHour: Array<{ hour: number; totalSeconds: number }>;
+  byHour: { hour: number; totalSeconds: number }[];
   colors: ReturnType<typeof createColors>;
 }
 
@@ -178,7 +178,7 @@ function HourHeatmap({ byHour, colors }: HourHeatmapProps) {
 
 // Top books list
 interface TopBooksProps {
-  topBooks: Array<{ bookId: string; bookTitle: string; totalSeconds: number }>;
+  topBooks: { bookId: string; bookTitle: string; totalSeconds: number }[];
   colors: ReturnType<typeof createColors>;
 }
 

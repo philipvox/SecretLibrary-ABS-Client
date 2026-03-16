@@ -11,6 +11,11 @@
  */
 
 // React Native global error handling utilities
+import { useEffect, useRef, useCallback } from 'react';
+import { Platform } from 'react-native';
+import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 interface ErrorUtils {
   getGlobalHandler?: () => ((error: Error, isFatal: boolean) => void) | undefined;
   setGlobalHandler?: (handler: (error: Error, isFatal: boolean) => void) => void;
@@ -32,11 +37,6 @@ declare const global: typeof globalThis & {
   ErrorUtils?: ErrorUtils;
   performance?: ExtendedPerformance;
 };
-
-import { useEffect, useRef, useCallback } from 'react';
-import { AppState, AppStateStatus, Platform } from 'react-native';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================================
 // TYPES

@@ -179,65 +179,65 @@ const sansFont = Platform.select({ ios: 'System', android: 'sans-serif', default
 const monoFont = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 
 // Google Font names (use these once fonts are loaded)
-const PLAYFAIR = 'PlayfairDisplay_400Regular';
-const PLAYFAIR_ITALIC = 'PlayfairDisplay_400Regular_Italic';
-const PLAYFAIR_MEDIUM = 'PlayfairDisplay_500Medium';
-const PLAYFAIR_SEMIBOLD = 'PlayfairDisplay_600SemiBold';
-const PLAYFAIR_BOLD = 'PlayfairDisplay_700Bold';
+const _PLAYFAIR = 'PlayfairDisplay_400Regular';
+const _PLAYFAIR_ITALIC = 'PlayfairDisplay_400Regular_Italic';
+const _PLAYFAIR_MEDIUM = 'PlayfairDisplay_500Medium';
+const _PLAYFAIR_SEMIBOLD = 'PlayfairDisplay_600SemiBold';
+const _PLAYFAIR_BOLD = 'PlayfairDisplay_700Bold';
 
-const CINZEL = 'Cinzel_400Regular';
-const CINZEL_MEDIUM = 'Cinzel_500Medium';
-const CINZEL_SEMIBOLD = 'Cinzel_600SemiBold';
-const CINZEL_BOLD = 'Cinzel_700Bold';
+const _CINZEL = 'Cinzel_400Regular';
+const _CINZEL_MEDIUM = 'Cinzel_500Medium';
+const _CINZEL_SEMIBOLD = 'Cinzel_600SemiBold';
+const _CINZEL_BOLD = 'Cinzel_700Bold';
 
-const BEBAS = 'BebasNeue_400Regular';
+const _BEBAS = 'BebasNeue_400Regular';
 
-const LORA = 'Lora_400Regular';
-const LORA_ITALIC = 'Lora_400Regular_Italic';
-const LORA_MEDIUM = 'Lora_500Medium';
-const LORA_SEMIBOLD = 'Lora_600SemiBold';
-const LORA_BOLD = 'Lora_700Bold';
+const _LORA = 'Lora_400Regular';
+const _LORA_ITALIC = 'Lora_400Regular_Italic';
+const _LORA_MEDIUM = 'Lora_500Medium';
+const _LORA_SEMIBOLD = 'Lora_600SemiBold';
+const _LORA_BOLD = 'Lora_700Bold';
 
-const MERRIWEATHER = 'Merriweather_400Regular';
-const MERRIWEATHER_ITALIC = 'Merriweather_400Regular_Italic';
-const MERRIWEATHER_BOLD = 'Merriweather_700Bold';
+const _MERRIWEATHER = 'Merriweather_400Regular';
+const _MERRIWEATHER_ITALIC = 'Merriweather_400Regular_Italic';
+const _MERRIWEATHER_BOLD = 'Merriweather_700Bold';
 
-const BITTER = 'Bitter_400Regular';
-const BITTER_MEDIUM = 'Bitter_500Medium';
-const BITTER_SEMIBOLD = 'Bitter_600SemiBold';
-const BITTER_BOLD = 'Bitter_700Bold';
+const _BITTER = 'Bitter_400Regular';
+const _BITTER_MEDIUM = 'Bitter_500Medium';
+const _BITTER_SEMIBOLD = 'Bitter_600SemiBold';
+const _BITTER_BOLD = 'Bitter_700Bold';
 
-const CRIMSON = 'CrimsonText_400Regular';
-const CRIMSON_ITALIC = 'CrimsonText_400Regular_Italic';
-const CRIMSON_SEMIBOLD = 'CrimsonText_600SemiBold';
-const CRIMSON_BOLD = 'CrimsonText_700Bold';
+const _CRIMSON = 'CrimsonText_400Regular';
+const _CRIMSON_ITALIC = 'CrimsonText_400Regular_Italic';
+const _CRIMSON_SEMIBOLD = 'CrimsonText_600SemiBold';
+const _CRIMSON_BOLD = 'CrimsonText_700Bold';
 
-const ROBOTO_SLAB = 'RobotoSlab_400Regular';
-const ROBOTO_SLAB_MEDIUM = 'RobotoSlab_500Medium';
-const ROBOTO_SLAB_BOLD = 'RobotoSlab_700Bold';
+const _ROBOTO_SLAB = 'RobotoSlab_400Regular';
+const _ROBOTO_SLAB_MEDIUM = 'RobotoSlab_500Medium';
+const _ROBOTO_SLAB_BOLD = 'RobotoSlab_700Bold';
 
-const SPECTRAL = 'Spectral_400Regular';
-const SPECTRAL_ITALIC = 'Spectral_400Regular_Italic';
-const SPECTRAL_MEDIUM = 'Spectral_500Medium';
-const SPECTRAL_SEMIBOLD = 'Spectral_600SemiBold';
+const _SPECTRAL = 'Spectral_400Regular';
+const _SPECTRAL_ITALIC = 'Spectral_400Regular_Italic';
+const _SPECTRAL_MEDIUM = 'Spectral_500Medium';
+const _SPECTRAL_SEMIBOLD = 'Spectral_600SemiBold';
 
-const OSWALD = 'Oswald_400Regular';
-const OSWALD_MEDIUM = 'Oswald_500Medium';
-const OSWALD_SEMIBOLD = 'Oswald_600SemiBold';
+const _OSWALD = 'Oswald_400Regular';
+const _OSWALD_MEDIUM = 'Oswald_500Medium';
+const _OSWALD_SEMIBOLD = 'Oswald_600SemiBold';
 
-const INTER = 'Inter_400Regular';
-const INTER_MEDIUM = 'Inter_500Medium';
-const INTER_SEMIBOLD = 'Inter_600SemiBold';
-const INTER_BOLD = 'Inter_700Bold';
+const _INTER = 'Inter_400Regular';
+const _INTER_MEDIUM = 'Inter_500Medium';
+const _INTER_SEMIBOLD = 'Inter_600SemiBold';
+const _INTER_BOLD = 'Inter_700Bold';
 
-const JETBRAINS = 'JetBrainsMono_400Regular';
-const JETBRAINS_MEDIUM = 'JetBrainsMono_500Medium';
-const JETBRAINS_BOLD = 'JetBrainsMono_700Bold';
+const _JETBRAINS = 'JetBrainsMono_400Regular';
+const _JETBRAINS_MEDIUM = 'JetBrainsMono_500Medium';
+const _JETBRAINS_BOLD = 'JetBrainsMono_700Bold';
 
-const CORMORANT = 'CormorantGaramond_400Regular';
-const CORMORANT_ITALIC = 'CormorantGaramond_400Regular_Italic';
-const CORMORANT_MEDIUM = 'CormorantGaramond_500Medium';
-const CORMORANT_LIGHT = 'CormorantGaramond_300Light';
+const _CORMORANT = 'CormorantGaramond_400Regular';
+const _CORMORANT_ITALIC = 'CormorantGaramond_400Regular_Italic';
+const _CORMORANT_MEDIUM = 'CormorantGaramond_500Medium';
+const _CORMORANT_LIGHT = 'CormorantGaramond_300Light';
 
 export const secretLibraryFonts = {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -656,7 +656,7 @@ export function getSpineDimensions(
   style: SpineStyle,
   baseHeight: number = 340
 ): { width: number; height: number } {
-  const config = spineStyles[style];
+  const _config = spineStyles[style];
 
   // Vary height based on style
   const heightVariation: Record<SpineStyle, number> = {

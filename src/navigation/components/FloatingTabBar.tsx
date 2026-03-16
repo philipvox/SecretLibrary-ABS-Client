@@ -8,9 +8,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Platform } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { usePlayerStore } from '@/features/player';
 import { useShallow } from 'zustand/react/shallow';
 import { spacing, useTheme } from '@/shared/theme';

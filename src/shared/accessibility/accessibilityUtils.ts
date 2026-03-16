@@ -5,7 +5,7 @@
  * Provides helpers for common accessibility patterns following WCAG 2.1 guidelines.
  */
 
-import { AccessibilityRole, AccessibilityState } from 'react-native';
+import { AccessibilityState } from 'react-native';
 
 // =============================================================================
 // CONSTANTS

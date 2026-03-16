@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { Dimensions, Platform, ScaledSize } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 
 // =============================================================================
 // TYPES

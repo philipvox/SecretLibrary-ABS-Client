@@ -21,33 +21,15 @@ import {
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { PlayIcon, PauseIcon } from '@/features/player/components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 
 import { useBookDetails } from '../hooks/useBookDetails';
-import { ErrorView, BookDetailSkeleton, Loading, SkullRefreshControl, TopNav, TopNavBackIcon, TopNavShareIcon } from '@/shared/components';
+import { ErrorView, Loading, SkullRefreshControl, TopNav, TopNavBackIcon, TopNavShareIcon } from '@/shared/components';
 import { useCoverUrl, useLibraryCache } from '@/core/cache';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
-
-// Extended metadata with narrator fields
-interface ExtendedBookMetadata extends BookMetadata {
-  narratorName?: string;
-}
-
-// Helper to get book metadata safely
-// Note: Does NOT require audioFiles - works with cache items that only have metadata
-function getBookMetadata(book: LibraryItem | null | undefined): ExtendedBookMetadata | null {
-  if (!book?.media?.metadata) return null;
-  return book.media.metadata as ExtendedBookMetadata;
-}
-
-// Helper to get book duration safely
-// Note: Does NOT require audioFiles - works with cache items that only have duration
-function getBookDuration(book: LibraryItem | null | undefined): number {
-  return book?.media?.duration || 0;
-}
+import { LibraryItem, BookMetadata } from '@/core/types';
 import { usePlayerStore, useCurrentChapterIndex } from '@/features/player';
 import { useShallow } from 'zustand/react/shallow';
 import { useQueueStore, useQueue } from '@/features/queue/stores/queueStore';
@@ -66,12 +48,29 @@ import { useProgressStore, useIsInLibrary } from '@/core/stores/progressStore';
 import { logger } from '@/shared/utils/logger';
 import {
   secretLibraryColors as staticColors,
-  secretLibraryFonts as fonts,
 } from '@/shared/theme/secretLibrary';
 import { useSpineCacheStore, BookSpineVertical, BookSpineVerticalData, useBookRowLayout, getTypographyForGenres, getSeriesStyle } from '@/shared/spine';
 import { SeriesSwipeContainer, SeriesNavigationArrows, useSeriesNavigation } from '../components/SeriesSwipeContainer';
 import { CoverStarStickers } from '../components/CoverStarStickers';
 import { useStarPositionStore, STAR_HIT_RADIUS } from '../stores/starPositionStore';
+
+// Extended metadata with narrator fields
+interface ExtendedBookMetadata extends BookMetadata {
+  narratorName?: string;
+}
+
+// Helper to get book metadata safely
+// Note: Does NOT require audioFiles - works with cache items that only have metadata
+function getBookMetadata(book: LibraryItem | null | undefined): ExtendedBookMetadata | null {
+  if (!book?.media?.metadata) return null;
+  return book.media.metadata as ExtendedBookMetadata;
+}
+
+// Helper to get book duration safely
+// Note: Does NOT require audioFiles - works with cache items that only have duration
+function getBookDuration(book: LibraryItem | null | undefined): number {
+  return book?.media?.duration || 0;
+}
 
 // =============================================================================
 // TYPES
@@ -129,7 +128,7 @@ const ResetIcon = ({ color = '#000', size = 14 }: IconProps) => (
   </Svg>
 );
 
-const BookmarkIcon = ({ color = '#000', size = 14, filled = false }: IconProps & { filled?: boolean }) => (
+const _BookmarkIcon = ({ color = '#000', size = 14, filled = false }: IconProps & { filled?: boolean }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color} strokeWidth={2}>
     <Path d="M5 4C5 2.89543 5.89543 2 7 2H17C18.1046 2 19 2.89543 19 4V21C19 21.3746 18.7907 21.7178 18.4576 21.8892C18.1245 22.0606 17.7236 22.0315 17.4188 21.8137L12 17.8619L6.58124 21.8137C6.27642 22.0315 5.87549 22.0606 5.54242 21.8892C5.20935 21.7178 5 21.3746 5 21V4Z" />
   </Svg>
@@ -370,7 +369,7 @@ export function SecretLibraryBookDetailScreen() {
 
   // Progress and finished state (single source of truth: SQLite)
   const { isFinished: isMarkedFinished } = useIsFinished(bookId);
-  const { progress: localProgress, currentTime: localCurrentTime, duration: localDuration } = useBookProgress(bookId);
+  const { progress: localProgress, currentTime: localCurrentTime, duration: _localDuration } = useBookProgress(bookId);
   const markFinished = useMarkFinished();
   const [isMarkingProgress, setIsMarkingProgress] = useState(false);
 
@@ -380,7 +379,7 @@ export function SecretLibraryBookDetailScreen() {
   const addStar = useStarPositionStore((s) => s.addStar);
   const removeStarAt = useStarPositionStore((s) => s.removeStarAt);
   const setBookRating = useSetBookRating();
-  const bookRating = useBookRating(bookId);
+  const _bookRating = useBookRating(bookId);
   // Double-tap handler (called from JS thread via runOnJS)
   const handleDoubleTap = useCallback((tapX: number, tapY: number) => {
     const coverWidth = scale(320);
@@ -443,7 +442,7 @@ export function SecretLibraryBookDetailScreen() {
   const removeFromLibrary = useProgressStore((s) => s.removeFromLibrary);
 
   // Auth context (for potential future use)
-  const { serverUrl } = useAuth();
+  const { serverUrl: _serverUrl } = useAuth();
 
   // Get cached spine data reactively (has correct progress/duration from library cache)
   // This selector is reactive - updates when spine cache updates
@@ -727,9 +726,9 @@ export function SecretLibraryBookDetailScreen() {
       ? metadata.narrators.join(', ')
       : '');
   const description = metadata?.description || '';
-  const publisher = metadata?.publisher || '';
+  const _publisher = metadata?.publisher || '';
   const publishedYear = metadata?.publishedYear || '';
-  const language = metadata?.language || 'English';
+  const _language = metadata?.language || 'English';
 
   // Series info
   const seriesInfo = useMemo(() => {
@@ -915,7 +914,7 @@ export function SecretLibraryBookDetailScreen() {
 
   // Get spine typography - USE CACHED TYPOGRAPHY for consistency
   // This ensures book detail shows the EXACT same font as the book spine on home screen
-  const spineTypography = useMemo(() => {
+  const _spineTypography = useMemo(() => {
     // FIRST: Use pre-computed typography from spine cache (computed at app startup)
     // This is the SAME typography used by BookSpineVertical.tsx
     if (cachedSpineData?.typography) {
@@ -941,11 +940,11 @@ export function SecretLibraryBookDetailScreen() {
   // Use standard site font for title (Georgia/serif) instead of variable spine fonts
   const titleFontFamily = Platform.select({ ios: 'Georgia', android: 'serif' });
   const titleFontWeight = '600';
-  const titleFontStyle = 'normal' as const;
+  const _titleFontStyle = 'normal' as const;
   const titleTransform = 'none';
 
   // Apply text transform
-  const displayTitle = useMemo(() => {
+  const _displayTitle = useMemo(() => {
     if (titleTransform === 'uppercase') {
       return title.toUpperCase();
     }

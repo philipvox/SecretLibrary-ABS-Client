@@ -62,7 +62,7 @@ const CheckIcon = ({ color = '#000', size = 14 }: IconProps) => (
   </Svg>
 );
 
-const LibraryPlusIcon = ({ color = '#000', size = 14 }: IconProps) => (
+const _LibraryPlusIcon = ({ color = '#000', size = 14 }: IconProps) => (
   <Svg width={size * 1.5} height={size} viewBox="0 0 36 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
     {/* Library books (shifted left) */}
     <Path d="m12 6 4 14" />
@@ -75,7 +75,7 @@ const LibraryPlusIcon = ({ color = '#000', size = 14 }: IconProps) => (
   </Svg>
 );
 
-const LibraryCheckIcon = ({ color = '#000', size = 14 }: IconProps) => (
+const _LibraryCheckIcon = ({ color = '#000', size = 14 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     {/* Library books */}
     <Path d="m16 6 4 14" />
@@ -102,7 +102,7 @@ function getChapterCount(item: LibraryItem): number {
   return (item.media as any)?.chapters?.length || 0;
 }
 
-function formatDuration(seconds: number): string {
+function _formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0) return '0m';
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
@@ -266,9 +266,9 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
     onCoverUrl?.(coverUrl);
   }, [coverUrl, onCoverUrl]);
 
-  const duration = book ? getBookDuration(book) : 0;
-  const progress = book?.userMediaProgress?.progress || 0;
-  const chapterCount = book ? getChapterCount(book) : 0;
+  const _duration = book ? getBookDuration(book) : 0;
+  const _progress = book?.userMediaProgress?.progress || 0;
+  const _chapterCount = book ? getChapterCount(book) : 0;
 
   // Split title for display
   const title = metadata?.title || 'Unknown';
@@ -276,7 +276,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
   const author = metadata?.authorName || 'Unknown Author';
   const narrator = metadata?.narratorName || '';
   const genres = metadata?.genres || [];
-  const publishedYear = metadata?.publishedYear || '';
+  const _publishedYear = metadata?.publishedYear || '';
 
   // Series info
   const seriesInfo = metadata?.series?.[0];
@@ -308,8 +308,8 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
   }, [cachedSpineData?.typography, cachedSpineData?.seriesName, seriesInfo?.name, genres, bookId]);
 
   // Use spine typography fontFamily directly
-  const titleFontFamily = spineTypography.fontFamily || Platform.select({ ios: 'Georgia', android: 'serif' });
-  const titleFontWeight = spineTypography.titleWeight || spineTypography.fontWeight || '500';
+  const _titleFontFamily = spineTypography.fontFamily || Platform.select({ ios: 'Georgia', android: 'serif' });
+  const _titleFontWeight = spineTypography.titleWeight || spineTypography.fontWeight || '500';
   const titleTransform = spineTypography.titleTransform || 'none';
 
   // Apply text transform to title
@@ -326,7 +326,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
     isDownloading,
     isPending,
     isPaused,
-    progress: downloadProgress,
+    progress: _downloadProgress,
   } = useDownloadStatus(book?.id || '');
 
   // Library membership state
@@ -372,7 +372,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
   }, [navigation]);
 
   // Handle genre press
-  const handleGenrePress = useCallback((genre: string) => {
+  const _handleGenrePress = useCallback((genre: string) => {
     haptics.selection();
     navigation.navigate('GenreDetail', { genreName: genre });
   }, [navigation]);

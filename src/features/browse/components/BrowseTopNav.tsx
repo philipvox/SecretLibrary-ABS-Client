@@ -15,7 +15,7 @@ import { TopNav, TopNavCloseIcon, TopNavSearchIcon } from '@/shared/components';
 import { useContentFilterStore } from '../stores/contentFilterStore';
 
 // Shelf icon — matches the home page discover icon
-const ShelfIcon = ({ color = '#fff' }: { color?: string }) => (
+const _ShelfIcon = ({ color = '#fff' }: { color?: string }) => (
   <Svg width={16} height={16} viewBox="0 0 24 24" fill={color}>
     <Rect x={3} y={4} width={4} height={14} rx={1} />
     <Rect x={9} y={6} width={4} height={12} rx={1} />

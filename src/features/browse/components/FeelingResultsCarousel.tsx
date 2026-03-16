@@ -5,7 +5,7 @@
  * Shows cover + title for matching books, sorted by score.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { secretLibraryColors as colors, secretLibraryFonts } from '@/shared/theme/secretLibrary';

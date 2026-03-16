@@ -18,7 +18,6 @@ import {
   GenreProfile,
   applySpineSizeOverrides,
   selectFontForBook,
-  hashString,
   FontWeight,
 } from './profiles/types';
 

@@ -89,7 +89,7 @@ export function BrowseContent({
   onViewAllBooks,
   onVibePress,
   onBrowseItemPress,
-  onMoodPress,
+  _onMoodPress,
   onScrollPastHero,
 }: BrowseContentProps) {
   const insets = useSafeAreaInsets();

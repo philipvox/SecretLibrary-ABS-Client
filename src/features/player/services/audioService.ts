@@ -33,7 +33,7 @@ try {
   MediaControl = mediaControlModule.MediaControl;
   MediaPlaybackState = mediaControlModule.PlaybackState;
   Command = mediaControlModule.Command;
-} catch (e) {
+} catch {
   audioLog.warn('[AudioService] expo-media-control not available (Expo Go mode)');
 }
 
@@ -41,7 +41,7 @@ try {
 let AudioNoisyModule: any = null;
 try {
   AudioNoisyModule = require('@modules/audio-noisy-module');
-} catch (e) {
+} catch {
   // Module may not be available in Expo Go
   if (Platform.OS === 'android') {
     audioLog.warn('[AudioService] audio-noisy-module not available');
@@ -82,7 +82,7 @@ export interface AudioError {
 type StatusCallback = (status: PlaybackState) => void;
 type ErrorCallback = (error: AudioError) => void;
 
-const DEBUG = __DEV__;
+const _DEBUG = __DEV__;
 const log = (...args: unknown[]) => audioLog.audio(args.map(String).join(' '));
 
 class AudioService {
@@ -212,7 +212,7 @@ class AudioService {
         log('Waiting for existing setup promise...');
         await this.setupPromise;
         return;
-      } catch (error) {
+      } catch {
         // Setup failed, will retry below
         audioLog.warn('Previous setup failed, retrying...');
       }
@@ -291,7 +291,7 @@ class AudioService {
     this.playbackStatusSubscription = this.player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
       // DEBUG: Log significant status changes
       const currentPos = this.player?.currentTime || 0;
-      const isPlaying = this.player?.playing || false;
+      const _isPlaying = this.player?.playing || false;
       const duration = this.player?.duration || 0;
 
       // Log when playback stops unexpectedly
@@ -391,7 +391,7 @@ class AudioService {
 
       // Add listener to pause when headphones are unplugged
       this.audioNoisySubscription = AudioNoisyModule.addAudioNoisyListener(
-        (event: { reason: string; timestamp: number }) => {
+        (_event: { reason: string; timestamp: number }) => {
           audioLog.warn('[HEADPHONE_UNPLUG] Audio becoming noisy - pausing playback');
           this.pause();
         }
@@ -2031,7 +2031,7 @@ class AudioService {
     if (this.mediaControlEnabled && MediaControl && MediaPlaybackState) {
       try {
         await MediaControl.updatePlaybackState(MediaPlaybackState.STOPPED);
-      } catch (e) {
+      } catch {
         // Ignore errors during cleanup
       }
     }
@@ -2110,11 +2110,11 @@ class AudioService {
 
     // Release audio players to free native resources
     if (this.player) {
-      try { this.player.remove(); } catch (_) { /* ignore */ }
+      try { this.player.remove(); } catch { /* ignore */ }
       this.player = null;
     }
     if (this.preloadPlayer) {
-      try { this.preloadPlayer.remove(); } catch (_) { /* ignore */ }
+      try { this.preloadPlayer.remove(); } catch { /* ignore */ }
       this.preloadPlayer = null;
     }
 
@@ -2129,7 +2129,7 @@ class AudioService {
       try {
         await MediaControl.disableMediaControls();
         this.mediaControlEnabled = false;
-      } catch (e) {
+      } catch {
         // Ignore errors during cleanup
       }
     }
@@ -2142,7 +2142,7 @@ class AudioService {
     if (Platform.OS === 'android' && AudioNoisyModule) {
       try {
         await AudioNoisyModule.stopListening();
-      } catch (e) {
+      } catch {
         // Ignore errors during cleanup
       }
     }

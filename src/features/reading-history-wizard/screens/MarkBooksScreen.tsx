@@ -57,7 +57,7 @@ import { useLibraryCache, getAllAuthors, getAllSeries } from '@/core/cache/libra
 import { useQueueStore } from '@/features/queue/stores/queueStore';
 import { getCoverUrl } from '@/core/cache';
 import { LibraryItem } from '@/core/types';
-import { useTheme, accentColors, wp, hp, moderateScale, spacing, ACCENT, colors } from '@/shared/theme';
+import { useTheme, wp, hp, moderateScale, spacing, ACCENT, colors } from '@/shared/theme';
 
 // =============================================================================
 // LAYOUT CONSTANTS (from spec)
@@ -718,7 +718,7 @@ export function MarkBooksScreen() {
 
   // Finished books from SQLite (single source of truth)
   const finishedBookIds = useFinishedBookIds();
-  const { mark: markBookFinished, unmark: unmarkBookFinished, undo: undoLastMark, canUndo, isProcessing } = useUndoableMarkFinished();
+  const { mark: markBookFinished, unmark: unmarkBookFinished, undo: _undoLastMark, _canUndo, _isProcessing } = useUndoableMarkFinished();
 
   // Gallery store for session/wizard UI state only
   const startSession = useGalleryStore((s) => s.startSession);

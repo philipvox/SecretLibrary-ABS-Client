@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { X, Delete } from 'lucide-react-native';
 import { haptics } from '@/core/native/haptics';
-import { spacing, scale, wp, hp, useTheme } from '@/shared/theme';
+import { spacing, scale, useTheme } from '@/shared/theme';
 
 // =============================================================================
 // TYPES
@@ -169,7 +169,7 @@ export function NumericInputModal({
   }, [mode, inputValue, hoursValue, minutesValue, min, max, onApply]);
 
   // Get display value
-  const displayValue = mode === 'speed'
+  const _displayValue = mode === 'speed'
     ? inputValue || '0'
     : `${hoursValue || '0'}h ${minutesValue || '0'}m`;
 

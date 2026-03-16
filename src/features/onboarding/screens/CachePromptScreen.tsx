@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Timer, Download, Check, X, Play } from 'lucide-react-native';
 import { LibraryItem } from '@/core/types';
-import { imageCacheService, estimateCacheSize, CacheProgress } from '@/core/services/imageCacheService';
+import { imageCacheService, estimateCacheSize } from '@/core/services/imageCacheService';
 import { useLibraryCache } from '@/core/cache';
 import {
   useImageCacheProgressStore,

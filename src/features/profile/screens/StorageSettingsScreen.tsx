@@ -31,7 +31,6 @@ import { useDownloads } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
 import { useLibraryCache } from '@/core/cache';
 import { networkMonitor } from '@/core/services/networkMonitor';
-import { sqliteCache } from '@/core/services/sqliteCache';
 import { imageCacheService, CacheProgress, estimateCacheSize } from '@/core/services/imageCacheService';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -98,7 +97,7 @@ export function StorageSettingsScreen() {
     try {
       const status = await imageCacheService.getFormattedCacheStatus(libraryItemCount);
       setImageCacheStatus(status);
-    } catch (err) {
+    } catch {
       setImageCacheStatus('Unknown');
     }
   }, [libraryItemCount]);
@@ -182,7 +181,7 @@ export function StorageSettingsScreen() {
     try {
       await refreshCache();
       Alert.alert('Success', 'Library cache refreshed successfully.');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to refresh library cache.');
     } finally {
       setIsRefreshingCache(false);

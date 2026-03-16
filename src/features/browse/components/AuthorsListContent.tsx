@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { AuthorCard } from '@/features/author';

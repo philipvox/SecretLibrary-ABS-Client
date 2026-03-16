@@ -98,7 +98,7 @@ function HiddenBookItem({ bookId, onRestore }: HiddenBookItemProps) {
 
 export function HiddenItemsScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
+  const _navigation = useNavigation<any>();
   const colors = useSecretLibraryColors();
 
   const dismissedItems = useDismissedItemsStore((s) => s.dismissedItems);

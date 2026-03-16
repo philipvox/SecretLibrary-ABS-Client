@@ -26,9 +26,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ChevronLeft, Play, Square, RotateCcw, AlertTriangle } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { scale, spacing, accentColors, useTheme } from '@/shared/theme';
+import { scale, spacing, useTheme } from '@/shared/theme';
 import {
-  errorStore,
   memoryMonitor,
   listenerMonitor,
   generateErrorReport,
@@ -73,10 +72,10 @@ export function DebugStressTestScreen() {
   // TEST DEFINITIONS
   // ============================================================
 
-  const tests: Array<{
+  const tests: {
     name: string;
     run: () => Promise<{ passed: boolean; details?: string; errors?: string[] }>;
-  }> = [
+  }[] = [
     {
       name: 'Memory Pressure Test',
       run: async () => {

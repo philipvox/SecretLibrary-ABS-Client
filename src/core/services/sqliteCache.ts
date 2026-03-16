@@ -6,7 +6,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { LibraryItem, Collection, Author } from '@/core/types';
+import { LibraryItem, Collection } from '@/core/types';
 import { createLogger } from '@/shared/utils/logger';
 
 const log = createLogger('SQLiteCache');
@@ -51,7 +51,7 @@ interface PlaybackProgress {
   synced: boolean;
 }
 
-interface SyncMetadata {
+interface _SyncMetadata {
   key: string;
   value: string;
   updatedAt: number;
@@ -842,7 +842,7 @@ class SQLiteCache {
         [libraryId]
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -915,7 +915,7 @@ class SQLiteCache {
         [libraryId]
       );
       return result?.updated_at || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1087,7 +1087,7 @@ class SQLiteCache {
         [itemId]
       );
       return row || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1140,7 +1140,7 @@ class SQLiteCache {
       return await db.getAllAsync<PlaybackProgress>(
         'SELECT item_id as itemId, position, duration, updated_at as updatedAt, synced FROM playback_progress WHERE synced = 0'
       );
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1179,7 +1179,7 @@ class SQLiteCache {
         [key]
       );
       return row?.value || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1303,11 +1303,11 @@ class SQLiteCache {
       finishedAt: number;
     };
     // Currently listening books for "More like X" titles
-    currentlyListening?: Array<{
+    currentlyListening?: {
       id: string;
       title: string;
       progress: number;
-    }>;
+    }[];
   }> {
     const db = await this.ensureReady();
     try {
@@ -1581,7 +1581,7 @@ class SQLiteCache {
         [itemId]
       );
       return !!row;
-    } catch (err) {
+    } catch {
       return false;
     }
   }
@@ -1618,7 +1618,7 @@ class SQLiteCache {
         addedAt: r.added_at,
         synced: false,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1751,7 +1751,7 @@ class SQLiteCache {
         narratorCount: narrators?.count || 0,
         collectionCount: collections?.count || 0,
       };
-    } catch (err) {
+    } catch {
       return { itemCount: 0, authorCount: 0, seriesCount: 0, narratorCount: 0, collectionCount: 0 };
     }
   }
@@ -1787,7 +1787,7 @@ class SQLiteCache {
         userPaused: row.user_paused === 1,
         resumableState: row.resumable_state,
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1818,7 +1818,7 @@ class SQLiteCache {
         userPaused: row.user_paused === 1,
         resumableState: row.resumable_state,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1849,7 +1849,7 @@ class SQLiteCache {
         userPaused: row.user_paused === 1,
         resumableState: row.resumable_state,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1954,7 +1954,7 @@ class SQLiteCache {
         'SELECT item_id FROM download_queue ORDER BY priority DESC, added_at ASC LIMIT 1'
       );
       return row?.item_id || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1972,7 +1972,7 @@ class SQLiteCache {
         'SELECT COUNT(*) as count FROM download_queue'
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -2025,7 +2025,7 @@ class SQLiteCache {
          FROM sync_log ORDER BY timestamp DESC LIMIT ?`,
         [limit]
       );
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -2124,7 +2124,7 @@ class SQLiteCache {
         [bookId]
       );
       return !!row;
-    } catch (err) {
+    } catch {
       return false;
     }
   }
@@ -2148,7 +2148,7 @@ class SQLiteCache {
         position: row.position,
         addedAt: row.added_at,
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -2208,7 +2208,7 @@ class SQLiteCache {
         'SELECT COUNT(*) as count FROM playback_queue'
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -2350,7 +2350,7 @@ class SQLiteCache {
         [bookId]
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -2547,7 +2547,7 @@ class SQLiteCache {
         sessionCount: row.session_count,
         booksTouched: JSON.parse(row.books_touched),
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -2561,7 +2561,7 @@ class SQLiteCache {
     uniqueBooks: number;
     dailyBreakdown: DailyStats[];
   }> {
-    const db = await this.ensureReady();
+    await this.ensureReady();
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -2866,7 +2866,7 @@ class SQLiteCache {
         [itemId]
       );
       return row?.is_complete === 1;
-    } catch (err) {
+    } catch {
       return false;
     }
   }
@@ -2909,7 +2909,7 @@ class SQLiteCache {
         itemId: r.item_id,
         isComplete: r.is_complete === 1,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -3205,7 +3205,7 @@ class SQLiteCache {
    */
   async setUserBookChapters(
     bookId: string,
-    chapters: Array<{ id: number; start: number; end: number; title: string }>
+    chapters: { id: number; start: number; end: number; title: string }[]
   ): Promise<void> {
     if (!chapters || chapters.length === 0) {
       log.debug(`Skipping empty chapters cache for ${bookId}`);
@@ -3259,7 +3259,7 @@ class SQLiteCache {
   async getUserBookChapters(
     bookId: string,
     maxAgeMs: number = 7 * 24 * 60 * 60 * 1000 // 7 days default
-  ): Promise<Array<{ id: number; start: number; end: number; title: string }> | null> {
+  ): Promise<{ id: number; start: number; end: number; title: string }[] | null> {
     try {
       const book = await this.getUserBook(bookId);
       if (!book?.chapters) return null;
@@ -3656,13 +3656,13 @@ class SQLiteCache {
    * Get abandoned books (5-30% progress, not played in 90+ days)
    * Used for applying negative affinity to authors of abandoned books
    */
-  async getAbandonedBooks(): Promise<Array<{
+  async getAbandonedBooks(): Promise<{
     bookId: string;
     author: string;
     progress: number;
     lastPlayedAt: string;
     daysSincePlay: number;
-  }>> {
+  }[]> {
     const db = await this.ensureReady();
     try {
       const rows = await db.getAllAsync<{
@@ -3966,7 +3966,7 @@ class SQLiteCache {
         'SELECT COUNT(*) as count FROM user_books'
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }

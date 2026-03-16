@@ -8,7 +8,6 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { scale, useTheme } from '@/shared/theme';
 
 interface InfoTilesProps {
@@ -102,7 +101,7 @@ export function InfoTiles({
   onTimePress,
   isSeeking,
   seekDelta,
-  seekDirection,
+  _seekDirection,
   isPlaying = false,
 }: InfoTilesProps) {
   const { colors } = useTheme();

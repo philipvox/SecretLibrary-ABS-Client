@@ -28,7 +28,7 @@ const IS_DEV = __DEV__;
 
 // Timestamp tracking
 let lastLogTime = Date.now();
-const appStartTime = Date.now();
+const _appStartTime = Date.now();
 
 /**
  * Get formatted timestamp showing:

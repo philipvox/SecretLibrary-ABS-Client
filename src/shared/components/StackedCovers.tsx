@@ -13,7 +13,7 @@ import React, { useMemo } from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { Library } from 'lucide-react-native';
-import { radius, cardTokens, scale, useTheme } from '@/shared/theme';
+import { radius, cardTokens, useTheme } from '@/shared/theme';
 
 interface StackedCoversProps {
   /** Cover URLs (first 2-3 will be used) */
@@ -47,7 +47,7 @@ export function StackedCovers({
   const { colors } = useTheme();
   // Memoize cover data with stable keys to prevent flickering
   const coverData = useMemo(() => {
-    const result: Array<{ url: string; key: string }> = [];
+    const result: { url: string; key: string }[] = [];
     for (let i = 0; i < Math.min(coverUrls.length, maxCovers); i++) {
       const url = coverUrls[i];
       if (url) {

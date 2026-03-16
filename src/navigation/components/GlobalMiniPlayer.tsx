@@ -85,11 +85,11 @@ export function GlobalMiniPlayer() {
     isPlaying,
     isLoading,
     isBuffering,
-    position,
-    duration,
+    _position,
+    _duration,
     chapters,
-    play,
-    pause,
+    _play,
+    _pause,
     cleanup,
   } = usePlayerStore(
     useShallow((s) => ({
@@ -160,7 +160,7 @@ export function GlobalMiniPlayer() {
     setPlayerVisible();
   }, [setPlayerVisible]);
 
-  const handleCloseMiniPlayer = useCallback(() => {
+  const _handleCloseMiniPlayer = useCallback(() => {
     haptics.selection();
     cleanup();
   }, [cleanup]);

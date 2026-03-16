@@ -43,7 +43,7 @@ export function SeriesGallery({
   onSeriesPress,
   onViewAll,
   maxSeries = 6,
-  variant = 'light',
+  _variant = 'light',
   layout = 'list',
 }: SeriesGalleryProps) {
   const renderStart = useRef(Date.now());

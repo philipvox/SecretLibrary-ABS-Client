@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { Play, Pause } from 'lucide-react-native';
 import { haptics } from '@/core/native/haptics';
-import { scale, accentColors, useTheme, useIsDarkMode } from '@/shared/theme';
+import { scale, useTheme, useIsDarkMode } from '@/shared/theme';
 
 // Size definitions (diameter in pt)
 const SIZES = {

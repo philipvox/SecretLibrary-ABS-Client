@@ -282,7 +282,7 @@ export function QueueScreen() {
       try {
         const { usePlayerStore } = await import('@/features/player/stores');
         usePlayerStore.getState().loadBook(book, { autoPlay: true, showPlayer: true });
-      } catch (err) {
+      } catch {
         navigation.navigate('BookDetail', { book });
       }
     })();

@@ -89,7 +89,7 @@ export function findNextInSeries(
   logger.debug(`[seriesUtils] Looking for next book in series "${currentSeriesInfo.name}" after sequence ${currentSeriesInfo.sequence}`);
 
   // Find all books in the same series with sequence numbers
-  const seriesBooks: Array<{ item: LibraryItem; sequence: number }> = [];
+  const seriesBooks: { item: LibraryItem; sequence: number }[] = [];
 
   for (const item of allItems) {
     if (item.id === currentBook.id) continue; // Skip current book
@@ -132,8 +132,8 @@ export function findNextInSeries(
 export function getSeriesBooks(
   seriesId: string,
   allItems: LibraryItem[]
-): Array<{ item: LibraryItem; sequence: number | null }> {
-  const seriesBooks: Array<{ item: LibraryItem; sequence: number | null }> = [];
+): { item: LibraryItem; sequence: number | null }[] {
+  const seriesBooks: { item: LibraryItem; sequence: number | null }[] = [];
 
   for (const item of allItems) {
     const itemSeriesInfo = getSeriesInfo(item);

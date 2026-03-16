@@ -38,7 +38,7 @@ export function CollectionsSection({
   skipFirst = false,
 }: CollectionsSectionProps) {
   // Theme-aware colors (used for header)
-  const colors = useSecretLibraryColors();
+  const _colors = useSecretLibraryColors();
 
   const handleCollectionPress = useCallback(
     (collectionId: string) => {

@@ -23,11 +23,11 @@ interface ReadHistoryStats {
     author: string;
     finishedAt: number;
   };
-  currentlyListening?: Array<{
+  currentlyListening?: {
     id: string;
     title: string;
     progress: number;
-  }>;
+  }[];
 }
 
 interface AbandonedBook {

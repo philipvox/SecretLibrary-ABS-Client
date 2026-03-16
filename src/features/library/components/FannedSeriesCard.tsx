@@ -23,6 +23,6 @@ export type {
 // Type alias for backward compatibility
 export type FannedSeriesCardData = {
   name: string;
-  books?: Array<{ id: string }>;
+  books?: { id: string }[];
   bookCount?: number;
 };

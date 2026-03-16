@@ -37,23 +37,38 @@ import {
   getSpineDimensions,
   calculateBookDimensions,
   MIN_TOUCH_TARGET,
-  hashString,
 } from '../utils/spine/adapter';
 // TEMPLATE SYSTEM: Genre-specific spine templates with size-based configs
 import {
-  matchBookToTemplate,
   applyTemplateConfig,
   shouldUseTemplates,
-  getTemplateInfo,
 } from '../utils/spine/templateAdapter';
 
 // TODO: Migrate these to new system
 import {
   SpineTypography,
   getPlatformFont,
-  getFontLineHeight,
   FONT_LINE_HEIGHTS,
-} from '../utils/spineCalculations';
+} from '../utils/spineCalculations'; // Toggle to see section bounds
+
+// =============================================================================
+// TEMPLATE-DIRECT RENDERING
+// =============================================================================
+
+/**
+ * TemplateSpineRenderer - A clean, isolated component for template-driven spines.
+ *
+ * This mirrors SpineTemplatePreviewScreen's SpinePreview component EXACTLY.
+ * It bypasses ALL the composition/solver complexity when templates are active.
+ *
+ * Key differences from the main BookSpineVertical rendering path:
+ * - Uses heightPercent DIRECTLY for section allocation
+ * - Applies fontSize DIRECTLY to Text components (no solver recalculation)
+ * - Uses adjustsFontSizeToFit for overflow handling (shrinks but doesn't grow)
+ * - Clean orientation handling via simple transforms
+ */
+
+import type { AppliedTemplateConfig } from '../utils/spine/templateAdapter';
 
 // =============================================================================
 // TYPES
@@ -104,13 +119,13 @@ interface BookSpineVerticalProps {
 // =============================================================================
 
 // Colors imported from spineCalculations.ts (single source of truth)
-const DEFAULT_SPINE_BG = '#F5F5F5'; // Light grey background for stroke design
-const DEFAULT_TEXT_COLOR = '#000000'; // Black text on white background
+const _DEFAULT_SPINE_BG = '#F5F5F5'; // Light grey background for stroke design
+const _DEFAULT_TEXT_COLOR = '#000000'; // Black text on white background
 const DOWNLOAD_INDICATOR_COLOR = '#FF6B35'; // Orange accent for downloaded books
 const DOWNLOAD_INDICATOR_HEIGHT = 1;
 
 // Spacing and margins - balanced for readability and fitting text
-const INNER_MARGIN = 1; // Margin from section edge - prevents clipping on rotated text
+const _INNER_MARGIN = 1; // Margin from section edge - prevents clipping on rotated text
 const EDGE_PADDING = 0; // Padding from spine edge for text positioning
 const TOP_PADDING = 8; // Padding from top of spine - room for ascenders
 const BOTTOM_PADDING = 4; // Padding from bottom - tight
@@ -123,32 +138,13 @@ const CORNER_RADIUS = 5; // Slight rounded corners on spine edges
 const STAR_STICKER_IMAGE = require('@assets/stars/star5.webp');
 
 // Cloth texture overlay for procedural spine backgrounds
-const SPINE_TEXTURE_IMAGE = require('@assets/textures/spine-cloth.png');
+const _SPINE_TEXTURE_IMAGE = require('@assets/textures/spine-cloth.png');
 
 const SPRING_CONFIG = { damping: 15, stiffness: 200 };
 const EMPTY_GENRES: string[] = []; // Stable reference for books without genres
 
 // Debug flag - set to true to show section boundaries
-const DEBUG_SECTIONS = __DEV__ && false; // Toggle to see section bounds
-
-// =============================================================================
-// TEMPLATE-DIRECT RENDERING
-// =============================================================================
-
-/**
- * TemplateSpineRenderer - A clean, isolated component for template-driven spines.
- *
- * This mirrors SpineTemplatePreviewScreen's SpinePreview component EXACTLY.
- * It bypasses ALL the composition/solver complexity when templates are active.
- *
- * Key differences from the main BookSpineVertical rendering path:
- * - Uses heightPercent DIRECTLY for section allocation
- * - Applies fontSize DIRECTLY to Text components (no solver recalculation)
- * - Uses adjustsFontSizeToFit for overflow handling (shrinks but doesn't grow)
- * - Clean orientation handling via simple transforms
- */
-import { getConfigForSize } from '../utils/spine/templateAdapter';
-import type { AppliedTemplateConfig } from '../utils/spine/templateAdapter';
+const DEBUG_SECTIONS = __DEV__ && false;
 
 interface TemplateSpineProps {
   templateConfig: AppliedTemplateConfig;
@@ -671,8 +667,8 @@ function TemplateSpineRenderer({
 }
 
 // Default dimensions when metadata not available
-const DEFAULT_HEIGHT = 320;
-const DEFAULT_WIDTH = 45; // Default for unknown duration (matches MEDIAN_WIDTH)
+const _DEFAULT_HEIGHT = 320;
+const _DEFAULT_WIDTH = 45; // Default for unknown duration (matches MEDIAN_WIDTH)
 const DEFAULT_DURATION = 10 * 60 * 60; // 10 hours default (~45px width)
 
 // Section percentages - must add to 100%
@@ -738,7 +734,7 @@ export function BookSpineVertical({
 }: BookSpineVerticalProps) {
   // Theme-aware colors
   const colors = useSecretLibraryColors();
-  const isDarkMode = colors.isDark;
+  const _isDarkMode = colors.isDark;
 
   // Server-side spine image support
   // Try to load pre-generated spine image from server, fall back to procedural rendering
@@ -759,7 +755,7 @@ export function BookSpineVertical({
   const spinePlaceholderUrlRaw = useSpineUrl(book.id, { thumb: true });
   const shouldTryServerSpine = useServerSpines && bookHasServerSpine;
   const spineImageUrl = shouldTryServerSpine ? spineImageUrlRaw : null;
-  const spinePlaceholderUrl = shouldTryServerSpine ? spinePlaceholderUrlRaw : null;
+  const _spinePlaceholderUrl = shouldTryServerSpine ? spinePlaceholderUrlRaw : null;
   const [spineImageFailed, setSpineImageFailed] = useState(false);
 
   // Reset failure state when URL changes
@@ -808,7 +804,7 @@ export function BookSpineVertical({
   // SpineTypography debug logging removed (too noisy with large libraries)
 
   // Check if colored spines are enabled (currently disabled for stroke design)
-  const useColoredSpines = useSpineCacheStore((state) => state.useColoredSpines);
+  const _useColoredSpines = useSpineCacheStore((state) => state.useColoredSpines);
 
   // Get spine colors - use book colors if provided, otherwise fall back to theme defaults
   // Dark mode: dark background with white text/stroke
@@ -946,12 +942,12 @@ export function BookSpineVertical({
     const titleNeedsTwoRows = titleWordCount >= 4 && isVerticalSpine; // 4+ words AND vertical
 
     let modifiedConfig = baseTemplateConfig;
-    let authorOverride = false;
-    let titleOverride = false;
+    let _authorOverride = false;
+    let _titleOverride = false;
 
     // Apply stacked-words override for authors (all books under 30 hours, vertical spines only)
     if (!isLongBook && authorHasMultipleNames && isVerticalSpine) {
-      authorOverride = true;
+      _authorOverride = true;
       modifiedConfig = {
         ...modifiedConfig,
         author: {
@@ -964,7 +960,7 @@ export function BookSpineVertical({
     // Apply two-row override for long titles (4+ words, 50% split, vertical spines only)
     // Reduce font size to ~45% to fit two lines in the narrow spine width
     if (titleNeedsTwoRows) {
-      titleOverride = true;
+      _titleOverride = true;
       const twoRowFontSize = Math.round(modifiedConfig.title.fontSize * 0.45);
       modifiedConfig = {
         ...modifiedConfig,
@@ -1162,12 +1158,12 @@ export function BookSpineVertical({
 
   // Calculate centers for each section
   // Use effectiveWidth for X centering since dimensions may be swapped when horizontal
-  const titleCenterX = effectiveWidth / 2;
-  const titleCenterY = titleY + titleHeight / 2;
-  const authorCenterX = effectiveWidth / 2;
-  const authorCenterY = authorY + authorHeight / 2;
-  const progressCenterX = effectiveWidth / 2;
-  const progressCenterY = progressY + progressHeight / 2;
+  const _titleCenterX = effectiveWidth / 2;
+  const _titleCenterY = titleY + titleHeight / 2;
+  const _authorCenterX = effectiveWidth / 2;
+  const _authorCenterY = authorY + authorHeight / 2;
+  const _progressCenterX = effectiveWidth / 2;
+  const _progressCenterY = progressY + progressHeight / 2;
 
   // Text content with case transforms from template
   const titleContent = useMemo(() => {
@@ -1187,10 +1183,10 @@ export function BookSpineVertical({
   }, [composition, typography.authorTransform, book.author]);
 
   // Available width after edge padding (uses effectiveWidth calculated earlier)
-  const availableWidth = effectiveWidth - (EDGE_PADDING * 2);
+  const _availableWidth = effectiveWidth - (EDGE_PADDING * 2);
 
   // Aspect ratio for layout decisions (uses effective dimensions)
-  const aspectRatio = useMemo(() => effectiveHeight / effectiveWidth, [effectiveHeight, effectiveWidth]);
+  const _aspectRatio = useMemo(() => effectiveHeight / effectiveWidth, [effectiveHeight, effectiveWidth]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // UNIFIED TITLE LAYOUT - Uses constraint satisfaction solver
@@ -1198,9 +1194,9 @@ export function BookSpineVertical({
   // Picks highest-scoring solution that meets constraints
   // Letter spacing is passed to solver for accurate width calculation
   // ═══════════════════════════════════════════════════════════════════════════
-  const titleLetterSpacing = typography.titleLetterSpacing ?? typography.letterSpacing ?? 0;
+  const _titleLetterSpacing = typography.titleLetterSpacing ?? typography.letterSpacing ?? 0;
 
-  const titleLayout = useMemo(() => {
+  const _titleLayout = useMemo(() => {
     if (!templateConfig) {
       return {
         lines: [{ text: titleContent, fontSize: 14, x: 0, y: titleHeight / 2 }],
@@ -1229,9 +1225,9 @@ export function BookSpineVertical({
     };
   }, [titleContent, titleHeight, templateConfig]);
 
-  const authorLetterSpacing = typography.authorLetterSpacing ?? (typography.letterSpacing ?? 0) * 0.5;
+  const _authorLetterSpacing = typography.authorLetterSpacing ?? (typography.letterSpacing ?? 0) * 0.5;
 
-  const authorLayout = useMemo(() => {
+  const _authorLayout = useMemo(() => {
     if (!templateConfig) {
       return {
         lines: [{ text: authorContent, fontSize: 10, x: 0, y: authorHeight / 2 }],
@@ -1311,13 +1307,13 @@ export function BookSpineVertical({
   }, [isActive, leanAngle]);
 
   // Progress font size - fits visual width with padding, slightly larger
-  const progressFontSize = Math.min(effectiveWidth * 0.45, 20);
+  const _progressFontSize = Math.min(effectiveWidth * 0.45, 20);
 
   // Checkmark size for finished books
-  const checkmarkSize = Math.min(effectiveWidth * 0.5, 16);
+  const _checkmarkSize = Math.min(effectiveWidth * 0.5, 16);
 
   // Series icon index (used for series consistency even though not displayed on spine)
-  const iconIndex = seriesStyle?.iconIndex ?? 0;
+  const _iconIndex = seriesStyle?.iconIndex ?? 0;
 
   // Last played time (compact format) - larger font for visibility
   const lastPlayedText = formatTimeAgoCompact(book.lastPlayedAt);
@@ -1345,15 +1341,15 @@ export function BookSpineVertical({
 
   // Font-specific line heights for tight display typography
   const fontLineHeights = FONT_LINE_HEIGHTS[resolvedFontFamily] || FONT_LINE_HEIGHTS['default'];
-  const titleLineHeightMultiplier = typography.titleLineHeight ?? fontLineHeights.title;
-  const authorLineHeightMultiplier = typography.authorLineHeight ?? fontLineHeights.author;
-  const tightLineHeightMultiplier = fontLineHeights.tight;
+  const _titleLineHeightMultiplier = typography.titleLineHeight ?? fontLineHeights.title;
+  const _authorLineHeightMultiplier = typography.authorLineHeight ?? fontLineHeights.author;
+  const _tightLineHeightMultiplier = fontLineHeights.tight;
 
   // Title font weight
-  const titleFontWeight = typography.titleWeight || typography.fontWeight || '600';
+  const _titleFontWeight = typography.titleWeight || typography.fontWeight || '600';
 
   // Author font weight
-  const authorFontWeight = typography.authorWeight || typography.fontWeight || '400';
+  const _authorFontWeight = typography.authorWeight || typography.fontWeight || '400';
 
   return (
     <AnimatedPressable

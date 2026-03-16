@@ -71,7 +71,7 @@ export async function persistSmartRewindState(
       AsyncStorage.setItem(SMART_REWIND_PAUSE_BOOK_ID_KEY, bookId),
       AsyncStorage.setItem(SMART_REWIND_PAUSE_POSITION_KEY, position.toString()),
     ]);
-  } catch (err) {
+  } catch {
     log('[SmartRewind] Failed to persist pause state');
   }
 }
@@ -115,7 +115,7 @@ export async function restoreSmartRewindState(
         position: storedPosition ? parseFloat(storedPosition) : null,
       };
     }
-  } catch (err) {
+  } catch {
     log('[SmartRewind] Failed to restore pause state');
   }
 

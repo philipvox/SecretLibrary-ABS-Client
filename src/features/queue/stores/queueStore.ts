@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { sqliteCache, QueueItem } from '@/core/services/sqliteCache';
+import { sqliteCache } from '@/core/services/sqliteCache';
 import { getNextBookInSeries } from '@/core/cache/libraryCache';
 import { createLogger } from '@/shared/utils/logger';
 

@@ -131,7 +131,7 @@ export function trackEvent(
       data,
       level,
     });
-  } catch (e) {
+  } catch {
     // Don't let monitoring crash the app
   }
 }
@@ -153,7 +153,7 @@ export function setUser(user: { id: string; username?: string } | null): void {
     } else {
       Sentry.setUser(null);
     }
-  } catch (e) {
+  } catch {
     // Don't let monitoring crash the app
   }
 }
@@ -177,7 +177,7 @@ export function addBreadcrumb(
       data,
       level: 'info',
     });
-  } catch (e) {
+  } catch {
     // Don't let monitoring crash the app
   }
 }

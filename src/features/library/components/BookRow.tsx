@@ -10,7 +10,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { Play, CheckCircle } from 'lucide-react-native';
 import { apiClient } from '@/core/api';
-import { scale, spacing, useTheme } from '@/shared/theme';
+import { scale, useTheme } from '@/shared/theme';
 import { EnrichedBook, formatDuration, formatTimeAgo } from '../types';
 
 interface BookRowProps {

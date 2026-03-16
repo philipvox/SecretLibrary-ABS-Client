@@ -368,7 +368,7 @@ export function DataStorageSettingsScreen() {
     if (!library?.id) return;
 
     try {
-      const playlistId = await librarySyncService.getOrCreateSeriesPlaylist(library.id);
+      const _playlistId = await librarySyncService.getOrCreateSeriesPlaylist(library.id);
       setLinkedSeriesPlaylistName('My Series (auto)');
 
       setIsSyncing(true);
@@ -396,7 +396,7 @@ export function DataStorageSettingsScreen() {
     try {
       await refreshCache();
       Alert.alert('Done', 'Your library has been reloaded from the server.');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Could not reload library. Please check your connection.');
     } finally {
       setIsRefreshingCache(false);

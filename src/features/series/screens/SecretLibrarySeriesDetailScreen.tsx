@@ -128,7 +128,7 @@ export function SecretLibrarySeriesDetailScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const colors = useSecretLibraryColors();
-  const isDarkMode = colors.isDark;
+  const _isDarkMode = colors.isDark;
   const { showMenu } = useBookContextMenu();
 
   // Handle both param formats

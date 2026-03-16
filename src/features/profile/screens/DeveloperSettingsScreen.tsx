@@ -5,7 +5,7 @@
  * Contains toggles and tools for development/debugging.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,6 @@ import { useNavigation } from '@react-navigation/native';
 import {
   ChevronRight,
   RefreshCw,
-  Eye,
   Paintbrush,
   Bug,
   type LucideIcon,
@@ -117,7 +116,7 @@ export function DeveloperSettingsScreen() {
     try {
       await imageCacheService.resetCachePromptSeen();
       Alert.alert('Done', 'Cache prompt will show again on next app launch.');
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to reset cache prompt.');
     }
   }, []);

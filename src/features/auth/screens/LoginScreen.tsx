@@ -3,7 +3,7 @@
  * Enhanced with real-time URL validation feedback per UX research
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 786.7 149
  * - Removes trailing slashes
  * - Validates basic URL structure
  */
-function normalizeServerUrl(url: string): { normalized: string; corrected: boolean; error?: string } {
+function _normalizeServerUrl(url: string): { normalized: string; corrected: boolean; error?: string } {
   let normalized = url.trim();
   let corrected = false;
 
@@ -281,7 +281,7 @@ export function LoginScreen() {
       // Save login info for next time
       await saveLoginInfo(result.normalizedUrl, username.trim());
       await login(result.normalizedUrl, username.trim(), password);
-    } catch (err) {
+    } catch {
       // Error handled by context
     }
   };

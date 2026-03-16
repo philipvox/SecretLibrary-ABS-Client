@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
@@ -17,7 +17,7 @@ import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { globalLoading } from '@/shared/stores/globalLoadingStore';
 
 export function DurationFilterScreen() {
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
   // Theme-aware colors

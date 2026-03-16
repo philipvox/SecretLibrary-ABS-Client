@@ -6,7 +6,6 @@
 
 import { LibraryItem } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { downloadManager } from '@/core/services/downloadManager';
 import { Mood } from '@/shared/utils/bookDNA';
 import { BookSummary, libraryItemToBookSummary } from '../types';
 

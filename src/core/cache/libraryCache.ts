@@ -21,7 +21,7 @@ import { getErrorMessage } from '@/shared/utils/errorUtils';
 const log = createLogger('LibraryCache');
 
 // Type guard for book media
-function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
+function _isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
   return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 

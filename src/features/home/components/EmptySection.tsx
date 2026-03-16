@@ -13,7 +13,6 @@ import {
   scale,
   layout,
   useTheme,
-  accentColors,
 } from '@/shared/theme';
 
 interface EmptySectionProps {

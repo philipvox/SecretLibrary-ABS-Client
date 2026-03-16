@@ -15,13 +15,13 @@ export {
   type BookMetadataExtracted,
 } from './metadata';
 // Re-export audioDebug except formatDuration (use format.ts version)
+// Note: logObject is excluded here because it's also exported from logger.ts (via export * from './logger')
 export {
   audioLog,
   startTiming,
   endTiming,
   createTimer,
   logSection,
-  logObject,
   TrackPlayerStateNames,
   getStateName,
   validateUrl,

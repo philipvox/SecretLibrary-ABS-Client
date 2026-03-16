@@ -18,7 +18,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  TextInput,
   SectionList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -28,7 +27,6 @@ import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { Icon } from '@/shared/components/Icon';
 import { SkullRefreshControl, TopNav, TopNavBackIcon, TagIcon, ScreenLoadingOverlay } from '@/shared/components';
 import { globalLoading } from '@/shared/stores/globalLoadingStore';
-import { secretLibraryColors } from '@/shared/theme/secretLibrary';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import {
   META_CATEGORIES,
@@ -43,7 +41,7 @@ import {
   PopularGenresSection,
 } from '../components/GenreSections';
 import { GenreListItem } from '../components/GenreCards';
-import { spacing, radius, useTheme } from '@/shared/theme';
+import { useTheme } from '@/shared/theme';
 
 type ViewMode = 'grouped' | 'flat';
 
@@ -153,7 +151,7 @@ export function GenresListScreen() {
     });
 
     // Sort genres within each category
-    grouped.forEach((genres, category) => {
+    grouped.forEach((genres, _category) => {
       genres.sort((a, b) => a.name.localeCompare(b.name));
     });
 

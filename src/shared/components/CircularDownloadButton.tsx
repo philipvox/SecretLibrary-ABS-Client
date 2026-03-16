@@ -93,7 +93,7 @@ export function CircularDownloadButton({
 
   // Check if there's currently an active download (for queue indicator)
   const { downloadingCount } = useDownloads();
-  const isAnotherDownloading = downloadingCount > 0 && !isDownloading;
+  const _isAnotherDownloading = downloadingCount > 0 && !isDownloading;
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;

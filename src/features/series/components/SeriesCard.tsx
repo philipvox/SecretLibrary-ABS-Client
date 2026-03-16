@@ -14,10 +14,10 @@ import { useNavigation } from '@react-navigation/native';
 import { Check } from 'lucide-react-native';
 import { SeriesInfo } from '../services/seriesAdapter';
 import { apiClient } from '@/core/api';
-import { scale, spacing, radius, elevation, cardTokens, useTheme } from '@/shared/theme';
+import { scale, spacing, radius, cardTokens, useTheme } from '@/shared/theme';
 import { StackedCovers } from '@/shared/components';
 import { formatDuration } from '@/shared/utils/format';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 
 // Helper to get book metadata safely
 // Note: Does NOT require audioFiles - works with cache items that only have metadata
@@ -56,7 +56,7 @@ interface ProgressDotProps {
   inactiveColor: string;
 }
 
-function ProgressDot({
+function _ProgressDot({
   status,
   size = 6,
   accentColor,
@@ -92,8 +92,8 @@ function SeriesCardComponent({ series, showProgress = true, downloadedIds }: Ser
 
   // Theme-aware accent colors
   const accentColor = colors.accent.primary;
-  const accentSubtle = colors.accent.primarySubtle;
-  const inactiveColor = colors.border.default;
+  const _accentSubtle = colors.accent.primarySubtle;
+  const _inactiveColor = colors.border.default;
 
   const handlePress = () => {
     navigation.navigate('SeriesDetail', { seriesName: series.name });
@@ -190,7 +190,7 @@ function SeriesCardComponent({ series, showProgress = true, downloadedIds }: Ser
   // Limit dots shown (max 10, then show indicator)
   const maxDots = 10;
   const showAllDots = series.bookCount <= maxDots;
-  const dotsToShow = showAllDots ? series.bookCount : maxDots - 1;
+  const _dotsToShow = showAllDots ? series.bookCount : maxDots - 1;
 
   const durationText = series.totalDuration > 0
     ? formatDuration(series.totalDuration)

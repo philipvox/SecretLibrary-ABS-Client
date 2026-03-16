@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { BookOpen } from 'lucide-react-native';
 import { Collection } from '@/core/types';
 import { apiClient } from '@/core/api';
-import { scale, spacing, radius } from '@/shared/theme';
+import { scale, radius } from '@/shared/theme';
 import { secretLibraryColors as colors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

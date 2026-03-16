@@ -105,7 +105,7 @@ class ProgressService {
             };
           }
         }
-      } catch (e: any) {
+      } catch {
         // Non-critical — memory cache result is still valid
       }
 

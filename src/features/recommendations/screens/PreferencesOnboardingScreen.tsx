@@ -111,7 +111,7 @@ export function PreferencesOnboardingScreen() {
 
   const currentQuestion = questions[currentStep];
   const isLastStep = currentStep === questions.length - 1;
-  const progress = (currentStep + 1) / questions.length;
+  const _progress = (currentStep + 1) / questions.length;
 
   const animateProgress = (toValue: number) => {
     Animated.timing(progressAnim, {

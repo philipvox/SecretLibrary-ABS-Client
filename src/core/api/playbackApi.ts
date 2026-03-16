@@ -40,9 +40,9 @@ export interface PlaybackSession {
   mediaMetadata: {
     title?: string;
     subtitle?: string;
-    authors?: Array<{ id: string; name: string }>;
+    authors?: { id: string; name: string }[];
     narrators?: string[];
-    series?: Array<{ id: string; name: string; sequence?: string }>;
+    series?: { id: string; name: string; sequence?: string }[];
   };
   displayTitle: string;
   displayAuthor: string;

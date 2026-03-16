@@ -17,13 +17,13 @@ import {
 describe('Spine Dimensions', () => {
   describe('calculateWidth', () => {
     it('returns minimum width for very short audiobooks', () => {
-      expect(calculateWidth(1800)).toBe(44);  // 30 minutes - MIN width
-      expect(calculateWidth(3000)).toBe(44);  // 50 minutes - MIN width
+      expect(calculateWidth(1800)).toBe(58);  // 30 minutes - MIN width
+      expect(calculateWidth(3000)).toBe(58);  // 50 minutes - MIN width
     });
 
     it('returns maximum width for very long audiobooks', () => {
-      expect(calculateWidth(180000)).toBe(280);  // 50 hours
-      expect(calculateWidth(200000)).toBe(280);  // 55+ hours
+      expect(calculateWidth(180000)).toBe(150);  // 50 hours
+      expect(calculateWidth(200000)).toBe(150);  // 55+ hours
     });
 
     it('scales with ease-out curve between min and max', () => {
@@ -55,10 +55,10 @@ describe('Spine Dimensions', () => {
     });
 
     it('produces realistic widths for common audiobook lengths', () => {
-      expect(calculateWidth(3600)).toBeGreaterThanOrEqual(44);    // 1hr - MIN
-      expect(calculateWidth(18000)).toBeGreaterThanOrEqual(80);   // 5hr
-      expect(calculateWidth(36000)).toBeGreaterThanOrEqual(120);  // 10hr
-      expect(calculateWidth(90000)).toBeGreaterThanOrEqual(200);  // 25hr
+      expect(calculateWidth(3600)).toBeGreaterThanOrEqual(58);    // 1hr - MIN
+      expect(calculateWidth(18000)).toBeGreaterThanOrEqual(70);   // 5hr
+      expect(calculateWidth(36000)).toBeGreaterThanOrEqual(85);   // 10hr
+      expect(calculateWidth(90000)).toBeGreaterThanOrEqual(120);  // 25hr
     });
   });
 
@@ -91,15 +91,15 @@ describe('Spine Dimensions', () => {
       // Test many random books
       for (let i = 0; i < 100; i++) {
         const height = calculateHeight('fantasy', `book-${i}`);
-        expect(height).toBeGreaterThanOrEqual(290);  // MIN_HEIGHT
-        expect(height).toBeLessThanOrEqual(450);     // MAX_HEIGHT
+        expect(height).toBeGreaterThanOrEqual(260);  // MIN_HEIGHT (200 * 1.3 = 260)
+        expect(height).toBeLessThanOrEqual(550);     // MAX_HEIGHT
       }
     });
 
     it('uses default height for unknown genre', () => {
       const height = calculateHeight(undefined, 'book-123');
-      expect(height).toBeGreaterThanOrEqual(290);
-      expect(height).toBeLessThanOrEqual(450);
+      expect(height).toBeGreaterThanOrEqual(260);
+      expect(height).toBeLessThanOrEqual(550);
     });
   });
 

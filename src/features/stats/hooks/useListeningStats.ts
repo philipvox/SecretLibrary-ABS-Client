@@ -9,10 +9,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import {
   sqliteCache,
-  ListeningSession,
-  DailyStats,
-  ListeningStreak,
-  MonthlyStats,
 } from '@/core/services/sqliteCache';
 
 // Query keys

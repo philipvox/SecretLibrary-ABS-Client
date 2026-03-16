@@ -20,9 +20,6 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
-import {
-  secretLibraryFonts as fonts,
-} from '@/shared/theme/secretLibrary';
 
 // Star PNG for the rating row
 const STAR_IMAGE = require('@assets/stars/star1.png');

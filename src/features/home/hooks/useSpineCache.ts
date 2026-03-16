@@ -5,9 +5,9 @@
  * Provides easy conversion to BookSpineVerticalData format.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useSpineCacheStore, CachedSpineData } from '../stores/spineCache';
+import { useSpineCacheStore } from '../stores/spineCache';
 import { BookSpineVerticalData } from '../components/BookSpineVertical';
 import { LibraryItem } from '@/core/types';
 

@@ -346,7 +346,7 @@ export function SeriesListScreen() {
           maxToRenderPerBatch={8}
           windowSize={7}
         renderItem={({ item: series }) => {
-          const isFavorite = favoriteSeriesNames.includes(series.name);
+          const _isFavorite = favoriteSeriesNames.includes(series.name);
 
           // Build spine items from book IDs
           const bookIds = series.books.map(b => b.id);

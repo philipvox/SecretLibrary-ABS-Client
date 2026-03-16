@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Pressable } from 'react-native';
 import { Icon } from './Icon';
-import { spacing, radius, scale, accentColors, useTheme } from '@/shared/theme';
+import { spacing, radius, scale, useTheme } from '@/shared/theme';
 
 export type SortOption = 'name-asc' | 'name-desc' | 'bookCount-asc' | 'bookCount-desc';
 

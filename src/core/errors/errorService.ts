@@ -20,9 +20,7 @@ import {
   isAppError,
   NetworkErrorCode,
   AuthErrorCode,
-  SyncErrorCode,
   DownloadErrorCode,
-  PlaybackErrorCode,
   DatabaseErrorCode,
 } from './types';
 import { getUserMessage, getCategoryMessage } from './errorMessages';

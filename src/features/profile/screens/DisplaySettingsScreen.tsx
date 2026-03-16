@@ -75,7 +75,7 @@ export function DisplaySettingsScreen() {
   // Home screen view — for status text
   const defaultView = usePlaylistSettingsStore((s) => s.defaultView);
   const hiddenBuiltInViews = usePlaylistSettingsStore((s) => s.hiddenBuiltInViews);
-  const visibleViews = 4 - hiddenBuiltInViews.length;
+  const _visibleViews = 4 - hiddenBuiltInViews.length;
 
   // Chapter cleaning — for status text
   const cleaningLevel = useChapterCleaningStore((s) => s.level);

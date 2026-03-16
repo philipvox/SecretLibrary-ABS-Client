@@ -13,7 +13,6 @@ import {
   scale,
   elevation,
   useTheme,
-  accentColors,
 } from '@/shared/theme';
 
 interface CoverArtworkProps {

@@ -26,10 +26,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache } from '@/core/cache';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { Icon } from '@/shared/components/Icon';
-import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, MicIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { SkullRefreshControl, TopNav, TopNavBackIcon, MicIcon, ScreenLoadingOverlay } from '@/shared/components';
 import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { useTheme, scale } from '@/shared/theme';
+import { useTheme } from '@/shared/theme';
 import {
   META_CATEGORIES,
   MetaCategory,
@@ -41,7 +41,6 @@ import {
   PopularPersonsSection,
   MetaCategoryPersonSection,
 } from '../components/PersonSections';
-import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 
 type ViewMode = 'grouped' | 'flat';
 
@@ -181,7 +180,7 @@ export function NarratorsListScreen() {
     });
 
     // Sort narrators within each category by book count
-    grouped.forEach((narrators, category) => {
+    grouped.forEach((narrators, _category) => {
       narrators.sort((a, b) => b.bookCount - a.bookCount);
     });
 

@@ -23,7 +23,6 @@ import { Icon } from '@/shared/components/Icon';
 import { useSecretLibraryColors } from '@/shared/theme';
 import { useLibraryCache } from '@/core/cache';
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { apiClient } from '@/core/api';
 import { createLogger } from '@/shared/utils/logger';
 
 const log = createLogger('BarcodeScanner');
@@ -46,7 +45,7 @@ try {
   CameraView = expoCamera.CameraView;
   useCameraPermissions = expoCamera.useCameraPermissions;
   cameraModuleAvailable = true;
-} catch (e) {
+} catch {
   log.warn('expo-camera native module not available - barcode scanning disabled');
 }
 

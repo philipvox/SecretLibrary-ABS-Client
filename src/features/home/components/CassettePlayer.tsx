@@ -13,7 +13,6 @@ import {
   Easing,
   Pressable,
   Text,
-  Image,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Svg, {
@@ -27,7 +26,7 @@ import Svg, {
   ClipPath,
   Image as SvgImage,
 } from 'react-native-svg';
-import { useTheme, accentColors } from '@/shared/theme';
+import { useTheme } from '@/shared/theme';
 
 interface CassettePlayerProps {
   /** Cover image URL to display in the card */
@@ -66,17 +65,19 @@ const SPINDLE_CENTER_Y = 25.5;
 const SPINDLE_SIZE = 38;
 
 // Memoized Spindle component to prevent re-renders
-const Spindle = memo(({ size }: { size: number }) => (
-  <Svg width={size} height={size} viewBox="0 0 38 38">
-    <Circle cx={19} cy={19} r={14} stroke="#AAAAAA" strokeWidth={1.5} fill="none" />
-    <Circle cx={19} cy={19} r={9} stroke="#AAAAAA" strokeWidth={1} fill="none" />
-    <Circle cx={19} cy={19} r={5} fill="#AAAAAA" />
-    <Circle cx={19} cy={19} r={2} fill="#666666" />
-    <Line x1={10} y1={12} x2={14} y2={14} stroke="#AAAAAA" strokeWidth={1.5} strokeLinecap="round" />
-    <Line x1={14} y1={28} x2={16} y2={25} stroke="#AAAAAA" strokeWidth={1.5} strokeLinecap="round" />
-    <Line x1={26} y1={18} x2={30} y2={17.5} stroke="#AAAAAA" strokeWidth={1.5} strokeLinecap="round" />
-  </Svg>
-));
+const Spindle = memo(function Spindle({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 38 38">
+      <Circle cx={19} cy={19} r={14} stroke="#AAAAAA" strokeWidth={1.5} fill="none" />
+      <Circle cx={19} cy={19} r={9} stroke="#AAAAAA" strokeWidth={1} fill="none" />
+      <Circle cx={19} cy={19} r={5} fill="#AAAAAA" />
+      <Circle cx={19} cy={19} r={2} fill="#666666" />
+      <Line x1={10} y1={12} x2={14} y2={14} stroke="#AAAAAA" strokeWidth={1.5} strokeLinecap="round" />
+      <Line x1={14} y1={28} x2={16} y2={25} stroke="#AAAAAA" strokeWidth={1.5} strokeLinecap="round" />
+      <Line x1={26} y1={18} x2={30} y2={17.5} stroke="#AAAAAA" strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  );
+});
 
 const CassettePlayer: React.FC<CassettePlayerProps> = ({
   coverUrl,

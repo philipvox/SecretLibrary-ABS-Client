@@ -33,17 +33,6 @@ import {
 } from 'lucide-react-native';
 import { useCoverUrl } from '@/core/cache';
 import type { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
-
-// Helper to get book metadata safely
-function getBookMetadata(item: LibraryItem): BookMetadata | null {
-  if (item.mediaType !== 'book' || !item.media?.metadata) return null;
-  return item.media.metadata as BookMetadata;
-}
-
-// Type guard for book media
-function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
-  return media !== undefined && 'duration' in media;
-}
 import { useDownloadStatus } from '@/core/hooks/useDownloads';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
@@ -58,12 +47,22 @@ import {
   layout,
   typography,
   scale,
-  formatProgress,
   formatDuration,
   iconSizes,
-  accentColors,
 } from '@/shared/theme';
 import { useTheme, ThemeColors } from '@/shared/theme';
+import { ThumbnailProgressBar } from './ThumbnailProgressBar';
+
+// Helper to get book metadata safely
+function getBookMetadata(item: LibraryItem): BookMetadata | null {
+  if (item.mediaType !== 'book' || !item.media?.metadata) return null;
+  return item.media.metadata as BookMetadata;
+}
+
+// Type guard for book media
+function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
+  return media !== undefined && 'duration' in media;
+}
 
 // Helper to get semantic colors from ThemeColors
 function getSemanticColors(c: ThemeColors) {
@@ -74,7 +73,6 @@ function getSemanticColors(c: ThemeColors) {
     iconInverse: c.icon.inverse, // White on dark backgrounds
   };
 }
-import { ThumbnailProgressBar } from './ThumbnailProgressBar';
 
 // Inline Progress Bar for book cards (UX: visual progress + time remaining)
 const InlineProgressBar = ({ progress, height = 4 }: { progress: number; height?: number }) => {

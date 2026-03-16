@@ -11,7 +11,7 @@
 import { useMemo } from 'react';
 import { useFinishedBooks, useFinishedBookIds } from '@/core/hooks/useUserBooks';
 import { useLibraryCache } from '@/core/cache/libraryCache';
-import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import { LibraryItem, BookMetadata } from '@/core/types';
 
 /**
  * SINGLE SOURCE OF TRUTH: Threshold for considering a book "finished"

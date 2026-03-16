@@ -5,7 +5,7 @@
  */
 
 import { AudioFile, EbookFile } from './files';
-import { Author, Series } from './metadata';
+import { Author } from './metadata';
 
 /**
  * Book media information

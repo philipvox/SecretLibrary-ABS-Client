@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, NativeModules } from 'react-native';
+import { View, NativeModules } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider } from './src/core/auth';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -18,8 +18,8 @@ import { appInitializer, InitResult } from './src/core/services/appInitializer';
 import { AnimatedSplash } from './src/shared/components/AnimatedSplash';
 import { GlobalLoadingOverlay } from './src/shared/components';
 import { ErrorProvider } from './src/core/errors';
-import { useAppHealthMonitor } from './src/utils/perfDebug';
-import { startAllMonitoring, stopAllMonitoring, fpsMonitor, memoryMonitor } from './src/utils/runtimeMonitor';
+
+
 import { useLibraryCache } from './src/core/cache';
 import { useSpineCacheStore, selectIsPopulated } from './src/features/home/stores/spineCache';
 import { useAppReadyStore, setAppBootComplete, setAppRefreshComplete } from './src/core/stores/appReadyStore';
@@ -28,11 +28,11 @@ import {
   INIT_VERY_SLOW_THRESHOLD_MS,
   CACHE_READY_TIMEOUT_MS,
 } from './src/constants/loading';
+import * as SplashScreen from 'expo-splash-screen';
 
 // Reset boot flags immediately on bundle load (before any components render)
 setAppBootComplete(false);
 setAppRefreshComplete(false);
-import * as SplashScreen from 'expo-splash-screen';
 
 // IMMEDIATELY hide native splash when JS bundle loads
 // AnimatedSplash will already be rendering, so transition is seamless
@@ -94,12 +94,12 @@ export default function App() {
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [isVerySlowLoading, setIsVerySlowLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-  const startTimeRef = useRef(Date.now());
+  const _startTimeRef = useRef(Date.now());
 
   // Check if library and spine caches are ready
   const isLibraryCacheLoaded = useLibraryCache((s) => s.isLoaded);
   const isLibraryCacheLoading = useLibraryCache((s) => s.isLoading);
-  const lastRefreshed = useLibraryCache((s) => s.lastRefreshed);
+  const _lastRefreshed = useLibraryCache((s) => s.lastRefreshed);
   const refreshCache = useLibraryCache((s) => s.refreshCache);
   const currentLibraryId = useLibraryCache((s) => s.currentLibraryId);
   const isSpineCachePopulated = useSpineCacheStore(selectIsPopulated);
