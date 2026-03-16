@@ -110,6 +110,11 @@ class AndroidAudioService {
       logSection('EXOPLAYER SETUP (Android)');
       timing('Start');
 
+      if (!ExoPlayerModule) {
+        audioLog.warn('ExoPlayerModule not available — skipping setup (Expo Go?)');
+        return;
+      }
+
       // Initialize the native ExoPlayer service
       await ExoPlayerModule.initialize();
       timing('Native service initialized');

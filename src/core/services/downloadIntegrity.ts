@@ -154,14 +154,12 @@ export async function verifyFileIntegrity(
     if (info.expectedChecksum) {
       try {
         result.actualChecksum = await calculateFileChecksum(info.filePath);
-        // Support both size-based fingerprints ("size:123") and legacy hex checksums
-        if (info.expectedChecksum.startsWith('size:') || result.actualChecksum.startsWith('size:')) {
-          // Size-based: both must have same size (already validated above)
+        if (info.expectedChecksum.startsWith('size:')) {
           result.checksumMatch = result.sizeMatch;
         } else {
-          result.checksumMatch =
-            result.actualChecksum.toLowerCase() ===
-            info.expectedChecksum.toLowerCase();
+          // Legacy hex checksum: cannot verify (would cause OOM), fall back to size check
+          console.warn('[downloadIntegrity] Legacy hex checksum detected, using size validation only');
+          result.checksumMatch = result.sizeMatch;
         }
 
         if (!result.checksumMatch) {

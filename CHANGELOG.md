@@ -26,11 +26,20 @@ All notable changes to the AudiobookShelf app are documented in this file.
 - `modules/avplayer-module/ios/AVPlayerModule.swift` — Native Swift implementation (~650 lines)
 - `src/features/player/services/audioService.ios.ts` — iOS JS bridge (~480 lines)
 
-### Files Unchanged
-- `src/features/player/services/audioService.ts` — Becomes fallback/web path (untouched)
-- `src/features/player/services/audioService.android.ts` — Android path (untouched)
-- `src/features/player/stores/playerStore.ts` — No changes needed
-- All UI components — No changes needed
+### Also Modified
+- `src/features/player/services/audioService.ts` — Updated fallback/web path
+- `src/features/player/services/audioService.android.ts` — ExoPlayer null guard, cleanup improvements
+- `src/features/player/stores/playerStore.ts` — Player store updates for native audio integration
+- `src/features/player/components/PlayerIcons.tsx` — Player UI updates
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` — Player screen updates
+- `src/features/player/services/bufferRecoveryService.ts` — Fixed double invocation of handleRecoveryFailed
+- `src/features/home/components/BookSpineVertical.tsx` — Home screen spine component updates
+- `src/features/home/screens/LibraryScreen.tsx` — Library screen updates
+- `src/core/services/downloadIntegrity.ts` — Cleaned up dead legacy checksum code
+- `src/core/services/sqliteCache.ts` — getAllPlaybackProgress now throws on error instead of swallowing
+- `src/core/services/finishedBooksSync.ts` — Added TODO for legacy table migration
+- `plugins/exo-player/src/AudioPlaybackService.kt` — Redacted URLs in logs, removed unsafe bitmap recycle
+- `plugins/android-auto/src/AndroidAutoMediaBrowserService.kt` — Added try-catch for loadChildrenAsync
 
 ---
 

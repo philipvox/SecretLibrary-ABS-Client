@@ -340,7 +340,7 @@ class BufferRecoveryService {
     // Recovery attempt failed
     if (this.status.recoveryAttempts >= MAX_RETRIES) {
       log.error(`Recovery failed after ${MAX_RETRIES} attempts`);
-      this.handleRecoveryFailed();
+      throw new Error(`Recovery failed after ${MAX_RETRIES} attempts`);
     } else {
       log.warn(`Recovery attempt ${this.status.recoveryAttempts} failed, will retry`);
     }

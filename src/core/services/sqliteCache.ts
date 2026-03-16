@@ -1109,7 +1109,7 @@ class SQLiteCache {
       return map;
     } catch (err) {
       log.warn('getAllPlaybackProgress error:', err);
-      return new Map();
+      throw err;
     }
   }
 

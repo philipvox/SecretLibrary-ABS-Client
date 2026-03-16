@@ -177,11 +177,15 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         result.detach()
 
         serviceScope.launch {
-            val items = loadChildrenAsync(parentId)
+            val items = try {
+                loadChildrenAsync(parentId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load children for $parentId", e)
+                mutableListOf()
+            }
             try {
                 result.sendResult(items)
             } catch (e: IllegalStateException) {
-                // Framework may have already timed out and sent an error result
                 Log.w(TAG, "sendResult failed (framework timeout?): ${e.message}")
             }
         }

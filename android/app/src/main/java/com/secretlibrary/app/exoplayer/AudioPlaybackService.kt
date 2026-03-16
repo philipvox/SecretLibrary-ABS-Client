@@ -345,7 +345,8 @@ class AudioPlaybackService : Service() {
             val url = track.url
             val isLocal = url.startsWith("file://") || url.startsWith("/")
             val urlType = if (isLocal) "LOCAL" else "STREAM"
-            Log.d(TAG, "Track[$idx] $urlType: ${url.take(150)}${if (url.length > 150) "..." else ""}")
+            val safeUrl = if (isLocal) url.take(80) else runCatching { android.net.Uri.parse(url).host ?: "unknown" }.getOrDefault("invalid")
+            Log.d(TAG, "Track[$idx] $urlType: $safeUrl")
             Log.d(TAG, "Track[$idx] title=${track.title}, offset=${track.startOffset}s, dur=${track.duration}s")
         }
 
@@ -565,7 +566,6 @@ class AudioPlaybackService : Service() {
         currentTitle = ""
         currentAuthor = ""
         currentArtworkUrl = null
-        currentArtworkBitmap?.let { if (!it.isRecycled) it.recycle() }
         currentArtworkBitmap = null
         currentChapterTitle = null
 

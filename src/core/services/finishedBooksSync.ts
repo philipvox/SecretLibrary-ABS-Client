@@ -196,6 +196,8 @@ export const finishedBooksSync = {
 
       // Batch-load ALL local playback progress upfront to avoid N+1 queries
       // (was calling sqliteCache.getPlaybackProgress(item.id) in a loop for 2700+ items)
+      // TODO: This reads from the legacy `playback_progress` table, but the active write path
+      // uses `user_books`. Migrate to reading from `user_books` once data consistency is verified.
       const allLocalProgress = await sqliteCache.getAllPlaybackProgress();
       log.info(`Loaded ${allLocalProgress.size} local progress records for batch comparison`);
 
