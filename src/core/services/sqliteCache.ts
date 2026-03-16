@@ -741,6 +741,28 @@ class SQLiteCache {
   }
 
   /**
+   * Upsert a single library item without deleting other cached items.
+   * Used by downloadManager to cache metadata for offline access
+   * without destroying the full library cache.
+   */
+  async upsertLibraryItem(libraryId: string, item: LibraryItem): Promise<void> {
+    const now = Date.now();
+
+    try {
+      await this.withTransactionLock(async (db) => {
+        await db.runAsync(
+          `INSERT OR REPLACE INTO library_items (id, library_id, data, updated_at)
+           VALUES (?, ?, ?, ?)`,
+          [item.id, libraryId, JSON.stringify(item), item.updatedAt || now]
+        );
+      });
+      log.debug(`Upserted library item ${item.id}`);
+    } catch (err) {
+      log.error('upsertLibraryItem error:', err);
+    }
+  }
+
+  /**
    * Bulk upsert book IDs into user_books with is_in_library = 1.
    * Uses transaction lock to prevent concurrent transaction errors.
    */
@@ -930,15 +952,16 @@ class SQLiteCache {
   }
 
   async setAuthors(libraryId: string, authors: CachedAuthor[]): Promise<void> {
-    const db = await this.ensureReady();
     const now = Date.now();
 
     try {
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('DELETE FROM authors WHERE library_id = ?', [libraryId]);
-        // Batch insert for 50-70% speedup
-        const rows = authors.map(author => [author.id, libraryId, JSON.stringify(author), now]);
-        await this.batchInsert(db, 'authors', ['id', 'library_id', 'data', 'updated_at'], rows);
+      await this.withTransactionLock(async (db) => {
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM authors WHERE library_id = ?', [libraryId]);
+          // Batch insert for 50-70% speedup
+          const rows = authors.map(author => [author.id, libraryId, JSON.stringify(author), now]);
+          await this.batchInsert(db, 'authors', ['id', 'library_id', 'data', 'updated_at'], rows);
+        });
       });
       log.debug(`Cached ${authors.length} authors`);
     } catch (err) {
@@ -965,15 +988,16 @@ class SQLiteCache {
   }
 
   async setSeries(libraryId: string, series: CachedSeries[]): Promise<void> {
-    const db = await this.ensureReady();
     const now = Date.now();
 
     try {
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('DELETE FROM series WHERE library_id = ?', [libraryId]);
-        // Batch insert for 50-70% speedup
-        const rows = series.map(s => [s.id, libraryId, JSON.stringify(s), now]);
-        await this.batchInsert(db, 'series', ['id', 'library_id', 'data', 'updated_at'], rows);
+      await this.withTransactionLock(async (db) => {
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM series WHERE library_id = ?', [libraryId]);
+          // Batch insert for 50-70% speedup
+          const rows = series.map(s => [s.id, libraryId, JSON.stringify(s), now]);
+          await this.batchInsert(db, 'series', ['id', 'library_id', 'data', 'updated_at'], rows);
+        });
       });
       log.debug(`Cached ${series.length} series`);
     } catch (err) {
@@ -1000,15 +1024,16 @@ class SQLiteCache {
   }
 
   async setNarrators(libraryId: string, narrators: CachedNarrator[]): Promise<void> {
-    const db = await this.ensureReady();
     const now = Date.now();
 
     try {
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('DELETE FROM narrators WHERE library_id = ?', [libraryId]);
-        // Batch insert for 50-70% speedup
-        const rows = narrators.map(n => [n.id, libraryId, JSON.stringify(n), now]);
-        await this.batchInsert(db, 'narrators', ['id', 'library_id', 'data', 'updated_at'], rows);
+      await this.withTransactionLock(async (db) => {
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM narrators WHERE library_id = ?', [libraryId]);
+          // Batch insert for 50-70% speedup
+          const rows = narrators.map(n => [n.id, libraryId, JSON.stringify(n), now]);
+          await this.batchInsert(db, 'narrators', ['id', 'library_id', 'data', 'updated_at'], rows);
+        });
       });
       log.debug(`Cached ${narrators.length} narrators`);
     } catch (err) {
@@ -1064,6 +1089,27 @@ class SQLiteCache {
       return row || null;
     } catch (err) {
       return null;
+    }
+  }
+
+  /**
+   * Load ALL playback progress records at once.
+   * Used by finishedBooksSync to avoid N+1 queries when syncing 2700+ items.
+   */
+  async getAllPlaybackProgress(): Promise<Map<string, PlaybackProgress>> {
+    const db = await this.ensureReady();
+    try {
+      const rows = await db.getAllAsync<PlaybackProgress>(
+        'SELECT item_id as itemId, position, duration, updated_at as updatedAt, synced FROM playback_progress'
+      );
+      const map = new Map<string, PlaybackProgress>();
+      for (const row of rows) {
+        map.set(row.itemId, row);
+      }
+      return map;
+    } catch (err) {
+      log.warn('getAllPlaybackProgress error:', err);
+      return new Map();
     }
   }
 

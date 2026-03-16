@@ -213,18 +213,9 @@ export const useSpeedStore = create<SpeedState & SpeedActions>()(
           }
         }
 
-        // Best-effort: Try to apply rate to audioService if it's ready
-        // This won't work during app startup, but the rate will be applied when book loads
-        // via applyBookSpeed() which is called during loadBook
-        if (playbackRate !== 1.0) {
-          log.debug(`Attempting to apply restored playback rate: ${playbackRate}x`);
-          // Note: This will likely fail during app startup since audio isn't loaded yet
-          // The rate is stored in state and will be properly applied in applyBookSpeed()
-          audioService.setPlaybackRate(playbackRate).catch((err) => {
-            // Expected during startup - audio service not ready, rate will be applied later
-            log.debug(`Rate application deferred (expected during startup):`, err);
-          });
-        }
+        // Note: Rate is stored in state and will be properly applied via applyBookSpeed()
+        // when a book loads. No need to attempt audioService.setPlaybackRate() here since
+        // audio isn't loaded yet during startup.
 
         set({
           bookSpeedMap,

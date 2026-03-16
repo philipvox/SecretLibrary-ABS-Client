@@ -718,10 +718,9 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
 
     // Automatically reload library data from server
     if (libraryId) {
-      // Use setTimeout to let the clear complete first
-      setTimeout(() => {
-        get().loadCache(libraryId, true);
-      }, 100);
+      // loadCache is already async and checks isLoading to avoid re-entrancy,
+      // so we can call it directly without a fragile setTimeout delay.
+      get().loadCache(libraryId, true);
     }
   },
 }));

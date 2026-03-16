@@ -452,6 +452,3 @@ export function AppNavigator() {
 
   return <AuthenticatedApp />;
 }
-
-// Styles removed - no longer using CacheLoadingScreen
-const styles = StyleSheet.create({});

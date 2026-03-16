@@ -69,6 +69,7 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         const val DESCRIPTION_EXTRAS_KEY_COMPLETION_PERCENTAGE = "android.media.extra.MEDIA_PROGRESS"
 
         // Instance reference for module communication
+        @Volatile
         var instance: AndroidAutoMediaBrowserService? = null
             private set
     }
@@ -80,13 +81,10 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Cover art cache with LRU eviction to prevent OOM (max ~50 entries ≈ 32MB)
-    private val coverArtCache = object : LruCache<String, Bitmap>(50) {
-        override fun entryRemoved(evicted: Boolean, key: String, oldValue: Bitmap, newValue: Bitmap?) {
-            if (evicted && !oldValue.isRecycled) {
-                oldValue.recycle()
-            }
-        }
-    }
+    // NOTE: Do NOT override entryRemoved to call bitmap.recycle() — evicted bitmaps may still
+    // be referenced by MediaItem descriptions, causing "Canvas: trying to use a recycled bitmap" crash.
+    // The LRU cap at 50 entries bounds memory; GC handles actual deallocation.
+    private val coverArtCache = LruCache<String, Bitmap>(50)
 
     // Track current now-playing artwork URL to invalidate on book change
     private var currentNowPlayingUrl: String? = null
@@ -131,14 +129,16 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     ): BrowserRoot {
         Log.d(TAG, "onGetRoot called by: $clientPackageName")
 
-        // Retry getting ExoPlayer's MediaSession if we didn't have it at onCreate
+        // Try to grab ExoPlayer's MediaSession token immediately (non-blocking).
+        // If ExoPlayer hasn't initialized yet, onLoadChildren will retry.
+        // NEVER block the binder thread here — Thread.sleep causes ANR.
         if (sessionToken == null) {
             val exoSession = AudioPlaybackService.instance?.mediaSession
             if (exoSession != null) {
                 sessionToken = exoSession.sessionToken
-                Log.d(TAG, "Got ExoPlayer's MediaSession token on retry")
+                Log.d(TAG, "Got ExoPlayer's MediaSession token in onGetRoot")
             } else {
-                Log.w(TAG, "ExoPlayer still not initialized — Android Auto may not show playback controls until audio starts")
+                Log.w(TAG, "ExoPlayer not initialized yet — will set session token when available")
             }
         }
 
@@ -164,12 +164,26 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     ) {
         Log.d(TAG, "onLoadChildren: $parentId")
 
+        // Lazily set session token if ExoPlayer became ready after onGetRoot
+        if (sessionToken == null) {
+            val exoSession = AudioPlaybackService.instance?.mediaSession
+            if (exoSession != null) {
+                sessionToken = exoSession.sessionToken
+                Log.d(TAG, "Got ExoPlayer's MediaSession token in onLoadChildren")
+            }
+        }
+
         // Detach result so we can load async
         result.detach()
 
         serviceScope.launch {
             val items = loadChildrenAsync(parentId)
-            result.sendResult(items)
+            try {
+                result.sendResult(items)
+            } catch (e: IllegalStateException) {
+                // Framework may have already timed out and sent an error result
+                Log.w(TAG, "sendResult failed (framework timeout?): ${e.message}")
+            }
         }
     }
 

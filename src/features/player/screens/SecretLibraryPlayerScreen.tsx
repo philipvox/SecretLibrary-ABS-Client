@@ -34,7 +34,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { CoverStars } from '@/shared/components/CoverStars';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import { PlayIcon, PauseIcon } from '../components/PlayerIcons';
+import { PlayIcon, PauseIcon, StopIcon } from '../components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
 import Slider from '@react-native-community/slider';
@@ -346,6 +346,7 @@ export function SecretLibraryPlayerScreen() {
   // Actions
   const {
     closePlayer,
+    stopPlayback,
     play,
     pause,
     seekTo,
@@ -357,6 +358,7 @@ export function SecretLibraryPlayerScreen() {
   } = usePlayerStore(
     useShallow((s) => ({
       closePlayer: s.closePlayer,
+      stopPlayback: s.stopPlayback,
       play: s.play,
       pause: s.pause,
       seekTo: s.seekTo,
@@ -583,6 +585,8 @@ export function SecretLibraryPlayerScreen() {
 
   // Swipe-down gesture on full player to dismiss
   const dismissGesture = Gesture.Pan()
+    .activeOffsetY(15)       // Only activate after 15px vertical movement
+    .failOffsetX([-15, 15])  // Fail if horizontal movement detected first (slider scrub)
     .onUpdate((event) => {
       'worklet';
       if (event.translationY > 0) {
@@ -829,6 +833,11 @@ export function SecretLibraryPlayerScreen() {
       play();
     }
   }, [isPlaying, play, pause]);
+
+  const handleStop = useCallback(() => {
+    haptics.buttonPress();
+    stopPlayback();
+  }, [stopPlayback]);
 
   const handlePrev = useCallback(() => {
     haptics.selection();
@@ -1183,6 +1192,12 @@ export function SecretLibraryPlayerScreen() {
                 </View>
               )}
               {bookId && <CoverStars bookId={bookId} starSize={scale(48)} />}
+              {/* Loading/buffering spinner overlay on cover */}
+              {(isLoading || isBuffering) && (
+                <View style={styles.coverLoadingOverlay}>
+                  <ActivityIndicator size={scale(64)} color="rgba(255,255,255,0.9)" />
+                </View>
+              )}
             </View>
 
             {/* Time Delta Popup - overlays cover */}
@@ -1372,22 +1387,15 @@ export function SecretLibraryPlayerScreen() {
             </TouchableOpacity>
 
             {/* Play/Pause - Large white rounded pill */}
+            {/* During loading/buffering: stop icon (square) to cancel */}
+            {/* Normal: play or pause icon */}
             <TouchableOpacity
               style={styles.playBtn}
-              onPress={handlePlayPause}
+              onPress={isLoading || isBuffering ? handleStop : handlePlayPause}
               activeOpacity={0.8}
             >
-              {isLoading ? (
-                <ActivityIndicator size={28} color="#000000" />
-              ) : isBuffering ? (
-                <View style={styles.bufferingContainer}>
-                  <ActivityIndicator size={48} color="#000000" style={styles.bufferingSpinner} />
-                  {isPlaying ? (
-                    <PauseIcon color="#000000" size={20} />
-                  ) : (
-                    <PlayIcon color="#000000" size={20} />
-                  )}
-                </View>
+              {isLoading || isBuffering ? (
+                <StopIcon color="#000000" size={28} />
               ) : isPlaying ? (
                 <PauseIcon color="#000000" size={36} />
               ) : (
@@ -1722,6 +1730,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.12)',
     letterSpacing: -2,
   },
+  coverLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: scale(8),
+  },
 
   // Time Delta Popup - overlays cover
   deltaPopup: {
@@ -1895,13 +1910,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
-  },
-  bufferingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bufferingSpinner: {
-    position: 'absolute',
   },
 
   // Settings Row - Speed, Sleep, Progress Mode

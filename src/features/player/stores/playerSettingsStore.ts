@@ -227,12 +227,16 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           AsyncStorage.getItem(SHOW_TIME_REMAINING_KEY),
         ]);
 
-        const skipForwardInterval = skipForwardStr ? parseInt(skipForwardStr, 10) : 30;
-        const skipBackInterval = skipBackStr ? parseInt(skipBackStr, 10) : 15;
+        // Fix: Add NaN guards to parseInt calls to prevent invalid values
+        const parsedSkipForward = skipForwardStr ? parseInt(skipForwardStr, 10) : 30;
+        const skipForwardInterval = !isNaN(parsedSkipForward) ? parsedSkipForward : 30;
+        const parsedSkipBack = skipBackStr ? parseInt(skipBackStr, 10) : 15;
+        const skipBackInterval = !isNaN(parsedSkipBack) ? parsedSkipBack : 15;
         const discAnimationEnabled = discAnimationStr !== 'false'; // Default true
         const useStandardPlayer = standardPlayerStr !== 'false'; // Default true
         const smartRewindEnabled = smartRewindEnabledStr !== 'false'; // Default true
-        const smartRewindMaxSeconds = smartRewindMaxSecondsStr ? parseInt(smartRewindMaxSecondsStr, 10) : 30;
+        const parsedSmartRewindMax = smartRewindMaxSecondsStr ? parseInt(smartRewindMaxSecondsStr, 10) : 30;
+        const smartRewindMaxSeconds = !isNaN(parsedSmartRewindMax) ? parsedSmartRewindMax : 30;
         const bluetoothAutoResume = bluetoothAutoResumeStr === 'true'; // Default false
         const showTimeRemaining = showTimeRemainingStr === 'true'; // Default false
 
@@ -249,7 +253,8 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           showTimeRemaining,
         });
       } catch (error) {
-        // Use defaults on error
+        // Fix: Log error instead of silently swallowing
+        console.warn('[PlayerSettingsStore] Failed to load settings, using defaults:', error);
       }
     },
   }))

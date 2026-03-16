@@ -49,6 +49,7 @@ function getBookDuration(book: LibraryItem | null | undefined): number {
   return book?.media?.duration || 0;
 }
 import { usePlayerStore, useCurrentChapterIndex } from '@/features/player';
+import { useShallow } from 'zustand/react/shallow';
 import { useQueueStore, useQueue } from '@/features/queue/stores/queueStore';
 import { useDownloadStatus, useDownloads } from '@/core/hooks/useDownloads';
 import { downloadManager } from '@/core/services/downloadManager';
@@ -70,7 +71,6 @@ import {
 import { useSpineCacheStore, BookSpineVertical, BookSpineVerticalData, useBookRowLayout, getTypographyForGenres, getSeriesStyle } from '@/shared/spine';
 import { SeriesSwipeContainer, SeriesNavigationArrows, useSeriesNavigation } from '../components/SeriesSwipeContainer';
 import { CoverStarStickers } from '../components/CoverStarStickers';
-import { StarRatingSheet } from '../components/StarRatingSheet';
 import { useStarPositionStore, STAR_HIT_RADIUS } from '../stores/starPositionStore';
 
 // =============================================================================
@@ -346,7 +346,15 @@ export function SecretLibraryBookDetailScreen() {
   const coverPlaceholderUrl = useCoverUrl(bookId, { thumb: true });
 
   // Player state
-  const { loadBook, currentBook, isPlaying, play, pause, position, togglePlayer } = usePlayerStore();
+  const { loadBook, currentBook, isPlaying, play, pause, position, togglePlayer } = usePlayerStore(useShallow((s) => ({
+    loadBook: s.loadBook,
+    currentBook: s.currentBook,
+    isPlaying: s.isPlaying,
+    play: s.play,
+    pause: s.pause,
+    position: s.position,
+    togglePlayer: s.togglePlayer,
+  })));
   const isThisBookPlaying = currentBook?.id === bookId && isPlaying;
   const isThisBookLoaded = currentBook?.id === bookId;
 
@@ -428,10 +436,6 @@ export function SecretLibraryBookDetailScreen() {
     }
     return tap;
   }, [handleDoubleTap, panGestureRef]);
-
-  // Hidden for now — star button + rating sheet
-  const [showStarButton] = useState(false);
-  const [showRatingSheet, setShowRatingSheet] = useState(false);
 
   // Library membership state
   const isInLibrary = useIsInLibrary(bookId);
@@ -668,21 +672,23 @@ export function SecretLibraryBookDetailScreen() {
     const seriesNameRaw = (typeof seriesData === 'object' ? seriesData?.name : seriesData)
       || metadata?.seriesName || '';
 
-    console.log('[BookDetail] handleSeriesPress:', {
-      seriesData,
-      seriesNameRaw,
-      metadataSeriesName: metadata?.seriesName,
-      metadataSeries: metadata?.series,
-    });
+    if (__DEV__) {
+      console.log('[BookDetail] handleSeriesPress:', {
+        seriesData,
+        seriesNameRaw,
+        metadataSeriesName: metadata?.seriesName,
+        metadataSeries: metadata?.series,
+      });
+    }
 
     if (seriesNameRaw) {
       haptics.selection();
       // Strip #N suffix and pass as seriesName (what SeriesDetailScreen expects)
       const cleanSeriesName = seriesNameRaw.replace(/\s*#[\d.]+$/, '').trim();
-      console.log('[BookDetail] Navigating to SeriesDetail with:', cleanSeriesName);
+      if (__DEV__) console.log('[BookDetail] Navigating to SeriesDetail with:', cleanSeriesName);
       navigation.navigate('SeriesDetail', { seriesName: cleanSeriesName });
     } else {
-      console.warn('[BookDetail] No series name found, cannot navigate');
+      if (__DEV__) console.warn('[BookDetail] No series name found, cannot navigate');
     }
   }, [book, navigation]);
 
@@ -1060,23 +1066,6 @@ export function SecretLibraryBookDetailScreen() {
             )}
             {/* Gold star sticker overlays */}
             <CoverStarStickers stars={stars} />
-            {/* Hidden: Floating star button (bottom-right) — kept for future use */}
-            {showStarButton ? (
-              <TouchableOpacity
-                style={styles.starButton}
-                onPress={() => {
-                  haptics.selection();
-                  setShowRatingSheet(true);
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Image
-                  source={require('@assets/stars/star1.png')}
-                  style={{ width: scale(28), height: scale(28) }}
-                  contentFit="contain"
-                />
-              </TouchableOpacity>
-            ) : null}
           </Animated.View>
           </GestureDetector>
 
@@ -1521,15 +1510,6 @@ export function SecretLibraryBookDetailScreen() {
         </SkullRefreshControl>
       </SeriesSwipeContainer>
 
-      {/* Star Rating Sheet */}
-      <StarRatingSheet
-        visible={showRatingSheet}
-        currentRating={bookRating}
-        onSubmit={(rating) => {
-          setBookRating.mutate({ bookId, rating });
-        }}
-        onClose={() => setShowRatingSheet(false)}
-      />
     </View>
   );
 }
@@ -1563,17 +1543,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
-  },
-  starButton: {
-    position: 'absolute',
-    bottom: scale(8),
-    right: scale(8),
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   coverImage: {
     width: '100%',

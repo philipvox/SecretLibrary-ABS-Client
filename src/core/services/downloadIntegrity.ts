@@ -2,17 +2,19 @@
  * src/core/services/downloadIntegrity.ts
  *
  * Download integrity verification service.
- * Verifies downloaded files using checksums and file size validation.
+ * Verifies downloaded files using file size validation.
  *
  * Features:
- * - SHA-256 checksum verification
  * - File size validation
  * - Partial download detection
- * - Corruption detection
+ * - Size-based integrity fingerprints
+ *
+ * NOTE: SHA-256 checksums were removed because expo-crypto doesn't support
+ * streaming hashes. Reading entire audiobook files (500MB+) as base64 strings
+ * caused OOM crashes. File size validation is sufficient for download integrity.
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Crypto from 'expo-crypto';
 
 // =============================================================================
 // Types
@@ -58,20 +60,17 @@ export const SIZE_TOLERANCE_PERCENT = 0.01;
 // =============================================================================
 
 /**
- * Calculate SHA-256 checksum of a file.
+ * Calculate a size-based fingerprint for a file.
+ * Returns a string like "size:123456789" for use as a lightweight integrity check.
+ *
+ * NOTE: This replaced SHA-256 hashing because expo-crypto doesn't support
+ * streaming hashes, and reading entire audiobook files (500MB+) as base64
+ * caused OOM crashes on mobile devices.
  */
 export async function calculateFileChecksum(filePath: string): Promise<string> {
   try {
-    const fileContent = await FileSystem.readAsStringAsync(filePath, {
-      encoding: 'base64',
-    });
-
-    const hash = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      fileContent
-    );
-
-    return hash;
+    const fileSize = await getFileSize(filePath);
+    return `size:${fileSize}`;
   } catch (error) {
     throw new Error(
       `Failed to calculate checksum for ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -151,13 +150,19 @@ export async function verifyFileIntegrity(
       result.error = `Size mismatch: expected ${info.expectedSize}, got ${result.actualSize}`;
     }
 
-    // Check checksum if provided
+    // Check checksum if provided (size-based fingerprint comparison)
     if (info.expectedChecksum) {
       try {
         result.actualChecksum = await calculateFileChecksum(info.filePath);
-        result.checksumMatch =
-          result.actualChecksum.toLowerCase() ===
-          info.expectedChecksum.toLowerCase();
+        // Support both size-based fingerprints ("size:123") and legacy hex checksums
+        if (info.expectedChecksum.startsWith('size:') || result.actualChecksum.startsWith('size:')) {
+          // Size-based: both must have same size (already validated above)
+          result.checksumMatch = result.sizeMatch;
+        } else {
+          result.checksumMatch =
+            result.actualChecksum.toLowerCase() ===
+            info.expectedChecksum.toLowerCase();
+        }
 
         if (!result.checksumMatch) {
           result.error = 'Checksum mismatch';
