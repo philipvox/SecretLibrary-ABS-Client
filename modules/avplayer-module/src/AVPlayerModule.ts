@@ -69,7 +69,17 @@ interface AVPlayerModuleInterface {
   cleanup(): Promise<void>;
 }
 
+// ── Events map for typed EventEmitter ──
+
+type AVPlayerEventsMap = {
+  AVPlayerPlaybackState: (event: AVPlayerPlaybackStateEvent) => void;
+  AVPlayerTrackChange: (event: AVPlayerTrackChangeEvent) => void;
+  AVPlayerError: (event: AVPlayerErrorEvent) => void;
+  AVPlayerBookEnd: () => void;
+  AVPlayerRemoteCommand: (event: AVPlayerRemoteCommandEvent) => void;
+};
+
 // ── Module + EventEmitter ──
 
 export const AVPlayerModule = requireNativeModule<AVPlayerModuleInterface>('AVPlayerModule');
-export const AVPlayerEventEmitter = new EventEmitter(AVPlayerModule);
+export const AVPlayerEventEmitter = new EventEmitter<AVPlayerEventsMap>(AVPlayerModule as any);

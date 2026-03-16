@@ -98,7 +98,7 @@ class IOSAudioService {
       try {
         await this.setupPromise;
         return;
-      } catch (error) {
+      } catch {
         audioLog.warn('Previous setup failed, retrying...');
       }
     }
@@ -535,7 +535,7 @@ class IOSAudioService {
 
     try {
       await AVPlayerModule.cleanup();
-    } catch (e) {
+    } catch {
       // Ignore errors during cleanup
     }
   }

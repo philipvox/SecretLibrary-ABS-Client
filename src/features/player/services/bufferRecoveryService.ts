@@ -148,7 +148,7 @@ class BufferRecoveryService {
       trackEvent('buffer_stall_resolved', {
         durationMs: duration,
         recoveryAttempts: this.status.recoveryAttempts,
-        wasRecovering: this.status.state === 'recovering',
+        wasRecovering: this.isRecovering,
         platform: Platform.OS,
       }, 'info');
     }
