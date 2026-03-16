@@ -39,12 +39,7 @@ export const useDisplayPosition = () => {
  * Returns the effective position for calculations.
  * Same as useDisplayPosition but named for clarity in computation contexts.
  */
-export const useEffectivePosition = () => {
-  const isSeeking = useSeekingStore((s) => s.isSeeking);
-  const seekPosition = useSeekingStore((s) => s.seekPosition);
-  const position = usePlayerStore((s) => s.position);
-  return isSeeking ? seekPosition : position;
-};
+export const useEffectivePosition = useDisplayPosition;
 
 // =============================================================================
 // SEEK SELECTORS (from seekingStore - source of truth)

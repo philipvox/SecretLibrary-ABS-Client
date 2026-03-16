@@ -9,6 +9,31 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.213] - 2026-03-15
+
+### Added — Native iOS Audio (AVPlayer)
+
+- **avplayer-module**: New Expo Module (`modules/avplayer-module/`) providing native AVPlayer-based audio playback for iOS, replacing expo-av. Uses AVAudioSession (.playback, .spokenAudio), MPRemoteCommandCenter (lock screen/CarPlay controls), MPNowPlayingInfoCenter (metadata display), and native periodic time observer (100ms updates).
+- **audioService.ios.ts**: Thin JS bridge (~480 lines) mirroring the Android ExoPlayer service API exactly. Metro bundler auto-selects this on iOS via platform extension. Zero changes to playerStore.ts or any UI components.
+- **Eliminated JS workarounds**: Native AVPlayer replaces ~1,500 lines of expo-av workarounds: `waitForDuration()` polling, `bufferRecoveryService`, ghost pause detection, foreground grace period, JS polling loop, track preload/swap, expo-media-control integration, and audio-noisy-module iOS path.
+- **Native features**: AVAudioSession interruption handling (phone calls auto-pause/resume), route change detection (headphone unplug auto-pause), stuck detection (3s position unchanged), 30s prepare timeout, multi-track management with cross-track seeking, async artwork loading.
+
+### Files Added
+- `modules/avplayer-module/expo-module.config.json` — iOS-only module registration
+- `modules/avplayer-module/index.ts` — Public exports
+- `modules/avplayer-module/src/AVPlayerModule.ts` — TypeScript interface + event emitter
+- `modules/avplayer-module/ios/AVPlayerModule.podspec` — CocoaPods spec (AVFoundation + MediaPlayer)
+- `modules/avplayer-module/ios/AVPlayerModule.swift` — Native Swift implementation (~650 lines)
+- `src/features/player/services/audioService.ios.ts` — iOS JS bridge (~480 lines)
+
+### Files Unchanged
+- `src/features/player/services/audioService.ts` — Becomes fallback/web path (untouched)
+- `src/features/player/services/audioService.android.ts` — Android path (untouched)
+- `src/features/player/stores/playerStore.ts` — No changes needed
+- All UI components — No changes needed
+
+---
+
 ## [0.9.212] - 2026-03-14
 
 ### Fixed — CodeRabbit Review Issues

@@ -1,15 +1,22 @@
 /**
- * src/features/player/services/audioService.android.ts
+ * src/features/player/services/audioService.ios.ts
  *
- * Android-specific audio service using ExoPlayer via native module.
- * Replaces expo-av, expo-media-control, and audio-noisy-module on Android.
- * ExoPlayer handles audio focus, headphone unplug, and notification natively.
+ * iOS-specific audio service using native AVPlayer via Expo Module.
+ * Replaces expo-av, expo-media-control, and foreground grace workarounds on iOS.
+ * AVPlayer handles audio focus, headphone unplug, and lock screen controls natively.
  *
- * The public interface is identical to the iOS/expo-av implementation
+ * The public interface is identical to the Android/ExoPlayer implementation
  * so playerStore.ts sees no difference.
  */
 
-import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
+import {
+  AVPlayerModule,
+  AVPlayerEventEmitter,
+  type AVPlayerPlaybackStateEvent,
+  type AVPlayerTrackChangeEvent,
+  type AVPlayerErrorEvent,
+  type AVPlayerRemoteCommandEvent,
+} from '@modules/avplayer-module';
 import {
   audioLog,
   createTimer,
@@ -52,10 +59,7 @@ type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForw
 
 const log = (...args: unknown[]) => audioLog.audio(args.map(String).join(' '));
 
-const ExoPlayerModule = NativeModules.ExoPlayerModule;
-const exoPlayerEmitter = ExoPlayerModule ? new NativeEventEmitter(ExoPlayerModule) : null;
-
-class AndroidAudioService {
+class IOSAudioService {
   private statusCallback: StatusCallback | null = null;
   private errorCallback: ErrorCallback | null = null;
   private remoteCommandCallback: RemoteCommandCallback | null = null;
@@ -105,23 +109,23 @@ class AndroidAudioService {
   private async setup(): Promise<void> {
     if (this.isSetup) return;
 
-    const timing = createTimer('exoplayer.setup');
+    const timing = createTimer('avplayer.setup');
     try {
-      logSection('EXOPLAYER SETUP (Android)');
+      logSection('AVPLAYER SETUP (iOS)');
       timing('Start');
 
-      // Initialize the native ExoPlayer service
-      await ExoPlayerModule.initialize();
-      timing('Native service initialized');
+      // Initialize the native AVPlayer + AVAudioSession + remote commands
+      await AVPlayerModule.initialize();
+      timing('Native AVPlayer initialized');
 
       // Set up event listeners from native
       this.setupEventListeners();
       timing('Event listeners attached');
 
       this.isSetup = true;
-      log('ExoPlayer ready (Android)');
+      log('AVPlayer ready (iOS)');
     } catch (error) {
-      audioLog.error('ExoPlayer setup failed:', getErrorMessage(error));
+      audioLog.error('AVPlayer setup failed:', getErrorMessage(error));
       this.setupPromise = null;
       throw error;
     }
@@ -131,26 +135,14 @@ class AndroidAudioService {
     // Remove old listeners if any
     this.removeEventListeners();
 
-    if (!exoPlayerEmitter) {
-      audioLog.warn('ExoPlayerModule not available — skipping event listeners (Expo Go?)');
-      return;
-    }
-
     // Playback state updates (position, isPlaying, etc.) — emitted at 100ms intervals
-    this.playbackStateSubscription = exoPlayerEmitter.addListener(
-      'ExoPlayerPlaybackState',
-      (state: {
-        isPlaying: boolean;
-        position: number;
-        duration: number;
-        isBuffering: boolean;
-        didJustFinish: boolean;
-        isStuck: boolean;
-      }) => {
+    this.playbackStateSubscription = AVPlayerEventEmitter.addListener(
+      'AVPlayerPlaybackState',
+      (state: AVPlayerPlaybackStateEvent) => {
         // Track isPlaying for sync reads
         this.lastIsPlaying = state.isPlaying;
 
-        // Skip position updates during scrubbing (same as iOS path)
+        // Skip position updates during scrubbing (same as Android path)
         if (!this.isScrubbing) {
           this.lastKnownGoodPosition = state.position;
         }
@@ -168,9 +160,9 @@ class AndroidAudioService {
     );
 
     // Track transitions
-    this.trackChangeSubscription = exoPlayerEmitter.addListener(
-      'ExoPlayerTrackChange',
-      (data: { trackIndex: number; totalTracks: number; title?: string; startOffset?: number }) => {
+    this.trackChangeSubscription = AVPlayerEventEmitter.addListener(
+      'AVPlayerTrackChange',
+      (data: AVPlayerTrackChangeEvent) => {
         this.currentTrackIndex = data.trackIndex;
         // Keep currentUrl aligned with native track transitions
         if (data.trackIndex < this.tracks.length) {
@@ -181,10 +173,10 @@ class AndroidAudioService {
     );
 
     // Errors
-    this.errorSubscription = exoPlayerEmitter.addListener(
-      'ExoPlayerError',
-      (data: { type: string; message: string; errorCode: number; position: number }) => {
-        audioLog.error(`ExoPlayer error: ${data.type} — ${data.message}`);
+    this.errorSubscription = AVPlayerEventEmitter.addListener(
+      'AVPlayerError',
+      (data: AVPlayerErrorEvent) => {
+        audioLog.error(`AVPlayer error: ${data.type} — ${data.message}`);
 
         if (data.type === 'URL_EXPIRED') {
           this.errorCallback?.({
@@ -206,17 +198,17 @@ class AndroidAudioService {
     );
 
     // Book end
-    this.bookEndSubscription = exoPlayerEmitter.addListener(
-      'ExoPlayerBookEnd',
+    this.bookEndSubscription = AVPlayerEventEmitter.addListener(
+      'AVPlayerBookEnd',
       () => {
         log('Book end event received from native');
       }
     );
 
-    // Remote commands (from notification/lock screen/Android Auto)
-    this.remoteCommandSubscription = exoPlayerEmitter.addListener(
-      'ExoPlayerRemoteCommand',
-      (data: { command: string; param?: string }) => {
+    // Remote commands (from lock screen / Control Center / CarPlay)
+    this.remoteCommandSubscription = AVPlayerEventEmitter.addListener(
+      'AVPlayerRemoteCommand',
+      (data: AVPlayerRemoteCommandEvent) => {
         log(`Remote command: ${data.command}`);
         switch (data.command) {
           case 'nextChapter':
@@ -230,11 +222,11 @@ class AndroidAudioService {
               this.remoteCommandCallback?.('seek', parseFloat(data.param));
             }
             break;
-          case 'playFromMediaId':
-            // Forward to Android Auto handler via the existing automotive bridge
-            // This is handled by automotiveService.ts which listens separately
+          case 'play':
+            this.play();
             break;
-          case 'playFromSearch':
+          case 'pause':
+            this.pause();
             break;
         }
       }
@@ -305,7 +297,7 @@ class AndroidAudioService {
     knownDuration?: number
   ): Promise<void> {
     const thisLoadId = ++this.loadId;
-    logSection('LOAD AUDIO (ExoPlayer single track)');
+    logSection('LOAD AUDIO (AVPlayer single track)');
     log('URL:', url.substring(0, 100) + (url.length > 100 ? '...' : ''));
     log('Start position:', startPositionSec.toFixed(1) + 's');
 
@@ -334,7 +326,7 @@ class AndroidAudioService {
     }];
 
     try {
-      await ExoPlayerModule.loadTracks(
+      await AVPlayerModule.loadTracks(
         trackInfo,
         0,
         startPositionSec * 1000, // ms
@@ -346,20 +338,20 @@ class AndroidAudioService {
       this.currentUrl = url;
       this.isLoaded = true;
 
-      // Update native metadata for notification/lock screen
-      ExoPlayerModule.setMetadata(
+      // Update native metadata for lock screen / Control Center
+      AVPlayerModule.setMetadata(
         metadata?.title || 'Unknown Title',
         metadata?.artist || 'Unknown Author',
         metadata?.artwork || null,
         null  // no chapter title for single track
       );
 
-      log('Single track loaded via ExoPlayer');
+      log('Single track loaded via AVPlayer');
     } catch (error) {
       if (this.loadId === thisLoadId) {
         this.isLoaded = false;
         const errorMsg = getErrorMessage(error);
-        audioLog.error('ExoPlayer load failed:', errorMsg);
+        audioLog.error('AVPlayer load failed:', errorMsg);
 
         const is403 = errorMsg.includes('403') || errorMsg.toLowerCase().includes('forbidden');
         const is401 = errorMsg.includes('401') || errorMsg.toLowerCase().includes('unauthorized');
@@ -390,7 +382,7 @@ class AndroidAudioService {
     knownTotalDuration?: number
   ): Promise<void> {
     const thisLoadId = ++this.loadId;
-    logSection('LOAD AUDIO (ExoPlayer multi-track)');
+    logSection('LOAD AUDIO (AVPlayer multi-track)');
 
     if (!tracks || !Array.isArray(tracks) || tracks.length === 0) {
       throw new Error('No audio tracks provided');
@@ -430,7 +422,7 @@ class AndroidAudioService {
     this.currentTrackIndex = targetTrackIndex;
 
     try {
-      // Send tracks to native ExoPlayer
+      // Send tracks to native AVPlayer
       const nativeTracks = tracks.map(t => ({
         url: t.url,
         title: t.title,
@@ -438,7 +430,7 @@ class AndroidAudioService {
         duration: t.duration,
       }));
 
-      await ExoPlayerModule.loadTracks(
+      await AVPlayerModule.loadTracks(
         nativeTracks,
         targetTrackIndex,
         positionInTrack * 1000, // ms
@@ -451,19 +443,19 @@ class AndroidAudioService {
       this.isLoaded = true;
 
       // Update native metadata
-      ExoPlayerModule.setMetadata(
+      AVPlayerModule.setMetadata(
         metadata?.title || 'Unknown Title',
         metadata?.artist || 'Unknown Author',
         metadata?.artwork || null,
         null
       );
 
-      log(`${tracks.length} tracks loaded via ExoPlayer, starting at track ${targetTrackIndex}`);
+      log(`${tracks.length} tracks loaded via AVPlayer, starting at track ${targetTrackIndex}`);
     } catch (error) {
       if (this.loadId === thisLoadId) {
         this.isLoaded = false;
         const errorMsg = getErrorMessage(error);
-        audioLog.error('ExoPlayer loadTracks failed:', errorMsg);
+        audioLog.error('AVPlayer loadTracks failed:', errorMsg);
 
         const is403 = errorMsg.includes('403') || errorMsg.toLowerCase().includes('forbidden');
         const is401 = errorMsg.includes('401') || errorMsg.toLowerCase().includes('unauthorized');
@@ -484,13 +476,13 @@ class AndroidAudioService {
   }
 
   async play(): Promise<void> {
-    log('▶ Play (ExoPlayer)');
-    ExoPlayerModule.play();
+    log('▶ Play (AVPlayer)');
+    AVPlayerModule.play();
   }
 
   async pause(): Promise<void> {
-    log('⏸ Pause (ExoPlayer)');
-    ExoPlayerModule.pause();
+    log('⏸ Pause (AVPlayer)');
+    AVPlayerModule.pause();
   }
 
   setPosition(positionSec: number): void {
@@ -499,13 +491,13 @@ class AndroidAudioService {
 
   async seekTo(positionSec: number): Promise<void> {
     this.lastKnownGoodPosition = positionSec;
-    ExoPlayerModule.seekTo(positionSec);
+    AVPlayerModule.seekTo(positionSec);
   }
 
   async setPlaybackRate(rate: number): Promise<void> {
     const clampedRate = Math.max(0.25, Math.min(4.0, rate));
-    log(`Speed: ${clampedRate}x (ExoPlayer)`);
-    ExoPlayerModule.setRate(clampedRate);
+    log(`Speed: ${clampedRate}x (AVPlayer)`);
+    AVPlayerModule.setRate(clampedRate);
   }
 
   async getPosition(): Promise<number> {
@@ -542,36 +534,36 @@ class AndroidAudioService {
     this.isScrubbing = false;
 
     try {
-      await ExoPlayerModule.cleanup();
+      await AVPlayerModule.cleanup();
     } catch (e) {
       // Ignore errors during cleanup
     }
   }
 
   /**
-   * Get the underlying player instance — not applicable for ExoPlayer (native).
-   * Audio sampling is not supported on Android ExoPlayer path.
+   * Get the underlying player instance — not applicable for AVPlayer (native).
+   * Audio sampling is not supported on native iOS AVPlayer path.
    */
   getPlayer(): any {
     return null;
   }
 
   setAudioSamplingEnabled(_enabled: boolean): void {
-    // Not supported on Android ExoPlayer path
+    // Not supported on native AVPlayer path
   }
 
   addAudioSampleListener(_callback: any): (() => void) | null {
-    // Not supported on Android ExoPlayer path
+    // Not supported on native AVPlayer path
     return null;
   }
 
   async cleanup(): Promise<void> {
-    // Do NOT removeEventListeners — the native service stays alive and we need
+    // Do NOT removeEventListeners — the native module stays alive and we need
     // to keep receiving events for the next book load.
-    // Do NOT reset isSetup/setupPromise — the native service stays alive.
+    // Do NOT reset isSetup/setupPromise — the native module stays alive.
     await this.unloadAudio();
     this.lastIsPlaying = false;
   }
 }
 
-export const audioService = new AndroidAudioService();
+export const audioService = new IOSAudioService();

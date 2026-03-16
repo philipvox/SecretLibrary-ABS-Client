@@ -15,7 +15,7 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -54,8 +54,6 @@ import {
 // CONSTANTS
 // =============================================================================
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 // Dark background color - matches library screen (secretLibraryColors.black)
 const MINI_PLAYER_BG = '#0f0f0f';
 
@@ -64,6 +62,7 @@ const MINI_PLAYER_BG = '#0f0f0f';
 // =============================================================================
 
 export function GlobalMiniPlayer() {
+  const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [currentRouteName, setCurrentRouteName] = useState('');
@@ -171,7 +170,7 @@ export function GlobalMiniPlayer() {
     .onUpdate((event) => {
       'worklet';
       // Convert upward drag to 0→1 progress
-      const progress = Math.min(Math.max(-event.translationY / SCREEN_HEIGHT, 0), 1);
+      const progress = Math.min(Math.max(-event.translationY / screenHeight, 0), 1);
       playerTransitionProgress.value = progress;
     })
     .onEnd((event) => {

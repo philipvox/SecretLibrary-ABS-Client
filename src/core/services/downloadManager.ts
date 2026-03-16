@@ -336,12 +336,12 @@ class DownloadManager {
       await sqliteCache.addToDownloadQueue(itemId, priority);
     }
 
-    // Cache the library item metadata for offline access
+    // Cache the library item metadata for offline access (upsert to avoid destroying cache)
     // Only cache if we have a valid libraryId
     if (item.libraryId) {
       log(`Caching library item metadata for offline access...`);
       try {
-        await sqliteCache.setLibraryItems(item.libraryId, [item]);
+        await sqliteCache.upsertLibraryItem(item.libraryId, item);
       } catch (err) {
         logWarn(`Failed to cache library item metadata:`, err);
       }
@@ -894,9 +894,9 @@ class DownloadManager {
           const fetchedItem = await apiClient.getItem(nextItemId);
           if (fetchedItem) {
             item = fetchedItem;
-            // Cache it for future use if it has a libraryId
+            // Cache it for future use if it has a libraryId (upsert to avoid destroying cache)
             if (item.libraryId) {
-              await sqliteCache.setLibraryItems(item.libraryId, [item]);
+              await sqliteCache.upsertLibraryItem(item.libraryId, item);
               log(`Cached fetched item metadata`);
             }
           }

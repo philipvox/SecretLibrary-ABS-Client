@@ -12,6 +12,15 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import { Platform } from 'react-native';
+import {
+  audioLog,
+  createTimer,
+  logSection,
+  validateUrl,
+  formatDuration,
+} from '@/shared/utils/audioDebug';
+import { getErrorMessage } from '@/shared/utils/errorUtils';
+import { bufferRecoveryService } from './bufferRecoveryService';
 
 // Try to import expo-media-control, but handle if native module is missing (Expo Go)
 let MediaControl: any = null;
@@ -42,16 +51,6 @@ try {
 // Remote command callback type for media control delegation
 type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForward' | 'skipBackward' | 'seek', position?: number) => void;
 let remoteCommandCallback: RemoteCommandCallback | null = null;
-
-import {
-  audioLog,
-  createTimer,
-  logSection,
-  validateUrl,
-  formatDuration,
-} from '@/shared/utils/audioDebug';
-import { getErrorMessage } from '@/shared/utils/errorUtils';
-import { bufferRecoveryService } from './bufferRecoveryService';
 
 export interface PlaybackState {
   isPlaying: boolean;
@@ -1130,10 +1129,12 @@ class AudioService {
         await this.waitForDuration(2000);
         this.totalDuration = this.player?.duration || 0;
       } else if (startPositionSec > 0) {
-        // Even with known duration, must wait for player to be seekable
-        // The player needs to parse the moov atom to resolve seek positions
+        // Must wait for player to be seekable (moov atom parsed)
+        // Only needed when we're resuming at a non-zero position
         await this.waitForDuration(2000);
       }
+      // When knownDuration is set AND startPositionSec === 0, skip wait entirely
+      // (no seek needed, duration already known — saves up to 2 seconds)
 
       // Seek to resume position
       if (startPositionSec > 0) {
@@ -1247,11 +1248,14 @@ class AudioService {
 
   private async waitForDuration(maxWaitMs: number = 5000): Promise<void> {
     const startTime = Date.now();
+    let interval = 10; // Start fast (10ms), double up to 200ms
     while (Date.now() - startTime < maxWaitMs) {
       if (this.player && this.player.duration > 0) {
+        log(`Duration detected in ${Date.now() - startTime}ms`);
         return;
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, interval));
+      interval = Math.min(interval * 2, 200);
     }
     log('Warning: Duration not available after waiting');
   }
@@ -2104,6 +2108,16 @@ class AudioService {
       this.playbackStatusSubscription = null;
     }
 
+    // Release audio players to free native resources
+    if (this.player) {
+      try { this.player.remove(); } catch (_) { /* ignore */ }
+      this.player = null;
+    }
+    if (this.preloadPlayer) {
+      try { this.preloadPlayer.remove(); } catch (_) { /* ignore */ }
+      this.preloadPlayer = null;
+    }
+
     // Remove media control listener
     if (this.removeMediaControlListener) {
       this.removeMediaControlListener();
@@ -2144,6 +2158,10 @@ class AudioService {
       clearTimeout(this.durationUpdateTimeout);
       this.durationUpdateTimeout = null;
     }
+
+    // Reset setup state so next setup() recreates players
+    this.isSetup = false;
+    this.setupPromise = null;
   }
 }
 

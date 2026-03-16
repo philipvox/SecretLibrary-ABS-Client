@@ -42,6 +42,9 @@ import java.util.concurrent.TimeUnit
  * Single ExoPlayer + single MediaSession = single source of truth.
  * JS becomes a thin control surface via ExoPlayerModule.
  * Android Auto, lock screen, and notification all share this MediaSession.
+ *
+ * Lifecycle: started once, stays alive across book switches.
+ * cleanup() just clears current audio. destroy() fully releases on service death.
  */
 class AudioPlaybackService : Service() {
 
@@ -69,10 +72,15 @@ class AudioPlaybackService : Service() {
          */
         fun start(context: Context) {
             val intent = Intent(context, AudioPlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                Log.d(TAG, "Service start intent sent")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start service: ${e.message}", e)
             }
         }
     }
@@ -103,9 +111,19 @@ class AudioPlaybackService : Service() {
     private var lastReportedPosition: Double = 0.0
     private var lastPositionChangeTime: Long = 0L
 
+    // MediaSession update throttle — max once per second to avoid audio focus renegotiation
+    private var lastMediaSessionUpdateTime: Long = 0L
+    private val MEDIA_SESSION_UPDATE_INTERVAL_MS = 1000L
+
     // State
-    private var isInitialized = false
+    var isInitialized = false
+        private set
     private var hasReachedEnd = false
+
+    // Prepare timeout — emits error if buffering takes too long
+    private var prepareTimeoutRunnable: Runnable? = null
+    private var prepareCallback: ((Boolean, String?) -> Unit)? = null
+    private val PREPARE_TIMEOUT_MS = 30_000L
 
     // Cover art
     private val glideOptions = RequestOptions()
@@ -138,20 +156,31 @@ class AudioPlaybackService : Service() {
         PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand")
+        Log.d(TAG, "onStartCommand called")
 
-        // Initialize on first start
-        if (!isInitialized) {
-            initialize()
+        try {
+            // Create notification channel FIRST (required before startForeground on Android 8+)
+            createNotificationChannel()
+
+            // Must call startForeground within 5 seconds of startForegroundService()
+            val notification = buildNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            Log.d(TAG, "startForeground called successfully")
+
+            // Initialize ExoPlayer AFTER startForeground (so service won't be killed)
+            if (!isInitialized) {
+                initialize()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "onStartCommand failed: ${e.message}", e)
         }
 
-        // Build and start foreground notification
-        val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        // ALWAYS set instance so the polling can find us
+        instance = this
 
         return START_STICKY
     }
@@ -160,7 +189,7 @@ class AudioPlaybackService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "Service onDestroy")
-        cleanup()
+        destroy()
         super.onDestroy()
     }
 
@@ -169,50 +198,56 @@ class AudioPlaybackService : Service() {
      */
     private fun initialize() {
         if (isInitialized) return
-        instance = this
 
         Log.d(TAG, "Initializing AudioPlaybackService")
 
-        // Create notification channel (required for Android 8+)
-        createNotificationChannel()
+        try {
+            // Create ExoPlayer
+            val player = ExoPlayer.Builder(applicationContext)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                        .setUsage(C.USAGE_MEDIA)
+                        .build(),
+                    true  // handleAudioFocus = true (ExoPlayer manages audio focus automatically)
+                )
+                .setHandleAudioBecomingNoisy(true)  // Auto-pause on headphone unplug
+                .setWakeMode(C.WAKE_MODE_NETWORK)   // Keep CPU + WiFi awake during playback
+                .build()
 
-        // Create ExoPlayer
-        val player = ExoPlayer.Builder(applicationContext)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
-                    .setUsage(C.USAGE_MEDIA)
-                    .build(),
-                true  // handleAudioFocus = true (ExoPlayer manages audio focus automatically)
-            )
-            .setHandleAudioBecomingNoisy(true)  // Auto-pause on headphone unplug
-            .setWakeMode(C.WAKE_MODE_NETWORK)   // Keep CPU + WiFi awake during playback
-            .build()
+            exoPlayer = player
+            Log.d(TAG, "ExoPlayer created")
 
-        exoPlayer = player
+            // Create legacy MediaSessionCompat (for Android Auto compatibility)
+            mediaSession = MediaSessionCompat(applicationContext, TAG).apply {
+                setFlags(
+                    MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+                )
+                setCallback(LegacyMediaSessionCallback())
+                isActive = true
+            }
+            Log.d(TAG, "MediaSessionCompat created")
 
-        // Create legacy MediaSessionCompat (for Android Auto compatibility)
-        mediaSession = MediaSessionCompat(applicationContext, TAG).apply {
-            setFlags(
-                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
-            )
-            setCallback(LegacyMediaSessionCallback())
-            isActive = true
+            // Create Media3 MediaSession (wraps ExoPlayer, auto-syncs state)
+            media3Session = MediaSession.Builder(applicationContext, player)
+                .build()
+            Log.d(TAG, "Media3 MediaSession created")
+
+            // Set up ExoPlayer listeners
+            player.addListener(PlayerEventListener())
+
+            // Set initial playback state and placeholder metadata
+            // so lock screen shows app name instead of blank until JS loads a book
+            updateMediaSessionMetadata()
+            updateMediaSessionState()
+
+            isInitialized = true
+            Log.d(TAG, "AudioPlaybackService fully initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "initialize() FAILED: ${e.message}", e)
+            // Don't set isInitialized — will retry on next loadTracks call
         }
-
-        // Create Media3 MediaSession (wraps ExoPlayer, auto-syncs state)
-        media3Session = MediaSession.Builder(applicationContext, player)
-            .build()
-
-        // Set up ExoPlayer listeners
-        player.addListener(PlayerEventListener())
-
-        // Set initial playback state
-        updateMediaSessionState()
-
-        isInitialized = true
-        Log.d(TAG, "AudioPlaybackService initialized")
     }
 
     /**
@@ -250,19 +285,43 @@ class AudioPlaybackService : Service() {
     }
 
     /**
+     * Ensure ExoPlayer is initialized. Retries if previous init failed.
+     * Returns true if ready, false if init failed.
+     */
+    fun ensureReady(): Boolean {
+        if (isInitialized && exoPlayer != null) return true
+        // Retry initialization
+        Log.w(TAG, "ensureReady: not initialized, retrying...")
+        initialize()
+        return isInitialized && exoPlayer != null
+    }
+
+    /**
      * Load tracks into ExoPlayer and optionally start playback.
+     *
+     * @param onPrepared Optional callback invoked when ExoPlayer reaches STATE_READY
+     *                   or on error/timeout. (success: Boolean, errorMessage: String?)
      */
     fun loadTracks(
         trackInfos: List<TrackInfo>,
         startIndex: Int,
         startPositionMs: Long,
-        autoPlay: Boolean
+        autoPlay: Boolean,
+        onPrepared: ((Boolean, String?) -> Unit)? = null
     ) {
-        val player = exoPlayer ?: return
+        // Ensure initialized — retry if needed
+        if (!ensureReady()) {
+            throw IllegalStateException("ExoPlayer failed to initialize")
+        }
+
+        val player = exoPlayer!!
         Log.d(TAG, "loadTracks: ${trackInfos.size} tracks, startIndex=$startIndex, startPos=${startPositionMs}ms, autoPlay=$autoPlay")
 
         // Stop position updates during load
         stopPositionUpdates()
+
+        // Cancel any pending prepare timeout from previous load
+        cancelPrepareTimeout()
 
         // Reset state
         hasReachedEnd = false
@@ -281,18 +340,35 @@ class AudioPlaybackService : Service() {
                 .build()
         }
 
+        // Log ALL track URLs for debugging
+        trackInfos.forEachIndexed { idx, track ->
+            val url = track.url
+            val isLocal = url.startsWith("file://") || url.startsWith("/")
+            val urlType = if (isLocal) "LOCAL" else "STREAM"
+            Log.d(TAG, "Track[$idx] $urlType: ${url.take(150)}${if (url.length > 150) "..." else ""}")
+            Log.d(TAG, "Track[$idx] title=${track.title}, offset=${track.startOffset}s, dur=${track.duration}s")
+        }
+
         // Clear and set new playlist
         player.stop()
         player.clearMediaItems()
         player.setMediaItems(mediaItems, startIndex, startPositionMs)
         player.playWhenReady = autoPlay
+
+        // Store prepare callback and start timeout
+        prepareCallback = onPrepared
+        if (onPrepared != null) {
+            startPrepareTimeout()
+        }
+
         player.prepare()
+        Log.d(TAG, "player.prepare() called — waiting for STATE_READY...")
 
         // Reset stuck detection
         lastReportedPosition = 0.0
         lastPositionChangeTime = System.currentTimeMillis()
 
-        // Start position updates
+        // Start position updates (emits buffering state to JS during prepare)
         startPositionUpdates()
 
         // Update notification metadata
@@ -301,13 +377,46 @@ class AudioPlaybackService : Service() {
         Log.d(TAG, "Tracks loaded, totalDuration=${totalDuration}s")
     }
 
+    private fun startPrepareTimeout() {
+        cancelPrepareTimeout()
+        val timeout = Runnable {
+            val player = exoPlayer
+            val state = player?.playbackState
+            Log.e(TAG, "Prepare timeout (${PREPARE_TIMEOUT_MS}ms) — ExoPlayer state: $state")
+
+            prepareCallback?.let { cb ->
+                prepareCallback = null
+                cb(false, "Audio buffering timeout (${PREPARE_TIMEOUT_MS / 1000}s). The server may be slow or the file format may require processing.")
+            }
+
+            // Also emit error event so JS shows error to user
+            ExoPlayerModule.emitEvent("onError", Bundle().apply {
+                putString("type", "LOAD_FAILED")
+                putString("message", "Audio failed to load after ${PREPARE_TIMEOUT_MS / 1000}s — buffering timeout")
+                putDouble("position", getCurrentPositionSec())
+                putInt("errorCode", -1)
+            })
+        }
+        prepareTimeoutRunnable = timeout
+        mainHandler.postDelayed(timeout, PREPARE_TIMEOUT_MS)
+    }
+
+    private fun cancelPrepareTimeout() {
+        prepareTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        prepareTimeoutRunnable = null
+    }
+
     fun play() {
-        exoPlayer?.play()
+        val player = exoPlayer ?: return
+        if (player.isPlaying) return  // Already playing — skip to avoid audio focus renegotiation
+        player.play()
         updateMediaSessionState()
     }
 
     fun pause() {
-        exoPlayer?.pause()
+        val player = exoPlayer ?: return
+        if (!player.isPlaying && !player.playWhenReady) return  // Already paused — skip
+        player.pause()
         updateMediaSessionState()
     }
 
@@ -431,8 +540,47 @@ class AudioPlaybackService : Service() {
         updateNotification()
     }
 
+    /**
+     * Unload current audio but keep the service and ExoPlayer alive for the next book.
+     * Called from ExoPlayerModule.cleanup() when switching books.
+     */
     fun cleanup() {
-        Log.d(TAG, "Cleaning up AudioPlaybackService")
+        Log.d(TAG, "Unloading current audio (service stays alive)")
+        cancelPrepareTimeout()
+        prepareCallback = null
+        stopPositionUpdates()
+
+        exoPlayer?.stop()
+        exoPlayer?.clearMediaItems()
+
+        // Reset track state
+        tracks = emptyList()
+        currentTrackIndex = 0
+        totalDuration = 0.0
+        hasReachedEnd = false
+        lastReportedPosition = 0.0
+        lastPositionChangeTime = System.currentTimeMillis()
+
+        // Clear metadata
+        currentTitle = ""
+        currentAuthor = ""
+        currentArtworkUrl = null
+        currentArtworkBitmap?.let { if (!it.isRecycled) it.recycle() }
+        currentArtworkBitmap = null
+        currentChapterTitle = null
+
+        // Update MediaSession to idle state so lock screen doesn't show stale book info
+        updateMediaSessionMetadata()  // Clears title/author/artwork on lock screen
+        updateMediaSessionState()
+        updateNotification()
+    }
+
+    /**
+     * Fully destroy the service — release all resources and stop.
+     * Only called from onDestroy().
+     */
+    private fun destroy() {
+        Log.d(TAG, "Destroying AudioPlaybackService")
         stopPositionUpdates()
         serviceScope.cancel()
 
@@ -452,10 +600,6 @@ class AudioPlaybackService : Service() {
 
         isInitialized = false
         instance = null
-
-        // Stop the foreground service
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
     }
 
     /**
@@ -546,6 +690,8 @@ class AudioPlaybackService : Service() {
                 }
                 // Re-check URL hasn't changed during async load
                 if (currentArtworkUrl == savedUrl) {
+                    // Recycle the previous bitmap before assigning the new one
+                    currentArtworkBitmap?.let { if (!it.isRecycled) it.recycle() }
                     currentArtworkBitmap = bitmap
                     updateMediaSessionMetadata()
                     updateNotification()
@@ -563,6 +709,7 @@ class AudioPlaybackService : Service() {
         val runnable = object : Runnable {
             override fun run() {
                 val player = exoPlayer ?: return
+                val now = System.currentTimeMillis()
 
                 val position = getCurrentPositionSec()
                 val isPlaying = player.isPlaying
@@ -570,7 +717,6 @@ class AudioPlaybackService : Service() {
 
                 // Stuck detection
                 if (isPlaying && !isBuffering) {
-                    val now = System.currentTimeMillis()
                     val posDelta = Math.abs(position - lastReportedPosition)
 
                     if (posDelta < 0.5) {
@@ -604,9 +750,11 @@ class AudioPlaybackService : Service() {
                     isStuck = false
                 )
 
-                // Update MediaSession state periodically (every ~1s, not every 100ms)
-                // to keep lock screen/Android Auto in sync without excessive updates
-                if (player.currentPosition % 1000 < POSITION_UPDATE_INTERVAL_MS) {
+                // Update MediaSession state on a fixed interval (every ~1s, not every 100ms)
+                // to keep lock screen/Android Auto in sync without excessive updates.
+                // Uses wall-clock time instead of unreliable modulo on position.
+                if (now - lastMediaSessionUpdateTime >= MEDIA_SESSION_UPDATE_INTERVAL_MS) {
+                    lastMediaSessionUpdateTime = now
                     updateMediaSessionState()
                 }
 
@@ -628,7 +776,14 @@ class AudioPlaybackService : Service() {
     private inner class PlayerEventListener : Player.Listener {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            Log.d(TAG, "onPlaybackStateChanged: $playbackState")
+            val stateName = when (playbackState) {
+                Player.STATE_IDLE -> "IDLE"
+                Player.STATE_BUFFERING -> "BUFFERING"
+                Player.STATE_READY -> "READY"
+                Player.STATE_ENDED -> "ENDED"
+                else -> "UNKNOWN($playbackState)"
+            }
+            Log.d(TAG, "onPlaybackStateChanged: $stateName")
 
             when (playbackState) {
                 Player.STATE_ENDED -> {
@@ -650,9 +805,16 @@ class AudioPlaybackService : Service() {
                     }
                 }
                 Player.STATE_READY -> {
+                    Log.d(TAG, "ExoPlayer STATE_READY — audio prepared and ready to play")
+                    cancelPrepareTimeout()
+                    prepareCallback?.let { cb ->
+                        prepareCallback = null
+                        cb(true, null)
+                    }
                     updateMediaSessionState()
                 }
                 Player.STATE_BUFFERING -> {
+                    Log.d(TAG, "ExoPlayer STATE_BUFFERING — waiting for data...")
                     updateMediaSessionState()
                 }
                 Player.STATE_IDLE -> {
@@ -686,7 +848,14 @@ class AudioPlaybackService : Service() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.e(TAG, "Player error: ${error.message}, code=${error.errorCode}")
+            Log.e(TAG, "Player error: ${error.message}, code=${error.errorCode}, cause=${error.cause}")
+
+            // Cancel prepare timeout — error is the resolution
+            cancelPrepareTimeout()
+            prepareCallback?.let { cb ->
+                prepareCallback = null
+                cb(false, error.message ?: "Playback error (code ${error.errorCode})")
+            }
 
             val errorData = Bundle().apply {
                 putString("message", error.message ?: "Unknown error")
@@ -695,10 +864,10 @@ class AudioPlaybackService : Service() {
             }
 
             // Detect URL expiration (HTTP 403/401)
-            val cause = error.cause
             val isAuthError = error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
             if (isAuthError) {
                 errorData.putString("type", "URL_EXPIRED")
+                Log.e(TAG, "HTTP error — likely expired/invalid streaming URL")
             } else {
                 errorData.putString("type", "PLAYBACK_ERROR")
             }

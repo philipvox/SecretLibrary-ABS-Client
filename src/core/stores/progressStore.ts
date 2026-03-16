@@ -269,14 +269,12 @@ export const useProgressStore = create<ProgressStoreState & ProgressStoreActions
         };
 
         // Update in-memory state immediately (for instant UI updates)
-        set((state) => {
-          const newMap = new Map(state.progressMap);
-          newMap.set(bookId, progressData);
-          return {
-            progressMap: newMap,
-            version: state.version + 1,
-          };
-        });
+        // Mutate the existing Map in place instead of creating a new one on every
+        // position update (called ~1x/sec during playback). The version counter
+        // triggers Zustand subscriber reactivity without the allocation overhead.
+        const { progressMap } = get();
+        progressMap.set(bookId, progressData);
+        set({ version: get().version + 1 });
 
         // Queue for SQLite write (debounced for performance during playback)
         if (writeToSqlite) {

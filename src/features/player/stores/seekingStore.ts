@@ -231,6 +231,9 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
 
       log.debug(`seekTo: ${clampedPos.toFixed(1)}`);
 
+      // Fix: Clear safety timeout from any prior startSeeking call to prevent interference
+      if (seekingSafetyTimeout) { clearTimeout(seekingSafetyTimeout); seekingSafetyTimeout = null; }
+
       // CRITICAL: Set isSeeking BEFORE the seek so the 100ms polling in playerStore
       // doesn't overwrite position/isPlaying with stale native values during the seek window.
       // Without this, skipForward/skipBackward/jumpToChapter cause a glitch where the
@@ -255,6 +258,11 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
           duration
         ).catch(() => {});
       }
+
+      // Fix: Update playerStore's position to the clamped value before clearing isSeeking
+      // This prevents the next playback state callback from flashing the old position
+      const { usePlayerStore } = require('./playerStore');
+      usePlayerStore.setState({ position: clampedPos });
 
       // Clear isSeeking and record seek time
       set({
@@ -324,11 +332,14 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
             return;
           }
 
-          const newPosition = Math.max(0, Math.min(duration, state.seekPosition + step));
+          // Fix: Read duration from playerStore inside interval to avoid stale closure
+          const { usePlayerStore } = require('./playerStore');
+          const currentDuration = usePlayerStore.getState().duration;
+          const newPosition = Math.max(0, Math.min(currentDuration, state.seekPosition + step));
 
           // Stop at boundaries
           if ((direction === 'backward' && newPosition <= 0) ||
-              (direction === 'forward' && newPosition >= duration)) {
+              (direction === 'forward' && newPosition >= currentDuration)) {
             set({ seekPosition: newPosition });
             await audioService.seekTo(newPosition).catch(err => {
               log.warn('Continuous seek boundary step failed:', err);
@@ -346,9 +357,11 @@ export const useSeekingStore = create<SeekingState & SeekingActions>()(
               seekInterval = null;
             }
             set({ isSeeking: false, seekDirection: null, lastSeekTime: Date.now() });
-            return; // Skip the position update below
           });
-          set({ seekPosition: newPosition });
+          // Fix: Guard against state update after error handler reset isSeeking
+          if (get().isSeeking) {
+            set({ seekPosition: newPosition });
+          }
         } finally {
           seekIntervalInProgress = false;
         }

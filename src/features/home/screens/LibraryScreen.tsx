@@ -30,9 +30,6 @@ import {
 import { Image } from 'expo-image';
 // Note: Safe area is handled by TopNav component
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
-import ReAnimated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
-import { Gyroscope } from 'expo-sensors';
-
 import { apiClient } from '@/core/api';
 import { librarySyncService } from '@/core/services/librarySyncService';
 import { useLibrarySyncStore } from '@/shared/stores/librarySyncStore';
@@ -701,24 +698,6 @@ export function LibraryScreen() {
     haptics.buttonPress();
     jumpToTabWithLoading('DiscoverTab');
   }, [jumpToTabWithLoading]);
-
-  // Gyroscope-driven rotation for discover ring
-  const discoverRotation = useSharedValue(0);
-  useEffect(() => {
-    Gyroscope.setUpdateInterval(32);
-    let prev = Date.now();
-    const sub = Gyroscope.addListener((data) => {
-      const now = Date.now();
-      const dt = (now - prev) / 1000;
-      prev = now;
-      discoverRotation.value += (data.y / 2) * dt * (180 / Math.PI) * 3;
-    });
-    return () => sub.remove();
-  }, [discoverRotation]);
-
-  const discoverRingStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${discoverRotation.value}deg` }],
-  }));
 
   // Handler for recommendation book spine press - navigate to book detail
   const handleRecommendationPress = useCallback((book: RecommendedBook) => {
@@ -1504,8 +1483,8 @@ export function LibraryScreen() {
               {/* Horizontal shelf for this series */}
               <BookshelfView
                 books={group.books}
-                onBookPress={(book) => handleBookPress(book)}
-                onBookLongPress={(book) => handleBookLongPress(book)}
+                onBookPress={handleBookPress}
+                onBookLongPress={handleBookLongPress}
                 layoutMode="shelf"
                 heightScale={0.5}
                 bottomPadding={0}
@@ -1517,7 +1496,7 @@ export function LibraryScreen() {
     }
 
     // Only show last played time when sorted by recent
-    const showLastPlayed = sortMode === 'recent';
+    const showLastPlayed = sortMode === 'lastPlayed';
     const spineData = allBooks.map((book) => {
       const item = libraryItemsMap.get(book.id);
       return item ? transformToSpineData(book, item, showLastPlayed) : null;
@@ -1527,8 +1506,8 @@ export function LibraryScreen() {
     return (
       <BookshelfView
         books={spineData}
-        onBookPress={(book) => handleBookPress(book)}
-        onBookLongPress={(book) => handleBookLongPress(book)}
+        onBookPress={handleBookPress}
+        onBookLongPress={handleBookLongPress}
         layoutMode={viewMode}
         bottomPadding={getBottomPadding(viewMode)}
         recommendations={discoverRecommendations}
@@ -1598,28 +1577,6 @@ export function LibraryScreen() {
           },
         ]}
       />
-
-      {/* Discover sticker — right-aligned below nav */}
-      {/* Discover button — globe with rotating "DISCOVER" ring */}
-      <Pressable
-        style={{ alignSelf: 'flex-end', marginRight: 16, marginTop: scale(4), width: scale(72), height: scale(72) }}
-        onPress={handleDiscoverPress}
-      >
-        {/* Static globe */}
-        <Image
-          source={require('../../../../assets/discover-world.png')}
-          style={{ width: scale(72), height: scale(72), position: 'absolute' }}
-          contentFit="contain"
-        />
-        {/* Rotating "DISCOVER" text ring */}
-        <ReAnimated.View style={[{ width: scale(72), height: scale(72) }, discoverRingStyle]}>
-          <Image
-            source={require('../../../../assets/discover-ring.png')}
-            style={{ width: scale(72), height: scale(72) }}
-            contentFit="contain"
-          />
-        </ReAnimated.View>
-      </Pressable>
 
       {/* Sort Dropdown Modal */}
       <Modal
@@ -1800,20 +1757,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  discoverSticker: {
-    alignSelf: 'flex-end',
-    marginRight: 16,
-    marginTop: scale(4),
-  },
-  discoverStickerImage: {
-    width: scale(220),
-    height: scale(220),
-  },
-  discoverStickerImage: {
-    width: scale(36),
-    height: scale(36),
-  },
-
   // Series section header (for series-sorted shelf view)
   seriesSectionHeader: {
     flexDirection: 'row',

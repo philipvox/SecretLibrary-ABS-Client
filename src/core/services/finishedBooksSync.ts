@@ -194,6 +194,11 @@ export const finishedBooksSync = {
       }
       log.info(`User has progress for ${progressMap.size} items`);
 
+      // Batch-load ALL local playback progress upfront to avoid N+1 queries
+      // (was calling sqliteCache.getPlaybackProgress(item.id) in a loop for 2700+ items)
+      const allLocalProgress = await sqliteCache.getAllPlaybackProgress();
+      log.info(`Loaded ${allLocalProgress.size} local progress records for batch comparison`);
+
       let itemsWithProgress = 0;
       let itemsCached = 0;
       let itemsSkippedInvalid = 0;
@@ -232,8 +237,8 @@ export const finishedBooksSync = {
             updatedAt: serverUpdatedAt || Date.now(),
           });
 
-          // Check existing playback_progress (what the player reads from)
-          const existingPlayback = await sqliteCache.getPlaybackProgress(item.id);
+          // Check existing playback_progress from batch-loaded map (no per-item DB query)
+          const existingPlayback = allLocalProgress.get(item.id) || null;
           const localUpdatedAt = existingPlayback?.updatedAt ? new Date(existingPlayback.updatedAt).getTime() : 0;
 
           // Only write to SQLite if server has more recent progress (by timestamp, not position)

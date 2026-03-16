@@ -1500,6 +1500,8 @@ export function BookSpineVertical({
             debugSections={DEBUG_SECTIONS}
           />
         )}
+          </>
+        )}
         {/* Gold star sticker overlay — uses first star's position/rotation from cover */}
         {hasStars && (() => {
           const star = bookStars![0];
@@ -1522,8 +1524,6 @@ export function BookSpineVertical({
             />
           );
         })()}
-          </>
-        )}
       </View>
 
       {/* Progress is now shown at the top combined with last played time */}

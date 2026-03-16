@@ -318,6 +318,7 @@ interface PlayerActions {
   // ---------------------------------------------------------------------------
   togglePlayer: () => void;
   closePlayer: () => void;
+  stopPlayback: () => Promise<void>;
   setPlayerVisible: (visible: boolean) => void;
   clearPlaybackError: () => void;
   handleAudioError: (error: AudioError) => Promise<void>;
@@ -348,19 +349,13 @@ interface PlayerActions {
 // CONSTANTS
 // =============================================================================
 
-const BOOK_SPEED_MAP_KEY = 'playerBookSpeedMap';
-const GLOBAL_DEFAULT_RATE_KEY = 'playerGlobalDefaultRate';
-const SHAKE_TO_EXTEND_KEY = 'playerShakeToExtend';
-const SKIP_FORWARD_INTERVAL_KEY = 'playerSkipForwardInterval';
-const SKIP_BACK_INTERVAL_KEY = 'playerSkipBackInterval';
-const DISC_ANIMATION_KEY = 'playerDiscAnimation';
-const STANDARD_PLAYER_KEY = 'playerStandardMode';
 const LAST_PLAYED_BOOK_ID_KEY = 'playerLastPlayedBookId';
-const ACTIVE_PLAYBACK_RATE_KEY = 'playerActivePlaybackRate';
-const SMART_REWIND_PAUSE_TIMESTAMP_KEY = 'smartRewindPauseTimestamp';
-const SMART_REWIND_PAUSE_BOOK_ID_KEY = 'smartRewindPauseBookId';
-const SMART_REWIND_PAUSE_POSITION_KEY = 'smartRewindPausePosition';
-// SHOW_COMPLETION_PROMPT_KEY and AUTO_MARK_FINISHED_KEY moved to completionStore (Phase 6)
+// NOTE: The following keys were delegated to child stores (Phase 2-7 refactor):
+//   BOOK_SPEED_MAP_KEY, GLOBAL_DEFAULT_RATE_KEY, ACTIVE_PLAYBACK_RATE_KEY → speedStore
+//   SHAKE_TO_EXTEND_KEY → sleepTimerStore
+//   SKIP_FORWARD/BACK_INTERVAL_KEY, DISC_ANIMATION_KEY, STANDARD_PLAYER_KEY → playerSettingsStore
+//   SMART_REWIND_PAUSE_*_KEY → smartRewind utils
+//   SHOW_COMPLETION_PROMPT_KEY, AUTO_MARK_FINISHED_KEY → completionStore
 const PROGRESS_SAVE_INTERVAL = 5000; // Save progress every 5 seconds (SQLite only, no UI updates)
 const MIN_PAUSE_FOR_REWIND_MS = 3000; // Minimum pause before smart rewind applies
 const PREV_CHAPTER_THRESHOLD = 3;     // Seconds before going to prev vs restart
@@ -523,6 +518,8 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Reset track finish guard for new book
       if (currentBook?.id !== book.id) {
         lastFinishedBookId = null;
+        // Fix: Reset progress save timer so saves start immediately for the new book
+        lastProgressSave = 0;
       }
 
       logSection('LOAD BOOK START');
@@ -557,6 +554,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         viewingBook: book,  // Sync viewing book when loading
         isPlaying: false,
         isBuffering: true,
+        playbackError: null,  // Fix: Clear any previous playback error
         // Set position early to avoid jarring jump from stale/0 to resume position
         position: earlyPosition,
       });
@@ -940,70 +938,82 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             }
           }
 
-          // Build track info for multi-file audiobooks
+          // Build track info for audiobooks
+          // IMPORTANT: Prefer /api/items/{id}/file/{ino}/stream URLs over session /s/item/ URLs.
+          // The /api/items/ path routes through the moov proxy (Caddy → port 13379) which caches
+          // moov atoms locally. Session /s/item/ URLs bypass the proxy and hit ABS directly,
+          // which must fetch from the Germany storage box over SSHFS — very slow for M4B files
+          // without faststart (moov at end of file).
           const audioTracks = session.audioTracks || [];
-          if (audioTracks.length > 1) {
-            log('MULTI-FILE AUDIOBOOK');
-            const baseUrl = apiClient.getBaseURL().replace(/\/+$/, '');
-            const token = apiClient.getAuthToken();
+          const bookAudioFiles = isBookMedia(book.media) ? book.media.audioFiles || [] : [];
+          const baseUrl = apiClient.getBaseURL().replace(/\/+$/, '');
+          const token = apiClient.getAuthToken();
 
-            // Log token status for debugging (don't log the actual token for security)
-            if (!token) {
-              logError('WARNING: No auth token available for audio streaming!');
-            } else {
-              log('Auth token present, length:', token.length);
+          if (!token) {
+            logError('WARNING: No auth token available for audio streaming!');
+          }
+
+          /**
+           * Build the best streaming URL for a track.
+           * Priority: moov-proxy URL (/api/items/{id}/file/{ino}/stream) > session contentUrl
+           */
+          const buildTrackUrl = (track: AudioTrack, index: number): string => {
+            // Try to find the matching audioFile for this track to get the INO
+            const audioFile = bookAudioFiles[index];
+            if (audioFile?.ino) {
+              // Use direct file URL — standard ABS endpoint, works on all servers.
+              // On servers with a moov proxy (Caddy routing /api/items/*/file/*),
+              // this also gets moov caching for free.
+              const fileUrl = `${baseUrl}/api/items/${book.id}/file/${audioFile.ino}?token=${token}`;
+              log(`Track[${index}] using FILE URL (ino=${audioFile.ino})`);
+              return fileUrl;
             }
 
-            audioTrackInfos = audioTracks.map((track: AudioTrack) => {
-              // Check if this is a direct file URL that needs /stream endpoint
-              // Pattern: /api/items/{item_id}/file/{file_ino}
-              let contentUrl = track.contentUrl;
-              const fileUrlPattern = /^\/api\/items\/[^/]+\/file\/\d+/;
-              if (fileUrlPattern.test(contentUrl)) {
-                // Append /stream for moov-at-end M4B support
-                const [path, query] = contentUrl.split('?');
-                contentUrl = `${path}/stream${query ? '?' + query : ''}`;
-              }
+            // Fallback: use session contentUrl
+            log(`Track[${index}] FALLBACK to session URL (no audioFile.ino available)`);
+            let contentUrl = track.contentUrl;
+            let trackUrl = `${baseUrl}${contentUrl}`;
+            if (!contentUrl.includes('token=')) {
+              const separator = contentUrl.includes('?') ? '&' : '?';
+              trackUrl = `${trackUrl}${separator}token=${token}`;
+            }
+            return trackUrl;
+          };
 
-              let trackUrl = `${baseUrl}${contentUrl}`;
-              if (!contentUrl.includes('token=')) {
-                const separator = contentUrl.includes('?') ? '&' : '?';
-                trackUrl = `${trackUrl}${separator}token=${token}`;
-              }
-              return {
-                url: trackUrl,
-                title: track.title,
-                startOffset: track.startOffset,
-                duration: track.duration,
-              };
-            });
+          if (audioTracks.length > 1) {
+            log('MULTI-FILE AUDIOBOOK');
+            log(`audioFiles available: ${bookAudioFiles.length}, session tracks: ${audioTracks.length}`);
+
+            audioTrackInfos = audioTracks.map((track: AudioTrack, index: number) => ({
+              url: buildTrackUrl(track, index),
+              title: track.title,
+              startOffset: track.startOffset,
+              duration: track.duration,
+            }));
             logTracks(audioTrackInfos);
           } else {
             log('SINGLE-FILE AUDIOBOOK');
-            let url = sessionService.getStreamUrl();
+            log(`audioFiles available: ${bookAudioFiles.length}`);
 
-            // Fallback: if sessionService has no session but we have audioTracks
-            // on the local session variable, build the URL directly
+            // Prefer moov-proxy URL for single-file books too
+            const singleTrack = audioTracks[0];
+            let url: string | null = null;
+
+            if (singleTrack && bookAudioFiles[0]?.ino) {
+              url = buildTrackUrl(singleTrack, 0);
+              log('Using moov proxy URL for single-file book');
+            } else {
+              // Fallback to session stream URL
+              url = sessionService.getStreamUrl();
+              if (url) {
+                log('Using sessionService stream URL');
+              }
+            }
+
+            // Final fallback: build from session audioTracks contentUrl
             if (!url && session?.audioTracks?.length) {
               log('getStreamUrl() returned null — building URL from session audioTracks directly');
-              const baseUrl = apiClient.getBaseURL().replace(/\/+$/, '');
-              const token = apiClient.getAuthToken() || '';
-              const track = session.audioTracks[0];
-              let contentUrl = track.contentUrl;
-
-              // Append /stream for moov-at-end M4B support
-              const fileUrlPattern = /^\/api\/items\/[^/]+\/file\/\d+/;
-              if (fileUrlPattern.test(contentUrl)) {
-                const [path, query] = contentUrl.split('?');
-                contentUrl = `${path}/stream${query ? '?' + query : ''}`;
-              }
-
-              if (contentUrl.includes('token=')) {
-                url = `${baseUrl}${contentUrl}`;
-              } else {
-                const separator = contentUrl.includes('?') ? '&' : '?';
-                url = `${baseUrl}${contentUrl}${separator}token=${token}`;
-              }
+              url = buildTrackUrl(session.audioTracks[0] as AudioTrack, 0);
               log('Fallback stream URL built successfully');
             }
 
@@ -1348,6 +1358,9 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Reset guards
       lastFinishedBookId = null;
 
+      // Fix: Clear auto-download tracking to prevent unbounded growth
+      autoDownloadCheckedBooks.clear();
+
       // Fix Bug #1: Clear stuck detection timeouts to prevent memory leaks
       clearStuckDetectionTimeouts();
 
@@ -1476,6 +1489,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         viewingBook: book,
         viewingChapters,
         isPlayerVisible: true,
+        playbackError: null,  // Fix: Clear any previous playback error
         // Set duration/position when audio isn't actively loaded
         ...(!isAudioLoaded && {
           duration: viewDuration,
@@ -1805,17 +1819,18 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     // =========================================================================
 
     startContinuousSeeking: async (direction: SeekDirection) => {
-      const { position, duration, isPlaying, pause } = get();
+      const { position, duration, pause } = get();
 
       log(`startContinuousSeeking: direction=${direction}, position=${position.toFixed(1)}`);
 
       // Delegate to seekingStore (single source of truth) with pause callback
+      // Fix: Read isPlaying inside callback to avoid stale closure
       await useSeekingStore.getState().startContinuousSeeking(
         direction,
         position,
         duration,
         async () => {
-          if (isPlaying) await pause();
+          if (get().isPlaying) await pause();
         }
       );
     },
@@ -2069,6 +2084,32 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       // Animate transition to collapsed, then update store
       playerTransitionProgress.value = withTiming(0, { duration: 250 });
       set({ isPlayerVisible: false });
+    },
+
+    stopPlayback: async () => {
+      // Cancel any in-flight loadBook by incrementing the load ID
+      currentLoadId++;
+      log('[STOP] Cancelling load and stopping playback');
+
+      // Unload audio (cancels ExoPlayer prepare, clears media items)
+      try {
+        await audioService.cleanup();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+
+      // Reset seeking state
+      useSeekingStore.getState().resetSeekingState();
+
+      // Close player and reset state — as if the book was never tapped
+      playerTransitionProgress.value = withTiming(0, { duration: 200 });
+      set({
+        isPlayerVisible: false,
+        isLoading: false,
+        isBuffering: false,
+        isPlaying: false,
+        playbackError: null,
+      });
     },
 
     setPlayerVisible: (visible: boolean) => {
