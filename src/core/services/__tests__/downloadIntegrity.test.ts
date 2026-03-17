@@ -2,8 +2,7 @@
  * Tests for Download Integrity Service
  */
 
-import * as FileSystem from 'expo-file-system';
-import * as Crypto from 'expo-crypto';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import {
   calculateFileChecksum,
@@ -20,28 +19,19 @@ import {
   SIZE_TOLERANCE_PERCENT,
 } from '../downloadIntegrity';
 
-// Mock expo-file-system
-jest.mock('expo-file-system', () => ({
+// Mock expo-file-system/legacy (matching the source's import)
+jest.mock('expo-file-system/legacy', () => ({
   getInfoAsync: jest.fn(),
   readAsStringAsync: jest.fn(),
   deleteAsync: jest.fn(),
   EncodingType: {
     Base64: 'base64',
+    UTF8: 'utf8',
   },
-}));
-
-// Mock expo-crypto
-jest.mock('expo-crypto', () => ({
-  digestStringAsync: jest.fn(),
-  CryptoDigestAlgorithm: {
-    SHA256: 'SHA-256',
-  },
-}));
+}), { virtual: true });
 
 const mockGetInfoAsync = FileSystem.getInfoAsync as jest.Mock;
-const mockReadAsStringAsync = FileSystem.readAsStringAsync as jest.Mock;
 const mockDeleteAsync = FileSystem.deleteAsync as jest.Mock;
-const mockDigestStringAsync = Crypto.digestStringAsync as jest.Mock;
 
 describe('Download Integrity Service', () => {
   beforeEach(() => {
@@ -107,15 +97,15 @@ describe('Download Integrity Service', () => {
 
   describe('calculateFileChecksum', () => {
     it('calculates checksum correctly', async () => {
-      mockReadAsStringAsync.mockResolvedValue('base64content');
-      mockDigestStringAsync.mockResolvedValue('abc123hash');
+      // Source now uses size-based fingerprints instead of SHA-256
+      mockGetInfoAsync.mockResolvedValue({ exists: true, size: 1024000 });
 
       const checksum = await calculateFileChecksum('/path/to/file.mp3');
-      expect(checksum).toBe('abc123hash');
+      expect(checksum).toBe('size:1024000');
     });
 
     it('throws on read error', async () => {
-      mockReadAsStringAsync.mockRejectedValue(new Error('Read failed'));
+      mockGetInfoAsync.mockResolvedValue({ exists: false });
 
       await expect(calculateFileChecksum('/path/to/file.mp3')).rejects.toThrow(
         'Failed to calculate checksum'
@@ -189,30 +179,29 @@ describe('Download Integrity Service', () => {
       expect(result.sizeMatch).toBe(true);
     });
 
-    it('verifies checksum when provided', async () => {
+    it('verifies checksum when provided (size-based fingerprint)', async () => {
+      // Source now uses size-based fingerprints: checksum = "size:N"
+      // When size matches, checksum also matches
       mockGetInfoAsync.mockResolvedValue({ exists: true, size: 1024000 });
-      mockReadAsStringAsync.mockResolvedValue('content');
-      mockDigestStringAsync.mockResolvedValue('expectedhash');
 
       const result = await verifyFileIntegrity({
         filePath: '/path/to/file.mp3',
         expectedSize: 1024000,
-        expectedChecksum: 'expectedhash',
+        expectedChecksum: 'size:1024000',
       });
 
       expect(result.isValid).toBe(true);
       expect(result.checksumMatch).toBe(true);
     });
 
-    it('returns invalid on checksum mismatch', async () => {
-      mockGetInfoAsync.mockResolvedValue({ exists: true, size: 1024000 });
-      mockReadAsStringAsync.mockResolvedValue('content');
-      mockDigestStringAsync.mockResolvedValue('actualhash');
+    it('returns invalid on checksum mismatch (size-based)', async () => {
+      // When expectedSize doesn't match actualSize, checksum also fails
+      mockGetInfoAsync.mockResolvedValue({ exists: true, size: 2000000 });
 
       const result = await verifyFileIntegrity({
         filePath: '/path/to/file.mp3',
         expectedSize: 1024000,
-        expectedChecksum: 'expectedhash',
+        expectedChecksum: 'size:1024000',
       });
 
       expect(result.isValid).toBe(false);
@@ -220,17 +209,17 @@ describe('Download Integrity Service', () => {
       expect(result.error).toBe('Checksum mismatch');
     });
 
-    it('handles case-insensitive checksum comparison', async () => {
+    it('handles legacy hex checksum by falling back to size validation', async () => {
+      // Legacy hex checksums can't be verified (would cause OOM), so falls back to size check
       mockGetInfoAsync.mockResolvedValue({ exists: true, size: 1024000 });
-      mockReadAsStringAsync.mockResolvedValue('content');
-      mockDigestStringAsync.mockResolvedValue('ABCDEF123');
 
       const result = await verifyFileIntegrity({
         filePath: '/path/to/file.mp3',
         expectedSize: 1024000,
-        expectedChecksum: 'abcdef123',
+        expectedChecksum: 'ABCDEF123',
       });
 
+      // Size matches, so legacy checksum validation passes via size fallback
       expect(result.isValid).toBe(true);
       expect(result.checksumMatch).toBe(true);
     });

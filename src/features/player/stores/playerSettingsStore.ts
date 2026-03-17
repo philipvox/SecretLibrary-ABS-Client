@@ -31,6 +31,8 @@ const DISC_ANIMATION_KEY = 'playerDiscAnimation';
 const STANDARD_PLAYER_KEY = 'playerStandardMode';
 const SMART_REWIND_ENABLED_KEY = 'playerSmartRewindEnabled';
 const SMART_REWIND_MAX_SECONDS_KEY = 'playerSmartRewindMaxSeconds';
+const BLUETOOTH_AUTO_RESUME_KEY = 'playerBluetoothAutoResume';
+const SHOW_TIME_REMAINING_KEY = 'playerShowTimeRemaining';
 
 // =============================================================================
 // TYPES
@@ -55,6 +57,12 @@ interface PlayerSettingsState {
   // Smart rewind
   smartRewindEnabled: boolean;        // Auto-rewind on resume based on pause duration (default true)
   smartRewindMaxSeconds: number;      // Maximum rewind amount in seconds (default 30)
+
+  // Bluetooth
+  bluetoothAutoResume: boolean;       // Resume playback when Bluetooth device connects (default false)
+
+  // Display
+  showTimeRemaining: boolean;         // Show remaining time instead of elapsed (default false)
 }
 
 interface PlayerSettingsActions {
@@ -67,6 +75,8 @@ interface PlayerSettingsActions {
   setUseStandardPlayer: (enabled: boolean) => Promise<void>;
   setSmartRewindEnabled: (enabled: boolean) => Promise<void>;
   setSmartRewindMaxSeconds: (seconds: number) => Promise<void>;
+  setBluetoothAutoResume: (enabled: boolean) => Promise<void>;
+  setShowTimeRemaining: (enabled: boolean) => Promise<void>;
 
   // Bulk load
   loadSettings: () => Promise<void>;
@@ -90,6 +100,8 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
     useStandardPlayer: true,
     smartRewindEnabled: true,
     smartRewindMaxSeconds: 30,
+    bluetoothAutoResume: false,
+    showTimeRemaining: false,
 
     // =========================================================================
     // ACTIONS
@@ -171,6 +183,24 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
       }
     },
 
+    setBluetoothAutoResume: async (enabled: boolean) => {
+      set({ bluetoothAutoResume: enabled });
+      try {
+        await AsyncStorage.setItem(BLUETOOTH_AUTO_RESUME_KEY, enabled.toString());
+      } catch (err) {
+        log.debug('Failed to persist bluetoothAutoResume:', err);
+      }
+    },
+
+    setShowTimeRemaining: async (enabled: boolean) => {
+      set({ showTimeRemaining: enabled });
+      try {
+        await AsyncStorage.setItem(SHOW_TIME_REMAINING_KEY, enabled.toString());
+      } catch (err) {
+        log.debug('Failed to persist showTimeRemaining:', err);
+      }
+    },
+
     loadSettings: async () => {
       try {
         const [
@@ -182,6 +212,8 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           standardPlayerStr,
           smartRewindEnabledStr,
           smartRewindMaxSecondsStr,
+          bluetoothAutoResumeStr,
+          showTimeRemainingStr,
         ] = await Promise.all([
           AsyncStorage.getItem(CONTROL_MODE_KEY),
           AsyncStorage.getItem(PROGRESS_MODE_KEY),
@@ -191,14 +223,22 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           AsyncStorage.getItem(STANDARD_PLAYER_KEY),
           AsyncStorage.getItem(SMART_REWIND_ENABLED_KEY),
           AsyncStorage.getItem(SMART_REWIND_MAX_SECONDS_KEY),
+          AsyncStorage.getItem(BLUETOOTH_AUTO_RESUME_KEY),
+          AsyncStorage.getItem(SHOW_TIME_REMAINING_KEY),
         ]);
 
-        const skipForwardInterval = skipForwardStr ? parseInt(skipForwardStr, 10) : 30;
-        const skipBackInterval = skipBackStr ? parseInt(skipBackStr, 10) : 15;
+        // Fix: Add NaN guards to parseInt calls to prevent invalid values
+        const parsedSkipForward = skipForwardStr ? parseInt(skipForwardStr, 10) : 30;
+        const skipForwardInterval = !isNaN(parsedSkipForward) ? parsedSkipForward : 30;
+        const parsedSkipBack = skipBackStr ? parseInt(skipBackStr, 10) : 15;
+        const skipBackInterval = !isNaN(parsedSkipBack) ? parsedSkipBack : 15;
         const discAnimationEnabled = discAnimationStr !== 'false'; // Default true
         const useStandardPlayer = standardPlayerStr !== 'false'; // Default true
         const smartRewindEnabled = smartRewindEnabledStr !== 'false'; // Default true
-        const smartRewindMaxSeconds = smartRewindMaxSecondsStr ? parseInt(smartRewindMaxSecondsStr, 10) : 30;
+        const parsedSmartRewindMax = smartRewindMaxSecondsStr ? parseInt(smartRewindMaxSecondsStr, 10) : 30;
+        const smartRewindMaxSeconds = !isNaN(parsedSmartRewindMax) ? parsedSmartRewindMax : 30;
+        const bluetoothAutoResume = bluetoothAutoResumeStr === 'true'; // Default false
+        const showTimeRemaining = showTimeRemainingStr === 'true'; // Default false
 
         set({
           controlMode: (controlMode as ControlMode) || 'rewind',
@@ -209,9 +249,12 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           useStandardPlayer,
           smartRewindEnabled,
           smartRewindMaxSeconds,
+          bluetoothAutoResume,
+          showTimeRemaining,
         });
       } catch (error) {
-        // Use defaults on error
+        // Fix: Log error instead of silently swallowing
+        console.warn('[PlayerSettingsStore] Failed to load settings, using defaults:', error);
       }
     },
   }))

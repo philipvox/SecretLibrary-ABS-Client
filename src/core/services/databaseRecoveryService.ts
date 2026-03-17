@@ -11,7 +11,7 @@
  * 4. Restore from AsyncStorage backup (critical data)
  */
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { trackEvent } from '@/core/monitoring';
 import { createLogger } from '@/shared/utils/logger';

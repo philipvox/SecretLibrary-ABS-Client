@@ -2,7 +2,6 @@ package com.secretlibrary.app.automotive
 
 import android.os.Handler
 import android.os.Looper
-import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
@@ -13,8 +12,11 @@ import java.io.File
  *
  * This module:
  * 1. Receives commands from the MediaBrowserService and emits them to JS
- * 2. Receives state updates from JS and updates the MediaSession
- * 3. Manages the browse data file that the service reads
+ * 2. Manages the browse data file that the service reads
+ *
+ * Playback state and metadata are now managed by ExoPlayer's AudioPlaybackService.
+ * This module no longer calls updatePlaybackState() or updateMetadata() — those
+ * operations caused audio focus fighting and are no longer needed.
  */
 class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -23,21 +25,16 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
         private const val TAG = "AndroidAutoModule"
         private const val EVENT_NAME = "AndroidAutoCommand"
         private const val BROWSE_DATA_FILE = "android_auto_browse.json"
-        private const val MAX_RETRY_ATTEMPTS = 5
-        // Reduced from 500ms to 100ms for faster command response
-        private const val RETRY_DELAY_MS = 100L
+        private const val MAX_RETRY_ATTEMPTS = 30
+        private const val RETRY_DELAY_MS = 200L
 
-        // Static reference for service to emit events
-        // Note: This can become stale if React Native creates a new context
         @Volatile
         private var moduleInstance: AndroidAutoModule? = null
 
-        // Handler for retry logic
         private val mainHandler = Handler(Looper.getMainLooper())
 
         /**
          * Called by MediaBrowserService to emit commands to JavaScript.
-         * Includes retry logic for when React context isn't ready yet.
          */
         fun emitCommand(command: String, param: String?) {
             emitCommandWithRetry(command, param, 0)
@@ -50,7 +47,6 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
                 return
             }
 
-            // Retry if we haven't exceeded max attempts
             if (attempt < MAX_RETRY_ATTEMPTS) {
                 Log.w(TAG, "React context not ready, retrying in ${RETRY_DELAY_MS}ms (attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS)")
                 mainHandler.postDelayed({
@@ -71,17 +67,12 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
 
     override fun invalidate() {
         Log.d(TAG, "AndroidAutoModule invalidated")
-        // Only clear if we're the current instance
         if (moduleInstance === this) {
             moduleInstance = null
         }
         super.invalidate()
     }
 
-    /**
-     * Try to send event to JavaScript.
-     * Returns true if successful, false if React context not ready.
-     */
     private fun tryEmitEvent(command: String, param: String?): Boolean {
         if (!reactContext.hasActiveReactInstance()) {
             Log.w(TAG, "React context not active")
@@ -108,41 +99,31 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
     }
 
     /**
-     * Update playback state in MediaSession
+     * updatePlaybackState — DEPRECATED.
+     * ExoPlayer's AudioPlaybackService now owns the MediaSession and updates state natively.
+     * This method is kept as a no-op so existing JS callers don't crash.
      */
     @ReactMethod
     fun updatePlaybackState(isPlaying: Boolean, position: Double, speed: Double) {
-        val state = if (isPlaying) {
-            PlaybackStateCompat.STATE_PLAYING
-        } else {
-            PlaybackStateCompat.STATE_PAUSED
-        }
-
-        AndroidAutoMediaBrowserService.instance?.updatePlaybackState(
-            state,
-            (position * 1000).toLong(), // Convert seconds to ms
-            speed.toFloat()
-        )
-        Log.d(TAG, "Updated playback state: playing=$isPlaying, pos=$position, speed=$speed")
+        // No-op — ExoPlayer handles MediaSession state natively.
+        // Keeping this method prevents crashes from automotiveService.ts calls
+        // that haven't been removed yet.
+        Log.d(TAG, "updatePlaybackState called (no-op, ExoPlayer handles this)")
     }
 
     /**
-     * Update metadata in MediaSession
+     * updateMetadata — DEPRECATED.
+     * ExoPlayer's AudioPlaybackService now owns metadata via setMetadata().
      */
     @ReactMethod
     fun updateMetadata(title: String, author: String, duration: Double, artworkUrl: String?) {
-        AndroidAutoMediaBrowserService.instance?.updateMetadata(
-            title,
-            author,
-            (duration * 1000).toLong(), // Convert seconds to ms
-            artworkUrl
-        )
-        Log.d(TAG, "Updated metadata: $title by $author")
+        // No-op — ExoPlayer handles metadata natively.
+        Log.d(TAG, "updateMetadata called (no-op, ExoPlayer handles this)")
     }
 
     /**
-     * Update extended metadata including chapter title, series, speed, and progress.
-     * Shows chapter title in Now Playing title and book title as album.
+     * updateMetadataExtended — DEPRECATED.
+     * ExoPlayer's AudioPlaybackService now owns metadata via setMetadata().
      */
     @ReactMethod
     fun updateMetadataExtended(
@@ -155,22 +136,12 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
         speed: Double,
         progress: Double
     ) {
-        AndroidAutoMediaBrowserService.instance?.updateMetadataExtended(
-            title,
-            author,
-            (duration * 1000).toLong(), // Convert seconds to ms
-            artworkUrl,
-            chapterTitle,
-            seriesName,
-            speed.toFloat(),
-            progress
-        )
-        Log.d(TAG, "Updated extended metadata: $title ch=$chapterTitle series=$seriesName")
+        // No-op — ExoPlayer handles metadata natively.
+        Log.d(TAG, "updateMetadataExtended called (no-op, ExoPlayer handles this)")
     }
 
     /**
      * Notify that browse data has been updated
-     * Called after React Native writes the JSON file
      */
     @ReactMethod
     fun notifyBrowseDataUpdated() {
@@ -180,7 +151,6 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
 
     /**
      * Write browse data to file for service to read
-     * This is called from the androidAutoBridge.ts
      */
     @ReactMethod
     fun writeBrowseData(jsonData: String, promise: Promise) {
@@ -189,7 +159,6 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
             file.writeText(jsonData)
             Log.d(TAG, "Browse data written to file: ${jsonData.length} chars")
 
-            // Notify service of update
             AndroidAutoMediaBrowserService.instance?.notifyBrowseDataChanged()
 
             promise.resolve(true)
@@ -208,30 +177,19 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(connected)
     }
 
-    /**
-     * Get constants exposed to JavaScript
-     */
     override fun getConstants(): MutableMap<String, Any> {
         return mutableMapOf(
             "EVENT_NAME" to EVENT_NAME
         )
     }
 
-    /**
-     * Add listener (required for NativeEventEmitter)
-     */
     @ReactMethod
     fun addListener(eventName: String) {
-        // Required for RN NativeEventEmitter
         Log.d(TAG, "addListener: $eventName")
     }
 
-    /**
-     * Remove listeners (required for NativeEventEmitter)
-     */
     @ReactMethod
     fun removeListeners(count: Int) {
-        // Required for RN NativeEventEmitter
         Log.d(TAG, "removeListeners: $count")
     }
 }

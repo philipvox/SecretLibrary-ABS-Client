@@ -194,7 +194,7 @@ interface PerformanceMetrics {
   errorCount: number;
   totalDuration: number;
   averageDuration: number;
-  slowRequests: Array<{ url: string; duration: number }>;
+  slowRequests: { url: string; duration: number }[];
 }
 
 class PerformanceTracker {

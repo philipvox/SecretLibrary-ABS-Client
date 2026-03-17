@@ -8,18 +8,6 @@
 // Types
 export type { AudioTrackInfo, Chapter } from './types';
 
-// Track navigation
-export {
-  findTrackForPosition,
-  calculateGlobalPosition,
-  isNearTrackEnd,
-  getNextTrackIndex,
-  getPreviousTrackIndex,
-  calculateTotalDuration,
-  getTrackAtIndex,
-  type TrackPosition,
-} from './trackNavigator';
-
 // Progress calculations
 export {
   calculateProgress,
@@ -32,22 +20,6 @@ export {
   calculateTimeRemaining,
   formatTimeRemainingWithRate,
 } from './progressCalculator';
-
-// Playback rate
-export {
-  MIN_PLAYBACK_RATE,
-  MAX_PLAYBACK_RATE,
-  DEFAULT_PLAYBACK_RATE,
-  RATE_INCREMENTS,
-  getPlaybackRateForBook,
-  clampPlaybackRate,
-  getNextPlaybackRate,
-  getPreviousPlaybackRate,
-  formatPlaybackRate,
-  isStandardRate,
-  nearestStandardRate,
-  adjustPlaybackRate,
-} from './playbackRateResolver';
 
 // Chapter navigation
 export {
@@ -77,15 +49,3 @@ export {
   type ResolutionResult,
 } from './positionResolver';
 
-// Time formatters (for player UI)
-export {
-  formatTime,
-  formatTimeHHMMSS,
-  formatTimeVerbose,
-} from './timeFormatters';
-
-// Player theme
-export {
-  usePlayerColors,
-  type PlayerColors,
-} from './playerTheme';

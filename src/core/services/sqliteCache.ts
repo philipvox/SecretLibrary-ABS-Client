@@ -6,7 +6,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import { LibraryItem, Collection, Author } from '@/core/types';
+import { LibraryItem, Collection } from '@/core/types';
 import { createLogger } from '@/shared/utils/logger';
 
 const log = createLogger('SQLiteCache');
@@ -51,7 +51,7 @@ interface PlaybackProgress {
   synced: boolean;
 }
 
-interface SyncMetadata {
+interface _SyncMetadata {
   key: string;
   value: string;
   updatedAt: number;
@@ -741,6 +741,28 @@ class SQLiteCache {
   }
 
   /**
+   * Upsert a single library item without deleting other cached items.
+   * Used by downloadManager to cache metadata for offline access
+   * without destroying the full library cache.
+   */
+  async upsertLibraryItem(libraryId: string, item: LibraryItem): Promise<void> {
+    const now = Date.now();
+
+    try {
+      await this.withTransactionLock(async (db) => {
+        await db.runAsync(
+          `INSERT OR REPLACE INTO library_items (id, library_id, data, updated_at)
+           VALUES (?, ?, ?, ?)`,
+          [item.id, libraryId, JSON.stringify(item), item.updatedAt || now]
+        );
+      });
+      log.debug(`Upserted library item ${item.id}`);
+    } catch (err) {
+      log.error('upsertLibraryItem error:', err);
+    }
+  }
+
+  /**
    * Bulk upsert book IDs into user_books with is_in_library = 1.
    * Uses transaction lock to prevent concurrent transaction errors.
    */
@@ -820,7 +842,7 @@ class SQLiteCache {
         [libraryId]
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -893,7 +915,7 @@ class SQLiteCache {
         [libraryId]
       );
       return result?.updated_at || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -930,15 +952,16 @@ class SQLiteCache {
   }
 
   async setAuthors(libraryId: string, authors: CachedAuthor[]): Promise<void> {
-    const db = await this.ensureReady();
     const now = Date.now();
 
     try {
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('DELETE FROM authors WHERE library_id = ?', [libraryId]);
-        // Batch insert for 50-70% speedup
-        const rows = authors.map(author => [author.id, libraryId, JSON.stringify(author), now]);
-        await this.batchInsert(db, 'authors', ['id', 'library_id', 'data', 'updated_at'], rows);
+      await this.withTransactionLock(async (db) => {
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM authors WHERE library_id = ?', [libraryId]);
+          // Batch insert for 50-70% speedup
+          const rows = authors.map(author => [author.id, libraryId, JSON.stringify(author), now]);
+          await this.batchInsert(db, 'authors', ['id', 'library_id', 'data', 'updated_at'], rows);
+        });
       });
       log.debug(`Cached ${authors.length} authors`);
     } catch (err) {
@@ -965,15 +988,16 @@ class SQLiteCache {
   }
 
   async setSeries(libraryId: string, series: CachedSeries[]): Promise<void> {
-    const db = await this.ensureReady();
     const now = Date.now();
 
     try {
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('DELETE FROM series WHERE library_id = ?', [libraryId]);
-        // Batch insert for 50-70% speedup
-        const rows = series.map(s => [s.id, libraryId, JSON.stringify(s), now]);
-        await this.batchInsert(db, 'series', ['id', 'library_id', 'data', 'updated_at'], rows);
+      await this.withTransactionLock(async (db) => {
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM series WHERE library_id = ?', [libraryId]);
+          // Batch insert for 50-70% speedup
+          const rows = series.map(s => [s.id, libraryId, JSON.stringify(s), now]);
+          await this.batchInsert(db, 'series', ['id', 'library_id', 'data', 'updated_at'], rows);
+        });
       });
       log.debug(`Cached ${series.length} series`);
     } catch (err) {
@@ -1000,15 +1024,16 @@ class SQLiteCache {
   }
 
   async setNarrators(libraryId: string, narrators: CachedNarrator[]): Promise<void> {
-    const db = await this.ensureReady();
     const now = Date.now();
 
     try {
-      await db.withTransactionAsync(async () => {
-        await db.runAsync('DELETE FROM narrators WHERE library_id = ?', [libraryId]);
-        // Batch insert for 50-70% speedup
-        const rows = narrators.map(n => [n.id, libraryId, JSON.stringify(n), now]);
-        await this.batchInsert(db, 'narrators', ['id', 'library_id', 'data', 'updated_at'], rows);
+      await this.withTransactionLock(async (db) => {
+        await db.withTransactionAsync(async () => {
+          await db.runAsync('DELETE FROM narrators WHERE library_id = ?', [libraryId]);
+          // Batch insert for 50-70% speedup
+          const rows = narrators.map(n => [n.id, libraryId, JSON.stringify(n), now]);
+          await this.batchInsert(db, 'narrators', ['id', 'library_id', 'data', 'updated_at'], rows);
+        });
       });
       log.debug(`Cached ${narrators.length} narrators`);
     } catch (err) {
@@ -1062,8 +1087,29 @@ class SQLiteCache {
         [itemId]
       );
       return row || null;
-    } catch (err) {
+    } catch {
       return null;
+    }
+  }
+
+  /**
+   * Load ALL playback progress records at once.
+   * Used by finishedBooksSync to avoid N+1 queries when syncing 2700+ items.
+   */
+  async getAllPlaybackProgress(): Promise<Map<string, PlaybackProgress>> {
+    const db = await this.ensureReady();
+    try {
+      const rows = await db.getAllAsync<PlaybackProgress>(
+        'SELECT item_id as itemId, position, duration, updated_at as updatedAt, synced FROM playback_progress'
+      );
+      const map = new Map<string, PlaybackProgress>();
+      for (const row of rows) {
+        map.set(row.itemId, row);
+      }
+      return map;
+    } catch (err) {
+      log.warn('getAllPlaybackProgress error:', err);
+      throw err;
     }
   }
 
@@ -1094,7 +1140,7 @@ class SQLiteCache {
       return await db.getAllAsync<PlaybackProgress>(
         'SELECT item_id as itemId, position, duration, updated_at as updatedAt, synced FROM playback_progress WHERE synced = 0'
       );
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1133,7 +1179,7 @@ class SQLiteCache {
         [key]
       );
       return row?.value || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1257,11 +1303,11 @@ class SQLiteCache {
       finishedAt: number;
     };
     // Currently listening books for "More like X" titles
-    currentlyListening?: Array<{
+    currentlyListening?: {
       id: string;
       title: string;
       progress: number;
-    }>;
+    }[];
   }> {
     const db = await this.ensureReady();
     try {
@@ -1535,7 +1581,7 @@ class SQLiteCache {
         [itemId]
       );
       return !!row;
-    } catch (err) {
+    } catch {
       return false;
     }
   }
@@ -1572,7 +1618,7 @@ class SQLiteCache {
         addedAt: r.added_at,
         synced: false,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1705,7 +1751,7 @@ class SQLiteCache {
         narratorCount: narrators?.count || 0,
         collectionCount: collections?.count || 0,
       };
-    } catch (err) {
+    } catch {
       return { itemCount: 0, authorCount: 0, seriesCount: 0, narratorCount: 0, collectionCount: 0 };
     }
   }
@@ -1741,7 +1787,7 @@ class SQLiteCache {
         userPaused: row.user_paused === 1,
         resumableState: row.resumable_state,
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1772,7 +1818,7 @@ class SQLiteCache {
         userPaused: row.user_paused === 1,
         resumableState: row.resumable_state,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1803,7 +1849,7 @@ class SQLiteCache {
         userPaused: row.user_paused === 1,
         resumableState: row.resumable_state,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -1908,7 +1954,7 @@ class SQLiteCache {
         'SELECT item_id FROM download_queue ORDER BY priority DESC, added_at ASC LIMIT 1'
       );
       return row?.item_id || null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -1926,7 +1972,7 @@ class SQLiteCache {
         'SELECT COUNT(*) as count FROM download_queue'
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -1979,7 +2025,7 @@ class SQLiteCache {
          FROM sync_log ORDER BY timestamp DESC LIMIT ?`,
         [limit]
       );
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -2078,7 +2124,7 @@ class SQLiteCache {
         [bookId]
       );
       return !!row;
-    } catch (err) {
+    } catch {
       return false;
     }
   }
@@ -2102,7 +2148,7 @@ class SQLiteCache {
         position: row.position,
         addedAt: row.added_at,
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -2162,7 +2208,7 @@ class SQLiteCache {
         'SELECT COUNT(*) as count FROM playback_queue'
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -2304,7 +2350,7 @@ class SQLiteCache {
         [bookId]
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }
@@ -2501,7 +2547,7 @@ class SQLiteCache {
         sessionCount: row.session_count,
         booksTouched: JSON.parse(row.books_touched),
       };
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -2515,7 +2561,7 @@ class SQLiteCache {
     uniqueBooks: number;
     dailyBreakdown: DailyStats[];
   }> {
-    const db = await this.ensureReady();
+    await this.ensureReady();
     const endDate = new Date().toISOString().split('T')[0];
     const startDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -2820,7 +2866,7 @@ class SQLiteCache {
         [itemId]
       );
       return row?.is_complete === 1;
-    } catch (err) {
+    } catch {
       return false;
     }
   }
@@ -2863,7 +2909,7 @@ class SQLiteCache {
         itemId: r.item_id,
         isComplete: r.is_complete === 1,
       }));
-    } catch (err) {
+    } catch {
       return [];
     }
   }
@@ -3159,7 +3205,7 @@ class SQLiteCache {
    */
   async setUserBookChapters(
     bookId: string,
-    chapters: Array<{ id: number; start: number; end: number; title: string }>
+    chapters: { id: number; start: number; end: number; title: string }[]
   ): Promise<void> {
     if (!chapters || chapters.length === 0) {
       log.debug(`Skipping empty chapters cache for ${bookId}`);
@@ -3213,7 +3259,7 @@ class SQLiteCache {
   async getUserBookChapters(
     bookId: string,
     maxAgeMs: number = 7 * 24 * 60 * 60 * 1000 // 7 days default
-  ): Promise<Array<{ id: number; start: number; end: number; title: string }> | null> {
+  ): Promise<{ id: number; start: number; end: number; title: string }[] | null> {
     try {
       const book = await this.getUserBook(bookId);
       if (!book?.chapters) return null;
@@ -3610,13 +3656,13 @@ class SQLiteCache {
    * Get abandoned books (5-30% progress, not played in 90+ days)
    * Used for applying negative affinity to authors of abandoned books
    */
-  async getAbandonedBooks(): Promise<Array<{
+  async getAbandonedBooks(): Promise<{
     bookId: string;
     author: string;
     progress: number;
     lastPlayedAt: string;
     daysSincePlay: number;
-  }>> {
+  }[]> {
     const db = await this.ensureReady();
     try {
       const rows = await db.getAllAsync<{
@@ -3920,7 +3966,7 @@ class SQLiteCache {
         'SELECT COUNT(*) as count FROM user_books'
       );
       return result?.count || 0;
-    } catch (err) {
+    } catch {
       return 0;
     }
   }

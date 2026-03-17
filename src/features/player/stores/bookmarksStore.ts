@@ -197,9 +197,10 @@ export const useBookmarksStore = create<BookmarksState & BookmarksActions>()(
         await sqliteCache.updateBookmark(bookmarkId, updates);
 
         // Only update local state after successful persist
+        // Fix: Use !== undefined instead of ?? so explicitly setting note to null (to clear it) works
         const updated = bookmarks.map((b) =>
           b.id === bookmarkId
-            ? { ...b, title: updates.title ?? b.title, note: updates.note ?? b.note }
+            ? { ...b, title: updates.title ?? b.title, note: updates.note !== undefined ? updates.note : b.note }
             : b
         );
         set({ bookmarks: updated });

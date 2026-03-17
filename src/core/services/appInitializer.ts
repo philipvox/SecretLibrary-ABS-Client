@@ -232,6 +232,9 @@ class AppInitializer {
     // Don't await - this doesn't need to block app startup
     this.initAutomotive();
 
+    // Initialize Chromecast in background
+    this.initChromecast();
+
     // Connect WebSocket if user is authenticated
     // Don't await - this runs in background
     if (result.user) {
@@ -368,6 +371,9 @@ class AppInitializer {
       const synced = await finishedBooksSync.importRecentProgress();
       if (synced > 0) {
         log.info(`Quick sync: ${synced} recent books synced`);
+        // Reload progressStore so the in-memory Map reflects server-imported data
+        const { useProgressStore } = await import('@/core/stores/progressStore');
+        await useProgressStore.getState().loadFromDatabase();
       }
     } catch (err) {
       log.warn('Recent progress sync failed:', err);
@@ -473,6 +479,16 @@ class AppInitializer {
     }
   }
 
+  private async initChromecast(): Promise<void> {
+    try {
+      const { useCastStore } = await import('@/features/chromecast');
+      useCastStore.getState().initialize();
+      log.debug('Chromecast initialized');
+    } catch (err) {
+      log.warn('Chromecast initialization failed:', err);
+    }
+  }
+
   private async initEventSystem(): Promise<void> {
     try {
       // Initialize app-wide event listeners (analytics, monitoring)
@@ -502,7 +518,7 @@ class AppInitializer {
   private async initBackgroundTaskService(): Promise<void> {
     try {
       const { backgroundTaskService, TaskPriority } = await import('@/core/services/backgroundTaskService');
-      const { useProgressStore } = await import('@/core/stores/progressStore');
+      const { _useProgressStore } = await import('@/core/stores/progressStore');
 
       // Start the background task service
       backgroundTaskService.start();
@@ -598,22 +614,29 @@ class AppInitializer {
         log.info(`Synced ${synced} local changes to server (${failed} failed)`);
       }
 
-      // Preload most recent book (reuses cached items-in-progress from importRecentProgress)
-      await finishedBooksSync.preloadMostRecentBook();
+      // Fetch items in progress ONCE and share with preload + prefetch
+      const { apiClient: api } = await import('@/core/api');
+      const itemsInProgress = await api.getItemsInProgress();
+
+      // Preload most recent book (uses shared data)
+      await finishedBooksSync.preloadMostRecentBook(itemsInProgress);
 
       // BACKGROUND: Full import from server (includes finished books)
       // This runs after quick sync so UI is responsive, but finished books show up soon
-      finishedBooksSync.importFromServer().then((finishedImported) => {
+      finishedBooksSync.importFromServer().then(async (finishedImported) => {
         if (finishedImported > 0) {
           log.info(`Background sync: ${finishedImported} finished books imported from server`);
+          // Reload progressStore so the in-memory Map reflects ALL server-imported data
+          const { useProgressStore } = await import('@/core/stores/progressStore');
+          await useProgressStore.getState().loadFromDatabase();
         }
       }).catch((err) => {
         log.warn('Background finished books sync failed:', err);
       });
 
-      // BACKGROUND: Prefetch sessions for recent books (enables instant playback)
+      // BACKGROUND: Prefetch sessions for recent books (uses shared data)
       // This caches audioTracks with MOOV data so play() doesn't need network calls
-      finishedBooksSync.prefetchSessions().then((prefetched) => {
+      finishedBooksSync.prefetchSessions(itemsInProgress).then((prefetched) => {
         if (prefetched > 0) {
           log.info(`Prefetched ${prefetched} sessions for instant playback`);
         }
@@ -738,7 +761,7 @@ class AppInitializer {
   async hideSplash(): Promise<void> {
     try {
       await SplashScreen.hideAsync();
-    } catch (err) {
+    } catch {
       // Already hidden or not available
     }
   }

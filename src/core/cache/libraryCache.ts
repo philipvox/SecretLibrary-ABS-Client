@@ -21,7 +21,7 @@ import { getErrorMessage } from '@/shared/utils/errorUtils';
 const log = createLogger('LibraryCache');
 
 // Type guard for book media
-function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
+function _isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
   return media !== undefined && 'duration' in media && !('episodes' in media);
 }
 
@@ -110,7 +110,7 @@ interface LibraryCacheState {
   getGenre: (name: string) => GenreInfo | undefined;
   searchItems: (query: string) => LibraryItem[];
   filterItems: (filters: FilterOptions) => LibraryItem[];
-  clearCache: () => Promise<void>;
+  clearCache: (skipSqlite?: boolean) => Promise<void>;
   loadSpineManifest: () => Promise<void>;
   hasServerSpine: (bookId: string) => boolean;
 }
@@ -526,13 +526,18 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
         const author = (metadata.authorName || '').toLowerCase();
         const narrator = (metadata.narratorName || '').toLowerCase();
         const series = (metadata.seriesName || '').toLowerCase();
+        // Genres + DNA tags (e.g., "slow burn", "unreliable narrator")
+        const genres = (metadata.genres || []).map((g: string) => g.toLowerCase()).join(' ');
+        const tags = ((item.media as any)?.tags || []).map((t: string) => t.toLowerCase()).join(' ');
 
         // Fast path 1: Simple substring match (handles 95%+ of searches)
         if (
           title.includes(lowerQuery) ||
           author.includes(lowerQuery) ||
           narrator.includes(lowerQuery) ||
-          series.includes(lowerQuery)
+          series.includes(lowerQuery) ||
+          genres.includes(lowerQuery) ||
+          tags.includes(lowerQuery)
         ) {
           return true;
         }
@@ -543,39 +548,36 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
           title.split(/\s+/).some((w: string) => w.startsWith(lowerQuery)) ||
           author.split(/\s+/).some((w: string) => w.startsWith(lowerQuery)) ||
           narrator.split(/\s+/).some((w: string) => w.startsWith(lowerQuery)) ||
-          series.split(/\s+/).some((w: string) => w.startsWith(lowerQuery))
+          series.split(/\s+/).some((w: string) => w.startsWith(lowerQuery)) ||
+          genres.split(/\s+/).some((w: string) => w.startsWith(lowerQuery)) ||
+          tags.split(/\s+/).some((w: string) => w.startsWith(lowerQuery))
         ) {
           return true;
         }
 
         // Fast path 3: Space-insensitive + accent-normalized matching
-        // FIX 1: Runs for ALL queries, not just multi-word
-        // FIX 7: Includes author and narrator
-        // FIX 8: Includes accent normalization
-        // "earthsea" matches "A Wizard of Earth Sea"
-        // "leguin" matches "Ursula K. Le Guin"
-        // "carre" matches "John le Carré"
         if (queryNorm.length >= 3) {
           const titleNorm = normalizeForSearch(title);
           const authorNorm = normalizeForSearch(author);
           const narratorNorm = normalizeForSearch(narrator);
           const seriesNorm = normalizeForSearch(series);
+          const genresNorm = normalizeForSearch(genres);
+          const tagsNorm = normalizeForSearch(tags);
           if (
             titleNorm.includes(queryNorm) ||
             authorNorm.includes(queryNorm) ||
             narratorNorm.includes(queryNorm) ||
-            seriesNorm.includes(queryNorm)
+            seriesNorm.includes(queryNorm) ||
+            genresNorm.includes(queryNorm) ||
+            tagsNorm.includes(queryNorm)
           ) {
             return true;
           }
         }
 
         // Fast path 4: Multi-word search - all significant words must appear
-        // FIX 4: Uses significant words only (filters "a", "of", "the")
-        // "long sun" matches "Lake of the Long Sun"
-        // "a wizard of earthsea" matches (uses "wizard", "earthsea")
         if (hasMultipleWords && significantWords.length > 0) {
-          const combined = `${title} ${author} ${series}`;
+          const combined = `${title} ${author} ${series} ${genres} ${tags}`;
           if (significantWords.every(word => combined.includes(word))) {
             return true;
           }
@@ -685,12 +687,15 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
     return get().booksWithServerSpines.has(bookId);
   },
 
-  clearCache: async () => {
+  clearCache: async (skipSqlite?: boolean) => {
     // Save libraryId before clearing so we can reload
     const libraryId = get().currentLibraryId;
 
     // Clear SQLite cache (single source of truth - P1 Fix)
-    await sqliteCache.clearAllCache();
+    // Skip if caller already cleared SQLite (e.g. logout via clearAllUserData)
+    if (!skipSqlite) {
+      await sqliteCache.clearAllCache();
+    }
     // Clear spine cache as well
     useSpineCacheStore.getState().clearCache();
     // Bump cover cache version so images refresh
@@ -718,10 +723,9 @@ export const useLibraryCache = create<LibraryCacheState>((set, get) => ({
 
     // Automatically reload library data from server
     if (libraryId) {
-      // Use setTimeout to let the clear complete first
-      setTimeout(() => {
-        get().loadCache(libraryId, true);
-      }, 100);
+      // loadCache is already async and checks isLoading to avoid re-entrancy,
+      // so we can call it directly without a fragile setTimeout delay.
+      get().loadCache(libraryId, true);
     }
   },
 }));

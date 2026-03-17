@@ -12,7 +12,6 @@ import { AppState, AppStateStatus } from 'react-native';
 import { apiClient } from '@/core/api';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { playbackCache } from '@/core/services/playbackCache';
-import { sessionService } from './sessionService';
 import { audioService } from './audioService';
 import { audioLog, formatDuration, logSection } from '@/shared/utils/audioDebug';
 import { trackEvent } from '@/core/monitoring';
@@ -23,7 +22,7 @@ import { getErrorMessage } from '@/shared/utils/errorUtils';
 import { useToastStore } from '@/shared/hooks/useToast';
 import { validatePositionForSync } from '../utils/progressCalculator';
 
-const DEBUG = __DEV__;
+const _DEBUG = __DEV__;
 const log = (...args: any[]) => audioLog.sync(args.join(' '));
 
 interface SyncQueueItem {
@@ -56,19 +55,38 @@ class BackgroundSyncService {
   private readonly PROCESS_MAX_DELAY = 30000; // Max 30 seconds before forced processing
   private readonly BACKGROUND_SYNC_TIMEOUT = 4000; // 4 seconds - iOS gives ~5s before suspension
 
+  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
+
   /**
    * Initialize background sync service
    */
   async init(): Promise<void> {
-    await sqliteCache.init();
+    // Guard: prevent AppState listener stacking on repeated init calls
+    if (this.isInitialized) return;
 
-    // Listen for app state changes
-    this.appStateSubscription = AppState.addEventListener(
-      'change',
-      this.handleAppStateChange.bind(this)
-    );
+    // Guard: if already initializing, wait for the in-flight init to complete
+    if (this.initPromise) return this.initPromise;
 
-    log('Initialized');
+    this.initPromise = (async () => {
+      await sqliteCache.init();
+
+      this.isInitialized = true;
+
+      // Listen for app state changes
+      this.appStateSubscription = AppState.addEventListener(
+        'change',
+        this.handleAppStateChange.bind(this)
+      );
+
+      log('Initialized');
+    })();
+
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
   }
 
   /**
@@ -98,11 +116,11 @@ class BackgroundSyncService {
   }
 
   /**
-   * Save progress locally only (SQLite) - FAST PATH
-   * Use this during active playback for instant saves without network overhead.
+   * Save progress locally only (SQLite + memory cache) - FAST PATH
+   * Use this during active playback for crash-safe saves without network overhead.
+   * Does NOT update progressStore to avoid triggering React re-renders during playback.
    * Progress will be synced to server at key moments (pause, background, finish).
    *
-   * UNIFIED PROGRESS: Also updates progressStore for instant UI reactivity.
    * FIX: Added position validation to prevent corrupted data from being saved.
    */
   async saveProgressLocal(
@@ -120,10 +138,8 @@ class BackgroundSyncService {
     // SQLite write only - no network, no queue processing
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
 
-    // FIX: Keep playbackCache in sync during playback so progressService.getProgressData()
-    // returns current position instead of stale startup-time value. Without this,
-    // the memory cache (populated once at startup by finishedBooksSync) goes stale
-    // and loadBook() could resume 2+ minutes behind the actual position.
+    // Keep playbackCache in sync so progressService.getProgressData()
+    // returns current position instead of stale startup-time value.
     playbackCache.setProgress(itemId, {
       currentTime: position,
       duration,
@@ -131,21 +147,10 @@ class BackgroundSyncService {
       updatedAt: Date.now(),
     });
 
-    // UNIFIED PROGRESS: Update progressStore for instant UI updates
-    // This makes spine progress bars, continue listening, etc. update immediately
-    try {
-      const { useProgressStore } = await import('@/core/stores/progressStore');
-      const progressStore = useProgressStore.getState();
-      // Check if store is ready before updating
-      if (progressStore.isLoaded) {
-        // Don't write to SQLite again - we just did that above
-        await progressStore.updateProgress(itemId, position, duration, false);
-      }
-    } catch (error) {
-      // FIX: Log error instead of silently ignoring - helps debug progress sync issues
-      // This can happen during app startup before progressStore is initialized
-      audioLog.debug(`saveProgressLocal: progressStore update skipped - ${getErrorMessage(error)}`);
-    }
+    // NOTE: We intentionally skip progressStore.updateProgress() here.
+    // Updating it every 5s causes React re-renders that interfere with
+    // scrubbing gestures and make FF/RW feel sluggish.
+    // progressStore is updated at key moments via saveProgress() instead.
   }
 
   /**
@@ -274,11 +279,29 @@ class BackgroundSyncService {
     log('Force sync complete');
   }
 
+  // FIX: Concurrency guard to prevent overlapping processSyncQueue executions
+  private processingQueue = false;
+
   /**
    * Process the sync queue - called periodically
    * Uses parallel processing with concurrency limit for better performance.
    */
   private async processSyncQueue(): Promise<void> {
+    // FIX: Prevent concurrent executions causing duplicate API calls
+    if (this.processingQueue) {
+      log('processSyncQueue already running - skipping');
+      return;
+    }
+    this.processingQueue = true;
+
+    try {
+      return await this._processSyncQueueInner();
+    } finally {
+      this.processingQueue = false;
+    }
+  }
+
+  private async _processSyncQueueInner(): Promise<void> {
     // Skip sync if offline - don't waste retry counts
     if (!networkMonitor.isConnected()) {
       log('Offline - skipping sync');
@@ -294,7 +317,7 @@ class BackgroundSyncService {
     const now = Date.now();
     const itemsToSync: SyncQueueItem[] = [];
 
-    for (const [itemId, item] of this.syncQueue.entries()) {
+    for (const [_itemId, item] of this.syncQueue.entries()) {
       // Check if enough time has passed since last attempt
       const timeSinceAttempt = now - item.lastAttempt;
       const requiredDelay = item.retryCount > 0
@@ -653,6 +676,9 @@ class BackgroundSyncService {
     // Reset state
     this.backgroundSyncInProgress = false;
     this.firstUnprocessedTime = 0;
+    this.processingQueue = false;
+    // FIX: Reset isInitialized so service can be re-initialized after destroy
+    this.isInitialized = false;
 
     log('Destroyed');
   }

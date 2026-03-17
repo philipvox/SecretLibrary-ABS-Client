@@ -22,7 +22,6 @@ import {
   quickValidate,
   verifyFileIntegrity,
   getIntegrityStatusSummary,
-  type FileIntegrityInfo,
 } from './downloadIntegrity';
 
 // Type guard for book media
@@ -179,6 +178,10 @@ class DownloadManager {
     // Resume any paused downloads
     await this.resumePausedDownloads();
 
+    // Ensure network monitor is initialized before subscribing
+    // (prevents race condition where canDownload returns wrong value from uninitialized state)
+    await networkMonitor.init();
+
     // Subscribe to network changes (AFTER stuck downloads processed)
     this.previousCanDownload = networkMonitor.canDownload();
     this.networkUnsubscribe = networkMonitor.subscribe((state) => {
@@ -332,12 +335,12 @@ class DownloadManager {
       await sqliteCache.addToDownloadQueue(itemId, priority);
     }
 
-    // Cache the library item metadata for offline access
+    // Cache the library item metadata for offline access (upsert to avoid destroying cache)
     // Only cache if we have a valid libraryId
     if (item.libraryId) {
       log(`Caching library item metadata for offline access...`);
       try {
-        await sqliteCache.setLibraryItems(item.libraryId, [item]);
+        await sqliteCache.upsertLibraryItem(item.libraryId, item);
       } catch (err) {
         logWarn(`Failed to cache library item metadata:`, err);
       }
@@ -796,7 +799,7 @@ class DownloadManager {
       log(`Cancelling active download: ${itemId}`);
       try {
         await download.cancelAsync();
-      } catch (e) {
+      } catch {
         // Ignore cancel errors
       }
       await sqliteCache.failDownload(itemId, 'Cancelled by user');
@@ -890,9 +893,9 @@ class DownloadManager {
           const fetchedItem = await apiClient.getItem(nextItemId);
           if (fetchedItem) {
             item = fetchedItem;
-            // Cache it for future use if it has a libraryId
+            // Cache it for future use if it has a libraryId (upsert to avoid destroying cache)
             if (item.libraryId) {
-              await sqliteCache.setLibraryItems(item.libraryId, [item]);
+              await sqliteCache.upsertLibraryItem(item.libraryId, item);
               log(`Cached fetched item metadata`);
             }
           }
@@ -1129,14 +1132,14 @@ class DownloadManager {
       }
 
       // Fetch full item details from API to get audioFiles
-      // The cached item may not have audioFiles included
+      // Must use expanded=1 (not include=expanded) to get duration/size/tracks
       log(`Fetching full item details from API...`);
-      const fullItem = await apiClient.getItem(itemId);
+      const fullItem = await apiClient.getItemExpanded(itemId);
 
-      // Get audio files to download
-      const audioFiles: AudioFileInfo[] = isBookMedia(fullItem.media)
-        ? ((fullItem.media.audioFiles || []) as AudioFileInfo[])
-        : [];
+      // Get audio files — access directly instead of via isBookMedia type guard,
+      // since the non-expanded API response lacks 'duration' in media
+      const audioFiles: AudioFileInfo[] =
+        ((fullItem.media as any)?.audioFiles || []) as AudioFileInfo[];
       log(`Audio files found: ${audioFiles.length}`);
 
       if (audioFiles.length === 0) {

@@ -12,10 +12,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   StatusBar,
   Animated,
-  PanResponder,
-  Dimensions,
   BackHandler,
   Platform,
   Modal,
@@ -23,17 +22,35 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
+import RAnimated, {
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import { PlayIcon, PauseIcon } from '../components/PlayerIcons';
+import { CoverStars } from '@/shared/components/CoverStars';
+import Svg, { Path, Circle } from 'react-native-svg';
+import { PlayIcon, PauseIcon, StopIcon } from '../components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
 import Slider from '@react-native-community/slider';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { TopNav, TopNavCloseIcon } from '@/shared/components';
+import { TopNav, TopNavBackIcon } from '@/shared/components';
+import {
+  playerTransitionProgress,
+  SPRING_CONFIG,
+  SNAP_THRESHOLD,
+  VELOCITY_THRESHOLD,
+} from '../stores/playerTransition';
 import {
   usePlayerStore,
+  useSeekingStore,
   useCurrentChapterIndex,
   useSleepTimerStore,
   useBookmarksStore,
@@ -51,10 +68,12 @@ import { haptics } from '@/core/native/haptics';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import {
   secretLibraryColors as staticColors,
-  secretLibraryFonts as fonts,
 } from '@/shared/theme/secretLibrary';
 import { useResponsive } from '@/shared/hooks/useResponsive';
 import { useSpineCacheStore, getTypographyForGenres, getSeriesStyle } from '@/shared/spine';
+
+// Chromecast
+import { useCastStore } from '@/features/chromecast';
 
 // Sheets/Panels
 import { SpeedSheet } from '../sheets/SpeedSheet';
@@ -94,7 +113,7 @@ const ListIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
   </Svg>
 );
 
-const DownloadIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
+const _DownloadIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.5}>
     <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <Path d="M7 10l5 5 5-5" />
@@ -121,13 +140,13 @@ const BookmarkIcon = ({ color = staticColors.black, size = 13 }: IconProps) => (
   </Svg>
 );
 
-const PrevIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
+const _PrevIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
   </Svg>
 );
 
-const NextIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
+const _NextIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
   </Svg>
@@ -164,9 +183,18 @@ const SkipPrevIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
 );
 
 // Chevron down icon (for other uses)
-const ChevronDownIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
+const _ChevronDownIcon = ({ color = staticColors.black, size = 12 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
     <Path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const CastIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+    <Path d="M2 12a9 9 0 0 1 8 8" />
+    <Path d="M2 16a5 5 0 0 1 4 4" />
+    <Circle cx={2} cy={20} r={0.5} fill={color} />
   </Svg>
 );
 
@@ -248,11 +276,14 @@ export function SecretLibraryPlayerScreen() {
     return { paddingHorizontal: scale(20) };
   }, [isTablet, screenWidth]);
 
-  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
-
   // Theme-aware colors
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
+
+  // Chromecast state
+  const castAvailable = useCastStore((s) => s.isAvailable);
+  const castConnected = useCastStore((s) => s.isConnected);
+  const showCastPicker = useCastStore((s) => s.showPicker);
 
   // Sheet state - no sheet open by default
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
@@ -312,10 +343,12 @@ export function SecretLibraryPlayerScreen() {
   // Sleep timer subscription - real-time countdown (1 sec updates)
   const sleepTimer = useSleepTimerStore((s) => s.sleepTimer);
 
-  // Position
-  const position = usePlayerStore(
-    (s) => Math.floor(s.isSeeking ? s.seekPosition : s.position)
-  );
+  // Position - read isSeeking/seekPosition from seekingStore (single source of truth)
+  // playerStore.isSeeking is a dead leftover from Phase 7 refactor and is always false
+  const storePosition = usePlayerStore((s) => s.position);
+  const seekingIsSeeking = useSeekingStore((s) => s.isSeeking);
+  const seekingPosition = useSeekingStore((s) => s.seekPosition);
+  const position = Math.floor(seekingIsSeeking ? seekingPosition : storePosition);
 
   // Bookmarks
   const bookmarks = useBookmarks();
@@ -329,6 +362,7 @@ export function SecretLibraryPlayerScreen() {
   // Actions
   const {
     closePlayer,
+    stopPlayback,
     play,
     pause,
     seekTo,
@@ -340,6 +374,7 @@ export function SecretLibraryPlayerScreen() {
   } = usePlayerStore(
     useShallow((s) => ({
       closePlayer: s.closePlayer,
+      stopPlayback: s.stopPlayback,
       play: s.play,
       pause: s.pause,
       seekTo: s.seekTo,
@@ -353,7 +388,7 @@ export function SecretLibraryPlayerScreen() {
 
   const chapterIndex = useCurrentChapterIndex();
   const coverUrl = useCoverUrl(currentBook?.id || '', { width: 1024 });
-  const { isDownloaded, isDownloading, isPaused, isPending, progress: downloadProgress } = useDownloadStatus(currentBook?.id || '');
+  const { isDownloaded, isDownloading, isPaused, isPending, progress: _downloadProgress } = useDownloadStatus(currentBook?.id || '');
   const { queueDownload } = useDownloads();
 
   // Book metadata
@@ -361,7 +396,7 @@ export function SecretLibraryPlayerScreen() {
   const title = metadata?.title || 'Unknown Title';
   const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
   const authorId = metadata?.authors?.[0]?.id || null;
-  const publishedYear = metadata?.publishedYear || '';
+  const _publishedYear = metadata?.publishedYear || '';
 
   // Parse series name - handle multiple formats
   const seriesName = useMemo(() => {
@@ -428,7 +463,7 @@ export function SecretLibraryPlayerScreen() {
 
   // Get spine typography - USE CACHED TYPOGRAPHY for consistency
   // This ensures player shows the EXACT same font as the book spine on home screen
-  const spineTypography = useMemo(() => {
+  const _spineTypography = useMemo(() => {
     if (!currentBook?.id) return null;
 
     // FIRST: Use pre-computed typography from spine cache (computed at app startup)
@@ -462,23 +497,135 @@ export function SecretLibraryPlayerScreen() {
   // Display title as-is (no uppercase transform - that's for spines only)
   const displayTitle = title;
 
-  // Animation for slide in/out
-  useEffect(() => {
-    if (isPlayerVisible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: screenHeight,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isPlayerVisible, slideAnim, screenHeight]);
+  // Reanimated: outer container slides based on shared transition progress
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateY: interpolate(
+        playerTransitionProgress.value,
+        [0, 1],
+        [screenHeight, 0],
+      ),
+    }],
+  }));
+
+  // Gradient background fades in early — feathered edge from transparent top to solid bottom
+  const bgAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.05, 0.35],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Solid background fills in fully at the end of the transition
+  const bgSolidAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.5, 0.8],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Cover: grows from mini player cover position/size to full player cover
+  //
+  // Geometry:
+  //   At progress=0, the container is at translateY=screenHeight (off-screen below).
+  //   The cover sits near the TOP of the player container (~insets.top + topNav).
+  //   The mini player cover sits near the BOTTOM of the screen.
+  //   We offset the cover within the container so its screen position matches
+  //   the mini player cover, then animate that offset to 0 as progress → 1.
+  //
+  const miniCoverSize = scale(40);       // mini player cover dimensions
+  const miniPlayerPadH = scale(20);      // mini player paddingHorizontal
+  const fullContentPad = isTablet && screenWidth > MAX_CONTENT_WIDTH
+    ? (screenWidth - MAX_CONTENT_WIDTH) / 2
+    : scale(20);
+  const fullCoverWidth = screenWidth - 2 * fullContentPad;
+  const scaleRatio = miniCoverSize / fullCoverWidth;
+  const bottomPad = insets.bottom > 0 ? insets.bottom : scale(12);
+
+  // Distance from container top to cover center Y (safe area + topNav + margin + half cover)
+  const coverTopInPlayer = insets.top + scale(79);
+  const coverCenterYInPlayer = coverTopInPlayer + fullCoverWidth / 2;
+
+  // Mini player cover center in screen coordinates
+  const miniCoverCenterX = miniPlayerPadH + miniCoverSize / 2;
+  const miniCoverCenterY = screenHeight - bottomPad - miniCoverSize / 2;
+
+  // Full player cover center in screen coordinates (at progress=0, container at screenHeight)
+  const fullCoverCenterX = screenWidth / 2;
+  const fullCoverCenterYAtP0 = screenHeight + coverCenterYInPlayer;
+
+  // Offsets needed at progress=0 to align cover with mini player
+  const targetTX = miniCoverCenterX - fullCoverCenterX;
+  const targetTY = miniCoverCenterY - fullCoverCenterYAtP0;
+
+  const coverAnimStyle = useAnimatedStyle(() => {
+    const p = playerTransitionProgress.value;
+    const coverScale = interpolate(p, [0, 0.7], [scaleRatio, 1], Extrapolation.CLAMP);
+
+    // Position: slide from mini player cover position to natural position
+    const offsetX = interpolate(p, [0, 0.7], [targetTX, 0], Extrapolation.CLAMP);
+    const offsetY = interpolate(p, [0, 0.7], [targetTY, 0], Extrapolation.CLAMP);
+
+    return {
+      transform: [
+        { translateX: offsetX },
+        { translateY: offsetY },
+        { scale: coverScale },
+      ],
+    };
+  });
+
+  // Controls (byline, progress bar, buttons) fade in late
+  const controlsAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.65, 0.9],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // TopNav fade in
+  const topNavAnimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      playerTransitionProgress.value,
+      [0.7, 0.95],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  // Swipe-down gesture on full player to dismiss
+  const dismissGesture = Gesture.Pan()
+    .activeOffsetY(15)       // Only activate after 15px vertical movement
+    .failOffsetX([-15, 15])  // Fail if horizontal movement detected first (slider scrub)
+    .onUpdate((event) => {
+      'worklet';
+      if (event.translationY > 0) {
+        // Convert downward drag to 1→0 progress
+        const progress = 1 - Math.min(event.translationY / screenHeight, 1);
+        playerTransitionProgress.value = progress;
+      }
+    })
+    .onEnd((event) => {
+      'worklet';
+      const progress = playerTransitionProgress.value;
+      const velocity = event.velocityY; // positive = downward
+
+      // Quick swipe down or past threshold = dismiss
+      const shouldDismiss = velocity > VELOCITY_THRESHOLD || (velocity > -VELOCITY_THRESHOLD && progress < (1 - SNAP_THRESHOLD));
+
+      if (shouldDismiss) {
+        playerTransitionProgress.value = withSpring(0, SPRING_CONFIG);
+        runOnJS(closePlayer)();
+      } else {
+        playerTransitionProgress.value = withSpring(1, SPRING_CONFIG);
+      }
+    });
 
   // Back handler
   useEffect(() => {
@@ -501,34 +648,6 @@ export function SecretLibraryPlayerScreen() {
       }
     };
   }, []);
-
-  // Pan responder for swipe down - needs to be memoized with screenHeight
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return gestureState.dy > 30 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
-        },
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dy > 0) {
-            slideAnim.setValue(gestureState.dy);
-          }
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dy > screenHeight * 0.3 || gestureState.vy > 0.5) {
-            closePlayer();
-          } else {
-            Animated.spring(slideAnim, {
-              toValue: 0,
-              useNativeDriver: true,
-              tension: 65,
-              friction: 11,
-            }).start();
-          }
-        },
-      }),
-    [screenHeight, slideAnim, closePlayer]
-  );
 
   // Update slider value when position changes (but not while scrubbing)
   useEffect(() => {
@@ -637,10 +756,7 @@ export function SecretLibraryPlayerScreen() {
     animateDeltaFontSize(delta);
   }, [progressMode, duration, chapters, chapterIndex, animateDeltaFontSize]);
 
-  const handleSliderComplete = useCallback((value: number) => {
-    setIsScrubbing(false);
-    // Fix 2: Clear scrubbing state in audioService
-    audioService.setScrubbing(false);
+  const handleSliderComplete = useCallback(async (value: number) => {
     haptics.selection();
 
     let newPosition: number;
@@ -654,7 +770,13 @@ export function SecretLibraryPlayerScreen() {
       const chapterLen = chapterEnd - chapterStart;
       newPosition = Math.round((chapterStart + value * chapterLen) * 10) / 10;
     }
-    seekTo(newPosition);
+
+    // IMPORTANT: Seek FIRST and AWAIT it, then clear scrubbing state.
+    // If we clear scrubbing before seek completes, the 100ms polling picks up
+    // the old native position and snaps the UI back before the seek takes effect.
+    await seekTo(newPosition);
+    setIsScrubbing(false);
+    audioService.setScrubbing(false);
 
     // Hide delta after a short delay
     if (deltaHideTimer.current) {
@@ -708,7 +830,7 @@ export function SecretLibraryPlayerScreen() {
   }, [currentBook?.id, closePlayer, navigation]);
 
   // Navigate to series detail
-  const handleSeriesPress = useCallback(() => {
+  const _handleSeriesPress = useCallback(() => {
     if (seriesName) {
       haptics.selection();
       closePlayer();
@@ -727,6 +849,11 @@ export function SecretLibraryPlayerScreen() {
       play();
     }
   }, [isPlaying, play, pause]);
+
+  const handleStop = useCallback(() => {
+    haptics.buttonPress();
+    stopPlayback();
+  }, [stopPlayback]);
 
   const handlePrev = useCallback(() => {
     haptics.selection();
@@ -751,11 +878,14 @@ export function SecretLibraryPlayerScreen() {
 
   const handleClose = useCallback(() => {
     haptics.selection();
-    closePlayer();
+    // Animate transition progress to 0, then set store state
+    playerTransitionProgress.value = withTiming(0, { duration: 250 });
+    // Small delay to let animation start before store update
+    setTimeout(() => closePlayer(), 260);
   }, [closePlayer]);
 
   // Download handler - supports pause/resume
-  const handleDownload = useCallback(async () => {
+  const _handleDownload = useCallback(async () => {
     if (!currentBook) return;
 
     // If downloading, pause it
@@ -787,7 +917,7 @@ export function SecretLibraryPlayerScreen() {
   }, [currentBook, isDownloaded, isDownloading, isPaused, isPending, queueDownload]);
 
   // Progress bar seek handler
-  const handleSeek = useCallback((progress: number) => {
+  const _handleSeek = useCallback((progress: number) => {
     if (duration > 0) {
       const newPosition = progress * duration;
       seekTo(newPosition);
@@ -806,6 +936,67 @@ export function SecretLibraryPlayerScreen() {
     skipForward(skipForwardInterval);
     showDeltaPopup(skipForwardInterval);
   }, [skipForward, skipForwardInterval, showDeltaPopup]);
+
+  // Double-tap on cover: left half = rewind, right half = fast-forward
+  const lastCoverTap = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
+  const coverRef = useRef<View>(null);
+  const coverTapCircleLeft = useRef(new Animated.Value(0)).current;
+  const coverTapCircleRight = useRef(new Animated.Value(0)).current;
+  const coverTapScaleLeft = useRef(new Animated.Value(0)).current;
+  const coverTapScaleRight = useRef(new Animated.Value(0)).current;
+  const coverTapOffsetLeft = useRef(new Animated.Value(0)).current;
+  const coverTapOffsetRight = useRef(new Animated.Value(0)).current;
+
+  const flashCircle = useCallback((side: 'left' | 'right', tapY: number, coverHeight: number) => {
+    const opacityAnim = side === 'left' ? coverTapCircleLeft : coverTapCircleRight;
+    const scaleAnim = side === 'left' ? coverTapScaleLeft : coverTapScaleRight;
+    const offsetAnim = side === 'left' ? coverTapOffsetLeft : coverTapOffsetRight;
+
+    // Center the oval on the tap Y position
+    // The oval is height=100% of cover, so offset = tapY - coverHeight/2
+    offsetAnim.setValue(tapY - coverHeight / 2);
+
+    // Reset to start state: visible and small
+    opacityAnim.setValue(1);
+    scaleAnim.setValue(0.3);
+
+    // Ripple out: scale up while fading
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [coverTapCircleLeft, coverTapCircleRight, coverTapScaleLeft, coverTapScaleRight, coverTapOffsetLeft, coverTapOffsetRight]);
+
+  const handleCoverPress = useCallback((evt: any) => {
+    const now = Date.now();
+    const tapX = evt.nativeEvent.locationX;
+    const tapY = evt.nativeEvent.locationY;
+    const prev = lastCoverTap.current;
+
+    if (now - prev.time < 300) {
+      // Double-tap detected — measure which half
+      coverRef.current?.measure((_x, _y, width, height) => {
+        if (tapX < width / 2) {
+          flashCircle('left', tapY, height);
+          handleSkipBack();
+        } else {
+          flashCircle('right', tapY, height);
+          handleSkipForward();
+        }
+      });
+      lastCoverTap.current = { time: 0, x: 0 }; // Reset to avoid triple-tap
+    } else {
+      lastCoverTap.current = { time: now, x: tapX };
+    }
+  }, [handleSkipBack, handleSkipForward, flashCircle]);
 
   // Sheet handlers - overlay fades in, panel slides up
   const openSheet = useCallback((sheet: ActiveSheet) => {
@@ -897,7 +1088,7 @@ export function SecretLibraryPlayerScreen() {
     setEditTime(0);
   }, []);
 
-  const handleDeleteBookmark = useCallback((bookmark: Bookmark) => {
+  const _handleDeleteBookmark = useCallback((bookmark: Bookmark) => {
     removeBookmark(bookmark.id);
   }, [removeBookmark]);
 
@@ -917,27 +1108,42 @@ export function SecretLibraryPlayerScreen() {
     haptics.selection();
   }, [duration]);
 
-  // Don't render if not visible
-  // Return empty View on Android to prevent SafeAreaProvider crash
-  if (!isPlayerVisible || !currentBook) {
+  // Only bail out if no book loaded — the player renders off-screen (translateY = screenHeight)
+  // when transition progress = 0, so no visual difference but hooks stay alive
+  if (!currentBook) {
     return Platform.OS === 'android' ? <View /> : null;
   }
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { backgroundColor: colors.white, transform: [{ translateY: slideAnim }] },
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.creamGray} />
+    <GestureDetector gesture={dismissGesture}>
+      <RAnimated.View
+        style={[
+          styles.container,
+          containerAnimStyle,
+        ]}
+      >
+        {/* Background: gradient feather (transparent top → solid bottom), then full solid */}
+        <RAnimated.View style={[StyleSheet.absoluteFill, bgAnimStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={['transparent', colors.white]}
+            locations={[0, 0.45]}
+            style={StyleSheet.absoluteFill}
+          />
+        </RAnimated.View>
+        {/* Solid background layer that fills in fully at the end of the transition */}
+        <RAnimated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.white }, bgSolidAnimStyle]}
+          pointerEvents="none"
+        />
 
-      {/* Safe Area Top */}
-      <View style={{ height: insets.top, backgroundColor: colors.white }} />
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.creamGray} />
 
-      {/* Header - outside screen padding for proper alignment */}
-      <TopNav
+        {/* Safe Area Top */}
+        <View style={{ height: insets.top }} />
+
+        {/* Header - fades in during transition */}
+        <RAnimated.View style={topNavAnimStyle}>
+          <TopNav
         variant={isDarkMode ? 'dark' : 'light'}
         showLogo={true}
         onLogoPress={handleLogoPress}
@@ -952,34 +1158,46 @@ export function SecretLibraryPlayerScreen() {
           {
             key: 'queue',
             label: 'Queue',
-            icon: <ListIcon color={activeSheet === 'queue' ? colors.white : colors.black} size={14} />,
+            icon: <ListIcon color={activeSheet === 'queue' ? colors.white : colors.black} size={16} />,
             active: activeSheet === 'queue',
             onPress: () => openSheet('queue'),
           },
           {
             key: 'bookmark',
             label: 'Bookmark',
-            icon: <BookmarkIcon color={bookmarks.length > 0 ? colors.orange : (activeSheet === 'bookmarks' ? colors.white : colors.black)} size={14} />,
+            icon: <BookmarkIcon color={bookmarks.length > 0 ? colors.orange : (activeSheet === 'bookmarks' ? colors.white : colors.black)} size={16} />,
             active: activeSheet === 'bookmarks',
             onPress: handleBookmark,
             onLongPress: () => openSheet('bookmarks'),
           },
         ]}
-        circleButtons={[
-          {
-            key: 'close',
-            icon: <TopNavCloseIcon color={colors.black} size={14} />,
-            onPress: handleClose,
-          },
-        ]}
-      />
+          circleButtons={[
+            ...(castAvailable ? [{
+              key: 'cast',
+              icon: <CastIcon color={castConnected ? '#F3B60C' : colors.black} size={16} />,
+              onPress: showCastPicker,
+            }] : []),
+            {
+              key: 'back',
+              icon: <TopNavBackIcon color={colors.black} size={16} />,
+              onPress: handleClose,
+            },
+          ]}
+        />
+        </RAnimated.View>
 
-      <View style={[styles.screen, contentStyle]}>
-        {/* Main Content - New Layout */}
-        <View style={styles.mainContent}>
-          {/* 1. Cover Image - Full width, larger */}
-          {/* Dims to 60% opacity when scrubbing time is displayed over it */}
-          <View style={styles.coverWrapper}>
+        <View style={[styles.screen, contentStyle]}>
+          {/* Main Content - New Layout */}
+          <View style={styles.mainContent}>
+            {/* 1. Cover Image - Full width, larger — scales up during transition */}
+            <RAnimated.View style={coverAnimStyle}>
+              {/* Double-tap left half = rewind, right half = fast-forward */}
+              {/* Dims to 60% opacity when scrubbing time is displayed over it */}
+              <Pressable
+                ref={coverRef}
+                style={styles.coverWrapper}
+                onPress={handleCoverPress}
+              >
             <View style={[styles.coverContainer, showDelta && { opacity: 0.6 }]}>
               {coverUrl ? (
                 <Image
@@ -994,6 +1212,25 @@ export function SecretLibraryPlayerScreen() {
                   </Text>
                 </View>
               )}
+              {bookId && <CoverStars bookId={bookId} starSize={scale(48)} />}
+              {/* Chromecast button overlay - top left of cover */}
+              {castAvailable && (
+                <TouchableOpacity
+                  onPress={showCastPicker}
+                  style={styles.castOverlay}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View style={[styles.castOverlayBg, castConnected && styles.castOverlayBgActive]}>
+                    <CastIcon color={castConnected ? '#F3B60C' : '#FFFFFF'} size={18} />
+                  </View>
+                </TouchableOpacity>
+              )}
+              {/* Loading/buffering spinner overlay on cover */}
+              {(isLoading || isBuffering) && (
+                <View style={styles.coverLoadingOverlay}>
+                  <ActivityIndicator size={scale(64)} color="rgba(255,255,255,0.9)" />
+                </View>
+              )}
             </View>
 
             {/* Time Delta Popup - overlays cover */}
@@ -1004,10 +1241,29 @@ export function SecretLibraryPlayerScreen() {
                 </Animated.Text>
               </Animated.View>
             )}
-          </View>
 
-          {/* 2. Byline - By Author (left) · Narrated by Narrator (right) - justified to cover width */}
-          <View style={styles.byline}>
+            {/* Double-tap ripple ovals — flash in small, ripple outward while fading */}
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.tapCircle, styles.tapCircleLeft, {
+                opacity: coverTapCircleLeft,
+                transform: [{ translateY: coverTapOffsetLeft }, { scaleX: 0.5 }, { scale: coverTapScaleLeft }],
+              }]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.tapCircle, styles.tapCircleRight, {
+                opacity: coverTapCircleRight,
+                transform: [{ translateY: coverTapOffsetRight }, { scaleX: 0.5 }, { scale: coverTapScaleRight }],
+              }]}
+            />
+          </Pressable>
+            </RAnimated.View>
+
+          {/* Controls section: byline, title — fades in during transition */}
+          <RAnimated.View style={controlsAnimStyle}>
+            {/* 2. Byline - By Author (left) · Narrated by Narrator (right) - justified to cover width */}
+            <View style={styles.byline}>
             {/* Left side: By Author */}
             <View style={styles.bylineLeft}>
               <Text style={[styles.bylineText, { color: colors.gray }]}>By </Text>
@@ -1058,11 +1314,13 @@ export function SecretLibraryPlayerScreen() {
                 {chapterTitle}
               </Text>
             </TouchableOpacity>
+            </View>
+          </RAnimated.View>
           </View>
-        </View>
 
-        {/* Bottom Controls Section */}
-        <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + scale(20) }]}>
+          {/* Bottom Controls Section — also fades in with transition */}
+          <RAnimated.View style={controlsAnimStyle}>
+            <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + scale(20) }]}>
           {/* Progress Bar - Slider with Bookmark Markers */}
           <View style={styles.progressBarContainer}>
             {/* Bookmark Markers (below slider, clickable) */}
@@ -1162,22 +1420,15 @@ export function SecretLibraryPlayerScreen() {
             </TouchableOpacity>
 
             {/* Play/Pause - Large white rounded pill */}
+            {/* During loading/buffering: stop icon (square) to cancel */}
+            {/* Normal: play or pause icon */}
             <TouchableOpacity
               style={styles.playBtn}
-              onPress={handlePlayPause}
+              onPress={isLoading || isBuffering ? handleStop : handlePlayPause}
               activeOpacity={0.8}
             >
-              {isLoading ? (
-                <ActivityIndicator size={28} color="#000000" />
-              ) : isBuffering ? (
-                <View style={styles.bufferingContainer}>
-                  <ActivityIndicator size={48} color="#000000" style={styles.bufferingSpinner} />
-                  {isPlaying ? (
-                    <PauseIcon color="#000000" size={20} />
-                  ) : (
-                    <PlayIcon color="#000000" size={20} />
-                  )}
-                </View>
+              {isLoading || isBuffering ? (
+                <StopIcon color="#000000" size={28} />
               ) : isPlaying ? (
                 <PauseIcon color="#000000" size={36} />
               ) : (
@@ -1255,11 +1506,12 @@ export function SecretLibraryPlayerScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-          </View>
+            </View>
+            </View>
+          </RAnimated.View>
         </View>
-      </View>
 
-      {/* Sheet Overlay - Centered popup */}
+        {/* Sheet Overlay - Centered popup */}
       {sheetVisible && (
         <View style={styles.sheetOverlay} pointerEvents="box-none">
           {/* Backdrop - fades in */}
@@ -1440,7 +1692,8 @@ export function SecretLibraryPlayerScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </Animated.View>
+      </RAnimated.View>
+    </GestureDetector>
   );
 }
 
@@ -1455,8 +1708,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: staticColors.creamGray,
-    zIndex: 100,
+    zIndex: 9999,
   },
   screen: {
     flex: 1,
@@ -1474,6 +1726,21 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     position: 'relative',
     marginBottom: scale(16),
+    overflow: 'hidden',
+  },
+  tapCircle: {
+    position: 'absolute',
+    height: '60%',
+    aspectRatio: 1,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    top: '20%',
+  },
+  tapCircleLeft: {
+    left: '-30%',
+  },
+  tapCircleRight: {
+    right: '-30%',
   },
   coverContainer: {
     width: '100%',
@@ -1495,6 +1762,32 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: 'rgba(255,255,255,0.12)',
     letterSpacing: -2,
+  },
+  coverLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: scale(8),
+  },
+
+  // Chromecast button overlay on cover
+  castOverlay: {
+    position: 'absolute',
+    top: scale(10),
+    left: scale(10),
+    zIndex: 10,
+  },
+  castOverlayBg: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  castOverlayBgActive: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
 
   // Time Delta Popup - overlays cover
@@ -1669,13 +1962,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
-  },
-  bufferingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bufferingSpinner: {
-    position: 'absolute',
   },
 
   // Settings Row - Speed, Sleep, Progress Mode

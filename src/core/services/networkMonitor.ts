@@ -182,7 +182,7 @@ class NetworkMonitor {
       this.autoDownloadSeriesEnabled = autoDownload !== 'false';
 
       log.debug(`Preferences loaded: wifiOnly=${this.wifiOnlyEnabled}, autoDownloadSeries=${this.autoDownloadSeriesEnabled}`);
-    } catch (err) {
+    } catch {
       log.debug('Failed to load preferences, using defaults');
     }
   }

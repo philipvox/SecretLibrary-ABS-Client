@@ -22,10 +22,14 @@ public class MemoryModule: Module {
         let totalMemory = ProcessInfo.processInfo.physicalMemory
         let totalMB = Double(totalMemory) / 1024.0 / 1024.0
 
+        // Get available memory for the process
+        let availableMB = Double(os_proc_available_memory()) / 1024.0 / 1024.0
+
         promise.resolve([
           "usedMb": usedMB,
           "virtualMb": virtualMB,
           "totalMb": totalMB,
+          "availableMb": availableMB,
           "usedPercent": (usedMB / totalMB) * 100,
           "platform": "ios"
         ] as [String: Any])

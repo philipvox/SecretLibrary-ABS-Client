@@ -286,7 +286,7 @@ function matchFrontBackMatter(title: string): ParsedChapter | null {
  * Pattern 2: Track-based (N - BookTitle: Chapter X)
  * Most common pattern - ~50,000 occurrences in real libraries
  */
-function matchTrackBased(title: string, bookTitle?: string): ParsedChapter | null {
+function matchTrackBased(title: string, _bookTitle?: string): ParsedChapter | null {
   // Match: N - Content or N – Content or N — Content or N_ Content
   const trackMatch = title.match(/^(\d{1,3})\s*[-–—_]\s*(.+)$/);
   if (!trackMatch) return null;

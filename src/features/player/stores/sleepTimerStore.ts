@@ -94,7 +94,7 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
     // =========================================================================
 
     setSleepTimer: (minutes: number, onExpire: () => void) => {
-      const { sleepTimerInterval, shakeToExtendEnabled } = get();
+      const { sleepTimerInterval, _shakeToExtendEnabled } = get();
 
       // Fix MEDIUM: Validate timer duration
       if (!Number.isFinite(minutes) || minutes <= 0) {

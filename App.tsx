@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, NativeModules } from 'react-native';
+import { View, NativeModules } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider } from './src/core/auth';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -18,8 +18,8 @@ import { appInitializer, InitResult } from './src/core/services/appInitializer';
 import { AnimatedSplash } from './src/shared/components/AnimatedSplash';
 import { GlobalLoadingOverlay } from './src/shared/components';
 import { ErrorProvider } from './src/core/errors';
-import { useAppHealthMonitor } from './src/utils/perfDebug';
-import { startAllMonitoring, stopAllMonitoring, fpsMonitor, memoryMonitor } from './src/utils/runtimeMonitor';
+
+
 import { useLibraryCache } from './src/core/cache';
 import { useSpineCacheStore, selectIsPopulated } from './src/features/home/stores/spineCache';
 import { useAppReadyStore, setAppBootComplete, setAppRefreshComplete } from './src/core/stores/appReadyStore';
@@ -28,11 +28,11 @@ import {
   INIT_VERY_SLOW_THRESHOLD_MS,
   CACHE_READY_TIMEOUT_MS,
 } from './src/constants/loading';
+import * as SplashScreen from 'expo-splash-screen';
 
 // Reset boot flags immediately on bundle load (before any components render)
 setAppBootComplete(false);
 setAppRefreshComplete(false);
-import * as SplashScreen from 'expo-splash-screen';
 
 // IMMEDIATELY hide native splash when JS bundle loads
 // AnimatedSplash will already be rendering, so transition is seamless
@@ -94,12 +94,12 @@ export default function App() {
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [isVerySlowLoading, setIsVerySlowLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-  const startTimeRef = useRef(Date.now());
+  const _startTimeRef = useRef(Date.now());
 
   // Check if library and spine caches are ready
   const isLibraryCacheLoaded = useLibraryCache((s) => s.isLoaded);
   const isLibraryCacheLoading = useLibraryCache((s) => s.isLoading);
-  const lastRefreshed = useLibraryCache((s) => s.lastRefreshed);
+  const _lastRefreshed = useLibraryCache((s) => s.lastRefreshed);
   const refreshCache = useLibraryCache((s) => s.refreshCache);
   const currentLibraryId = useLibraryCache((s) => s.currentLibraryId);
   const isSpineCachePopulated = useSpineCacheStore(selectIsPopulated);
@@ -306,11 +306,21 @@ export default function App() {
     setShowSplash(false);
   }, []);
 
+  // Detect logout: when library cache transitions from loaded → cleared,
+  // clear the stale initResult.user so isDataReady becomes true for login screen.
+  const prevCacheLoadedRef = useRef(false);
+  useEffect(() => {
+    if (prevCacheLoadedRef.current && !isLibraryCacheLoaded && !isLibraryCacheLoading) {
+      // Cache was loaded but is now cleared (logout) — clear stale user
+      console.log('[App] Logout detected — clearing stale initResult.user');
+      setInitResult(prev => prev ? { ...prev, user: null } : null);
+    }
+    prevCacheLoadedRef.current = isLibraryCacheLoaded;
+  }, [isLibraryCacheLoaded, isLibraryCacheLoading]);
+
   // Determine if data is ready for splash to dismiss
   // - Not logged in AND no library loading: ready immediately
   // - Logged in (or cache loading after fresh login): wait for caches
-  // Note: After a fresh login, initResult.user is still null (set at init time),
-  // but currentLibraryId/isLibraryCacheLoading become true as caches start loading.
   const isDataReady = (!initResult?.user && !currentLibraryId && !isLibraryCacheLoading) || isCacheReady;
 
   // Re-show splash when a fresh login triggers cache loading

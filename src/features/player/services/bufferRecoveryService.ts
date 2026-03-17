@@ -24,6 +24,7 @@ const RETRY_BACKOFF_BASE_MS = 500;            // Base backoff: 0.5s, 1s, 2s (fas
 const REWIND_RECOVERY_SECONDS = 3;            // Seek back 3s on recovery (better buffer refill)
 const RECOVERY_COOLDOWN_MS = 30000;           // 30s cooldown between recovery cycles
 const BUFFER_MONITOR_INTERVAL_MS = 1000;      // Check buffer state every second
+const RECOVERY_TIMEOUT_MS = 15000;            // 15s max for a single recovery attempt
 
 export type BufferState = 'ok' | 'buffering' | 'stalled' | 'recovering' | 'failed';
 
@@ -147,7 +148,7 @@ class BufferRecoveryService {
       trackEvent('buffer_stall_resolved', {
         durationMs: duration,
         recoveryAttempts: this.status.recoveryAttempts,
-        wasRecovering: this.status.state === 'recovering',
+        wasRecovering: this.isRecovering,
         platform: Platform.OS,
       }, 'info');
     }
@@ -218,7 +219,9 @@ class BufferRecoveryService {
     if (this.monitorInterval) return;
 
     this.monitorInterval = setInterval(() => {
-      this.checkForStall();
+      this.checkForStall().catch(err => {
+        log.warn('checkForStall error:', err);
+      });
     }, BUFFER_MONITOR_INTERVAL_MS);
   }
 
@@ -274,65 +277,72 @@ class BufferRecoveryService {
 
     this.options.onRecoveryStart?.();
 
+    // Timeout wrapper to prevent isRecovering from getting stuck forever
+    const recoveryTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Recovery attempt timed out')), RECOVERY_TIMEOUT_MS)
+    );
+
     try {
-      // Strategy 1: Try simple retry with backoff
-      const backoffMs = RETRY_BACKOFF_BASE_MS * Math.pow(2, this.status.recoveryAttempts - 1);
-      log.debug(`Waiting ${backoffMs}ms before retry...`);
-
-      await new Promise(resolve => setTimeout(resolve, backoffMs));
-
-      // Attempt to play
-      if (this.options.retryPlay) {
-        const success = await this.options.retryPlay();
-
-        if (success) {
-          log.info('Recovery successful via retry');
-          this.handleRecoverySuccess();
-          return;
-        }
-      }
-
-      // Strategy 2: Rewind recovery - seek back slightly to refill buffer
-      if (this.options.onSeekForRecovery && this.options.getCurrentPosition) {
-        const currentPos = this.options.getCurrentPosition();
-        const newPos = Math.max(0, currentPos - REWIND_RECOVERY_SECONDS);
-
-        log.info(`Attempting rewind recovery: ${currentPos.toFixed(1)}s -> ${newPos.toFixed(1)}s`);
-
-        await this.options.onSeekForRecovery(newPos);
-
-        // Wait a bit and check if playing
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        if (this.options.retryPlay) {
-          const success = await this.options.retryPlay();
-
-          if (success) {
-            log.info('Recovery successful via rewind');
-            this.handleRecoverySuccess();
-            return;
-          }
-        }
-      }
-
-      // Recovery attempt failed
-      if (this.status.recoveryAttempts >= MAX_RETRIES) {
-        log.error(`Recovery failed after ${MAX_RETRIES} attempts`);
-        this.handleRecoveryFailed();
-      } else {
-        log.warn(`Recovery attempt ${this.status.recoveryAttempts} failed, will retry`);
-        this.isRecovering = false;
-        // Will retry on next checkForStall interval
-      }
-
+      await Promise.race([this.executeRecovery(), recoveryTimeout]);
     } catch (error) {
       log.error('Recovery error:', error);
 
       if (this.status.recoveryAttempts >= MAX_RETRIES) {
         this.handleRecoveryFailed();
+      } else {
+        log.warn(`Recovery attempt ${this.status.recoveryAttempts} failed, will retry`);
       }
     } finally {
       this.isRecovering = false;
+    }
+  }
+
+  /**
+   * Execute the recovery strategies (retry + rewind).
+   * Extracted so it can be wrapped in a timeout via Promise.race.
+   */
+  private async executeRecovery(): Promise<void> {
+    // Strategy 1: Try simple retry with backoff
+    const backoffMs = RETRY_BACKOFF_BASE_MS * Math.pow(2, this.status.recoveryAttempts - 1);
+    log.debug(`Waiting ${backoffMs}ms before retry...`);
+
+    await new Promise(resolve => setTimeout(resolve, backoffMs));
+
+    if (this.options.retryPlay) {
+      const success = await this.options.retryPlay();
+      if (success) {
+        log.info('Recovery successful via retry');
+        this.handleRecoverySuccess();
+        return;
+      }
+    }
+
+    // Strategy 2: Rewind recovery - seek back slightly to refill buffer
+    if (this.options.onSeekForRecovery && this.options.getCurrentPosition) {
+      const currentPos = this.options.getCurrentPosition();
+      const newPos = Math.max(0, currentPos - REWIND_RECOVERY_SECONDS);
+
+      log.info(`Attempting rewind recovery: ${currentPos.toFixed(1)}s -> ${newPos.toFixed(1)}s`);
+      await this.options.onSeekForRecovery(newPos);
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      if (this.options.retryPlay) {
+        const success = await this.options.retryPlay();
+        if (success) {
+          log.info('Recovery successful via rewind');
+          this.handleRecoverySuccess();
+          return;
+        }
+      }
+    }
+
+    // Recovery attempt failed
+    if (this.status.recoveryAttempts >= MAX_RETRIES) {
+      log.error(`Recovery failed after ${MAX_RETRIES} attempts`);
+      throw new Error(`Recovery failed after ${MAX_RETRIES} attempts`);
+    } else {
+      log.warn(`Recovery attempt ${this.status.recoveryAttempts} failed, will retry`);
     }
   }
 

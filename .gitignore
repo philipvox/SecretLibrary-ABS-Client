@@ -45,3 +45,10 @@ y
 y.pub
 builds/
 *.apk
+
+# Build artifacts in expo modules
+modules/*/android/build/
+modules/*/ios/build/
+
+# Backup directories
+**/_backup_*/

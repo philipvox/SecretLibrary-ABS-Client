@@ -145,12 +145,12 @@ export type EventMap = {
     connectionType: string;
   };
 
-  'network:offline': {};
+  'network:offline': Record<string, never>;
 
   // === APP LIFECYCLE ===
-  'app:foreground': {};
+  'app:foreground': Record<string, never>;
 
-  'app:background': {};
+  'app:background': Record<string, never>;
 
   'app:cold_start': {
     loadTimeMs: number;

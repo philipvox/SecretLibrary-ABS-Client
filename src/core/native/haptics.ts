@@ -12,6 +12,12 @@
 import * as ExpoHaptics from 'expo-haptics';
 import { logger } from '@/shared/utils/logger';
 
+// ============================================================================
+// REACT HOOK
+// ============================================================================
+
+import { useCallback } from 'react';
+
 // Lazy import of settings store to avoid circular dependencies
 let getHapticSettings: (() => {
   enabled: boolean;
@@ -30,7 +36,7 @@ function loadSettingsStore() {
     try {
       const { useHapticSettingsStore } = require('@/features/profile/stores/hapticSettingsStore');
       getHapticSettings = () => useHapticSettingsStore.getState();
-    } catch (e) {
+    } catch {
       // Store not available yet, use defaults
       getHapticSettings = () => ({
         enabled: true,
@@ -130,7 +136,7 @@ class HapticService {
     try {
       const notificationType = this.getNotificationType(type);
       ExpoHaptics.notificationAsync(notificationType).catch(() => {});
-    } catch (e) {
+    } catch {
       // Silently fail on unsupported devices
     }
   }
@@ -508,12 +514,6 @@ class HapticService {
 // ============================================================================
 
 export const haptics = new HapticService();
-
-// ============================================================================
-// REACT HOOK
-// ============================================================================
-
-import { useCallback } from 'react';
 
 /**
  * Hook for haptic feedback in components

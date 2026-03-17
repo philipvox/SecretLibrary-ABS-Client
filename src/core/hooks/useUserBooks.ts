@@ -553,6 +553,29 @@ export function useUndoableMarkFinished() {
 }
 
 /**
+ * Get user rating for a book.
+ */
+export function useBookRating(bookId: string | null | undefined) {
+  const { data: userBook } = useUserBook(bookId);
+  return userBook?.userRating ?? null;
+}
+
+/**
+ * Set user rating for a book.
+ */
+export function useSetBookRating() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ bookId, rating }: { bookId: string; rating: number }) => {
+      await sqliteCache.setUserBook({ bookId, userRating: rating || null });
+    },
+    onSuccess: (_, { bookId }) => {
+      queryClient.invalidateQueries({ queryKey: userBooksKeys.one(bookId) });
+    },
+  });
+}
+
+/**
  * Simple hook to check if a book is finished.
  * More efficient than useIsFinished for simple boolean checks.
  */

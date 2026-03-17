@@ -189,7 +189,7 @@ export function ErrorProvider({
       {children}
 
       {/* Toast notifications */}
-      {toasts.map((toast, index) => (
+      {toasts.map((toast, _index) => (
         <ErrorToast
           key={toast.id}
           error={toast.error}

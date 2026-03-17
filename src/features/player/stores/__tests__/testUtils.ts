@@ -257,12 +257,12 @@ export function createPlaybackSimulator(): PlaybackSimulator {
       player.currentTime = player.duration;
     },
 
-    simulateError(error: Error): void {
+    simulateError(_error: Error): void {
       // Trigger error callback if registered
       // This would be used with actual audio service integration
     },
 
-    simulateBuffering(isBuffering: boolean): void {
+    simulateBuffering(_isBuffering: boolean): void {
       // Trigger buffering state change
     },
   };

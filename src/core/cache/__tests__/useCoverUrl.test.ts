@@ -43,7 +43,8 @@ describe('getCoverUrl', () => {
     const url = getCoverUrl('123');
 
     expect(url).toBe('https://server.com/api/items/123/cover');
-    expect(mockGetItemCoverUrl).toHaveBeenCalledWith('123', undefined);
+    // When no options provided, getCoverUrl applies default width of 80
+    expect(mockGetItemCoverUrl).toHaveBeenCalledWith('123', { width: 80 });
   });
 
   it('appends cache-busting timestamp when lastRefreshed is set', () => {

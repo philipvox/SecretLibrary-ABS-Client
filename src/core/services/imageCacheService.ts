@@ -249,7 +249,7 @@ class ImageCacheService {
     const storedProgress = await this.getStoredProgress();
     if (storedProgress) {
       // Verify book IDs match (library hasn't changed)
-      const storedIdsSet = new Set(storedProgress.bookIds);
+      const _storedIdsSet = new Set(storedProgress.bookIds);
       const currentIdsSet = new Set(bookIds);
       const sameLibrary = storedProgress.bookIds.length === bookIds.length &&
         storedProgress.bookIds.every(id => currentIdsSet.has(id));
@@ -302,7 +302,7 @@ class ImageCacheService {
             cachedCovers += batch.length;
             bytesDownloaded += batch.length * COVER_AVG_SIZE;
             reportProgress();
-          } catch (err) {
+          } catch {
             // Continue even if batch fails - some images may not exist
             log.debug(`Cover batch ${Math.floor(i / BATCH_SIZE) + 1} partial failure`);
             cachedCovers += batch.length; // Count as attempted
@@ -345,7 +345,7 @@ class ImageCacheService {
             cachedSpines += batch.length;
             bytesDownloaded += batch.length * SPINE_AVG_SIZE;
             reportProgress();
-          } catch (err) {
+          } catch {
             // Spine failures are non-critical - procedural fallback exists
             log.debug(`Spine batch ${Math.floor(i / BATCH_SIZE) + 1} partial failure`);
             cachedSpines += batch.length; // Count as attempted

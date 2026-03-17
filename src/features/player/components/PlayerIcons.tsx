@@ -31,6 +31,12 @@ export const PauseIcon = ({ color = colors.white, size = 18 }: IconProps) => (
   </Svg>
 );
 
+export const StopIcon = ({ color = colors.white, size = 18 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Rect x={5} y={5} width={14} height={14} rx={2} />
+  </Svg>
+);
+
 export const RewindIcon = ({ color = colors.black, size = 20 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M12.5 8L7 12l5.5 4V8z" />

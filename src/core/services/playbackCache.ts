@@ -29,20 +29,20 @@ export interface CachedSession {
   duration: number;
   currentTime: number;
   updatedAt?: number;
-  audioTracks: Array<{
+  audioTracks: {
     index: number;
     startOffset: number;
     duration: number;
     title: string;
     contentUrl: string;
     mimeType: string;
-  }>;
-  chapters: Array<{
+  }[];
+  chapters: {
     id: number;
     start: number;
     end: number;
     title: string;
-  }>;
+  }[];
   mediaMetadata?: {
     title?: string;
     authorName?: string;
@@ -72,6 +72,16 @@ class PlaybackCache {
       ...data,
     });
     log.debug(`Cached progress for ${itemId}: ${(data.currentTime || 0).toFixed(1)}s`);
+  }
+
+  /**
+   * Cache progress without logging (for bulk operations like importFromServer)
+   */
+  setProgressSilent(itemId: string, data: Omit<CachedProgress, 'itemId'>): void {
+    this.progressCache.set(itemId, {
+      itemId,
+      ...data,
+    });
   }
 
   /**

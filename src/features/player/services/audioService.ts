@@ -12,6 +12,15 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import { Platform } from 'react-native';
+import {
+  audioLog,
+  createTimer,
+  logSection,
+  validateUrl,
+  formatDuration,
+} from '@/shared/utils/audioDebug';
+import { getErrorMessage } from '@/shared/utils/errorUtils';
+import { bufferRecoveryService } from './bufferRecoveryService';
 
 // Try to import expo-media-control, but handle if native module is missing (Expo Go)
 let MediaControl: any = null;
@@ -24,7 +33,7 @@ try {
   MediaControl = mediaControlModule.MediaControl;
   MediaPlaybackState = mediaControlModule.PlaybackState;
   Command = mediaControlModule.Command;
-} catch (e) {
+} catch {
   audioLog.warn('[AudioService] expo-media-control not available (Expo Go mode)');
 }
 
@@ -32,26 +41,16 @@ try {
 let AudioNoisyModule: any = null;
 try {
   AudioNoisyModule = require('@modules/audio-noisy-module');
-} catch (e) {
+} catch {
   // Module may not be available in Expo Go
   if (Platform.OS === 'android') {
     audioLog.warn('[AudioService] audio-noisy-module not available');
   }
 }
 
-// Remote command callback type for chapter navigation
-type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter') => void;
+// Remote command callback type for media control delegation
+type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForward' | 'skipBackward' | 'seek', position?: number) => void;
 let remoteCommandCallback: RemoteCommandCallback | null = null;
-
-import {
-  audioLog,
-  createTimer,
-  logSection,
-  validateUrl,
-  formatDuration,
-} from '@/shared/utils/audioDebug';
-import { getErrorMessage } from '@/shared/utils/errorUtils';
-import { bufferRecoveryService } from './bufferRecoveryService';
 
 export interface PlaybackState {
   isPlaying: boolean;
@@ -83,7 +82,7 @@ export interface AudioError {
 type StatusCallback = (status: PlaybackState) => void;
 type ErrorCallback = (error: AudioError) => void;
 
-const DEBUG = __DEV__;
+const _DEBUG = __DEV__;
 const log = (...args: unknown[]) => audioLog.audio(args.map(String).join(' '));
 
 class AudioService {
@@ -138,6 +137,7 @@ class AudioService {
   // Track switch synchronization - prevents stale position updates during switch
   private trackSwitchInProgress = false;
   private trackSwitchStartTime = 0;
+  private trackEndInProgress = false; // Re-entrancy guard for handleTrackEnd
 
   // Event listener tracking - prevents listener stacking on retry
   private playbackStatusSubscription: { remove: () => void } | null = null;
@@ -212,7 +212,7 @@ class AudioService {
         log('Waiting for existing setup promise...');
         await this.setupPromise;
         return;
-      } catch (error) {
+      } catch {
         // Setup failed, will retry below
         audioLog.warn('Previous setup failed, retrying...');
       }
@@ -291,7 +291,7 @@ class AudioService {
     this.playbackStatusSubscription = this.player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
       // DEBUG: Log significant status changes
       const currentPos = this.player?.currentTime || 0;
-      const isPlaying = this.player?.playing || false;
+      const _isPlaying = this.player?.playing || false;
       const duration = this.player?.duration || 0;
 
       // Log when playback stops unexpectedly
@@ -307,7 +307,10 @@ class AudioService {
 
       // Handle track end - only once per load, and only if still loaded
       if (status.didJustFinish && !this.hasReachedEnd && this.isLoaded) {
-        this.handleTrackEnd();
+        this.handleTrackEnd().catch(err => {
+          audioLog.warn('handleTrackEnd failed:', err);
+          this.trackEndInProgress = false; // Ensure flag is cleared on error
+        });
       }
     });
 
@@ -388,7 +391,7 @@ class AudioService {
 
       // Add listener to pause when headphones are unplugged
       this.audioNoisySubscription = AudioNoisyModule.addAudioNoisyListener(
-        (event: { reason: string; timestamp: number }) => {
+        (_event: { reason: string; timestamp: number }) => {
           audioLog.warn('[HEADPHONE_UNPLUG] Audio becoming noisy - pausing playback');
           this.pause();
         }
@@ -417,22 +420,34 @@ class AudioService {
         this.pause();
         break;
       case Command.SKIP_FORWARD:
-        // Skip forward 30 seconds
-        this.getPosition().then((pos) => {
-          const newPos = Math.min(pos + 30, this.totalDuration);
-          this.seekTo(newPos);
-        });
+        // Delegate to player store for consistent seek behavior
+        if (remoteCommandCallback) {
+          remoteCommandCallback('skipForward');
+        } else {
+          this.getPosition().then((pos) => {
+            const newPos = Math.min(pos + 30, this.totalDuration);
+            return this.seekTo(newPos);
+          }).catch(err => audioLog.warn('Skip forward failed:', err));
+        }
         break;
       case Command.SKIP_BACKWARD:
-        // Skip backward 30 seconds
-        this.getPosition().then((pos) => {
-          const newPos = Math.max(pos - 30, 0);
-          this.seekTo(newPos);
-        });
+        // Delegate to player store for consistent seek behavior
+        if (remoteCommandCallback) {
+          remoteCommandCallback('skipBackward');
+        } else {
+          this.getPosition().then((pos) => {
+            const newPos = Math.max(pos - 30, 0);
+            return this.seekTo(newPos);
+          }).catch(err => audioLog.warn('Skip backward failed:', err));
+        }
         break;
       case Command.SEEK:
         if (event.data?.position !== undefined) {
-          this.seekTo(event.data.position);
+          if (remoteCommandCallback) {
+            remoteCommandCallback('seek', event.data.position);
+          } else {
+            this.seekTo(event.data.position).catch(err => audioLog.warn('Media SEEK failed:', err));
+          }
         }
         break;
       case Command.NEXT_TRACK:
@@ -536,11 +551,17 @@ class AudioService {
   }
 
   private async handleTrackEnd(): Promise<void> {
+    // Re-entrancy guard — prevent concurrent invocations from skipping chapters
+    if (this.trackEndInProgress) {
+      log('🔸 handleTrackEnd already in progress - ignoring duplicate');
+      return;
+    }
     // Don't handle if already unloaded or not properly loaded
     if (!this.isLoaded) {
       log('🔸 handleTrackEnd called but not loaded - ignoring');
       return;
     }
+    this.trackEndInProgress = true;
     // Capture load ID to detect if a new book loads while we're handling track end
     const trackEndLoadId = this.loadId;
 
@@ -554,6 +575,7 @@ class AudioService {
     // which causes a cascade of track advances. Only advance if we've actually played.
     if (playerDuration <= 0 || currentPlayerPos < 1) {
       log(`🔸 handleTrackEnd IGNORED: spurious event (dur=${playerDuration.toFixed(1)}s, pos=${currentPlayerPos.toFixed(1)}s)`);
+      this.trackEndInProgress = false;
       return;
     }
 
@@ -562,6 +584,7 @@ class AudioService {
       // Bail if a new book was loaded while we were handling track end
       if (this.loadId !== trackEndLoadId) {
         log('🔸 handleTrackEnd: loadId changed during processing, aborting');
+        this.trackEndInProgress = false;
         return;
       }
       // CRITICAL: Set flag BEFORE changing track index to prevent race conditions
@@ -569,86 +592,89 @@ class AudioService {
       this.trackSwitchInProgress = true;
       this.trackSwitchStartTime = Date.now();
 
-      // Capture position BEFORE changing track index
-      const positionBeforeSwitch = this.getGlobalPositionSync();
-      this.lastKnownGoodPosition = positionBeforeSwitch;
+      // FIX: try-finally ensures trackSwitchInProgress is ALWAYS cleared even on error
+      try {
+        // Capture position BEFORE changing track index
+        const positionBeforeSwitch = this.getGlobalPositionSync();
+        this.lastKnownGoodPosition = positionBeforeSwitch;
 
-      // Play next track
-      this.currentTrackIndex++;
-      const nextTrack = this.tracks[this.currentTrackIndex];
+        // Play next track
+        this.currentTrackIndex++;
+        const nextTrack = this.tracks[this.currentTrackIndex];
 
-      // Fix HIGH: Validate nextTrack exists before accessing properties
-      if (!nextTrack) {
-        audioLog.error(`[handleTrackEnd] nextTrack is undefined at index ${this.currentTrackIndex}`);
-        this.trackSwitchInProgress = false;
-        return;
-      }
-
-      log(`Auto-advancing to track ${this.currentTrackIndex}: ${nextTrack.title}`);
-      log(`Auto-advancing to track ${this.currentTrackIndex + 1}/${this.tracks.length}: ${nextTrack.title}`);
-
-      // Use preloaded player if available for seamless transition
-      if (this.preloadedTrackIndex === this.currentTrackIndex && this.preloadPlayer) {
-        log('Using pre-buffered track for seamless transition');
-        // CRITICAL: Stop the old player BEFORE swapping to prevent multiple audio streams
-        this.player?.pause();
-
-        // Remove listener from old player before swap
-        if (this.playbackStatusSubscription) {
-          this.playbackStatusSubscription.remove();
-          this.playbackStatusSubscription = null;
+        // Fix HIGH: Validate nextTrack exists before accessing properties
+        if (!nextTrack) {
+          audioLog.error(`[handleTrackEnd] nextTrack is undefined at index ${this.currentTrackIndex}`);
+          this.trackEndInProgress = false;
+          return;
         }
 
-        // Swap players
-        const temp = this.player;
-        this.player = this.preloadPlayer;
-        this.preloadPlayer = temp;
+        log(`Auto-advancing to track ${this.currentTrackIndex}: ${nextTrack.title}`);
+        log(`Auto-advancing to track ${this.currentTrackIndex + 1}/${this.tracks.length}: ${nextTrack.title}`);
 
-        // Re-attach listener to new player - CRITICAL for detecting next track end
-        this.setupEventListeners();
+        // Use preloaded player if available for seamless transition
+        if (this.preloadedTrackIndex === this.currentTrackIndex && this.preloadPlayer) {
+          log('Using pre-buffered track for seamless transition');
+          // CRITICAL: Stop the old player BEFORE swapping to prevent multiple audio streams
+          this.player?.pause();
 
-        // Start playback immediately
-        this.player?.play();
-
-        // Verify playback started with retry
-        await this.verifyPlaybackAfterTransition();
-
-        // Reset preload state and start preloading next-next track
-        this.preloadedTrackIndex = -1;
-        this.preloadNextTrack();
-
-        // Update lastKnownGoodPosition to new track start
-        this.lastKnownGoodPosition = this.tracks[this.currentTrackIndex].startOffset;
-      } else {
-        // Fallback: load directly (may have brief gap)
-        if (this.player) {
-          log('[Audio] Loading next track directly (no preload available)');
-          this.player.replace({ uri: nextTrack.url });
-          this.player.play();
-
-          // Wait for track to be ready with retry logic
-          let trackReady = await this.waitForTrackReady(2000);
-          if (!trackReady) {
-            // Retry once on timeout
-            log('[Audio] Track load timeout - retrying...');
-            this.player.replace({ uri: nextTrack.url });
-            this.player.play();
-            trackReady = await this.waitForTrackReady(3000);
-            if (!trackReady) {
-              audioLog.error('[Audio] Track load failed after retry - chapter may be stuck');
-            }
+          // Remove listener from old player before swap
+          if (this.playbackStatusSubscription) {
+            this.playbackStatusSubscription.remove();
+            this.playbackStatusSubscription = null;
           }
+
+          // Swap players
+          const temp = this.player;
+          this.player = this.preloadPlayer;
+          this.preloadPlayer = temp;
+
+          // Re-attach listener to new player - CRITICAL for detecting next track end
+          this.setupEventListeners();
+
+          // Start playback immediately
+          this.player?.play();
 
           // Verify playback started with retry
           await this.verifyPlaybackAfterTransition();
 
+          // Reset preload state and start preloading next-next track
+          this.preloadedTrackIndex = -1;
+          this.preloadNextTrack();
+
           // Update lastKnownGoodPosition to new track start
           this.lastKnownGoodPosition = this.tracks[this.currentTrackIndex].startOffset;
-        }
-      }
+        } else {
+          // Fallback: load directly (may have brief gap)
+          if (this.player) {
+            log('[Audio] Loading next track directly (no preload available)');
+            this.player.replace({ uri: nextTrack.url });
+            this.player.play();
 
-      // Clear flag after transition is complete
-      this.trackSwitchInProgress = false;
+            // Wait for track to be ready with retry logic
+            let trackReady = await this.waitForTrackReady(2000);
+            if (!trackReady) {
+              // Retry once on timeout
+              log('[Audio] Track load timeout - retrying...');
+              this.player.replace({ uri: nextTrack.url });
+              this.player.play();
+              trackReady = await this.waitForTrackReady(3000);
+              if (!trackReady) {
+                audioLog.error('[Audio] Track load failed after retry - chapter may be stuck');
+              }
+            }
+
+            // Verify playback started with retry
+            await this.verifyPlaybackAfterTransition();
+
+            // Update lastKnownGoodPosition to new track start
+            this.lastKnownGoodPosition = this.tracks[this.currentTrackIndex].startOffset;
+          }
+        }
+      } finally {
+        // Clear flag after transition is complete (or on error)
+        this.trackSwitchInProgress = false;
+      }
     } else if (this.tracks.length === 0) {
       // Single-track mode - check if we're actually at the end
       const currentPos = await this.getPosition();
@@ -716,6 +742,8 @@ class AudioService {
         didJustFinish: true,
       });
     }
+    // Clear re-entrancy guard
+    this.trackEndInProgress = false;
   }
 
 
@@ -904,7 +932,11 @@ class AudioService {
         const targetRate = isPlaying ? this.POLL_RATE_PLAYING : this.POLL_RATE_PAUSED;
         if (targetRate !== this.currentPollRate) {
           this.currentPollRate = targetRate;
-          this.stopProgressUpdates();
+          // Only clear and recreate the interval — don't call stopProgressUpdates()
+          // which has side effects (stops buffer recovery, clears unrelated timeouts)
+          if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+          }
           this.progressInterval = setInterval(updateProgress, this.currentPollRate);
         }
 
@@ -1051,6 +1083,12 @@ class AudioService {
     // Reset buffer recovery for new playback session
     bufferRecoveryService.resetStatus();
 
+    // FIX CRITICAL: Reattach event listener if removed by unloadAudio()
+    if (!this.playbackStatusSubscription && this.player) {
+      log('Reattaching playback status listener after unload');
+      this.setupEventListeners();
+    }
+
     try {
       this.metadata = metadata || {};
       this.tracks = [];
@@ -1065,6 +1103,12 @@ class AudioService {
       // Reset stuck detection for new load
       this.stuckDetectionLastPosition = 0;
       this.stuckDetectionLastTime = Date.now();
+      // FIX: Reset transition/scrubbing flags for clean load
+      this.trackEndInProgress = false;
+      this.trackSwitchInProgress = false;
+      this.isScrubbing = false;
+      this.pendingTrackSwitch = null;
+      this.pendingSeekAfterLoad = null;
 
       timing('Loading audio with retry');
       await this.loadUrlWithRetry(url);
@@ -1085,10 +1129,12 @@ class AudioService {
         await this.waitForDuration(2000);
         this.totalDuration = this.player?.duration || 0;
       } else if (startPositionSec > 0) {
-        // Even with known duration, must wait for player to be seekable
-        // The player needs to parse the moov atom to resolve seek positions
+        // Must wait for player to be seekable (moov atom parsed)
+        // Only needed when we're resuming at a non-zero position
         await this.waitForDuration(2000);
       }
+      // When knownDuration is set AND startPositionSec === 0, skip wait entirely
+      // (no seek needed, duration already known — saves up to 2 seconds)
 
       // Seek to resume position
       if (startPositionSec > 0) {
@@ -1146,24 +1192,25 @@ class AudioService {
         }, 1000);
       } else if (!knownDuration || this.totalDuration === 0) {
         // FIX: If we didn't have duration, poll for it (streaming audio may not have it immediately)
-        // Poll every 500ms for up to 10 seconds
+        // Use setTimeout chaining (not setInterval) so durationUpdateTimeout is always a timeout
         let pollCount = 0;
         const maxPolls = 20;
-        const pollInterval = setInterval(() => {
+        const pollForDuration = () => {
           pollCount++;
           if (this.player && this.player.duration > 0 && this.totalDuration === 0) {
             this.totalDuration = this.player.duration;
             log(`[DURATION_POLL] Duration detected: ${this.totalDuration.toFixed(1)}s (after ${pollCount * 500}ms)`);
-            clearInterval(pollInterval);
+            this.durationUpdateTimeout = null;
           } else if (pollCount >= maxPolls) {
             if (this.totalDuration === 0) {
               log('[DURATION_POLL] Failed to detect duration after 10s');
             }
-            clearInterval(pollInterval);
+            this.durationUpdateTimeout = null;
+          } else {
+            this.durationUpdateTimeout = setTimeout(pollForDuration, 500);
           }
-        }, 500);
-        // Store interval reference for cleanup
-        this.durationUpdateTimeout = pollInterval as unknown as NodeJS.Timeout;
+        };
+        this.durationUpdateTimeout = setTimeout(pollForDuration, 500);
       }
 
       // Update media controls with metadata
@@ -1171,9 +1218,8 @@ class AudioService {
       await this.updateMediaControlPlaybackState(autoPlay, startPositionSec);
     } catch (error) {
       if (this.loadId === thisLoadId) {
-        // Clean up duration polling interval on load failure
+        // Clean up duration polling timeout on load failure
         if (this.durationUpdateTimeout) {
-          clearInterval(this.durationUpdateTimeout as unknown as ReturnType<typeof setInterval>);
           clearTimeout(this.durationUpdateTimeout);
           this.durationUpdateTimeout = null;
         }
@@ -1202,11 +1248,14 @@ class AudioService {
 
   private async waitForDuration(maxWaitMs: number = 5000): Promise<void> {
     const startTime = Date.now();
+    let interval = 10; // Start fast (10ms), double up to 200ms
     while (Date.now() - startTime < maxWaitMs) {
       if (this.player && this.player.duration > 0) {
+        log(`Duration detected in ${Date.now() - startTime}ms`);
         return;
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, interval));
+      interval = Math.min(interval * 2, 200);
     }
     log('Warning: Duration not available after waiting');
   }
@@ -1326,6 +1375,18 @@ class AudioService {
     // Reset buffer recovery for new playback session
     bufferRecoveryService.resetStatus();
 
+    // FIX CRITICAL: Reattach event listener if removed by unloadAudio()
+    if (!this.playbackStatusSubscription && this.player) {
+      log('Reattaching playback status listener after unload');
+      this.setupEventListeners();
+    }
+
+    // FIX: Clear stale duration timeout from previous load
+    if (this.durationUpdateTimeout) {
+      clearTimeout(this.durationUpdateTimeout);
+      this.durationUpdateTimeout = null;
+    }
+
     try {
       this.metadata = metadata || {};
       this.tracks = tracks;
@@ -1336,6 +1397,12 @@ class AudioService {
       // Reset stuck detection for new load
       this.stuckDetectionLastPosition = 0;
       this.stuckDetectionLastTime = Date.now();
+      // FIX: Reset transition/scrubbing flags for clean load
+      this.trackEndInProgress = false;
+      this.trackSwitchInProgress = false;
+      this.isScrubbing = false;
+      this.pendingTrackSwitch = null;
+      this.pendingSeekAfterLoad = null;
 
       // Find which track contains the start position
       let targetTrackIndex = 0;
@@ -1527,6 +1594,8 @@ class AudioService {
         // Increased from 50ms to 150ms - 50ms was too short for typical scrub gestures
         // and caused pending track switches to be overwritten during rapid scrubbing
         this.trackSwitchTimeout = setTimeout(() => {
+          // Clear stale ref — timeout has fired
+          this.trackSwitchTimeout = null;
           // Fix HIGH: Check isScrubbing INSIDE timeout - if scrubbing ended, bail out
           // The final seekTo from setScrubbing(false) will handle the correct position
           if (!this.isScrubbing) {
@@ -1537,7 +1606,7 @@ class AudioService {
             this.executeTrackSwitch(
               this.pendingTrackSwitch.trackIndex,
               this.pendingTrackSwitch.positionInTrack
-            );
+            ).catch(err => audioLog.warn('Debounced track switch failed:', err));
             this.pendingTrackSwitch = null;
           }
         }, 150);
@@ -1595,12 +1664,17 @@ class AudioService {
       // Check if we have this track preloaded for instant switch
       if (this.preloadedTrackIndex === targetTrackIndex && this.preloadPlayer) {
         // CRITICAL: Stop the old player BEFORE swapping to prevent multiple audio streams
-        // Fix HIGH: Add null check - player could have been unloaded
         if (!this.player) {
           audioLog.warn('[executeTrackSwitch] Player became null before preload swap');
           return;
         }
         this.player.pause();
+
+        // Remove listener from old player before swap (same as handleTrackEnd)
+        if (this.playbackStatusSubscription) {
+          this.playbackStatusSubscription.remove();
+          this.playbackStatusSubscription = null;
+        }
 
         // Swap players for seamless transition
         const temp = this.player;
@@ -1608,13 +1682,14 @@ class AudioService {
         this.preloadPlayer = temp;
         this.preloadedTrackIndex = -1;
 
-        // Fix HIGH: Check player after swap - preloadPlayer could have been released
+        // Re-attach listener to new player — CRITICAL for detecting next track end
+        this.setupEventListeners();
+
         if (!this.player) {
           audioLog.warn('[executeTrackSwitch] Player null after swap');
           return;
         }
         await this.player.seekTo(positionInTrack);
-        // Fix HIGH: Check player after async seek
         if (wasPlaying && this.player) {
           this.player.play();
         }
@@ -1937,6 +2012,12 @@ class AudioService {
     this.loadId++; // Cancel any pending loads
     this.stopProgressUpdates();
 
+    // Remove event listener to prevent stale didJustFinish from firing on next load
+    if (this.playbackStatusSubscription) {
+      this.playbackStatusSubscription.remove();
+      this.playbackStatusSubscription = null;
+    }
+
     if (this.player) {
       this.player.pause();
       // Don't replace with empty string - it causes ExoPlayer to try opening "/"
@@ -1950,7 +2031,7 @@ class AudioService {
     if (this.mediaControlEnabled && MediaControl && MediaPlaybackState) {
       try {
         await MediaControl.updatePlaybackState(MediaPlaybackState.STOPPED);
-      } catch (e) {
+      } catch {
         // Ignore errors during cleanup
       }
     }
@@ -1964,6 +2045,18 @@ class AudioService {
     this.preloadedTrackIndex = -1;
     this.currentPollRate = 100; // Reset poll rate
     this.hasReachedEnd = false; // Reset end flag
+    // FIX: Reset all transition/scrubbing flags to prevent stuck state on book switch
+    this.trackEndInProgress = false;
+    this.trackSwitchInProgress = false;
+    this.isScrubbing = false;
+    this.pendingTrackSwitch = null;
+    this.pendingSeekAfterLoad = null;
+
+    // Clear callbacks to prevent stale events from firing into wrong book context
+    // New callbacks are set by loadBook() before the next loadAudio/loadTracks call
+    this.statusCallback = null;
+    this.errorCallback = null;
+    remoteCommandCallback = null;
   }
 
   /**
@@ -2021,6 +2114,16 @@ class AudioService {
       this.playbackStatusSubscription = null;
     }
 
+    // Release audio players to free native resources
+    if (this.player) {
+      try { this.player.remove(); } catch { /* ignore */ }
+      this.player = null;
+    }
+    if (this.preloadPlayer) {
+      try { this.preloadPlayer.remove(); } catch { /* ignore */ }
+      this.preloadPlayer = null;
+    }
+
     // Remove media control listener
     if (this.removeMediaControlListener) {
       this.removeMediaControlListener();
@@ -2032,7 +2135,7 @@ class AudioService {
       try {
         await MediaControl.disableMediaControls();
         this.mediaControlEnabled = false;
-      } catch (e) {
+      } catch {
         // Ignore errors during cleanup
       }
     }
@@ -2045,7 +2148,7 @@ class AudioService {
     if (Platform.OS === 'android' && AudioNoisyModule) {
       try {
         await AudioNoisyModule.stopListening();
-      } catch (e) {
+      } catch {
         // Ignore errors during cleanup
       }
     }
@@ -2056,11 +2159,15 @@ class AudioService {
       this.appStateSubscription = null;
     }
 
-    // Clean up duration polling interval
+    // Clean up duration polling timeout
     if (this.durationUpdateTimeout) {
-      clearInterval(this.durationUpdateTimeout);
+      clearTimeout(this.durationUpdateTimeout);
       this.durationUpdateTimeout = null;
     }
+
+    // Reset setup state so next setup() recreates players
+    this.isSetup = false;
+    this.setupPromise = null;
   }
 }
 

@@ -179,4 +179,10 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // ExoPlayer (Media3) for native audio playback
+    implementation "androidx.media3:media3-exoplayer:1.5.1"
+    implementation "androidx.media3:media3-session:1.5.1"
+    implementation "androidx.media3:media3-ui:1.5.1"
+    implementation "androidx.media:media:1.7.0"
 }

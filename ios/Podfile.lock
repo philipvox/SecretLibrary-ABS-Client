@@ -1,4 +1,6 @@
 PODS:
+  - AVPlayerModule (1.0.0):
+    - ExpoModulesCore
   - EASClient (1.0.7):
     - ExpoModulesCore
   - EXConstants (18.0.10):
@@ -2396,6 +2398,7 @@ PODS:
     - ZXingObjC/Core
 
 DEPENDENCIES:
+  - AVPlayerModule (from `../modules/avplayer-module/ios`)
   - EASClient (from `../node_modules/expo-eas-client/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXJSONUtils (from `../node_modules/expo-json-utils/ios`)
@@ -2518,6 +2521,8 @@ SPEC REPOS:
     - ZXingObjC
 
 EXTERNAL SOURCES:
+  AVPlayerModule:
+    :path: "../modules/avplayer-module/ios"
   EASClient:
     :path: "../node_modules/expo-eas-client/ios"
   EXConstants:
@@ -2739,6 +2744,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  AVPlayerModule: ea031b1284d897c7fc5e5db5f0cd3c28b0e3ebd3
   EASClient: 68127f1248d2b25fdc82dbbfb17be95d1c4700be
   EXConstants: fd688cef4e401dcf798a021cfb5d87c890c30ba3
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd

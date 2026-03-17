@@ -29,6 +29,12 @@
         android:name="com.google.android.gms.car.application"
         android:resource="@xml/automotive_app_desc"/>
 
+    <!-- ExoPlayer Audio Playback Foreground Service -->
+    <service
+        android:name=".exoplayer.AudioPlaybackService"
+        android:exported="false"
+        android:foregroundServiceType="mediaPlayback"/>
+
     <!-- Android Auto Media Browser Service -->
     <service
         android:name=".automotive.AndroidAutoMediaBrowserService"

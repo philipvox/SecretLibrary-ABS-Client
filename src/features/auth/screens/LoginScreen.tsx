@@ -3,7 +3,7 @@
  * Enhanced with real-time URL validation feedback per UX research
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { Check, X, AlertCircle, Eye, EyeOff } from 'lucide-react-native';
 import { SvgXml } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/core/auth';
-// Button import removed — using custom white-outline TouchableOpacity
+import { oauthService } from '@/features/auth/services/oauthService';
 import { SkullCandle } from '@/shared/components/AnimatedSplash';
 import { spacing, radius, scale, useTheme } from '@/shared/theme';
 import { logger } from '@/shared/utils/logger';
@@ -35,7 +35,7 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 786.7 149
  * - Removes trailing slashes
  * - Validates basic URL structure
  */
-function normalizeServerUrl(url: string): { normalized: string; corrected: boolean; error?: string } {
+function _normalizeServerUrl(url: string): { normalized: string; corrected: boolean; error?: string } {
   let normalized = url.trim();
   let corrected = false;
 
@@ -74,7 +74,7 @@ function normalizeServerUrl(url: string): { normalized: string; corrected: boole
 }
 
 export function LoginScreen() {
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, loginWithToken, isLoading, error, clearError } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -84,6 +84,8 @@ export function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [urlCorrectionMsg, setUrlCorrectionMsg] = useState('');
+  const [ssoAvailable, setSsoAvailable] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
 
   // Real-time URL validation status
   type UrlStatus = 'empty' | 'valid' | 'correctable' | 'invalid' | 'checking';
@@ -125,6 +127,7 @@ export function LoginScreen() {
   useEffect(() => {
     // Reset on URL change
     setAbsCheckStatus('idle');
+    setSsoAvailable(false);
     if (absCheckTimer.current) clearTimeout(absCheckTimer.current);
     if (absCheckAbort.current) absCheckAbort.current.abort();
 
@@ -147,8 +150,12 @@ export function LoginScreen() {
           // ABS returns { isInit, authMethods, ... }
           if (data && (data.isInit !== undefined || data.authMethods !== undefined)) {
             setAbsCheckStatus('valid');
+            // Detect OIDC/SSO availability
+            const methods: string[] = data.authMethods || [];
+            setSsoAvailable(methods.includes('openid'));
           } else {
             setAbsCheckStatus('invalid');
+            setSsoAvailable(false);
           }
         } else if (res.status === 401 || res.status === 403) {
           // Server exists but requires auth — likely ABS behind a reverse proxy
@@ -271,6 +278,32 @@ export function LoginScreen() {
     return { valid: true, normalizedUrl: urlValidation.normalized };
   };
 
+  const handleSsoLogin = async () => {
+    const normalizedUrl = urlValidation.normalized;
+    if (!normalizedUrl) {
+      setValidationError('Please enter a valid server URL first');
+      return;
+    }
+
+    try {
+      setSsoLoading(true);
+      setValidationError('');
+      clearError();
+
+      const token = await oauthService.startOAuthFlow(normalizedUrl);
+
+      // Save server URL for next time
+      await saveLoginInfo(normalizedUrl, '');
+      await loginWithToken(normalizedUrl, token);
+    } catch (err: any) {
+      if (err.message !== 'SSO login was cancelled') {
+        setValidationError(err.message || 'SSO login failed');
+      }
+    } finally {
+      setSsoLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     const result = validateInputs();
     if (!result.valid || !result.normalizedUrl) {
@@ -281,7 +314,7 @@ export function LoginScreen() {
       // Save login info for next time
       await saveLoginInfo(result.normalizedUrl, username.trim());
       await login(result.normalizedUrl, username.trim(), password);
-    } catch (err) {
+    } catch {
       // Error handled by context
     }
   };
@@ -421,10 +454,36 @@ export function LoginScreen() {
             </View>
           ) : null}
 
+          {/* SSO Button (shown when OIDC is available on server) */}
+          {ssoAvailable && (
+            <TouchableOpacity
+              onPress={handleSsoLogin}
+              disabled={isLoading || ssoLoading}
+              style={[
+                styles.loginButton,
+                {
+                  borderWidth: 1,
+                  borderColor: colors.text.primary,
+                  borderRadius: radius.md,
+                  paddingVertical: spacing.md + 2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: isLoading || ssoLoading ? 0.5 : 1,
+                },
+              ]}
+            >
+              {ssoLoading ? (
+                <ActivityIndicator color={colors.text.primary} />
+              ) : (
+                <Text style={{ color: colors.text.primary, fontSize: 16, fontWeight: '600' }}>Sign in with SSO</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
           {/* Login Button */}
           <TouchableOpacity
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={isLoading || ssoLoading}
             style={[
               styles.loginButton,
               {
@@ -434,7 +493,7 @@ export function LoginScreen() {
                 paddingVertical: spacing.md + 2,
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: isLoading ? 0.5 : 1,
+                opacity: isLoading || ssoLoading ? 0.5 : 1,
               },
             ]}
           >
