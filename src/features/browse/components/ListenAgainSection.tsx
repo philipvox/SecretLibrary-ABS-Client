@@ -14,7 +14,6 @@ import { useCoverUrl } from '@/core/cache';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { scale, wp } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/features/completion';
-import { CoverStars } from '@/shared/components/CoverStars';
 import { useReadingHistory } from '@/features/reading-history-wizard';
 
 // Carousel layout constants
@@ -61,7 +60,6 @@ const CarouselBookCard = React.memo(function CarouselBookCard({ item, onPress, o
           cachePolicy="memory-disk"
           transition={200}
         />
-        <CoverStars bookId={item.id} />
         <CompleteBadgeOverlay bookId={item.id} size="small" />
       </View>
       <Text style={[styles.cardTitle, { color: colors.white }]} numberOfLines={1}>

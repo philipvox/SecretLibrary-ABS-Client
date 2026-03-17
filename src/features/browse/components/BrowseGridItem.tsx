@@ -22,9 +22,7 @@ interface BrowseGridItemProps {
 }
 
 function BrowseGridItemComponent({
-  _type,
   title,
-  _count,
   iconName,
   onPress,
 }: BrowseGridItemProps) {

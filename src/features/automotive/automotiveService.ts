@@ -714,10 +714,12 @@ class AutomotiveService {
       // Try to add bookmark via the bookmark store/API
       try {
         const { useBookmarksStore } = await import('@/features/player/stores/bookmarksStore');
+        useBookmarksStore.getState().setCurrentBookId(bookId);
         await useBookmarksStore.getState().addBookmark({
-          libraryItemId: bookId,
-          time: position,
           title: `Bookmark at ${this.formatTime(position)}`,
+          note: null,
+          time: position,
+          chapterTitle: null,
         });
         log(`Bookmark added at ${position}s for "${bookTitle}"`);
       } catch {

@@ -83,7 +83,6 @@ const SeriesCard = React.memo(function SeriesCard({ series, onPress }: SeriesCar
 
 export function RecentSeriesSection({
   onSeriesPress,
-  _onBookPress,
   onViewAll,
   limit = 8
 }: RecentSeriesSectionProps) {
