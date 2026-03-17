@@ -9,6 +9,69 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.215] - 2026-03-17
+
+### Fixed — Android Auto: Covers, Last Played, and Cold-Start Playback
+- **Fix covers not loading** — Replaced Glide bitmap loading with `setIconUri()` in `AndroidAutoMediaBrowserService`. Android Auto's framework now handles cover image loading and caching natively, eliminating stale auth token 401 errors and the 5-second Glide timeout per image. Removed `coverArtCache` LRU and all Glide imports from the browse service.
+- **Fix "Last Played" only showing current session** — `getBrowseSections()` now queries `sqliteCache.getInProgressUserBooks()` for up to 20 recently played books sorted by `last_played_at DESC`, replacing the single-item section that only showed `playerState.currentBook`. Current book still appears as a dedicated "Continue Listening" section for quick resume.
+- **Fix cold-start playback from Android Auto** — When user taps play in Android Auto and JS isn't running, the command is now queued in `AudioPlaybackService.pendingPlayMediaId` and replayed by `ExoPlayerModule.initialize()` once JS connects. Also increased `AndroidAutoModule` retry window from 500ms (5×100ms) to 6s (30×200ms) to cover React Native cold start time.
+- **Periodic browse sync** — Added 30-minute periodic browse data sync while app is open to keep auth tokens fresh in cover URLs and update the recently played list.
+
+### Files Modified
+- `plugins/android-auto/src/AndroidAutoMediaBrowserService.kt` — `setIconUri()` instead of Glide; removed `coverArtCache`, `loadCoverArt()`, `clearCoverArtCache()`
+- `plugins/android-auto/src/AndroidAutoModule.kt` — Retry window 5→30 attempts, 100→200ms delay
+- `plugins/exo-player/src/AudioPlaybackService.kt` — Added `pendingPlayMediaId` static field; store pending command in `onPlayFromMediaId` when JS unavailable
+- `plugins/exo-player/src/ExoPlayerModule.kt` — `emitEvent()` returns Boolean; `replayPendingCommand()` on `initialize()`
+- `src/features/automotive/automotiveService.ts` — SQLite-backed "Recently Played" section; periodic 30-min browse sync
+- `src/constants/version.ts` — Version bump to 0.9.215
+
+---
+
+## [0.9.214] - 2026-03-16
+
+### Added — OAuth/SSO Login
+- **oauthService**: New service (`src/features/auth/services/oauthService.ts`) for OIDC authentication flow using `expo-web-browser`. Opens system browser to ABS OIDC endpoint, catches callback via `secretlibrary://oauth-callback` deep link.
+- **loginWithToken**: New method on `authService` and `authContext` for token-based login (used by OAuth callback). Fetches user data via `GET /api/me` with the JWT token.
+- **SSO button on LoginScreen**: "Sign in with SSO" button appears automatically when the server reports `authMethods: ["openid"]` in `/api/status`. Uses the same white-outline style as the Login button.
+- **URL scheme**: Added `"scheme": "secretlibrary"` to `app.json` for deep link support.
+
+### Added — Chromecast Support
+- **chromecast plugin**: New Expo config plugin (`plugins/chromecast/`) with Android Kotlin native module (CastModule, CastPackage, CastOptionsProvider) and iOS Swift native module. Handles Cast SDK initialization, device discovery, session management, and remote media control.
+- **chromecast feature module**: New feature (`src/features/chromecast/`) with Zustand store (castStore), JS bridge service (castService), CastButton component, CastDeviceSheet component, and useCastSession hook.
+- **Player integration**: CastButton appears in player TopNav when Cast devices are available. Play/pause commands route through Cast when connected. Position updates sync from Cast device.
+- **Cast playback flow**: Stream URLs with `?token=` auth are sent to Cast device. Cover art displayed on Cast device. On disconnect, playback resumes locally at Cast device's last position.
+
+### Dependencies Added
+- `expo-web-browser` — System browser for OIDC flow
+- `expo-linking` — Deep link URL parsing
+
+### Files Added
+- `src/features/auth/services/oauthService.ts`
+- `plugins/chromecast/withChromecast.js`
+- `plugins/chromecast/src/CastModule.kt`
+- `plugins/chromecast/src/CastPackage.kt`
+- `plugins/chromecast/src/CastOptionsProvider.kt`
+- `plugins/chromecast/ios/CastModule.swift`
+- `plugins/chromecast/ios/CastModule-Bridging-Header.h`
+- `src/features/chromecast/stores/castStore.ts`
+- `src/features/chromecast/services/castService.ts`
+- `src/features/chromecast/components/CastButton.tsx`
+- `src/features/chromecast/components/CastDeviceSheet.tsx`
+- `src/features/chromecast/hooks/useCastSession.ts`
+- `src/features/chromecast/index.ts`
+
+### Files Modified
+- `app.json` — Added URL scheme and chromecast plugin
+- `src/core/auth/authService.ts` — Added loginWithToken method
+- `src/core/auth/authContext.tsx` — Exposed loginWithToken in context
+- `src/features/auth/screens/LoginScreen.tsx` — SSO button, authMethods detection
+- `src/features/player/stores/playerStore.ts` — Cast-aware play/pause routing
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` — CastButton in TopNav
+- `src/core/services/appInitializer.ts` — Chromecast initialization
+- `src/constants/version.ts` — Version bump
+
+---
+
 ## [0.9.213] - 2026-03-15
 
 ### Added — Native iOS Audio (AVPlayer)

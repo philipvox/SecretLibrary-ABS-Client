@@ -25,8 +25,8 @@ class AndroidAutoModule(private val reactContext: ReactApplicationContext) :
         private const val TAG = "AndroidAutoModule"
         private const val EVENT_NAME = "AndroidAutoCommand"
         private const val BROWSE_DATA_FILE = "android_auto_browse.json"
-        private const val MAX_RETRY_ATTEMPTS = 5
-        private const val RETRY_DELAY_MS = 100L
+        private const val MAX_RETRY_ATTEMPTS = 30
+        private const val RETRY_DELAY_MS = 200L
 
         @Volatile
         private var moduleInstance: AndroidAutoModule? = null

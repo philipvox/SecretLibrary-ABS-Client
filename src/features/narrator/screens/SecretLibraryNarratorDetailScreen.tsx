@@ -644,7 +644,7 @@ export function SecretLibraryNarratorDetailScreen() {
         )}
 
         {/* Footer */}
-        <View style={[styles.footer, { borderTopColor: colors.grayLine }]}>
+        <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.gray }]}>
             {allBooks.length} {allBooks.length === 1 ? 'title' : 'titles'} · {Math.round(totalDuration / 3600)} hours total
           </Text>
@@ -801,6 +801,7 @@ const styles = StyleSheet.create({
   },
   groupedList: {
     flex: 1,
+    paddingHorizontal: 24,
   },
   groupSection: {
     marginBottom: 36,
@@ -834,8 +835,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: staticColors.grayLine,
     marginTop: 20,
     paddingHorizontal: 24,
   },

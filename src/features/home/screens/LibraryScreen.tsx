@@ -41,6 +41,7 @@ import { useLibraryCache } from '@/core/cache';
 import { useToastStore } from '@/shared/hooks/useToast';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { TopNav, TopNavSearchIcon, SkeletonBox, useBookContextMenu } from '@/shared/components';
+import { CoverStars } from '@/shared/components/CoverStars';
 import { useNavigationWithLoading } from '@/shared/hooks';
 import {
   secretLibraryColors as staticColors,
@@ -1260,11 +1261,14 @@ export function LibraryScreen() {
         onPress={() => handleBookPress(book)}
         onLongPress={() => handleBookLongPress(book)}
       >
-        <Image
-          source={{ uri: coverUrl }}
-          style={styles.gridCover}
-          contentFit="cover"
-        />
+        <View style={styles.gridCoverContainer}>
+          <Image
+            source={{ uri: coverUrl }}
+            style={styles.gridCover}
+            contentFit="cover"
+          />
+          <CoverStars bookId={book.id} starSize={scale(20)} />
+        </View>
         <View style={styles.gridInfo}>
           <Text style={[styles.gridTitle, { color: colors.black }]} numberOfLines={2}>
             {book.title}
@@ -1993,9 +1997,15 @@ const styles = StyleSheet.create({
   gridCard: {
     width: '48%',
   },
-  gridCover: {
+  gridCoverContainer: {
     width: '100%',
     aspectRatio: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  gridCover: {
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
     backgroundColor: staticColors.grayLine,
   },

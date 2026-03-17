@@ -27,6 +27,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Import audioService directly (not from barrel) to avoid circular dependency
 import { audioService, PlaybackState, AudioTrackInfo, AudioError } from '@/features/player/services/audioService';
 
+// Chromecast integration — lazy import to avoid circular dependency
+const getCastState = () => {
+  try {
+    const { useCastStore } = require('@/features/chromecast/stores/castStore');
+    return useCastStore.getState();
+  } catch {
+    return { isConnected: false };
+  }
+};
+
 // Import debug utilities
 import {
   audioLog,
@@ -1540,6 +1550,14 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       } = get();
       const { smartRewindEnabled, smartRewindMaxSeconds } = usePlayerSettingsStore.getState();
 
+      // If casting to Chromecast, route play through cast
+      const castState = getCastState();
+      if (castState.isConnected) {
+        set({ isPlaying: true });
+        castState.play?.();
+        return;
+      }
+
       // If audio isn't loaded, we need to load the book first
       if (!audioService.getIsLoaded()) {
         // If we have a book to play, load it
@@ -1713,6 +1731,14 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
     },
 
     pause: async () => {
+      // If casting to Chromecast, route pause through cast
+      const castState = getCastState();
+      if (castState.isConnected) {
+        set({ isPlaying: false });
+        castState.pause?.();
+        return;
+      }
+
       // INSTANT: Use store position and don't block on async operations
       // Store position is kept in sync by polling, good enough for pause
       const { position: storePosition, currentBook, duration } = get();
@@ -2178,15 +2204,25 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
         position: prevPosition,
       } = get();
 
+      // Guard: Ignore events when no book is loaded (stale callbacks from previous book)
+      if (!currentBook) return;
+
       // STUCK DETECTION: Handle stuck audio (position unchanged for 5+ seconds)
       if (state.isStuck) {
         set({ playbackError: 'Playback stuck - retrying...' });
         audioLog.warn('[Player] Stuck detected - attempting recovery');
 
+        // Capture book ID to guard recovery timeout against book switches
+        const bookIdAtStuck = currentBook.id;
+
         // Attempt recovery by calling play()
         audioService.play().then(() => {
           // Wait 1 second to verify recovery worked
           setTimeout(() => {
+            const currentState = get();
+            // Guard: Don't act if book changed or was unloaded during recovery
+            if (!currentState.currentBook || currentState.currentBook.id !== bookIdAtStuck) return;
+
             if (!audioService.getIsPlaying()) {
               set({ playbackError: 'Playback failed. Tap to retry.' });
               audioLog.error('[Player] Recovery failed - playback still stuck');
@@ -2196,7 +2232,11 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             }
           }, 1000);
         }).catch((err) => {
-          set({ playbackError: 'Playback failed. Tap to retry.' });
+          // Guard: Only update error if same book is still active
+          const currentState = get();
+          if (currentState.currentBook?.id === bookIdAtStuck) {
+            set({ playbackError: 'Playback failed. Tap to retry.' });
+          }
           audioLog.error('[Player] Recovery play() failed:', err);
         });
         return; // Don't process normal update while handling stuck

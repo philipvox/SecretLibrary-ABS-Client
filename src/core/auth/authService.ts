@@ -192,13 +192,17 @@ class AuthService {
       await storage.deleteItem(USER_KEY);
 
       // 3. Clear SQLite user data (all tables with user-specific data)
+      // This deletes from ALL tables (library_items, authors, series, user_books, etc.)
       await sqliteCache.clearAllUserData();
 
       // 4. Clear React Query cache (in-memory server state)
       queryClient.clear();
 
       // 5. Reset Zustand stores (in-memory app state)
-      useLibraryCache.getState().clearCache();
+      // Pass skipSqlite=true since clearAllUserData already cleared the DB.
+      // Calling clearCache() without this causes a nested transaction error
+      // ("cannot start a transaction within a transaction").
+      useLibraryCache.getState().clearCache(true);
 
       // 6. Reset network optimizer cache (prevents stale API responses/covers)
       apiClient.resetNetwork();
@@ -273,6 +277,48 @@ class AuthService {
 
       // Generic fallback with original message
       throw new Error(getErrorMessage(error) || 'Login failed. Please try again.');
+    }
+  }
+
+  /**
+   * Login with a pre-obtained token (e.g. from OAuth/SSO callback).
+   * Configures apiClient, fetches user data via GET /api/me, stores session.
+   */
+  async loginWithToken(serverUrl: string, token: string): Promise<User> {
+    try {
+      // Configure API client with server URL and token
+      apiClient.configure({ baseURL: serverUrl, token });
+
+      // Fetch user data to verify token and get full user object
+      const user = await apiClient.getCurrentUser();
+
+      if (!user) {
+        throw new Error('Invalid response from server');
+      }
+
+      // Attach token to user object (same shape as login response)
+      const userWithToken: User = { ...user, token };
+
+      // Store credentials
+      await this.storeToken(token);
+      await this.storeServerUrl(serverUrl);
+      await this.storeUser(userWithToken);
+
+      return userWithToken;
+    } catch (error) {
+      log.error('Token login failed:', error);
+
+      const errorMessage = getErrorMessage(error).toLowerCase();
+
+      if (errorMessage.includes('unauthorized') || errorMessage.includes('401')) {
+        throw new Error('SSO token is invalid or expired. Please try again.');
+      }
+
+      if (errorMessage.includes('network error') || errorMessage.includes('timeout')) {
+        throw new Error('Cannot connect to server. Check your connection.');
+      }
+
+      throw new Error(getErrorMessage(error) || 'SSO login failed. Please try again.');
     }
   }
 

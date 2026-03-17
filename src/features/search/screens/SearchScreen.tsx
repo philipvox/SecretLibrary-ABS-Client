@@ -22,6 +22,8 @@ import {
   Keyboard,
   Pressable,
   Dimensions,
+  PanResponder,
+  type GestureResponderEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,6 +50,8 @@ import { SeriesCard } from '@/features/browse/components/SeriesCard';
 import { BookSimpleRow } from '../components/BookSimpleRow';
 import { SearchFilterSheet, type SearchFilterState, type AvailableFilters, type AgeRange } from '../components/SearchFilterSheet';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
+import { SearchHeroCard } from '../components/SearchHeroCard';
+import { RecentlyAddedSection } from '@/features/browse/components/RecentlyAddedSection';
 import { DURATION_RANGES, type DurationRangeId } from '@/features/browse/hooks/useBrowseCounts';
 
 // Type guard for book media
@@ -99,13 +103,186 @@ type SearchScreenParams = {
   scannedISBN?: string;
 };
 
+// ─── DNA Range Slider ───────────────────────────────────────────────────────
+type DnaFilter = { baseTag: string; label: string; minScore: number; maxScore: number; filterMin: number; filterMax: number };
+
+const THUMB_W = scale(22);
+const TRACK_H = scale(4);
+
+const DnaRangeSlider = React.memo(function DnaRangeSlider({
+  filter,
+  onChange,
+  onRemove,
+  resultCount,
+  styles: s,
+}: {
+  filter: DnaFilter;
+  onChange: (f: DnaFilter) => void;
+  onRemove: () => void;
+  resultCount: number;
+  styles: any;
+}) {
+  const trackWidth = useRef(0);
+  const trackX = useRef(0);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Pending values during drag — visual only, committed on release
+  const [pending, setPending] = useState<{ filterMin: number; filterMax: number } | null>(null);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+  const dragging = useRef<'min' | 'max' | null>(null);
+
+  const steps = filter.maxScore - filter.minScore;
+
+  const xToVal = (x: number) => {
+    const ratio = Math.max(0, Math.min(1, x / trackWidth.current));
+    return Math.round(ratio * steps) + filterRef.current.minScore;
+  };
+
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (e: GestureResponderEvent) => {
+      const localX = e.nativeEvent.pageX - trackX.current;
+      const f = filterRef.current;
+      const s = f.maxScore - f.minScore;
+      const tw = trackWidth.current;
+      const minX = ((f.filterMin - f.minScore) / Math.max(s, 1)) * tw;
+      const maxX = ((f.filterMax - f.minScore) / Math.max(s, 1)) * tw;
+      // When thumbs overlap, pick based on which side the tap is on
+      if (f.filterMin === f.filterMax) {
+        dragging.current = localX >= maxX ? 'max' : 'min';
+      } else {
+        dragging.current = Math.abs(localX - minX) <= Math.abs(localX - maxX) ? 'min' : 'max';
+      }
+      const newVal = xToVal(localX);
+      if (dragging.current === 'min') {
+        setPending({ filterMin: Math.min(newVal, f.filterMax), filterMax: f.filterMax });
+      } else {
+        setPending({ filterMin: f.filterMin, filterMax: Math.max(newVal, f.filterMin) });
+      }
+    },
+    onPanResponderMove: (e: GestureResponderEvent) => {
+      const localX = e.nativeEvent.pageX - trackX.current;
+      const newVal = xToVal(localX);
+      const f = filterRef.current;
+      if (dragging.current === 'min') {
+        setPending((p) => ({ filterMin: Math.min(newVal, p?.filterMax ?? f.filterMax), filterMax: p?.filterMax ?? f.filterMax }));
+      } else {
+        setPending((p) => ({ filterMin: p?.filterMin ?? f.filterMin, filterMax: Math.max(newVal, p?.filterMin ?? f.filterMin) }));
+      }
+    },
+    onPanResponderRelease: () => {
+      const p = pendingRef.current;
+      if (p) {
+        onChangeRef.current({ ...filterRef.current, ...p });
+      }
+      setPending(null);
+      dragging.current = null;
+    },
+    onPanResponderTerminate: () => {
+      setPending(null);
+      dragging.current = null;
+    },
+  })).current;
+
+  const onTrackLayout = useCallback((e: any) => {
+    trackWidth.current = e.nativeEvent.layout.width;
+    e.target?.measureInWindow?.((x: number) => { trackX.current = x; });
+  }, []);
+
+  // Use pending values while dragging, committed values otherwise
+  const [expanded, setExpanded] = useState(true);
+
+  const displayMin = pending ? pending.filterMin : filter.filterMin;
+  const displayMax = pending ? pending.filterMax : filter.filterMax;
+  const ticks = Array.from({ length: steps + 1 }, (_, i) => filter.minScore + i);
+
+  const pct = (val: number) => `${((val - filter.minScore) / Math.max(steps, 1)) * 100}%`;
+
+  return (
+    <View style={s.dnaScoreBar}>
+      <View style={s.dnaScoreHeader}>
+        <TouchableOpacity style={s.dnaScoreHeaderLeft} onPress={() => setExpanded(!expanded)} activeOpacity={0.7}>
+          <Icon name={expanded ? 'ChevronDown' : 'ChevronRight'} size={14} color={staticColors.gray} strokeWidth={1.5} />
+          <Text style={s.dnaScoreLabel}>
+            <Text style={{ textTransform: 'capitalize' }}>{filter.label}</Text>
+          </Text>
+          <Text style={s.dnaScoreValue}>
+            {displayMin}–{displayMax}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Icon name="X" size={14} color={staticColors.gray} strokeWidth={1.5} />
+        </TouchableOpacity>
+      </View>
+
+      {expanded && (
+        <>
+          {/* Track + thumbs */}
+          <View style={s.dnaTrackContainer} {...panResponder.panHandlers}>
+            <View style={s.dnaTrack} onLayout={onTrackLayout}>
+              <View style={[s.dnaTrackFill, { left: pct(displayMin), right: `${((filter.maxScore - displayMax) / Math.max(steps, 1)) * 100}%` }]} />
+            </View>
+            <View style={[s.dnaThumb, { left: pct(displayMin) }]}>
+              <View style={s.dnaThumbInner} />
+            </View>
+            <View style={[s.dnaThumb, { left: pct(displayMax) }]}>
+              <View style={s.dnaThumbInner} />
+            </View>
+          </View>
+
+          {/* Number ticks */}
+          <View style={s.dnaTickRow}>
+            {ticks.map((val) => {
+              const inRange = val >= displayMin && val <= displayMax;
+              return (
+                <TouchableOpacity
+                  key={val}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  onPress={() => {
+                    const f = filterRef.current;
+                    if (f.filterMin === f.filterMax) {
+                      // Overlapping: expand toward tap direction
+                      if (val >= f.filterMax) {
+                        onChangeRef.current({ ...f, filterMax: val });
+                      } else {
+                        onChangeRef.current({ ...f, filterMin: val });
+                      }
+                    } else {
+                      const distMin = Math.abs(val - f.filterMin);
+                      const distMax = Math.abs(val - f.filterMax);
+                      if (distMin <= distMax) {
+                        onChangeRef.current({ ...f, filterMin: Math.min(val, f.filterMax) });
+                      } else {
+                        onChangeRef.current({ ...f, filterMax: Math.max(val, f.filterMin) });
+                      }
+                    }
+                  }}
+                >
+                  <Text style={[s.dnaTickText, inRange && s.dnaTickTextActive]}>
+                    {val}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
+    </View>
+  );
+});
+
 export function SearchScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ Search: SearchScreenParams }, 'Search'>>();
   const inputRef = useRef<TextInput>(null);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { loadBook, isLoading: _isPlayerLoading, _currentBook } = usePlayerStore();
+  const loadBook = usePlayerStore((s) => s.loadBook);
 
   // Book context menu
   const { _showMenu } = useBookContextMenu();
@@ -152,6 +329,17 @@ export function SearchScreen() {
   // Debounced query for search (300ms delay per research)
   const debouncedQuery = useDebounce(query, DEBOUNCE_MS);
 
+  // Lazy load heavy sections (hero card, recently added) so search opens instantly
+  const [showHeavySections, setShowHeavySections] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHeavySections(true), 150);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // DNA score filter — when searching scored DNA tags (e.g., dna:mood:mystery)
+  const [dnaScoreFilters, setDnaScoreFilters] = useState<DnaFilter[]>([]);
+  const [showDnaTagPicker, setShowDnaTagPicker] = useState(false);
+
   // Show autocomplete when typing (but not for committed searches)
   // Start committed if we have an initial query (e.g., from ISBN search)
   const [hasCommittedSearch, setHasCommittedSearch] = useState(() => !!route.params?.initialQuery);
@@ -192,7 +380,7 @@ export function SearchScreen() {
   const { showError } = useToast();
 
   // Get cached data
-  const { filterItems, isLoaded } = useLibraryCache();
+  const { items: libraryItems, filterItems, isLoaded } = useLibraryCache();
 
   // Get filter options from cache
   const allGenres = useMemo(() => getAllGenres(), [isLoaded]);
@@ -281,7 +469,8 @@ export function SearchScreen() {
   // Check if we have any active search/filters (use debounced for results)
   const hasActiveSearch = debouncedQuery.trim().length > 0 || selectedGenres.length > 0 ||
     selectedAuthors.length > 0 || selectedNarrators.length > 0 || selectedSeries.length > 0 ||
-    durationFilter.min !== undefined || durationFilter.max !== undefined || ageRange !== 'all';
+    durationFilter.min !== undefined || durationFilter.max !== undefined || ageRange !== 'all' ||
+    dnaScoreFilters.length > 0;
 
   // Helper to filter by age range based on genres
   const filterByAgeRange = useCallback((items: LibraryItem[], range: AgeRange): LibraryItem[] => {
@@ -315,8 +504,11 @@ export function SearchScreen() {
   const bookResults = useMemo(() => {
     if (!hasActiveSearch) return [];
 
-    // Get base results from cache
-    let results = filterItems(filters);
+    // Get base results — if only DNA filters active (no query/other filters), start with all books
+    const hasTextOrFilterSearch = debouncedQuery.trim().length > 0 || selectedGenres.length > 0 ||
+      selectedAuthors.length > 0 || selectedNarrators.length > 0 || selectedSeries.length > 0 ||
+      durationFilter.min !== undefined || durationFilter.max !== undefined || ageRange !== 'all';
+    let results = hasTextOrFilterSearch ? filterItems(filters) : [...libraryItems].filter(i => i.mediaType === 'book');
 
     // If query has results, use them; otherwise try fuzzy matching
     if (results.length === 0 && debouncedQuery.trim()) {
@@ -339,8 +531,23 @@ export function SearchScreen() {
     // Apply age range filter
     results = filterByAgeRange(results, ageRange);
 
+    // Apply DNA score filters — each filter narrows results (AND logic)
+    for (const df of dnaScoreFilters) {
+      const { baseTag, filterMin, filterMax } = df;
+      results = results.filter((item) => {
+        const tags: string[] = (item.media as any)?.tags || [];
+        return tags.some((t) => {
+          const lower = t.toLowerCase();
+          if (!lower.startsWith(baseTag + ':')) return false;
+          const scorePart = lower.slice(baseTag.length + 1);
+          const score = parseFloat(scorePart);
+          return !isNaN(score) && score >= filterMin && score <= filterMax;
+        });
+      });
+    }
+
     return results.slice(0, 100);
-  }, [filterItems, filters, hasActiveSearch, debouncedQuery, kidModeEnabled, ageRange, filterByAgeRange]);
+  }, [filterItems, filters, hasActiveSearch, debouncedQuery, kidModeEnabled, ageRange, filterByAgeRange, dnaScoreFilters, libraryItems, selectedGenres, selectedAuthors, selectedNarrators, selectedSeries, durationFilter]);
 
   // Filter authors matching query (with fuzzy matching)
   const authorResults = useMemo(() => {
@@ -371,8 +578,85 @@ export function SearchScreen() {
   // ============================================================================
 
   // Autocomplete uses instant query (not debounced) for responsiveness
+  // Parse DNA tags: "dna:mood:mystery:7" → { baseTag: "dna:mood:mystery", category: "mood", label: "mystery", score: 7 }
+  // Plain tags: "slow-burn" → { baseTag: "slow-burn", category: "", label: "slow-burn", score: null }
+  interface ParsedTag {
+    baseTag: string;   // Tag without score (used for grouping)
+    category: string;  // DNA category (mood, trope, etc.) or empty
+    label: string;     // Human-readable label
+    score: number | null;
+    searchable: string;
+  }
+
+  function parseDnaTag(raw: string): ParsedTag {
+    const lower = raw.toLowerCase().trim();
+    if (lower.startsWith('dna:')) {
+      const parts = lower.slice(4).split(':');
+      // Check if last part is a number (score)
+      const lastPart = parts[parts.length - 1];
+      const maybeScore = parseFloat(lastPart);
+      const hasScore = parts.length >= 3 && !isNaN(maybeScore);
+
+      const category = parts[0].replace(/-/g, ' ');
+      const labelParts = hasScore ? parts.slice(1, -1) : parts.slice(1);
+      const label = labelParts.join(' ').replace(/-/g, ' ').trim();
+      const score = hasScore ? maybeScore : null;
+      const baseTag = hasScore ? `dna:${parts.slice(0, -1).join(':')}` : lower;
+      const searchable = `${category} ${label} ${label.replace(/\s/g, '')}`;
+
+      return { baseTag, category, label, score, searchable };
+    }
+    return { baseTag: lower, category: '', label: lower, score: null, searchable: lower };
+  }
+
+  interface TagSuggestion {
+    baseTag: string;
+    category: string;
+    label: string;
+    hasScore: boolean;
+    minScore: number;
+    maxScore: number;
+    bookCount: number;
+    searchable: string;
+  }
+
+  // Build unique tags list, grouping scored DNA tags by baseTag
+  const allTags = useMemo(() => {
+    if (!isLoaded) return [] as TagSuggestion[];
+    const tagMap = new Map<string, TagSuggestion>();
+    for (const item of libraryItems) {
+      const metadata = getBookMetadata(item);
+      const genres = metadata?.genres || [];
+      const tags = (item.media as any)?.tags || [];
+      for (const t of [...genres, ...tags]) {
+        const parsed = parseDnaTag(t);
+        const existing = tagMap.get(parsed.baseTag);
+        if (existing) {
+          existing.bookCount++;
+          if (parsed.score !== null) {
+            existing.hasScore = true;
+            existing.minScore = Math.min(existing.minScore, parsed.score);
+            existing.maxScore = Math.max(existing.maxScore, parsed.score);
+          }
+        } else {
+          tagMap.set(parsed.baseTag, {
+            baseTag: parsed.baseTag,
+            category: parsed.category,
+            label: parsed.label,
+            hasScore: parsed.score !== null,
+            minScore: parsed.score ?? 0,
+            maxScore: parsed.score ?? 0,
+            bookCount: 1,
+            searchable: parsed.searchable,
+          });
+        }
+      }
+    }
+    return Array.from(tagMap.values()).sort((a, b) => b.bookCount - a.bookCount);
+  }, [libraryItems, isLoaded]);
+
   const autocompleteSuggestions = useMemo(() => {
-    if (!query.trim() || query.length < 2) return { books: [], authors: [], series: [], narrators: [] };
+    if (!query.trim() || query.length < 2) return { books: [], authors: [], series: [], narrators: [], tags: [] };
 
     const _lowerQuery = query.toLowerCase();
 
@@ -396,7 +680,6 @@ export function SearchScreen() {
       });
 
     // Authors - max 2 (with image data for thumbnails)
-    // FIX 3: Use fuzzyMatch for consistent matching (accent/space-insensitive)
     const authors = allAuthors
       .filter(a => fuzzyMatch(query, a.name))
       .slice(0, 2)
@@ -408,21 +691,24 @@ export function SearchScreen() {
       }));
 
     // Series - max 1
-    // FIX 3: Use fuzzyMatch for consistent matching
     const series = allSeries
       .filter(s => fuzzyMatch(query, s.name))
       .slice(0, 1)
       .map(s => ({ name: s.name, bookCount: s.bookCount }));
 
     // Narrators - max 1
-    // FIX 3: Use fuzzyMatch for consistent matching
     const narrators = allNarrators
       .filter(n => fuzzyMatch(query, n.name))
       .slice(0, 1)
       .map(n => ({ name: n.name, bookCount: n.bookCount }));
 
-    return { books, authors, series, narrators };
-  }, [query, filterItems, allAuthors, allSeries, allNarrators, kidModeEnabled]);
+    // Tags/Genres/DNA - max 3, search against label and searchable (not raw dna: prefix)
+    const tags = allTags
+      .filter(t => t.searchable.includes(_lowerQuery) || _lowerQuery.split(/\s+/).every(w => t.searchable.includes(w)))
+      .slice(0, 3);
+
+    return { books, authors, series, narrators, tags };
+  }, [query, filterItems, allAuthors, allSeries, allNarrators, allTags, kidModeEnabled]);
 
   // "Did you mean" suggestions when no results
   const spellingSuggestions = useMemo(() => {
@@ -544,6 +830,8 @@ export function SearchScreen() {
     setSelectedSeries([]);
     setDurationRangeId(null);
     setAgeRange('all');
+    setDnaScoreFilters([]);
+    setShowDnaTagPicker(false);
     setHasCommittedSearch(false);
     inputRef.current?.focus();
   };
@@ -641,6 +929,41 @@ export function SearchScreen() {
     navigation.navigate('NarratorDetail', { narratorName });
   };
 
+  // Handle tag/genre autocomplete — commits as search query
+  const handleAutocompleteTag = (tag: TagSuggestion) => {
+    setQuery(tag.baseTag);
+    setHasCommittedSearch(true);
+    saveSearch(tag.label);
+    if (tag.hasScore) {
+      addDnaFilter(tag);
+    }
+    Keyboard.dismiss();
+  };
+
+  const addDnaFilter = (tag: TagSuggestion) => {
+    // Don't add duplicate
+    if (dnaScoreFilters.some((f) => f.baseTag === tag.baseTag)) return;
+    setDnaScoreFilters((prev) => [
+      ...prev,
+      {
+        baseTag: tag.baseTag,
+        label: tag.category ? `${tag.category} › ${tag.label}` : tag.label,
+        minScore: tag.minScore,
+        maxScore: tag.maxScore,
+        filterMin: tag.minScore,
+        filterMax: tag.maxScore,
+      },
+    ]);
+  };
+
+  const removeDnaFilter = (baseTag: string) => {
+    setDnaScoreFilters((prev) => prev.filter((f) => f.baseTag !== baseTag));
+  };
+
+  const updateDnaFilter = (updated: DnaFilter) => {
+    setDnaScoreFilters((prev) => prev.map((f) => (f.baseTag === updated.baseTag ? updated : f)));
+  };
+
   // Handle "Did you mean" suggestion tap
   const handleSpellingSuggestion = (text: string) => {
     setQuery(text);
@@ -689,6 +1012,13 @@ export function SearchScreen() {
   // Check if we have any results
   const hasResults = bookResults.length > 0 || seriesResults.length > 0 ||
     authorResults.length > 0 || narratorResults.length > 0;
+
+  // Suggested books for no-results state — recently added books
+  const suggestedBooks = useMemo(() => {
+    if (hasResults || !hasActiveSearch) return [];
+    const sorted = [...libraryItems].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    return sorted.slice(0, 6);
+  }, [libraryItems, hasResults, hasActiveSearch]);
 
   // Header colors based on theme — match page bg for seamless look
   const _headerBg = colors.white; // Same as page background
@@ -880,11 +1210,48 @@ export function SearchScreen() {
                 </View>
               )}
 
+              {/* Tags / Genres / DNA */}
+              {autocompleteSuggestions.tags.length > 0 && (
+                <View style={styles.autocompleteSectionContainer}>
+                  <Text style={styles.autocompleteSection}>TAGS</Text>
+                  {autocompleteSuggestions.tags.map((tag) => (
+                    <TouchableOpacity
+                      key={tag.baseTag}
+                      style={styles.autocompleteItem}
+                      onPress={() => handleAutocompleteTag(tag)}
+                      accessibilityLabel={`Tag: ${tag.label}, ${tag.bookCount} books`}
+                      accessibilityRole="button"
+                    >
+                      <Icon name="Tag" size={16} color={TEXT_TERTIARY} strokeWidth={1.5} />
+                      <View style={styles.autocompleteItemContent}>
+                        <Text style={styles.autocompleteTitle} numberOfLines={1}>
+                          {tag.category ? (
+                            <>
+                              <Text style={{ color: TEXT_SECONDARY, textTransform: 'capitalize' }}>{tag.category}</Text>
+                              <Text style={{ color: TEXT_TERTIARY }}> › </Text>
+                              <Text style={{ textTransform: 'capitalize' }}>{tag.label}</Text>
+                            </>
+                          ) : (
+                            <Text style={{ textTransform: 'capitalize' }}>{tag.label}</Text>
+                          )}
+                          {tag.hasScore && (
+                            <Text style={{ color: TEXT_TERTIARY }}> ({tag.minScore}–{tag.maxScore})</Text>
+                          )}
+                        </Text>
+                        <Text style={styles.autocompleteMeta}>{tag.bookCount} books</Text>
+                      </View>
+                      <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               {/* No autocomplete results */}
               {autocompleteSuggestions.books.length === 0 &&
                 autocompleteSuggestions.authors.length === 0 &&
                 autocompleteSuggestions.series.length === 0 &&
-                autocompleteSuggestions.narrators.length === 0 && (
+                autocompleteSuggestions.narrators.length === 0 &&
+                autocompleteSuggestions.tags.length === 0 && (
                   <View style={styles.noAutocomplete}>
                     <Text style={styles.noAutocompleteText}>Press search to find results</Text>
                   </View>
@@ -915,6 +1282,53 @@ export function SearchScreen() {
         {/* Empty state - show previous searches */}
         {isLoaded && !hasActiveSearch && (
           <View style={styles.emptyStateContainer}>
+            {/* DNA filter — start narrowing from all books */}
+            <View style={styles.dnaAddContainer}>
+              {showDnaTagPicker ? (
+                <View>
+                  <View style={styles.dnaTagPickerHeader}>
+                    <Text style={styles.dnaAddText}>DNA FILTERS</Text>
+                    <TouchableOpacity onPress={() => setShowDnaTagPicker(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Icon name="X" size={14} color={TEXT_TERTIARY} strokeWidth={1.5} />
+                    </TouchableOpacity>
+                  </View>
+                  {(() => {
+                    const scored = allTags.filter((t) => t.hasScore);
+                    const groups = new Map<string, typeof scored>();
+                    for (const t of scored) {
+                      const cat = t.category || 'Other';
+                      if (!groups.has(cat)) groups.set(cat, []);
+                      groups.get(cat)!.push(t);
+                    }
+                    return Array.from(groups.entries()).map(([cat, tags]) => (
+                      <View key={cat}>
+                        <Text style={styles.dnaTagCategoryLabel}>{cat}</Text>
+                        <View style={styles.dnaTagPickerWrap}>
+                          {tags.map((tag) => (
+                            <TouchableOpacity
+                              key={tag.baseTag}
+                              style={styles.dnaTagChip}
+                              onPress={() => {
+                                addDnaFilter(tag);
+                                setShowDnaTagPicker(false);
+                              }}
+                            >
+                              <Text style={styles.dnaTagChipText}>{tag.label}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    ));
+                  })()}
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.dnaAddButton} onPress={() => setShowDnaTagPicker(true)}>
+                  <Icon name="Plus" size={12} color={TEXT_TERTIARY} strokeWidth={1.5} />
+                  <Text style={styles.dnaAddText}>DNA filter</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {previousSearches.length > 0 ? (
               <View style={styles.previousSearches}>
                 <View style={styles.previousSearchesHeader}>
@@ -949,47 +1363,135 @@ export function SearchScreen() {
               </View>
             )}
 
+            {/* Featured book hero card — lazy loaded */}
+            {showHeavySections && (
+              <SearchHeroCard
+                items={libraryItems}
+                onBookPress={(id) => navigation.navigate('BookDetail', { id })}
+              />
+            )}
+
             {/* Browse categories */}
             <View style={styles.browseRecovery}>
-              <View style={styles.browseRecoveryGrid}>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('GenresList')}
-                >
-                  <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('AuthorsList')}
-                >
-                  <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('SeriesList')}
-                >
-                  <Icon name="Library" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('DurationFilter')}
-                >
-                  <Icon name="Timer" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
-                </TouchableOpacity>
-              </View>
               {/* Big Browse Button */}
               <TouchableOpacity
                 style={styles.bigBrowseButton}
                 onPress={() => { navigation.navigate('BrowsePage'); }}
               >
-                <Icon name="Globe" size={18} color="rgba(255,255,255,0.5)" strokeWidth={1.5} />
-                <Text style={styles.bigBrowseButtonText}>Discover</Text>
+                <Icon name="Globe" size={18} color={colors.black} strokeWidth={1} />
+                <Text style={[styles.bigBrowseButtonText, { color: colors.black }]}>Discover</Text>
               </TouchableOpacity>
+              <View style={styles.browseRecoveryGrid}>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('GenresList')}
+                >
+                  <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('AuthorsList')}
+                >
+                  <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('SeriesList')}
+                >
+                  <Icon name="Library" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('DurationFilter')}
+                >
+                  <Icon name="Timer" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+
+          </View>
+        )}
+
+        {/* DNA Score Range Sliders — always at top when active */}
+        {hasActiveSearch && dnaScoreFilters.length > 0 && (
+          <View>
+            {dnaScoreFilters.map((df) => (
+              <DnaRangeSlider
+                key={df.baseTag}
+                filter={df}
+                onChange={updateDnaFilter}
+                onRemove={() => removeDnaFilter(df.baseTag)}
+                resultCount={bookResults.length}
+                styles={styles}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* + Add DNA filter button — always at top when searching */}
+        {hasActiveSearch && (
+          <View style={styles.dnaAddContainer}>
+            {showDnaTagPicker ? (
+              <View>
+                <View style={styles.dnaTagPickerHeader}>
+                  <Text style={styles.dnaAddText}>DNA FILTERS</Text>
+                  <TouchableOpacity onPress={() => setShowDnaTagPicker(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Icon name="X" size={14} color={TEXT_TERTIARY} strokeWidth={1.5} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.dnaTagPickerWrap}>
+                  {(() => {
+                    const candidates = allTags.filter((t) => {
+                      if (!t.hasScore) return false;
+                      if (dnaScoreFilters.some((f) => f.baseTag === t.baseTag)) return false;
+                      return bookResults.some((book) => {
+                        const tags: string[] = (book.media as any)?.tags || [];
+                        return tags.some((bt) => bt.toLowerCase().startsWith(t.baseTag + ':'));
+                      });
+                    });
+                    return candidates
+                      .map((tag) => {
+                        const matchCount = bookResults.filter((book) => {
+                          const tags: string[] = (book.media as any)?.tags || [];
+                          return tags.some((bt) => {
+                            const lower = bt.toLowerCase();
+                            if (!lower.startsWith(tag.baseTag + ':')) return false;
+                            const score = parseFloat(lower.slice(tag.baseTag.length + 1));
+                            return !isNaN(score) && score >= 5;
+                          });
+                        }).length;
+                        const distance = matchCount === 0 ? Infinity : Math.abs(matchCount - 10);
+                        return { tag, matchCount, distance };
+                      })
+                      .filter((c) => c.matchCount > 0)
+                      .sort((a, b) => a.distance - b.distance);
+                  })()
+                    .map(({ tag, matchCount }) => (
+                      <TouchableOpacity
+                        key={tag.baseTag}
+                        style={styles.dnaTagChip}
+                        onPress={() => {
+                          addDnaFilter(tag);
+                          setShowDnaTagPicker(false);
+                        }}
+                      >
+                        <Text style={styles.dnaTagChipText}>
+                          {tag.label} <Text style={styles.dnaTagChipCount}>{matchCount}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.dnaAddButton} onPress={() => setShowDnaTagPicker(true)}>
+                <Icon name="Plus" size={12} color={TEXT_TERTIARY} strokeWidth={1.5} />
+                <Text style={styles.dnaAddText}>Add filter</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1018,55 +1520,56 @@ export function SearchScreen() {
               </View>
             )}
 
-            {/* Browse categories */}
+            {/* Browse categories — matches idle page layout */}
             <View style={styles.browseRecovery}>
-              <View style={styles.browseRecoveryGrid}>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('GenresList')}
-                >
-                  <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('AuthorsList')}
-                >
-                  <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('SeriesList')}
-                >
-                  <Icon name="Library" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.browseRecoveryItem, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.08)' : colors.cream }]}
-                  onPress={() => navigation.navigate('DurationFilter')}
-                >
-                  <Icon name="Timer" size={24} color={colors.black} strokeWidth={1.5} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
-                </TouchableOpacity>
-              </View>
-              {/* Big Browse Button */}
               <TouchableOpacity
                 style={styles.bigBrowseButton}
                 onPress={() => { navigation.navigate('BrowsePage'); }}
               >
-                <Icon name="Globe" size={18} color="rgba(255,255,255,0.5)" strokeWidth={1.5} />
-                <Text style={styles.bigBrowseButtonText}>Discover</Text>
+                <Icon name="Globe" size={18} color={colors.black} strokeWidth={1} />
+                <Text style={[styles.bigBrowseButtonText, { color: colors.black }]}>Discover</Text>
               </TouchableOpacity>
+              <View style={styles.browseRecoveryGrid}>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('GenresList')}
+                >
+                  <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('AuthorsList')}
+                >
+                  <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('SeriesList')}
+                >
+                  <Icon name="Library" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.browseRecoveryItem}
+                  onPress={() => navigation.navigate('DurationFilter')}
+                >
+                  <Icon name="Timer" size={24} color={colors.black} strokeWidth={1} />
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Tips */}
-            <View style={styles.searchTips}>
-              <Text style={styles.searchTipsTitle}>Search tips:</Text>
-              <Text style={styles.searchTip}>• Check spelling of author/narrator names</Text>
-              <Text style={styles.searchTip}>• Try searching by series name</Text>
-              <Text style={styles.searchTip}>• Use fewer keywords</Text>
-            </View>
+            {/* Recently added — horizontal cover carousel like Browse page, lazy loaded */}
+            {showHeavySections && (
+              <RecentlyAddedSection
+                items={libraryItems}
+                onBookPress={(id) => navigation.navigate('BookDetail', { id })}
+                limit={12}
+                backgroundColor="transparent"
+              />
+            )}
           </View>
         )}
 
@@ -1074,7 +1577,7 @@ export function SearchScreen() {
         {hasActiveSearch && bookResults.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Books</Text>
+              <Text style={styles.sectionLabel}>BOOKS</Text>
             </View>
             <View>
               {bookResults.slice(0, 10).map((book, index) => {
@@ -1839,7 +2342,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 
   // Browse recovery
   browseRecovery: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   browseRecoveryTitle: {
     color: colors.TEXT_SECONDARY,
@@ -1856,11 +2359,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.isDarkMode ? 'rgba(255,255,255,0.04)' : colors.CARD_COLOR,
+    backgroundColor: 'transparent',
     borderRadius: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+    borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
   },
   browseRecoveryText: {
     color: colors.TEXT_SECONDARY,
@@ -1876,16 +2379,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 10,
     paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 16,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
   },
   bigBrowseButtonText: {
-    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
     fontSize: scale(11),
     textTransform: 'uppercase',
     letterSpacing: 1,
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.TEXT_PRIMARY,
   },
 
   // Search tips
@@ -1906,5 +2409,151 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.TEXT_TERTIARY,
     fontSize: 13,
     lineHeight: 20,
+  },
+
+  // Section label (subtle uppercase like "NEW TO LIBRARY")
+  sectionLabel: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(11),
+    color: colors.TEXT_TERTIARY,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+
+  // DNA Score Filter Bar
+  dnaScoreBar: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    marginBottom: 12,
+  },
+  dnaScoreHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  dnaScoreHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dnaScoreLabel: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.medium,
+    fontSize: scale(11),
+    color: colors.TEXT_SECONDARY,
+    letterSpacing: 0.5,
+  },
+  dnaScoreValue: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    color: colors.TEXT_TERTIARY,
+  },
+  dnaTrackContainer: {
+    height: scale(24),
+    justifyContent: 'center',
+    marginHorizontal: THUMB_W / 2,
+  },
+  dnaTrack: {
+    height: scale(2),
+    backgroundColor: colors.isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+    borderRadius: 1,
+    overflow: 'hidden',
+  },
+  dnaTrackFill: {
+    position: 'absolute' as const,
+    top: 0,
+    bottom: 0,
+    backgroundColor: colors.isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)',
+    borderRadius: 1,
+  },
+  dnaThumb: {
+    position: 'absolute' as const,
+    width: THUMB_W,
+    height: scale(20),
+    marginLeft: -THUMB_W / 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  dnaThumbInner: {
+    width: scale(4),
+    height: scale(14),
+    borderRadius: scale(2),
+    backgroundColor: colors.isDarkMode ? '#FFFFFF' : '#333333',
+  },
+  dnaTickRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    marginHorizontal: THUMB_W / 2,
+    marginTop: 0,
+  },
+  dnaTickText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    color: colors.TEXT_TERTIARY,
+    textAlign: 'center' as const,
+    width: scale(20),
+    marginLeft: -scale(10),
+  },
+  dnaTickTextActive: {
+    color: colors.isDarkMode ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+  },
+
+  // DNA add filter
+  dnaAddContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  dnaAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  dnaAddText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    color: colors.TEXT_TERTIARY,
+    letterSpacing: 0.5,
+  },
+
+  // DNA tag picker
+  dnaTagPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dnaTagPickerWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  dnaTagCategoryLabel: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    color: colors.TEXT_TERTIARY,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  dnaTagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+    backgroundColor: colors.isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+  },
+  dnaTagChipText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    color: colors.TEXT_SECONDARY,
+    textTransform: 'capitalize',
+  },
+  dnaTagChipCount: {
+    color: colors.TEXT_TERTIARY,
+    fontSize: scale(9),
   },
 });

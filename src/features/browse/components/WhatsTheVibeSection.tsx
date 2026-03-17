@@ -16,6 +16,7 @@ import { parseCompVibes } from '@/shared/utils/bookDNA';
 import { SectionHeader } from './SectionHeader';
 import { LibraryItem } from '@/core/types';
 import { VibeCard } from './VibeCard';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 interface WhatsTheVibeSectionProps {
   items: LibraryItem[];
@@ -57,7 +58,9 @@ function seededShuffle<T>(arr: T[]): T[] {
   return result;
 }
 
-export function WhatsTheVibeSection({ items, onVibePress }: WhatsTheVibeSectionProps) {
+export const WhatsTheVibeSection = React.memo(function WhatsTheVibeSection({ items, onVibePress }: WhatsTheVibeSectionProps) {
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
+
   const vibeData = useMemo(() => {
     const vibeCounts = new Map<string, number>();
     const vibeBookIds = new Map<string, string[]>();
@@ -96,7 +99,7 @@ export function WhatsTheVibeSection({ items, onVibePress }: WhatsTheVibeSectionP
     onVibePress(slug);
   }, [onVibePress]);
 
-  if (vibeData.length === 0) return null;
+  if (!dnaEnabled || vibeData.length === 0) return null;
 
   return (
     <View style={styles.container}>
@@ -119,7 +122,7 @@ export function WhatsTheVibeSection({ items, onVibePress }: WhatsTheVibeSectionP
       </ScrollView>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -138,7 +138,7 @@ interface TopPickHeroProps {
   onCoverUrl?: (url: string | null) => void;
 }
 
-export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'forYou', headerHeight, onCoverUrl }: TopPickHeroProps) {
+export const TopPickHero = React.memo(function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'forYou', headerHeight, onCoverUrl }: TopPickHeroProps) {
   const renderStart = useRef(Date.now());
   const navigation = useNavigation<any>();
 
@@ -312,13 +312,10 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
   const _titleFontWeight = spineTypography.titleWeight || spineTypography.fontWeight || '500';
   const titleTransform = spineTypography.titleTransform || 'none';
 
-  // Apply text transform to title
+  // Hero always uses natural case (no uppercase transform)
   const { displayLine1, displayLine2 } = useMemo(() => {
-    if (titleTransform === 'uppercase') {
-      return { displayLine1: line1.toUpperCase(), displayLine2: line2.toUpperCase() };
-    }
     return { displayLine1: line1, displayLine2: line2 };
-  }, [line1, line2, titleTransform]);
+  }, [line1, line2]);
 
   // Download status
   const {
@@ -464,7 +461,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
       <View style={[styles.hero, headerHeight ? { paddingTop: headerHeight + scale(20) } : undefined]}>
         {/* Centered Cover */}
         <TouchableOpacity style={styles.heroCover} onPress={handleCoverPress} onLongPress={handleCoverLongPress} activeOpacity={0.9}>
-          <Image source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" />
+          <Image source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" cachePolicy="memory-disk" />
           <CoverStars bookId={bookId} starSize={scale(28)} />
         </TouchableOpacity>
 
@@ -543,7 +540,7 @@ export function TopPickHero({ items, onBookPress, onBookLongPress, variant = 'fo
 
     </View>
   );
-}
+});
 
 // =============================================================================
 // STYLES

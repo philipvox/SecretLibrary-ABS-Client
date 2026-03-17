@@ -60,7 +60,7 @@ export function MyLibraryScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const { loadBook } = usePlayerStore();
+  const loadBook = usePlayerStore((s) => s.loadBook);
   const { showMenu } = useBookContextMenu();
   const { getItem } = useLibraryCache();
 

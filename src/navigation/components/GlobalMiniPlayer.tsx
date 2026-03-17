@@ -235,7 +235,7 @@ export function GlobalMiniPlayer() {
             {/* Book Info - tap to open player */}
             <Pressable style={styles.infoContainer} onPress={handleOpenPlayer}>
               <Animated.View style={[styles.coverWrap, coverAnimStyle]}>
-                <Image source={coverUrl} style={styles.cover} contentFit="cover" />
+                <Image source={coverUrl} style={styles.cover} contentFit="cover" cachePolicy="memory-disk" />
                 {currentBook?.id && <CoverStars bookId={currentBook.id} starSize={scale(14)} />}
               </Animated.View>
               <View style={styles.textContainer}>

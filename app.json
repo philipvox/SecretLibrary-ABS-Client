@@ -5,6 +5,7 @@
     "version": "1.0.4",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
+    "scheme": "secretlibrary",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -71,6 +72,7 @@
     "plugins": [
       "./plugins/android-auto/withAndroidAuto",
       "./plugins/exo-player/withExoPlayer",
+      "./plugins/chromecast/withChromecast",
       "expo-splash-screen",
       [
         "expo-audio",

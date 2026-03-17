@@ -16,61 +16,32 @@ import { LibraryItem } from '@/core/types';
 // =============================================================================
 
 export interface ScaledSpineData {
-  /** The BookSpineVerticalData for rendering */
   book: BookSpineVerticalData;
-  /** Scaled width */
   width: number;
-  /** Scaled height */
   height: number;
-  /** Hash for deterministic randomization */
   hash: number;
-  /** Touch padding for small books */
   touchPadding: number;
-  /** Pre-computed typography (font family, weight, transforms, etc.) for consistency across screens */
-  typography?: {
-    fontFamily: string;
-    fontWeight: string;
-    fontStyle: string;
-    titleTransform: string;
-    authorTransform: string;
-    authorPosition: string;
-    authorBox: string;
-    letterSpacing: number;
-    titleLetterSpacing: number;
-    authorLetterSpacing: number;
-    authorOrientationBias: string;
-    contrast: string;
-    titleWeight: string;
-    authorWeight: string;
-    authorAbbreviation: string;
-  };
+  accentColor?: string;
 }
 
 export interface UseSpineCacheOptions {
-  /** Scale factor for dimensions (default: 1) */
   scaleFactor?: number;
-  /** Width multiplier for spine thickness (default: 1) */
   thicknessMultiplier?: number;
-  /** Minimum touch target width (default: 44) */
   minTouchTarget?: number;
 }
 
 // =============================================================================
-// CONSTANTS - Conservative defaults to prevent oversized spines
+// CONSTANTS
 // =============================================================================
 
-const DEFAULT_SCALE = 0.95;  // Reduced from 1 to match BookshelfView dynamic scaling
-const DEFAULT_THICKNESS_MULTIPLIER = 1.1;  // Reduced from 1.22 to prevent over-thickening
+const DEFAULT_SCALE = 0.95;
+const DEFAULT_THICKNESS_MULTIPLIER = 1.1;
 const DEFAULT_MIN_TOUCH_TARGET = 44;
 
 // =============================================================================
 // HOOK
 // =============================================================================
 
-/**
- * Get scaled spine data for a list of books.
- * Uses pre-calculated cache for dimensions.
- */
 export function useSpineCache(
   bookIds: string[],
   options: UseSpineCacheOptions = {}
@@ -108,16 +79,12 @@ export function useSpineCache(
         height,
         hash: cached.hash,
         touchPadding,
-        typography: cached.typography,
+        accentColor: cached.accentColor,
       };
     });
   }, [bookIds, scaleFactor, thicknessMultiplier, minTouchTarget, getSpineDataBatch]);
 }
 
-/**
- * Convert LibraryItems to BookSpineVerticalData using cache.
- * Falls back to extracting from LibraryItem if not cached.
- */
 export function useSpineCacheFromItems(
   items: LibraryItem[],
   options: UseSpineCacheOptions = {}
@@ -126,9 +93,6 @@ export function useSpineCacheFromItems(
   return useSpineCache(bookIds, options);
 }
 
-/**
- * Get a single book's cached spine data.
- */
 export function useSingleSpineData(
   bookId: string | undefined,
   options: UseSpineCacheOptions = {}
@@ -168,15 +132,11 @@ export function useSingleSpineData(
       height,
       hash: cached.hash,
       touchPadding,
-      composition: cached.composition,
-      typography: cached.typography,
+      accentColor: cached.accentColor,
     };
   }, [bookId, scaleFactor, thicknessMultiplier, minTouchTarget, getSpineData]);
 }
 
-/**
- * Check if the spine cache is populated.
- */
 export function useSpineCacheStatus() {
   return useSpineCacheStore(
     useShallow((state) => ({
@@ -187,9 +147,6 @@ export function useSpineCacheStatus() {
   );
 }
 
-/**
- * Get the populate function for manual cache population.
- */
 export function usePopulateSpineCache() {
   return useSpineCacheStore((state) => state.populateFromLibrary);
 }

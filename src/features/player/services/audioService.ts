@@ -2051,6 +2051,12 @@ class AudioService {
     this.isScrubbing = false;
     this.pendingTrackSwitch = null;
     this.pendingSeekAfterLoad = null;
+
+    // Clear callbacks to prevent stale events from firing into wrong book context
+    // New callbacks are set by loadBook() before the next loadAudio/loadTracks call
+    this.statusCallback = null;
+    this.errorCallback = null;
+    remoteCommandCallback = null;
   }
 
   /**

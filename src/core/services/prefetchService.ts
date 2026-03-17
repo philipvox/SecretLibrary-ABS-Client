@@ -7,6 +7,7 @@
 
 import { QueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { Asset } from 'expo-asset';
 import { apiClient } from '@/core/api';
 import { LibraryItem } from '@/core/types';
 import { sqliteCache } from './sqliteCache';
@@ -14,15 +15,51 @@ import { imageCacheService } from './imageCacheService';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
 import { logger } from '@/shared/utils/logger';
 
+// Book cloth textures used by BookSpineVertical — preload to avoid pop-in
+const BOOK_TEXTURES = [
+  require('@assets/textures/book-texture-1.webp'),
+  require('@assets/textures/book-texture-2.webp'),
+  require('@assets/textures/book-texture-3.webp'),
+  require('@assets/textures/book-texture-4.webp'),
+  require('@assets/textures/book-texture-5.webp'),
+  require('@assets/textures/book-texture-6.webp'),
+  require('@assets/textures/book-texture-7.webp'),
+  require('@assets/textures/book-texture-8.webp'),
+  require('@assets/textures/book-texture-9.webp'),
+  require('@assets/textures/book-texture-10.webp'),
+  require('@assets/textures/book-texture-11.webp'),
+  require('@assets/textures/book-texture-12.webp'),
+  require('@assets/textures/book-texture-13.webp'),
+];
+
+const STAR_STICKER = require('@assets/stars/star5.webp');
+
 class PrefetchService {
   private queryClient: QueryClient | null = null;
   private isLoading = false;
   private cachedItems: LibraryItem[] = [];
+  private texturesPreloaded = false;
   private lastLibraryId: string = '';
   private isHydrated = false;
 
   setQueryClient(client: QueryClient) {
     this.queryClient = client;
+  }
+
+  /**
+   * Preload book cloth textures and star sticker into memory.
+   * These are bundled assets that need decoding on first use — without
+   * preloading they cause a visible pop-in when spines first render.
+   */
+  async preloadTextures(): Promise<void> {
+    if (this.texturesPreloaded) return;
+    try {
+      await Asset.loadAsync([...BOOK_TEXTURES, STAR_STICKER]);
+      this.texturesPreloaded = true;
+      logger.debug(`[Prefetch] Preloaded ${BOOK_TEXTURES.length} textures + star sticker`);
+    } catch (err) {
+      logger.debug('[Prefetch] Texture preload error (non-critical):', err);
+    }
   }
 
   /**
@@ -36,8 +73,11 @@ class PrefetchService {
     if (!libraryId) return [];
 
     try {
-      // Initialize SQLite
-      await sqliteCache.init();
+      // Initialize SQLite + preload textures in parallel
+      await Promise.all([
+        sqliteCache.init(),
+        this.preloadTextures(),
+      ]);
 
       const startTime = Date.now();
 

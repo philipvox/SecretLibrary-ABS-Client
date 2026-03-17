@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { scale } from '@/shared/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { secretLibraryColors as secretLibraryDarkColors } from '@/shared/theme/secretLibrary';
+import { secretLibraryDarkColors } from '@/shared/theme/secretLibrary';
 import { useSecretLibraryColors } from '@/shared/theme';
 import { useLibraryCache } from '@/core/cache';
 import { useSpineCacheStatus } from '@/features/home';
@@ -146,11 +146,16 @@ export function SecretLibraryBrowseScreen() {
     navigateWithLoading('CollectionsList');
   }, [navigateWithLoading]);
 
+  const handleViewAllNewToLibrary = useCallback(() => {
+    navigation.navigate('AllBooks', { filter: 'new_to_library' });
+  }, [navigation]);
+
+  const handleViewAllNewReleases = useCallback(() => {
+    navigation.navigate('AllBooks', { filter: 'new_releases' });
+  }, [navigation]);
+
   const handleViewAllBooks = useCallback(() => {
-    navigation.navigate('FilteredBooks', {
-      title: 'All Books',
-      filterType: 'all_books',
-    });
+    navigation.navigate('AllBooks', { filter: 'all' });
   }, [navigation]);
 
   const handleBrowseItemPress = useCallback((type: 'genres' | 'narrators' | 'series' | 'duration') => {
@@ -238,7 +243,8 @@ export function SecretLibraryBrowseScreen() {
         onAuthorPress={handleAuthorPress}
         onCollectionPress={handleCollectionPress}
         onViewAllCollections={handleViewAllCollections}
-        onViewAllBooks={handleViewAllBooks}
+        onViewAllNewToLibrary={handleViewAllNewToLibrary}
+        onViewAllNewReleases={handleViewAllNewReleases}
         onVibePress={handleVibePress}
         onBrowseItemPress={handleBrowseItemPress}
         onMoodPress={handleMoodPress}

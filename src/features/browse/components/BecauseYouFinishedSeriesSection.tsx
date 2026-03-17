@@ -16,6 +16,7 @@ import { CompleteBadgeOverlay } from '@/features/completion';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { SectionHeader } from './SectionHeader';
 import { useRecentlyCompletedSeries } from '../hooks/useRecentlyCompletedSeries';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 // Layout constants for 2-row horizontal scroll
 const PADDING = 24;
@@ -81,6 +82,7 @@ export const BecauseYouFinishedSeriesSection = React.memo(function BecauseYouFin
   onBookPress,
   onBookLongPress,
 }: BecauseYouFinishedSeriesSectionProps) {
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
   const colors = useSecretLibraryColors();
   const result = useRecentlyCompletedSeries(items);
 
@@ -105,7 +107,7 @@ export const BecauseYouFinishedSeriesSection = React.memo(function BecauseYouFin
     [onBookLongPress],
   );
 
-  if (!result || columns.length === 0) return null;
+  if (!dnaEnabled || !result || columns.length === 0) return null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>

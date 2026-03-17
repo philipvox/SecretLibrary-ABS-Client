@@ -5,7 +5,7 @@
  * Clean editorial aesthetic with Playfair Display and JetBrains Mono typography.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   StatusBar,
   TouchableOpacity,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,9 +28,13 @@ import {
   Vibrate,
   Palette,
   Info,
+  RefreshCw,
+  Undo2,
+  Redo2,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useAuth } from '@/core/auth';
+import { TopNavBackIcon } from '@/shared/components';
 import { useDownloads } from '@/core/hooks/useDownloads';
 import { haptics } from '@/core/native/haptics';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
@@ -40,11 +45,19 @@ import {
   secretLibraryFonts as fonts,
 } from '@/shared/theme/secretLibrary';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
-import { usePlayerStore } from '@/features/player/stores';
+import { usePlayerStore, useSpeedStore } from '@/features/player/stores';
+import { usePlayerSettingsStore } from '@/features/player/stores/playerSettingsStore';
+const SPEED_QUICK_OPTIONS = [1, 1.25, 1.5, 2];
+const SKIP_FORWARD_OPTIONS = [10, 15, 30, 45, 60];
+const SKIP_BACK_OPTIONS = [5, 10, 15, 30, 45];
 import { useChapterCleaningStore, CLEANING_LEVEL_INFO } from '../stores/chapterCleaningStore';
 import { useHapticSettingsStore } from '../stores/hapticSettingsStore';
+import { useDNASettingsStore } from '../stores/dnaSettingsStore';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
 import { useLibrarySyncStore } from '@/shared/stores/librarySyncStore';
+import { useLibraryCache } from '@/core/cache';
+import { useAllTimeStats, useListeningStreak } from '@/features/stats/hooks/useListeningStats';
+import { isBookMedia } from '@/shared/utils/metadata';
 
 // =============================================================================
 // HELPERS
@@ -56,6 +69,17 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+function formatListeningTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  return `${hours.toLocaleString()}h`;
+}
+
+function formatMemberSince(timestamp: number): string {
+  const date = new Date(timestamp);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 // =============================================================================
@@ -126,6 +150,31 @@ export function ProfileScreen() {
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
 
+  // Profile card data
+  const libraryItems = useLibraryCache((s) => s.items);
+  const allTimeStats = useAllTimeStats();
+  const listeningStreak = useListeningStreak();
+  const bookCount = libraryItems.length;
+  const totalListened = allTimeStats.data?.totalSeconds ?? 0;
+  const streak = listeningStreak.data?.currentStreak ?? 0;
+  const serverDisplay = (serverUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const userRole = user?.type ?? 'user';
+  const memberSince = user?.createdAt ? formatMemberSince(user.createdAt) : null;
+  const hasDNA = React.useMemo(() => {
+    return libraryItems.some((item) => {
+      if (!isBookMedia(item.media)) return false;
+      return (item.media.tags || []).some((t: string) => t.startsWith('dna:'));
+    });
+  }, [libraryItems]);
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
+  const toggleDNA = useDNASettingsStore((s) => s.toggleDNAFeatures);
+
+  // Quick settings
+  const { setGlobalDefaultRate } = useSpeedStore();
+  const currentLibraryId = useLibraryCache((s) => s.currentLibraryId);
+  const loadCache = useLibraryCache((s) => s.loadCache);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Download stats
   const { downloads } = useDownloads();
   const completedDownloads = downloads.filter(d => d.status === 'complete');
@@ -133,9 +182,9 @@ export function ProfileScreen() {
   const totalStorage = completedDownloads.reduce((sum, d) => sum + (d.totalBytes || 0), 0);
 
   // Dynamic subtitle values
-  const globalDefaultRate = usePlayerStore((s) => s.globalDefaultRate);
-  const skipForwardInterval = usePlayerStore((s) => s.skipForwardInterval ?? 30);
-  const skipBackInterval = usePlayerStore((s) => s.skipBackInterval ?? 15);
+  const globalDefaultRate = useSpeedStore((s) => s.globalDefaultRate);
+  const skipForwardInterval = usePlayerSettingsStore((s) => s.skipForwardInterval);
+  const skipBackInterval = usePlayerSettingsStore((s) => s.skipBackInterval);
   const chapterLevel = useChapterCleaningStore((s) => s.level);
   const hapticsEnabled = useHapticSettingsStore((s) => s.enabled);
 
@@ -207,6 +256,40 @@ export function ProfileScreen() {
     }
   }, [navigation]);
 
+  const handleSpeedCycle = useCallback(() => {
+    haptics.buttonPress();
+    const currentIdx = SPEED_QUICK_OPTIONS.indexOf(globalDefaultRate ?? 1);
+    const nextIdx = (currentIdx + 1) % SPEED_QUICK_OPTIONS.length;
+    setGlobalDefaultRate(SPEED_QUICK_OPTIONS[nextIdx]);
+  }, [globalDefaultRate, setGlobalDefaultRate]);
+
+  const handleSkipForwardCycle = useCallback(() => {
+    haptics.buttonPress();
+    const idx = SKIP_FORWARD_OPTIONS.indexOf(skipForwardInterval);
+    const next = SKIP_FORWARD_OPTIONS[(idx + 1) % SKIP_FORWARD_OPTIONS.length];
+    usePlayerStore.getState().setSkipForwardInterval(next);
+  }, [skipForwardInterval]);
+
+  const handleSkipBackCycle = useCallback(() => {
+    haptics.buttonPress();
+    const idx = SKIP_BACK_OPTIONS.indexOf(skipBackInterval);
+    const next = SKIP_BACK_OPTIONS[(idx + 1) % SKIP_BACK_OPTIONS.length];
+    usePlayerStore.getState().setSkipBackInterval(next);
+  }, [skipBackInterval]);
+
+  const handleSync = useCallback(async () => {
+    if (!currentLibraryId || isSyncing) return;
+    haptics.buttonPress();
+    setIsSyncing(true);
+    try {
+      await loadCache(currentLibraryId, true);
+      const { librarySyncService } = await import('@/core/services/librarySyncService');
+      await librarySyncService.fullSync();
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [currentLibraryId, isSyncing, loadCache]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.white} />
@@ -214,30 +297,18 @@ export function ProfileScreen() {
       {/* Safe area background */}
       <View style={[styles.safeAreaTop, { height: insets.top, backgroundColor: colors.white }]} />
 
-      {/* Top Navigation with User Info */}
+      {/* Top Navigation */}
       <View style={[styles.topNav, { backgroundColor: colors.white }]}>
-        {/* Skull logo - tap to go home */}
         <Pressable onPress={handleLogoPress} style={styles.topNavLeft}>
-          <SkullLogo size={36} color={colors.black} />
-          <Text style={[styles.topNavTitle, { color: colors.black }]}>Settings</Text>
+          <SkullLogo size={48} color={colors.black} />
         </Pressable>
-        <View style={styles.topNavRight}>
-          <View style={styles.topNavUser}>
-            <Text style={[styles.topNavUsername, { color: colors.black }]}>{user?.username || 'User'}</Text>
-            <Text style={[styles.topNavServer, { color: colors.gray }]} numberOfLines={1}>
-              {(serverUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '')}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.signOutPill, { borderColor: colors.borderLight }]}
-            onPress={handleLogout}
-            disabled={isLoading}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <LogOut size={scale(14)} color={colors.gray} strokeWidth={1.5} />
-            <Text style={[styles.signOutText, { color: colors.gray }]}>Log out</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.backPill, { borderColor: colors.borderLight }]}
+          onPress={() => { haptics.buttonPress(); navigation.goBack(); }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <TopNavBackIcon size={scale(16)} color={colors.gray} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -248,6 +319,170 @@ export function ProfileScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+
+        {/* Profile Card */}
+        <View style={[styles.profileCard, { backgroundColor: colors.cream, borderColor: colors.borderLight }]}>
+          {/* Identity + Log out */}
+          <View style={styles.identityRow}>
+            <View style={styles.identityInfo}>
+              <Text style={[styles.profileName, { color: colors.black }]}>
+                {user?.username || 'User'}
+              </Text>
+              <Text style={[styles.profileServer, { color: colors.gray }]} numberOfLines={1}>
+                {serverDisplay}
+              </Text>
+              <Text style={[styles.profileMeta, { color: colors.textMuted }]}>
+                {userRole}{memberSince ? ` · member since ${memberSince}` : ''}
+              </Text>
+            </View>
+            <View style={styles.identityActions}>
+              <TouchableOpacity
+                style={[styles.signOutPill, { borderColor: colors.borderLight }]}
+                onPress={handleLogout}
+                disabled={isLoading}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <LogOut size={scale(12)} color={colors.gray} strokeWidth={1.5} />
+                <Text style={[styles.signOutText, { color: colors.gray }]}>Log out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dnaPill, {
+                  backgroundColor: !hasDNA ? colors.grayLight
+                    : dnaEnabled ? colors.orange : colors.grayLight,
+                }]}
+                onPress={() => {
+                  if (!hasDNA) return;
+                  haptics.buttonPress();
+                  toggleDNA();
+                }}
+                activeOpacity={hasDNA ? 0.7 : 1}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[styles.dnaPillText, {
+                  color: !hasDNA ? colors.gray
+                    : dnaEnabled ? colors.white : colors.gray,
+                }]}>
+                  {!hasDNA ? 'No DNA' : dnaEnabled ? 'DNA' : 'DNA off'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Stats row */}
+          <TouchableOpacity
+            style={[styles.statsRow, { borderTopColor: colors.borderLight }]}
+            onPress={() => navigation.navigate('Stats')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.black }]}>
+                {bookCount.toLocaleString()}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.gray }]}>books</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.borderLight }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.black }]}>
+                {formatListeningTime(totalListened)}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.gray }]}>listened</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.borderLight }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.black }]}>
+                {streak} day{streak !== 1 ? 's' : ''}
+              </Text>
+              <Text style={[styles.statLabel, { color: colors.gray }]}>streak</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Actions — RW, FF, Sync in one row */}
+        <View style={styles.quickActionsRow}>
+          {/* Rewind */}
+          <TouchableOpacity
+            style={[styles.quickTileSmall, { backgroundColor: colors.cream, borderColor: colors.borderLight }]}
+            onPress={handleSkipBackCycle}
+            activeOpacity={0.7}
+          >
+            <Undo2 size={scale(16)} color={colors.gray} strokeWidth={1.5} />
+            <Text style={[styles.quickTileSmallValue, { color: colors.black }]}>
+              {skipBackInterval}s
+            </Text>
+            <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>Rewind</Text>
+          </TouchableOpacity>
+
+          {/* Fast Forward */}
+          <TouchableOpacity
+            style={[styles.quickTileSmall, { backgroundColor: colors.cream, borderColor: colors.borderLight }]}
+            onPress={handleSkipForwardCycle}
+            activeOpacity={0.7}
+          >
+            <Redo2 size={scale(16)} color={colors.gray} strokeWidth={1.5} />
+            <Text style={[styles.quickTileSmallValue, { color: colors.black }]}>
+              {skipForwardInterval}s
+            </Text>
+            <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>Forward</Text>
+          </TouchableOpacity>
+
+          {/* Sync */}
+          {libraryPlaylistId && (
+            <TouchableOpacity
+              style={[styles.quickTileSmall, { backgroundColor: colors.cream, borderColor: colors.borderLight }]}
+              onPress={handleSync}
+              activeOpacity={0.7}
+              disabled={isSyncing}
+            >
+              {isSyncing ? (
+                <ActivityIndicator size={scale(16)} color={colors.gray} />
+              ) : (
+                <RefreshCw size={scale(16)} color={colors.gray} strokeWidth={1.5} />
+              )}
+              <Text style={[styles.quickTileSmallValue, { color: colors.black }]}>
+                {isSyncing ? '...' : 'Sync'}
+              </Text>
+              <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>Library</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Default Speed Bar */}
+        <View style={[styles.speedBar, { backgroundColor: colors.cream, borderColor: colors.borderLight }]}>
+          <View style={styles.speedBarHeader}>
+            <Text style={[styles.speedBarLabel, { color: colors.gray }]}>Default Speed</Text>
+            <Text style={[styles.speedBarDesc, { color: colors.textMuted }]}>
+              Applied to new books without a saved speed
+            </Text>
+          </View>
+          <View style={styles.speedBarPills}>
+            {SPEED_QUICK_OPTIONS.map((rate) => {
+              const isActive = (globalDefaultRate ?? 1) === rate;
+              return (
+                <TouchableOpacity
+                  key={rate}
+                  style={[
+                    styles.speedPill,
+                    {
+                      backgroundColor: isActive ? colors.black : 'transparent',
+                      borderColor: isActive ? colors.black : colors.borderLight,
+                    },
+                  ]}
+                  onPress={() => { haptics.buttonPress(); setGlobalDefaultRate(rate); }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.speedPillText,
+                      { color: isActive ? colors.white : colors.gray },
+                    ]}
+                  >
+                    {rate}x
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
 
         {/* All Settings */}
         <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
@@ -283,17 +518,17 @@ export function ProfileScreen() {
           />
         </View>
 
-      </ScrollView>
-
-      {/* Footer — pinned to bottom */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={{ opacity: 0.3 }}>
-          <SkullLogo size={40} color={colors.gray} />
+        {/* Footer */}
+        <View style={styles.footer}>
+          <View style={{ opacity: 0.3 }}>
+            <SkullLogo size={40} color={colors.gray} />
+          </View>
+          <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
+            <Text style={[styles.versionText, { color: colors.gray }]}>Secret Library · v{APP_VERSION}</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={handleVersionTap} activeOpacity={0.7}>
-          <Text style={[styles.versionText, { color: colors.gray }]}>Secret Library · v{APP_VERSION}</Text>
-        </TouchableOpacity>
-      </View>
+
+      </ScrollView>
     </View>
   );
 }
@@ -325,30 +560,153 @@ const styles = StyleSheet.create({
     fontFamily: fonts.playfair.regular,
     fontSize: scale(22),
   },
-  topNavRight: {
-    flexDirection: 'row',
+  backPill: {
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
+    borderWidth: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
-  topNavUser: {
-    alignItems: 'flex-end',
+  // Profile Card
+  profileCard: {
+    borderRadius: scale(12),
+    borderWidth: 1,
+    marginTop: 12,
+    marginBottom: 20,
+    overflow: 'hidden',
   },
-  topNavUsername: {
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 18,
+  },
+  identityInfo: {
+    flex: 1,
+  },
+  profileName: {
     fontFamily: fonts.playfair.regular,
-    fontSize: scale(15),
+    fontSize: scale(18),
+    marginBottom: 4,
   },
-  topNavServer: {
+  profileServer: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    marginTop: 4,
+  },
+  identityActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  profileMeta: {
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(9),
-    marginTop: 1,
+    marginTop: 6,
+  },
+  dnaPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  dnaPillText: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(8),
+    fontWeight: '600',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontFamily: fonts.playfair.regular,
+    fontSize: scale(16),
+    fontWeight: '600',
+  },
+  statLabel: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+  },
+  // Speed Bar
+  speedBar: {
+    borderRadius: scale(12),
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+  },
+  speedBarHeader: {
+    marginBottom: 12,
+  },
+  speedBarLabel: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  speedBarDesc: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(8),
+    marginTop: 3,
+  },
+  speedBarPills: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  speedPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  speedPillText: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+  },
+  // Quick Actions Row
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  quickTileSmall: {
+    flex: 1,
+    borderRadius: scale(12),
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 4,
+  },
+  quickTileSmallValue: {
+    fontFamily: fonts.playfair.regular,
+    fontSize: scale(14),
+    fontWeight: '600',
+  },
+  quickTileSmallLabel: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(8),
   },
   signOutPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
     borderWidth: 1,
   },
   signOutText: {
@@ -409,7 +767,7 @@ const styles = StyleSheet.create({
   // Footer
   footer: {
     alignItems: 'center',
-    paddingTop: 12,
+    paddingVertical: 20,
     gap: 6,
   },
   versionText: {

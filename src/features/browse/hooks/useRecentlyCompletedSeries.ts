@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import { useProgressStore } from '@/core/stores/progressStore';
 import { LibraryItem, BookMetadata, BookMedia } from '@/core/types';
 import { parseBookDNA, BookDNA, getDNAQuality } from '@/shared/utils/bookDNA';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 function getMetadata(item: LibraryItem): BookMetadata | Record<string, never> {
   if (item.mediaType !== 'book' || !item.media?.metadata) return {};
@@ -210,6 +211,7 @@ export function useRecentlyCompletedSeries(
   items: LibraryItem[]
 ): CompletedSeriesResult | null {
   const progressMap = useProgressStore((s) => s.progressMap);
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
 
   return useMemo(() => {
     if (!items.length || progressMap.size === 0) return null;
@@ -276,8 +278,8 @@ export function useRecentlyCompletedSeries(
     seriesWithFinished.sort((a, b) => b.latestFinish - a.latestFinish);
     const topSeries = seriesWithFinished[0];
 
-    // Try DNA-based matching first
-    const seriesDNAProfile = buildSeriesDNAProfile(topSeries.books);
+    // Try DNA-based matching first (skip when DNA features disabled)
+    const seriesDNAProfile = dnaEnabled ? buildSeriesDNAProfile(topSeries.books) : null;
 
     // Build series index: for each series, map sequence# → bookId
     // Used to check if user can start a mid-series book
@@ -381,5 +383,5 @@ export function useRecentlyCompletedSeries(
       genreTags: displayGenres,
       matchingBooks,
     };
-  }, [items, progressMap]);
+  }, [items, progressMap, dnaEnabled]);
 }

@@ -1,7 +1,6 @@
 package com.secretlibrary.app.automotive
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
@@ -10,17 +9,12 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
-import android.util.LruCache
 import androidx.media.MediaBrowserServiceCompat
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.RequestOptions
 import com.secretlibrary.app.exoplayer.AudioPlaybackService
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * MediaBrowserService for Android Auto integration.
@@ -31,7 +25,7 @@ import java.util.concurrent.TimeUnit
  * 3. Shares MediaSession from AudioPlaybackService (ExoPlayer)
  *    — NO own MediaSession, NO playback state management, NO audio focus fighting
  * 4. Emits browse commands back to React Native via AndroidAutoModule
- * 5. Loads cover art asynchronously with caching
+ * 5. Uses setIconUri() for browse item covers (Android Auto handles loading natively)
  */
 class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
 
@@ -39,9 +33,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         private const val TAG = "AndroidAutoService"
         private const val MEDIA_ROOT_ID = "secret_library_media_root"
         private const val BROWSE_DATA_FILE = "android_auto_browse.json"
-
-        // Cover art dimensions for Android Auto (recommended size)
-        private const val COVER_ART_SIZE = 400
 
         // Media ID prefixes for routing
         const val PREFIX_SECTION = "section:"
@@ -80,21 +71,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     // Coroutine scope for async operations
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // Cover art cache with LRU eviction to prevent OOM (max ~50 entries ≈ 32MB)
-    // NOTE: Do NOT override entryRemoved to call bitmap.recycle() — evicted bitmaps may still
-    // be referenced by MediaItem descriptions, causing "Canvas: trying to use a recycled bitmap" crash.
-    // The LRU cap at 50 entries bounds memory; GC handles actual deallocation.
-    private val coverArtCache = LruCache<String, Bitmap>(50)
-
-    // Track current now-playing artwork URL to invalidate on book change
-    private var currentNowPlayingUrl: String? = null
-
-    // Glide request options for cover art
-    private val glideOptions = RequestOptions()
-        .diskCacheStrategy(DiskCacheStrategy.ALL)
-        .override(COVER_ART_SIZE, COVER_ART_SIZE)
-        .centerCrop()
-
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -117,7 +93,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     override fun onDestroy() {
         instance = null
         serviceScope.cancel()
-        coverArtCache.evictAll()
         super.onDestroy()
         Log.d(TAG, "AndroidAutoMediaBrowserService destroyed")
     }
@@ -191,7 +166,7 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    private suspend fun loadChildrenAsync(parentId: String): MutableList<MediaBrowserCompat.MediaItem> {
+    private fun loadChildrenAsync(parentId: String): MutableList<MediaBrowserCompat.MediaItem> {
         val items = mutableListOf<MediaBrowserCompat.MediaItem>()
 
         when {
@@ -242,9 +217,11 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     }
 
     /**
-     * Create a media item with cover art loaded asynchronously
+     * Create a media item with cover art URI.
+     * Uses setIconUri() so Android Auto handles image loading natively —
+     * no Glide, no bitmap cache, no auth token staleness issues.
      */
-    private suspend fun createMediaItemWithArt(item: JSONObject): MediaBrowserCompat.MediaItem {
+    private fun createMediaItemWithArt(item: JSONObject): MediaBrowserCompat.MediaItem {
         val id = item.getString("id")
         val title = item.getString("title")
         val subtitle = item.optString("subtitle", "")
@@ -259,12 +236,9 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
             .setTitle(title)
             .setSubtitle(subtitle)
 
-        // Load cover art
+        // Set cover art URI — Android Auto framework handles loading and caching
         if (!imageUrl.isNullOrEmpty()) {
-            val bitmap = loadCoverArt(id, imageUrl)
-            if (bitmap != null) {
-                descriptionBuilder.setIconBitmap(bitmap)
-            }
+            descriptionBuilder.setIconUri(Uri.parse(imageUrl))
         }
 
         // Add progress and duration as extras with Android Auto progress indicator support
@@ -292,46 +266,6 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         if (isBrowsable) flags = flags or MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
 
         return MediaBrowserCompat.MediaItem(description, flags)
-    }
-
-    /**
-     * Load cover art using Glide with caching.
-     */
-    private suspend fun loadCoverArt(itemId: String, imageUrl: String): Bitmap? {
-        val cacheKey = "$itemId:${imageUrl.hashCode()}"
-        coverArtCache.get(cacheKey)?.let { return it }
-
-        return withContext(Dispatchers.IO) {
-            try {
-                val urlDomain = try {
-                    android.net.Uri.parse(imageUrl).host ?: "unknown"
-                } catch (e: Exception) { "invalid" }
-                Log.d(TAG, "Loading cover art for $itemId from $urlDomain (has token: ${imageUrl.contains("token=")})")
-
-                val bitmap = Glide.with(this@AndroidAutoMediaBrowserService)
-                    .asBitmap()
-                    .load(imageUrl)
-                    .apply(glideOptions)
-                    .submit()
-                    .get(5, TimeUnit.SECONDS)
-
-                coverArtCache.put(cacheKey, bitmap)
-                Log.d(TAG, "Loaded cover art for: $itemId (${bitmap.width}x${bitmap.height})")
-                bitmap
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to load cover art for $itemId: ${e.message}")
-                null
-            }
-        }
-    }
-
-    /**
-     * Clear cover art cache (call when library updates)
-     */
-    fun clearCoverArtCache() {
-        coverArtCache.evictAll()
-        currentNowPlayingUrl = null
-        Log.d(TAG, "Cover art cache cleared")
     }
 
     private fun loadBrowseData() {

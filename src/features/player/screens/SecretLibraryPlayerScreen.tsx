@@ -72,6 +72,9 @@ import {
 import { useResponsive } from '@/shared/hooks/useResponsive';
 import { useSpineCacheStore, getTypographyForGenres, getSeriesStyle } from '@/shared/spine';
 
+// Chromecast
+import { useCastStore } from '@/features/chromecast';
+
 // Sheets/Panels
 import { SpeedSheet } from '../sheets/SpeedSheet';
 import { SleepTimerSheet } from '../sheets/SleepTimerSheet';
@@ -186,6 +189,15 @@ const _ChevronDownIcon = ({ color = staticColors.black, size = 12 }: IconProps) 
   </Svg>
 );
 
+const CastIcon = ({ color = staticColors.black, size = 16 }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+    <Path d="M2 12a9 9 0 0 1 8 8" />
+    <Path d="M2 16a5 5 0 0 1 4 4" />
+    <Circle cx={2} cy={20} r={0.5} fill={color} />
+  </Svg>
+);
+
 // =============================================================================
 // HELPERS
 // =============================================================================
@@ -267,6 +279,11 @@ export function SecretLibraryPlayerScreen() {
   // Theme-aware colors
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
+
+  // Chromecast state
+  const castAvailable = useCastStore((s) => s.isAvailable);
+  const castConnected = useCastStore((s) => s.isConnected);
+  const showCastPicker = useCastStore((s) => s.showPicker);
 
   // Sheet state - no sheet open by default
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
@@ -1155,6 +1172,11 @@ export function SecretLibraryPlayerScreen() {
           },
         ]}
           circleButtons={[
+            ...(castAvailable ? [{
+              key: 'cast',
+              icon: <CastIcon color={castConnected ? '#F3B60C' : colors.black} size={16} />,
+              onPress: showCastPicker,
+            }] : []),
             {
               key: 'back',
               icon: <TopNavBackIcon color={colors.black} size={16} />,
@@ -1191,6 +1213,18 @@ export function SecretLibraryPlayerScreen() {
                 </View>
               )}
               {bookId && <CoverStars bookId={bookId} starSize={scale(48)} />}
+              {/* Chromecast button overlay - top left of cover */}
+              {castAvailable && (
+                <TouchableOpacity
+                  onPress={showCastPicker}
+                  style={styles.castOverlay}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View style={[styles.castOverlayBg, castConnected && styles.castOverlayBgActive]}>
+                    <CastIcon color={castConnected ? '#F3B60C' : '#FFFFFF'} size={18} />
+                  </View>
+                </TouchableOpacity>
+              )}
               {/* Loading/buffering spinner overlay on cover */}
               {(isLoading || isBuffering) && (
                 <View style={styles.coverLoadingOverlay}>
@@ -1735,6 +1769,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: scale(8),
+  },
+
+  // Chromecast button overlay on cover
+  castOverlay: {
+    position: 'absolute',
+    top: scale(10),
+    left: scale(10),
+    zIndex: 10,
+  },
+  castOverlayBg: {
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  castOverlayBgActive: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
 
   // Time Delta Popup - overlays cover
