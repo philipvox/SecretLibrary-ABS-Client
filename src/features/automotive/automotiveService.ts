@@ -826,6 +826,7 @@ class AutomotiveService {
 
   // Periodic sync interval for Android Auto position updates
   private periodicSyncInterval: ReturnType<typeof setInterval> | null = null;
+  private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Set up player state synchronization for Android Auto MediaSession
@@ -863,7 +864,6 @@ class AutomotiveService {
       // Debounce timer to collapse rapid state changes into one native call.
       // This prevents audio focus renegotiation storms when play/pause/seek
       // fire multiple store updates in quick succession.
-      let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
       const SYNC_DEBOUNCE_MS = 300;
 
       // Command cooldown — after handling an AA command, suppress syncState
@@ -881,11 +881,11 @@ class AutomotiveService {
       // Helper to sync playback state to Android Auto (debounced)
       const syncPlaybackState = (isPlaying: boolean, position: number, speed: number) => {
         // Clear any pending debounced sync
-        if (syncDebounceTimer) {
-          clearTimeout(syncDebounceTimer);
+        if (this.syncDebounceTimer) {
+          clearTimeout(this.syncDebounceTimer);
         }
-        syncDebounceTimer = setTimeout(() => {
-          syncDebounceTimer = null;
+        this.syncDebounceTimer = setTimeout(() => {
+          this.syncDebounceTimer = null;
           try {
             const result = AndroidAutoModule.updatePlaybackState(
               isPlaying,
@@ -1521,6 +1521,12 @@ class AutomotiveService {
     if (this.periodicSyncInterval) {
       clearInterval(this.periodicSyncInterval);
       this.periodicSyncInterval = null;
+    }
+
+    // Clear debounce timer to prevent stale native calls after teardown
+    if (this.syncDebounceTimer) {
+      clearTimeout(this.syncDebounceTimer);
+      this.syncDebounceTimer = null;
     }
 
     // Remove Android Auto event subscription

@@ -14,6 +14,8 @@ class CastModule: RCTEventEmitter {
 
   private var hasListeners = false
   private var statusTimer: Timer?
+  /// Retain request delegates strongly — GCKRequest.delegate is weak
+  private var pendingDelegates: [Int: RequestDelegate] = [:]
 
   override init() {
     super.init()
@@ -23,7 +25,9 @@ class CastModule: RCTEventEmitter {
   private func setupCastContext() {
     let options = GCKCastOptions(discoveryCriteria:
       GCKDiscoveryCriteria(applicationID: kGCKDefaultMediaReceiverApplicationID))
-    GCKCastContext.setSharedInstanceWith(options)
+    if !GCKCastContext.isSharedInstanceInitialized() {
+      GCKCastContext.setSharedInstanceWith(options)
+    }
     sessionManager.add(self)
   }
 
@@ -109,7 +113,11 @@ class CastModule: RCTEventEmitter {
       options.playPosition = position
 
       let request = client.loadMedia(builder.build(), with: options)
-      request.delegate = RequestDelegate(resolve: resolve, reject: reject)
+      let delegate = RequestDelegate(resolve: resolve, reject: reject) { [weak self] requestID in
+        self?.pendingDelegates.removeValue(forKey: requestID)
+      }
+      self.pendingDelegates[Int(request.requestID)] = delegate
+      request.delegate = delegate
       self.startMediaStatusPolling()
     }
   }
@@ -244,17 +252,21 @@ extension CastModule: GCKSessionManagerListener {
 private class RequestDelegate: NSObject, GCKRequestDelegate {
   let resolve: RCTPromiseResolveBlock
   let reject: RCTPromiseRejectBlock
+  let onComplete: (Int) -> Void
 
-  init(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+  init(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock, onComplete: @escaping (Int) -> Void) {
     self.resolve = resolve
     self.reject = reject
+    self.onComplete = onComplete
   }
 
   func requestDidComplete(_ request: GCKRequest) {
+    onComplete(Int(request.requestID))
     resolve(true)
   }
 
   func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+    onComplete(Int(request.requestID))
     reject("LOAD_ERROR", error.localizedDescription, error)
   }
 }

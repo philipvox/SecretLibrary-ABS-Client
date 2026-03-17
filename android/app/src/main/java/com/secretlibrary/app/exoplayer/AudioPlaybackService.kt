@@ -280,7 +280,6 @@ class AudioPlaybackService : Service() {
             builder.setStyle(
                 androidx.media.app.NotificationCompat.MediaStyle()
                     .setMediaSession(session.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
             )
         }
 
@@ -314,13 +313,21 @@ class AudioPlaybackService : Service() {
         autoPlay: Boolean,
         onPrepared: ((Boolean, String?) -> Unit)? = null
     ) {
+        // Validate inputs
+        if (trackInfos.isEmpty()) {
+            onPrepared?.invoke(false, "Empty playlist — no tracks to load")
+            return
+        }
+        val safeStartIndex = startIndex.coerceIn(0, trackInfos.lastIndex)
+        val safeStartPositionMs = startPositionMs.coerceAtLeast(0L)
+
         // Ensure initialized — retry if needed
         if (!ensureReady()) {
             throw IllegalStateException("ExoPlayer failed to initialize")
         }
 
         val player = exoPlayer!!
-        Log.d(TAG, "loadTracks: ${trackInfos.size} tracks, startIndex=$startIndex, startPos=${startPositionMs}ms, autoPlay=$autoPlay")
+        Log.d(TAG, "loadTracks: ${trackInfos.size} tracks, startIndex=$safeStartIndex, startPos=${safeStartPositionMs}ms, autoPlay=$autoPlay")
 
         // Stop position updates during load
         stopPositionUpdates()
@@ -331,7 +338,7 @@ class AudioPlaybackService : Service() {
         // Reset state
         hasReachedEnd = false
         tracks = trackInfos
-        currentTrackIndex = startIndex
+        currentTrackIndex = safeStartIndex
         totalDuration = if (trackInfos.isNotEmpty()) {
             val lastTrack = trackInfos.last()
             lastTrack.startOffset + lastTrack.duration
@@ -358,7 +365,7 @@ class AudioPlaybackService : Service() {
         // Clear and set new playlist
         player.stop()
         player.clearMediaItems()
-        player.setMediaItems(mediaItems, startIndex, startPositionMs)
+        player.setMediaItems(mediaItems, safeStartIndex, safeStartPositionMs)
         player.playWhenReady = autoPlay
 
         // Store prepare callback and start timeout
@@ -586,6 +593,8 @@ class AudioPlaybackService : Service() {
      */
     private fun destroy() {
         Log.d(TAG, "Destroying AudioPlaybackService")
+        cancelPrepareTimeout()
+        prepareCallback = null
         stopPositionUpdates()
         serviceScope.cancel()
 
