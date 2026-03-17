@@ -198,7 +198,7 @@ export function DiscoverMoreCard({
   recommendations,
   onPress,
   onBookPress,
-  height = 320,
+  _height = 320,
 }: DiscoverMoreCardProps) {
   // Theme-aware colors
   const colors = useSecretLibraryColors();

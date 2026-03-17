@@ -21,6 +21,9 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { scale, useTheme } from '@/shared/theme';
+import { usePlayerStore } from '@/features/player';
+import { GLOBAL_MINI_PLAYER_HEIGHT } from '@/navigation/components/GlobalMiniPlayer';
+import { BOTTOM_NAV_HEIGHT } from '@/constants/layout';
 
 interface AlphabetScrubberProps {
   /** Available letters to display */
@@ -46,9 +49,15 @@ export function AlphabetScrubber({
   const containerRef = useRef<View>(null);
   const [containerHeight, setContainerHeight] = useState(0);
   const lastLetterRef = useRef<string>('');
+  const hasMiniPlayer = usePlayerStore((s) => !!s.currentBook);
 
-  // Calculate letter height for mapping touch position to letter
-  const letterHeight = letters.length > 0 ? containerHeight / letters.length : 0;
+  // Use refs so PanResponder always accesses latest values
+  const lettersRef = useRef(letters);
+  lettersRef.current = letters;
+  const containerHeightRef = useRef(containerHeight);
+  containerHeightRef.current = containerHeight;
+  const onLetterSelectRef = useRef(onLetterSelect);
+  onLetterSelectRef.current = onLetterSelect;
 
   // Trigger haptic feedback
   const triggerHaptic = useCallback(() => {
@@ -59,15 +68,18 @@ export function AlphabetScrubber({
     }
   }, []);
 
-  // Convert Y position to letter index
+  // Convert Y position to letter index (uses refs for fresh values)
   const getLetterFromY = useCallback((y: number): string | null => {
-    if (letterHeight === 0 || letters.length === 0) return null;
-    const index = Math.floor(y / letterHeight);
-    const clampedIndex = Math.max(0, Math.min(letters.length - 1, index));
-    return letters[clampedIndex];
-  }, [letters, letterHeight]);
+    const currentLetters = lettersRef.current;
+    const height = containerHeightRef.current;
+    const letterH = currentLetters.length > 0 ? height / currentLetters.length : 0;
+    if (letterH === 0 || currentLetters.length === 0) return null;
+    const index = Math.floor(y / letterH);
+    const clampedIndex = Math.max(0, Math.min(currentLetters.length - 1, index));
+    return currentLetters[clampedIndex];
+  }, []);
 
-  // Handle touch/drag events
+  // Handle touch/drag events — stable because getLetterFromY uses refs
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -78,7 +90,7 @@ export function AlphabetScrubber({
         if (letter && letter !== lastLetterRef.current) {
           lastLetterRef.current = letter;
           triggerHaptic();
-          onLetterSelect(letter);
+          onLetterSelectRef.current(letter);
         }
       },
       onPanResponderMove: (evt) => {
@@ -87,7 +99,7 @@ export function AlphabetScrubber({
         if (letter && letter !== lastLetterRef.current) {
           lastLetterRef.current = letter;
           triggerHaptic();
-          onLetterSelect(letter);
+          onLetterSelectRef.current(letter);
         }
       },
       onPanResponderRelease: () => {
@@ -109,29 +121,32 @@ export function AlphabetScrubber({
   return (
     <View
       ref={containerRef}
-      style={[styles.container, style]}
+      style={[styles.container, hasMiniPlayer && { bottom: GLOBAL_MINI_PLAYER_HEIGHT + BOTTOM_NAV_HEIGHT }, style]}
       onLayout={handleLayout}
       {...panResponder.panHandlers}
     >
-      {letters.map((letter) => (
-        <View
-          key={letter}
-          style={[
-            styles.letterContainer,
-            activeLetter === letter && { backgroundColor: colors.accent.primary, borderRadius: scale(12) },
-          ]}
-        >
-          <Text
+      {letters.map((letter) => {
+        const isActive = activeLetter === letter;
+        return (
+          <View
+            key={letter}
             style={[
-              styles.letter,
-              { color: colors.accent.primary },
-              activeLetter === letter && { color: colors.background.primary },
+              styles.letterContainer,
+              isActive && styles.activeLetterContainer,
             ]}
           >
-            {letter}
-          </Text>
-        </View>
-      ))}
+            <Text
+              style={[
+                styles.letter,
+                { color: 'rgba(255,255,255,0.5)' },
+                isActive && styles.activeLetter,
+              ]}
+            >
+              {letter}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -140,9 +155,10 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     right: 2,
-    top: 8,
+    top: 0,
+    bottom: 0,
     width: 24,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
   },
@@ -150,11 +166,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 24,
-    minHeight: 14,
+    width: 22,
+  },
+  activeLetterContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 11,
   },
   letter: {
-    fontSize: scale(10),
-    fontWeight: '700',
+    fontSize: scale(9),
+    fontWeight: '600',
+  },
+  activeLetter: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 });

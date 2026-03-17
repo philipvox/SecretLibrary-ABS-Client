@@ -1,49 +1,42 @@
 /**
  * src/features/library/screens/NarratorsListScreen.tsx
  *
- * Redesigned Narrator Browse page matching GenresListScreen pattern:
- * - View mode toggle (grouped vs flat A-Z)
- * - Your Narrators section (personalized from listening history)
- * - Popular Narrators section (top by book count)
- * - Browse by Category (grouped by primary genre)
- * - Collapsible meta-category sections
- *
- * Note: Narrators don't have images, always display initials.
+ * Narrators list matching AllBooksScreen design:
+ * - Skull logo TopNav with sort pill + back pill + search circle button
+ * - JetBrainsMono uppercase count label
+ * - Flat sorted FlatList with Playfair names and JetBrainsMono metadata
+ * - Sort dropdown modal (Name, Book Count)
+ * - AlphabetScrubber for Name sort
+ * - Narrators always use initials (no images)
  */
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { InteractionManager } from 'react-native';
 import {
   View,
   Text,
-  ScrollView,
-  SectionList,
+  FlatList,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
+  Pressable,
+  Modal,
+  ViewStyle,
+  TextStyle,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLibraryCache } from '@/core/cache';
-import { useContinueListening } from '@/shared/hooks/useContinueListening';
-import { Icon } from '@/shared/components/Icon';
-import { AlphabetScrubber, SkullRefreshControl, TopNav, TopNavBackIcon, MicIcon, ScreenLoadingOverlay } from '@/shared/components';
+import { SkullRefreshControl, TopNav, TopNavBackIcon, TopNavSearchIcon, AlphabetScrubber, ScreenLoadingOverlay } from '@/shared/components';
 import { globalLoading } from '@/shared/stores/globalLoadingStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
-import { useTheme, scale } from '@/shared/theme';
-import {
-  META_CATEGORIES,
-  MetaCategory,
-  getMetaCategoryForGenre,
-} from '../constants/genreCategories';
-import {
-  PersonWithData,
-  YourPersonsSection,
-  PopularPersonsSection,
-  MetaCategoryPersonSection,
-} from '../components/PersonSections';
+import { scale, useTheme } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 
-type ViewMode = 'grouped' | 'flat';
+const PADDING = 16;
 
 // Avatar color generator based on name
 const AVATAR_COLORS = [
@@ -60,425 +53,369 @@ function getInitials(name: string): string {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
-export function NarratorsListScreen() {
-  const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
-  const accent = colors.accent.primary;
-  const sectionListRef = useRef<SectionList>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('grouped');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [mounted, setMounted] = useState(false);
+// Sort types
+type SortType = 'name' | 'bookCount';
+type SortDirection = 'asc' | 'desc';
 
-  // Mark as mounted after first render and hide global loading
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMounted(true);
-      globalLoading.hide();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
+const SORT_OPTIONS: { key: SortType; label: string; defaultDir: SortDirection }[] = [
+  { key: 'name', label: 'Name', defaultDir: 'asc' },
+  { key: 'bookCount', label: 'Book Count', defaultDir: 'desc' },
+];
 
-  const { refreshCache, isLoaded } = useLibraryCache();
-  const narratorsMap = useLibraryCache((s) => s.narrators);
-  const { items: inProgressItems } = useContinueListening();
+// Sort arrow icon
+const SortArrow = ({ color = '#000', direction = 'desc' }: { color?: string; direction?: 'asc' | 'desc' }) => (
+  <Svg
+    width={10}
+    height={10}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={3}
+    style={direction === 'asc' ? { transform: [{ rotate: '180deg' }] } : undefined}
+  >
+    <Path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
 
-  // Get all narrators with genre info and meta-category (from pre-indexed cache)
-  const narratorsWithData = useMemo((): PersonWithData[] => {
-    if (!narratorsMap || narratorsMap.size === 0) return [];
+interface NarratorItem {
+  name: string;
+  bookCount: number;
+  primaryGenre: string | null;
+}
 
-    return Array.from(narratorsMap.values()).map(narrator => {
-      // Count genres across all books (books already indexed in cache)
-      const genreCounts = new Map<string, number>();
-      const sampleBookIds: string[] = [];
-
-      narrator.books?.forEach(book => {
-        if (sampleBookIds.length < 3) {
-          sampleBookIds.push(book.id);
-        }
-        const genres = (book.media?.metadata as any)?.genres || [];
-        genres.forEach((genre: string) => {
-          genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
-        });
-      });
-
-      // Find primary genre (most common)
-      const primaryGenre = [...genreCounts.entries()]
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-
-      // Map to meta-category
-      const metaCategory = primaryGenre ? getMetaCategoryForGenre(primaryGenre) : null;
-
-      return {
-        name: narrator.name,
-        bookCount: narrator.bookCount,
-        primaryGenre,
-        metaCategoryId: metaCategory?.id || null,
-        sampleBookIds,
-        books: narrator.books, // Keep reference for yourNarrators lookup
-        // Narrators don't have images
-      };
-    });
-  }, [narratorsMap]);
-
-  // Filter by search query
-  const filteredNarrators = useMemo(() => {
-    if (!searchQuery.trim()) return narratorsWithData;
-    const lowerQuery = searchQuery.toLowerCase();
-    return narratorsWithData.filter(n => n.name.toLowerCase().includes(lowerQuery));
-  }, [narratorsWithData, searchQuery]);
-
-  // Get "Your Narrators" - narrators from books user is listening to
-  const yourNarrators = useMemo((): PersonWithData[] => {
-    const listenedBookIds = new Set(inProgressItems.map(item => item.id));
-    if (listenedBookIds.size === 0) return [];
-
-    const narratorCounts = new Map<string, number>();
-    narratorsWithData.forEach(narrator => {
-      // Use pre-indexed books from cache instead of filterItems
-      const listenedCount = (narrator.books || []).filter(b => listenedBookIds.has(b.id)).length;
-      if (listenedCount > 0) {
-        narratorCounts.set(narrator.name, listenedCount);
-      }
-    });
-
-    return narratorsWithData
-      .filter(n => narratorCounts.has(n.name))
-      .sort((a, b) => (narratorCounts.get(b.name) || 0) - (narratorCounts.get(a.name) || 0))
-      .slice(0, 5);
-  }, [narratorsWithData, inProgressItems]);
-
-  // Get popular narrators (top 6 by book count)
-  const popularNarrators = useMemo((): PersonWithData[] => {
-    return [...filteredNarrators]
-      .sort((a, b) => b.bookCount - a.bookCount)
-      .slice(0, 6);
-  }, [filteredNarrators]);
-
-  // Group narrators by meta-category
-  const narratorsByCategory = useMemo(() => {
-    const grouped = new Map<MetaCategory, PersonWithData[]>();
-
-    // Initialize all categories
-    META_CATEGORIES.forEach(cat => grouped.set(cat, []));
-
-    // Assign narrators
-    filteredNarrators.forEach(narrator => {
-      const category = META_CATEGORIES.find(c => c.id === narrator.metaCategoryId);
-      if (category) {
-        const existing = grouped.get(category) || [];
-        existing.push(narrator);
-        grouped.set(category, existing);
-      } else {
-        // Fallback to Fiction
-        const fiction = META_CATEGORIES[0];
-        const existing = grouped.get(fiction) || [];
-        existing.push(narrator);
-        grouped.set(fiction, existing);
-      }
-    });
-
-    // Sort narrators within each category by book count
-    grouped.forEach((narrators, category) => {
-      narrators.sort((a, b) => b.bookCount - a.bookCount);
-    });
-
-    return grouped;
-  }, [filteredNarrators]);
-
-  // Get total books per category
-  const categoryTotals = useMemo(() => {
-    const totals = new Map<string, number>();
-    narratorsByCategory.forEach((narrators, category) => {
-      totals.set(category.id, narrators.reduce((sum, n) => sum + n.bookCount, 0));
-    });
-    return totals;
-  }, [narratorsByCategory]);
-
-  // Flat list sections (A-Z) for SectionList
-  const flatSections = useMemo(() => {
-    const sorted = [...filteredNarrators].sort((a, b) => a.name.localeCompare(b.name));
-    const sections: { title: string; data: PersonWithData[] }[] = [];
-
-    sorted.forEach(narrator => {
-      const letter = narrator.name[0].toUpperCase();
-      const existing = sections.find(s => s.title === letter);
-      if (existing) {
-        existing.data.push(narrator);
-      } else {
-        sections.push({ title: letter, data: [narrator] });
-      }
-    });
-
-    return sections;
-  }, [filteredNarrators]);
-
-  // Available letters for alphabet index
-  const availableLetters = useMemo(() => {
-    return flatSections.map(s => s.title);
-  }, [flatSections]);
-
-  // Handle alphabet letter press - scroll to section
-  const handleLetterPress = useCallback((letter: string) => {
-    const sectionIndex = flatSections.findIndex(s => s.title === letter);
-    if (sectionIndex >= 0 && sectionListRef.current) {
-      sectionListRef.current.scrollToLocation({
-        sectionIndex,
-        itemIndex: 0,
-        animated: true,
-        viewPosition: 0,
-      });
-    }
-  }, [flatSections]);
-
-  const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.navigate('Main');
-    }
-  };
-
-  const handleNarratorPress = (narratorName: string) => {
-    navigation.navigate('NarratorDetail', { narratorName });
-  };
-
-  const handleToggleCategory = useCallback((categoryId: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshCache();
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshCache]);
-
-  const isSearching = searchQuery.trim().length > 0;
-
-  const handleLogoPress = useCallback(() => {
-    navigation.navigate('Main', { screen: 'HomeTab' });
-  }, [navigation]);
-
-  if (!isLoaded) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background.primary }]}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  // Render narrator list item for flat view
-  const renderNarratorItem = ({ item }: { item: PersonWithData }) => (
-    <TouchableOpacity
-      style={styles.narratorRow}
-      onPress={() => handleNarratorPress(item.name)}
-      activeOpacity={0.7}
+// List item component
+const ListNarratorItem = React.memo(function ListNarratorItem({
+  item,
+  onPress,
+  isDark,
+}: {
+  item: NarratorItem;
+  onPress: () => void;
+  isDark: boolean;
+}) {
+  return (
+    <Pressable
+      style={[styles.row, isDark ? styles.rowDark : styles.rowLight]}
+      onPress={onPress}
     >
-      {/* Avatar - Narrators don't have images, always use initials */}
+      {/* Avatar - always initials */}
       <View style={[styles.avatar, { backgroundColor: getAvatarColor(item.name) }]}>
         <Text style={styles.avatarText}>{getInitials(item.name)}</Text>
       </View>
 
       {/* Info */}
-      <View style={styles.narratorInfo}>
-        <Text style={[styles.narratorName, { color: colors.text.primary }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[styles.bookCount, { color: colors.text.secondary }]}>{item.bookCount} books in library</Text>
+      <View style={styles.itemInfo}>
+        <Text
+          style={[styles.itemName, isDark && styles.itemNameDark]}
+          numberOfLines={1}
+        >
+          {item.name}
+        </Text>
+        <Text style={styles.itemMeta}>
+          {item.bookCount} {item.bookCount === 1 ? 'book' : 'books'}{item.primaryGenre ? ` · ${item.primaryGenre}` : ''}
+        </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
+});
 
-  // Render grouped view
-  const renderGroupedView = () => (
-    <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Your Narrators Section */}
-        {!isSearching && yourNarrators.length > 0 && (
-          <YourPersonsSection
-            persons={yourNarrators}
-            onPersonPress={handleNarratorPress}
-            type="narrator"
-          />
-        )}
+export function NarratorsListScreen() {
+  const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const flatListRef = useRef<FlatList>(null);
 
-        {/* Popular Narrators Section */}
-        {!isSearching && (
-          <PopularPersonsSection
-            persons={popularNarrators}
-            onPersonPress={handleNarratorPress}
-            type="narrator"
-          />
-        )}
+  const [sortBy, setSortBy] = useState<SortType>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
 
-        {/* Browse by Category Header */}
-        {!isSearching && (
-          <View style={styles.browseHeader}>
-            <Text style={[styles.browseTitle, { color: colors.text.secondary }]}>Browse by Category</Text>
-          </View>
-        )}
+  const { refreshCache } = useLibraryCache();
+  const narratorsMap = useLibraryCache((s) => s.narrators);
 
-        {/* Meta-Category Sections */}
-        {META_CATEGORIES.map(category => {
-          const narrators = narratorsByCategory.get(category) || [];
-          if (narrators.length === 0) return null;
+  // Current sort label for the pill
+  const currentSortLabel = useMemo(() => {
+    const option = SORT_OPTIONS.find(o => o.key === sortBy);
+    return option?.label || 'Sort';
+  }, [sortBy]);
 
-          return (
-            <MetaCategoryPersonSection
-              key={category.id}
-              metaCategory={category}
-              persons={narrators}
-              totalBooks={categoryTotals.get(category.id) || 0}
-              isExpanded={expandedCategories.has(category.id)}
-              onToggle={() => handleToggleCategory(category.id)}
-              onPersonPress={handleNarratorPress}
-              type="narrator"
-              label={`${category.name} Narrators`}
-            />
-          );
-        })}
+  // Wait for navigation animation
+  useEffect(() => {
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      setMounted(true);
+      globalLoading.hide();
+    });
+    return () => interaction.cancel();
+  }, []);
 
-        {/* Empty State */}
-        {filteredNarrators.length === 0 && (
-          <View style={styles.emptyState}>
-            <Icon name="Search" size={48} color={colors.text.tertiary} />
-            <Text style={[styles.emptyText, { color: colors.text.primary }]}>No narrators found</Text>
-            <Text style={[styles.emptySubtext, { color: colors.text.secondary }]}>Try a different search term</Text>
-          </View>
-        )}
-      </ScrollView>
-    </SkullRefreshControl>
-  );
+  // Build narrator list with primary genre
+  const narratorsWithData = useMemo((): NarratorItem[] => {
+    if (!narratorsMap || narratorsMap.size === 0) return [];
 
-  // Render flat A-Z view with SectionList
-  const renderFlatView = () => (
-    <View style={styles.flatContainer}>
-      <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-        <SectionList
-          ref={sectionListRef}
-          sections={flatSections}
-          keyExtractor={(item) => item.name}
-          stickySectionHeadersEnabled
-          contentContainerStyle={{ paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom, paddingRight: 28 }}
-          showsVerticalScrollIndicator={false}
-          renderSectionHeader={({ section }) => (
-            <View style={[styles.sectionHeader, { backgroundColor: colors.background.primary }]}>
-              <Text style={[styles.sectionHeaderText, { color: accent }]}>{section.title}</Text>
-            </View>
-          )}
-          renderItem={renderNarratorItem}
-          onScrollToIndexFailed={() => {}}
-          getItemLayout={(data, index) => ({
-            length: 72,
-            offset: 72 * index,
-            index,
-          })}
-        />
-      </SkullRefreshControl>
+    return Array.from(narratorsMap.values()).map(narrator => {
+      const genreCounts = new Map<string, number>();
+      narrator.books?.forEach(book => {
+        const genres = (book.media?.metadata as any)?.genres || [];
+        genres.forEach((genre: string) => {
+          genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
+        });
+      });
+      const primaryGenre = [...genreCounts.entries()]
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
-      {/* Custom Alphabet Index */}
-      {availableLetters.length > 1 && (
-        <View style={[styles.alphabetIndex, { bottom: SCREEN_BOTTOM_PADDING + insets.bottom + 60 }]}>
-          {availableLetters.map((letter) => (
-            <TouchableOpacity
-              key={letter}
-              style={styles.alphabetLetterButton}
-              onPress={() => handleLetterPress(letter)}
-            >
-              <Text style={[styles.alphabetLetter, { color: accent }]}>{letter}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
+      return {
+        name: narrator.name,
+        bookCount: narrator.bookCount,
+        primaryGenre,
+      };
+    });
+  }, [narratorsMap]);
+
+  // Sort narrators
+  const sortedNarrators = useMemo(() => {
+    if (!narratorsWithData.length) return [];
+
+    const sorted = [...narratorsWithData];
+    const direction = sortDirection === 'asc' ? 1 : -1;
+
+    switch (sortBy) {
+      case 'name':
+        sorted.sort((a, b) => direction * a.name.localeCompare(b.name));
+        break;
+      case 'bookCount':
+        sorted.sort((a, b) => direction * (b.bookCount - a.bookCount));
+        break;
+    }
+
+    return sorted;
+  }, [narratorsWithData, sortBy, sortDirection]);
+
+  // Alphabet letters for scrubber (Name sort only)
+  const isAlphabeticSort = sortBy === 'name';
+  const { letters: alphabetLetters, letterIndexMap } = useMemo(() => {
+    if (!isAlphabeticSort) {
+      return { letters: [], letterIndexMap: new Map<string, number>() };
+    }
+
+    const lettersSet = new Set<string>();
+    const indexMap = new Map<string, number>();
+
+    sortedNarrators.forEach((item, index) => {
+      const firstChar = (item.name || '').charAt(0).toUpperCase();
+      if (/[A-Z]/.test(firstChar)) {
+        if (!lettersSet.has(firstChar)) {
+          lettersSet.add(firstChar);
+          indexMap.set(firstChar, index);
+        }
+      }
+    });
+
+    return {
+      letters: Array.from(lettersSet).sort(),
+      letterIndexMap: indexMap,
+    };
+  }, [sortedNarrators, isAlphabeticSort]);
+
+  // Handlers
+  const handleBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main');
+    }
+  }, [navigation]);
+
+  const handleLogoPress = useCallback(() => {
+    navigation.navigate('Main', { screen: 'HomeTab' });
+  }, [navigation]);
+
+  const handleSearchPress = useCallback(() => {
+    navigation.navigate('Search');
+  }, [navigation]);
+
+  const handleNarratorPress = useCallback((narratorName: string) => {
+    navigation.navigate('NarratorDetail', { narratorName });
+  }, [navigation]);
+
+  const handleSortPillPress = useCallback(() => {
+    setShowSortDropdown(true);
+  }, []);
+
+  const handleSortSelect = useCallback((key: SortType) => {
+    if (sortBy === key) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(key);
+      const option = SORT_OPTIONS.find(o => o.key === key);
+      setSortDirection(option?.defaultDir || 'desc');
+      if (key !== 'name') {
+        setActiveLetter(undefined);
+      }
+    }
+    setShowSortDropdown(false);
+  }, [sortBy]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refreshCache();
+    setIsRefreshing(false);
+  }, [refreshCache]);
+
+  // Estimated row height: avatar (48) + vertical padding (24) + border (1)
+  const ESTIMATED_ITEM_HEIGHT = 73;
+
+  const handleLetterSelect = useCallback((letter: string) => {
+    setActiveLetter(letter);
+    const index = letterIndexMap.get(letter);
+    if (index !== undefined) {
+      flatListRef.current?.scrollToOffset({
+        offset: index * ESTIMATED_ITEM_HEIGHT,
+        animated: true,
+      });
+    }
+  }, [letterIndexMap]);
+
+  // Track active letter from scroll position
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!isAlphabeticSort) return;
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const currentIndex = Math.floor(offsetY / ESTIMATED_ITEM_HEIGHT);
+    if (currentIndex >= 0 && currentIndex < sortedNarrators.length) {
+      const item = sortedNarrators[currentIndex];
+      const firstChar = (item.name || '').charAt(0).toUpperCase();
+      if (/[A-Z]/.test(firstChar) && firstChar !== activeLetter) {
+        setActiveLetter(firstChar);
+      }
+    }
+  }, [isAlphabeticSort, sortedNarrators, activeLetter]);
+
+  const renderItem = useCallback(({ item }: { item: NarratorItem }) => (
+    <ListNarratorItem
+      item={item}
+      onPress={() => handleNarratorPress(item.name)}
+      isDark={isDark}
+    />
+  ), [handleNarratorPress, isDark]);
+
+  const keyExtractor = useCallback((item: NarratorItem) => item.name, []);
+
+  // Icon colors for TopNav
+  const iconColor = isDark ? secretLibraryColors.white : secretLibraryColors.black;
+  const sortPillIconColor = showSortDropdown
+    ? (isDark ? secretLibraryColors.black : secretLibraryColors.white)
+    : iconColor;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background.primary }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background.primary} />
+    <View style={[styles.container, { backgroundColor: secretLibraryColors.black }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={secretLibraryColors.black} />
 
-      {/* Loading overlay for initial load */}
       <ScreenLoadingOverlay visible={!mounted} />
 
-      {/* TopNav with skull logo and integrated search bar */}
       <TopNav
         variant={isDark ? 'dark' : 'light'}
         showLogo={true}
         onLogoPress={handleLogoPress}
-        style={{ backgroundColor: colors.background.primary }}
-        pills={[
-          {
-            key: 'narrators',
-            label: 'Narrators',
-            icon: <MicIcon size={10} color={colors.text.primary} />,
-          },
-        ]}
+        style={{ backgroundColor: secretLibraryColors.black }}
         circleButtons={[
           {
+            key: 'search',
+            icon: <TopNavSearchIcon color={iconColor} size={16} />,
+            onPress: handleSearchPress,
+          },
+        ]}
+        pills={[
+          {
+            key: 'sort',
+            icon: <SortArrow color={sortPillIconColor} direction={sortDirection} />,
+            label: currentSortLabel,
+            onPress: handleSortPillPress,
+            active: showSortDropdown,
+          },
+          {
             key: 'back',
-            icon: <TopNavBackIcon color={colors.text.primary} size={14} />,
+            label: '',
+            icon: <TopNavBackIcon color={iconColor} size={16} />,
             onPress: handleBack,
           },
         ]}
-        searchBar={{
-          value: searchQuery,
-          onChangeText: setSearchQuery,
-          placeholder: 'Search narrators...',
-        }}
       />
 
-      {/* View Mode Toggle & Count */}
-      <View style={styles.controlBar}>
-        <Text style={[styles.resultCount, { color: colors.text.secondary }]}>{filteredNarrators.length} narrators</Text>
-        <View style={[
-          styles.viewToggle,
-          {
-            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-          }
-        ]}>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'grouped' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
-            onPress={() => setViewMode('grouped')}
-          >
-            <Icon
-              name="LayoutGrid"
-              size={16}
-              color={viewMode === 'grouped' ? colors.text.primary : colors.text.tertiary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewMode === 'flat' && [styles.toggleButtonActive, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]]}
-            onPress={() => setViewMode('flat')}
-          >
-            <Icon
-              name="List"
-              size={16}
-              color={viewMode === 'flat' ? colors.text.primary : colors.text.tertiary}
-            />
-          </TouchableOpacity>
-        </View>
+      {/* Narrator count */}
+      <View style={styles.countBar}>
+        <Text style={[styles.resultCount, { color: colors.text.secondary }]}>
+          {sortedNarrators.length} narrators
+        </Text>
       </View>
 
-      {/* Content */}
-      {viewMode === 'grouped' || isSearching ? renderGroupedView() : renderFlatView()}
+      {/* Narrator List */}
+      <View style={styles.listContainer}>
+        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+          <FlatList
+            ref={flatListRef}
+            data={mounted ? sortedNarrators : []}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={[styles.list, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={32}
+            initialNumToRender={12}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+          />
+        </SkullRefreshControl>
+
+        {alphabetLetters.length > 0 && (
+          <AlphabetScrubber
+            letters={alphabetLetters}
+            activeLetter={activeLetter}
+            onLetterSelect={handleLetterSelect}
+          />
+        )}
+      </View>
+
+      {/* Sort Dropdown Modal */}
+      <Modal
+        visible={showSortDropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSortDropdown(false)}
+      >
+        <Pressable
+          style={styles.dropdownOverlay}
+          onPress={() => setShowSortDropdown(false)}
+        >
+          <View style={[styles.dropdownMenu, { backgroundColor: isDark ? '#1a1a1a' : secretLibraryColors.white }]}>
+            {SORT_OPTIONS.map((option) => {
+              const isActive = sortBy === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  style={styles.dropdownItem}
+                  onPress={() => handleSortSelect(option.key)}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      { color: isDark ? secretLibraryColors.white : secretLibraryColors.black },
+                      isActive && styles.dropdownItemTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {isActive && (
+                    <Text style={styles.dropdownCheck}>
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -487,106 +424,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-  },
-  controlBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+  countBar: {
+    paddingHorizontal: PADDING,
+    paddingBottom: 8,
   },
   resultCount: {
-    fontSize: 14,
-  },
-  viewToggle: {
-    flexDirection: 'row',
-    borderRadius: 8,
-    padding: 2,
-  },
-  toggleButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  toggleButtonActive: {
-    // backgroundColor applied inline
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 8,
-  },
-  flatContainer: {
-    flex: 1,
-  },
-  browseHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  browseTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(11),
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  emptyState: {
+  listContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 80,
+    flexDirection: 'row',
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
+  list: {
+    paddingHorizontal: PADDING,
   },
-  emptySubtext: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  // Flat view styles
-  sectionHeader: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  sectionHeaderText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  alphabetIndex: {
-    position: 'absolute',
-    right: 2,
-    top: 8,
-    width: 24,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  alphabetLetterButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 24,
-    minHeight: 14,
-  },
-  alphabetLetter: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  // Narrator row for flat view
-  narratorRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    minHeight: 72,
+    paddingHorizontal: 0,
+  },
+  rowLight: {
+    backgroundColor: secretLibraryColors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+  },
+  rowDark: {
+    backgroundColor: secretLibraryColors.black,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   avatar: {
     width: 48,
@@ -602,16 +471,66 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000',
   },
-  narratorInfo: {
+  itemInfo: {
     flex: 1,
   },
-  narratorName: {
+  itemName: {
+    fontFamily: secretLibraryFonts.playfair.regular,
+    fontSize: scale(16),
+    color: secretLibraryColors.black,
+    lineHeight: scale(20),
+    marginBottom: 2,
+  },
+  itemNameDark: {
+    color: secretLibraryColors.white,
+  },
+  itemMeta: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: scale(10),
+    color: secretLibraryColors.gray,
+  },
+
+  // Sort dropdown modal
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as ViewStyle,
+  dropdownMenu: {
+    width: 260,
+    maxHeight: 420,
+    borderRadius: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  } as ViewStyle,
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    minHeight: 52,
+  } as ViewStyle,
+  dropdownItemText: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.regular,
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  } as TextStyle,
+  dropdownItemTextActive: {
+    fontFamily: secretLibraryFonts.jetbrainsMono.bold,
+  } as TextStyle,
+  dropdownCheck: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  bookCount: {
-    fontSize: 14,
-    marginBottom: 2,
-  },
+    fontWeight: '700',
+    color: '#F3B60C',
+  } as TextStyle,
 });
+
+export default NarratorsListScreen;

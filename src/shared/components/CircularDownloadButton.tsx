@@ -78,7 +78,7 @@ const QueueIconPath = ({ color = '#FFB800' }: { color?: string }) => (
 export function CircularDownloadButton({
   book,
   size = scale(40),
-  strokeWidth = 3,
+  strokeWidth = 4,
 }: CircularDownloadButtonProps) {
   const {
     isDownloaded,
@@ -93,7 +93,7 @@ export function CircularDownloadButton({
 
   // Check if there's currently an active download (for queue indicator)
   const { downloadingCount } = useDownloads();
-  const isAnotherDownloading = downloadingCount > 0 && !isDownloading;
+  const _isAnotherDownloading = downloadingCount > 0 && !isDownloading;
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -198,7 +198,7 @@ export function CircularDownloadButton({
               cx={center}
               cy={center}
               r={radius}
-              stroke="rgba(255, 255, 255, 0.15)"
+              stroke="rgba(255, 255, 255, 0.3)"
               strokeWidth={strokeWidth}
               fill="none"
             />

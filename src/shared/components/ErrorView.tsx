@@ -16,7 +16,6 @@ import {
   typography,
   scale,
   useTheme,
-  accentColors,
 } from '@/shared/theme';
 
 // Icon components - color defaults provided by component, not by icons

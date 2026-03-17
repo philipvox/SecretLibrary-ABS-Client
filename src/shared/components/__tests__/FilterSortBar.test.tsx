@@ -10,7 +10,7 @@ import { FilterSortBar, SortOption } from '../FilterSortBar';
 
 // Mock Icon component
 jest.mock('../Icon', () => ({
-  Icon: ({ name }: { name: string }) => null,
+  Icon: ({ _name }: { name: string }) => null,
 }));
 
 // Mock the theme module

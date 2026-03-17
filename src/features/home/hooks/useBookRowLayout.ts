@@ -7,12 +7,12 @@
  * Used by BookshelfView, SeriesSpineCard, and other book row displays.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { BookSpineVerticalData } from '../components/BookSpineVertical';
 // MIGRATED: Now using new spine system via adapter
 import { calculateBookDimensions, hashString } from '../utils/spine/adapter';
 import { SERVER_SPINE_BOX, PROCEDURAL_SPINE_BOX } from '../utils/spine/constants';
-import { fitToBoundingBox } from '../utils/spine/core/dimensions';
+import { fitToBoundingBox, getDurationScale } from '../utils/spine/core/dimensions';
 import { useSpineCacheStore } from '../stores/spineCache';
 
 // =============================================================================
@@ -55,22 +55,6 @@ const DEFAULT_MIN_TOUCH_TARGET = 44;
 const DEFAULT_BOOK_GAP = 9;
 const DEFAULT_DURATION = 6 * 60 * 60; // 6 hours
 
-// Duration-based scaling (same curve as BookshelfView)
-// Range: 0.70 (0 hours) to 1.15 (30+ hours), ease-out (sqrt)
-const DURATION_SCALE_MIN = 0.70;
-const DURATION_SCALE_MAX = 1.15;
-const DURATION_MAX_HOURS = 30;
-
-function getDurationScale(durationSeconds: number): number {
-  const hours = Math.max(0, durationSeconds / 3600);
-  if (hours <= DURATION_MAX_HOURS) {
-    const t = Math.sqrt(hours / DURATION_MAX_HOURS);
-    return DURATION_SCALE_MIN + (DURATION_SCALE_MAX - DURATION_SCALE_MIN) * t;
-  }
-  // Extended ramp for 30-60hr books (consistent with BookshelfView)
-  const extraHours = Math.min(hours, 60) - 30;
-  return 1.15 + (1.40 - 1.15) * (extraHours / 30);
-}
 
 // =============================================================================
 // HOOK
@@ -104,11 +88,27 @@ export function useBookRowLayout(
   // Get spine cache for fast lookups
   const getSpineData = useSpineCacheStore((state) => state.getSpineData);
 
-  // Server spine settings - subscribe to lightweight version counter instead of the full
-  // dimensions object to avoid re-rendering all consumers when ANY book's dimensions change
+  // Server spine settings
   const useServerSpines = useSpineCacheStore((state) => state.useServerSpines);
-  const serverDimsVersion = useSpineCacheStore((state) => state.serverSpineDimensionsVersion);
   const isHydrated = useSpineCacheStore((state) => state.isHydrated);
+
+  // Per-row dimension fingerprint — only triggers recalc when a book IN THIS ROW
+  // gets new server dimensions (not when any random book changes).
+  // Replaces global serverSpineDimensionsVersion counter that caused all rows to recalc.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rowDimsSelector = useCallback((state: any) => {
+    if (!state.isHydrated || !state.useServerSpines) return 0;
+    let hash = 0;
+    for (const book of books) {
+      const d = state.serverSpineDimensions[book.id];
+      if (d) {
+        hash = (hash * 31 + d.width) | 0;
+        hash = (hash * 31 + d.height) | 0;
+      }
+    }
+    return hash;
+  }, [books]);
+  const rowDimsFingerprint = useSpineCacheStore(rowDimsSelector);
 
   return useMemo(() => {
     if (!books || books.length === 0) return [];
@@ -226,7 +226,7 @@ export function useBookRowLayout(
         touchPadding,
       };
     });
-  }, [books, scaleFactor, leanAngle, minTouchTarget, enableLeaning, fixedHeight, getSpineData, useServerSpines, serverDimsVersion, isHydrated]);
+  }, [books, scaleFactor, leanAngle, minTouchTarget, enableLeaning, fixedHeight, getSpineData, useServerSpines, rowDimsFingerprint, isHydrated]);
 }
 
 /**

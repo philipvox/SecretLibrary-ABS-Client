@@ -15,7 +15,6 @@ import {
   typography,
   scale,
   interactiveStates,
-  cardTokens,
 } from '@/shared/theme';
 import { useTheme } from '@/shared/theme';
 

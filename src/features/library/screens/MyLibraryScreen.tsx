@@ -23,11 +23,12 @@ import { useNavigation } from '@react-navigation/native';
 import { apiClient } from '@/core/api';
 import { useLibraryCache } from '@/core/cache';
 import { usePlayerStore } from '@/features/player';
-import { TOP_NAV_HEIGHT, SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { useScreenLoadTime } from '@/core/hooks/useScreenLoadTime';
 import { scale, spacing, useTheme } from '@/shared/theme';
-import { SectionSkeleton, BookCardSkeleton, SkullRefreshControl } from '@/shared/components';
-import { SortPicker, SortOption } from '../components/SortPicker';
+import { SectionSkeleton, BookCardSkeleton, SkullRefreshControl, useBookContextMenu } from '@/shared/components';
+import { SortPicker } from '../components/SortPicker';
+import { useLibraryViewStore } from '../stores/libraryViewStore';
 import { LibraryTabBar } from '../components/LibraryTabBar';
 import { LibraryEmptyState } from '../components/LibraryEmptyState';
 import {
@@ -59,17 +60,20 @@ export function MyLibraryScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const { loadBook } = usePlayerStore();
+  const loadBook = usePlayerStore((s) => s.loadBook);
+  const { showMenu } = useBookContextMenu();
+  const { getItem } = useLibraryCache();
 
   // Tab, sort, and search state
   const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [sort, setSort] = useState<SortOption>('recently-played');
+  const sort = useLibraryViewStore((s) => s.sort);
+  const setSort = useLibraryViewStore((s) => s.setSort);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Get all library data from hook
   const {
-    enrichedBooks,
+    _enrichedBooks,
     filteredBooks,
     favoritedBooks,
     serverInProgressBooks,
@@ -80,7 +84,7 @@ export function MyLibraryScreen() {
     activeDownloads,
     continueListeningItems,
     totalStorageUsed,
-    isLoaded,
+    _isLoaded,
     isLoading,
     hasDownloading,
     hasPaused,
@@ -124,7 +128,10 @@ export function MyLibraryScreen() {
       navigation.navigate('Main', { screen: 'DiscoverTab' });
     }
   };
-  const handleBookPress = (itemId: string) => navigation.navigate('BookDetail', { id: itemId });
+  const handleBookPress = useCallback((itemId: string) => {
+    const item = getItem(itemId);
+    if (item) showMenu(item);
+  }, [getItem, showMenu]);
   const handleSeriesPress = (seriesName: string) => navigation.navigate('SeriesDetail', { seriesName });
   const handleAuthorPress = (authorName: string) => navigation.navigate('AuthorDetail', { name: authorName });
   const handleNarratorPress = (narratorName: string) => navigation.navigate('NarratorDetail', { name: narratorName });

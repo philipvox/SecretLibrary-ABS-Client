@@ -112,17 +112,19 @@ describe('NetworkStatusBar', () => {
       expect(getByText('No internet connection')).toBeTruthy();
     });
 
-    it('shows offline message when internet not reachable', async () => {
+    it('does not show offline message when connected but internet not reachable', async () => {
+      // The component only checks isConnected, not isInternetReachable,
+      // because isInternetReachable can give false negatives on some networks
       mockNetInfoState.isConnected = true;
       mockNetInfoState.isInternetReachable = false;
 
-      const { getByText } = render(<NetworkStatusBar />);
+      const { queryByText } = render(<NetworkStatusBar />);
 
       await act(async () => {
         await Promise.resolve();
       });
 
-      expect(getByText('No internet connection')).toBeTruthy();
+      expect(queryByText('No internet connection')).toBeNull();
     });
 
     it('responds to network state changes', async () => {

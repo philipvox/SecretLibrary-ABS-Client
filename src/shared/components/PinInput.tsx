@@ -14,8 +14,8 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Pressable, Animated } from 'react-native';
-import { scale, spacing, accentColors, useTheme } from '@/shared/theme';
+import { View, TextInput, Text, StyleSheet, Pressable } from 'react-native';
+import { scale, spacing, useTheme } from '@/shared/theme';
 
 // ============================================================================
 // CONSTANTS

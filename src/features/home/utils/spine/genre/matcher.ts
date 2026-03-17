@@ -178,7 +178,7 @@ export function matchGenre(genre: string): GenreDefinition | null {
   }
 
   // 2. Check aliases
-  for (const [key, definition] of Object.entries(GENRE_TAXONOMY)) {
+  for (const [_key, definition] of Object.entries(GENRE_TAXONOMY)) {
     if (definition.aliases?.includes(normalized)) {
       return definition;
     }

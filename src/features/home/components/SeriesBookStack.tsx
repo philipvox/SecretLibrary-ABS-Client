@@ -27,7 +27,7 @@
 
 import React, { memo, useMemo, useCallback } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import Svg, { Rect, Text as SvgText, G, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Rect, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
   useSeriesStackLayout,
   StackBookData,

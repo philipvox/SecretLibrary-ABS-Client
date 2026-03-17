@@ -72,7 +72,7 @@ export interface SeriesGroup {
 /** Fanned series card data */
 export interface FannedSeriesCardData {
   name: string;
-  books: Array<{ id: string }>;
+  books: { id: string }[];
   bookCount?: number;
 }
 

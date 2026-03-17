@@ -61,7 +61,7 @@ const DEFAULT_SCALE = 1;
 const DEFAULT_MAX_OFFSET = 3; // Minimal offset for cleaner look
 
 // Width calculation constants (horizontal span of book when lying flat)
-const BASE_WIDTH = 90;      // Base book width
+const _BASE_WIDTH = 90;      // Base book width
 const MIN_WIDTH = 70;       // Minimum book width
 const MAX_WIDTH = 130;      // Maximum book width
 const DEFAULT_DURATION = 8 * 60 * 60; // 8 hours default

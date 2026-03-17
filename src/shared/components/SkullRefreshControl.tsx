@@ -138,7 +138,7 @@ export function SkullRefreshControl({
 }: SkullRefreshControlProps) {
   const { colors } = useTheme();
   const pullDistance = useRef(new Animated.Value(0)).current;
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [_isRefreshing, setIsRefreshing] = useState(false);
   const hasTriggeredRefresh = useRef(false);
 
   // Sync internal state with prop

@@ -15,6 +15,7 @@ import { usePreferencesStore } from '@/features/recommendations/stores/preferenc
 import { useFinishedBookIds, useInProgressBooks } from '@/core/hooks/useUserBooks';
 import { useContinueListening } from '@/shared/hooks/useContinueListening';
 import { useCompletionStore } from '@/features/completion';
+import { useProgressStore } from '@/core/stores/progressStore';
 import { useKidModeStore } from '@/shared/stores/kidModeStore';
 import { isKidFriendly } from '@/shared/utils/kidModeFilter';
 import {
@@ -87,6 +88,10 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
   // Continue listening data from server
   const { items: continueListeningItems, isLoading: isContinueLoading, isServerLoading, refetch: refetchContinueListening } = useContinueListening();
 
+  // Real-time progress from progressStore (reactive, instant updates)
+  const progressVersion = useProgressStore((s) => s.version);
+  const progressMap = useProgressStore((s) => s.progressMap);
+
   // SQLite progress data for accurate in-progress state
   // Use isFetching to catch all fetches (not just initial load without cache)
   const { data: sqliteInProgressBooks = [], isLoading: isProgressLoading, isFetching: isProgressFetching } = useInProgressBooks();
@@ -103,6 +108,18 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
 
   // Kid Mode filter
   const kidModeEnabled = useKidModeStore((state) => state.enabled);
+
+  // Unified lastPlayedAt resolver: progressStore (real-time) → SQLite → server
+  const getLastPlayedAt = useCallback((bookId: string, item?: LibraryItem | null): number | undefined => {
+    // 1. progressStore — real-time, updated instantly during playback
+    const pd = progressMap.get(bookId);
+    if (pd?.lastPlayedAt) return pd.lastPlayedAt;
+    // 2. SQLite in-progress books — accurate but only for non-finished books
+    const sqlite = sqliteProgressMap.get(bookId);
+    if (sqlite?.lastPlayedAt) return new Date(sqlite.lastPlayedAt).getTime();
+    // 3. Server API response — stale but always available
+    return item?.userMediaProgress?.lastUpdate;
+  }, [progressMap, sqliteProgressMap]);
 
   // Combined loading state - wait for ALL data sources before showing sorted results
   // This prevents the "flash" where books reorder as each async source completes
@@ -188,12 +205,10 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
       const metadata = getMetadata(item);
       const { cleanName: seriesName, sequence } = extractSeriesMetadata(metadata.seriesName || '');
 
-      // Use SQLite progress if available (more accurate), fallback to API response
+      // Progress: progressStore (real-time) → SQLite → server
+      const pdProgress = progressMap.get(download.itemId);
       const sqliteProgress = sqliteProgressMap.get(download.itemId);
-      const progress = sqliteProgress?.progress ?? getProgress(item);
-      const lastPlayedAt = sqliteProgress?.lastPlayedAt
-        ? new Date(sqliteProgress.lastPlayedAt).getTime()
-        : item.userMediaProgress?.lastUpdate;
+      const progress = pdProgress?.progress ?? sqliteProgress?.progress ?? getProgress(item);
 
       return {
         id: download.itemId,
@@ -205,12 +220,12 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
         progress,
         duration: getDuration(item),
         totalBytes: download.totalBytes || 0,
-        lastPlayedAt,
+        lastPlayedAt: getLastPlayedAt(download.itemId, item),
         addedAt: item.addedAt,
         isDownloaded: true,
       };
     });
-  }, [completedDownloads, getItem, isLoaded, sqliteProgressMap]);
+  }, [completedDownloads, getItem, isLoaded, sqliteProgressMap, getLastPlayedAt, progressMap]);
 
   // Server in-progress books
   const serverInProgressBooks = useMemo<EnrichedBook[]>(() => {
@@ -218,6 +233,7 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
       const metadata = getMetadata(item);
       const { cleanName: seriesName, sequence } = extractSeriesMetadata(metadata.seriesName || '');
       const download = downloadMap.get(item.id);
+      const pdProgress = progressMap.get(item.id);
 
       return {
         id: item.id,
@@ -226,15 +242,15 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
         author: metadata.authorName || metadata.authors?.[0]?.name || 'Unknown Author',
         seriesName,
         sequence,
-        progress: item.userMediaProgress?.progress || 0,
+        progress: pdProgress?.progress ?? item.userMediaProgress?.progress ?? 0,
         duration: getDuration(item),
         totalBytes: download?.totalBytes || 0,
-        lastPlayedAt: item.userMediaProgress?.lastUpdate,
+        lastPlayedAt: getLastPlayedAt(item.id, item),
         addedAt: item.addedAt,
         isDownloaded: !!download,
       };
     });
-  }, [continueListeningItems, downloadMap]);
+  }, [continueListeningItems, downloadMap, getLastPlayedAt, progressMap]);
 
   // Favorited books
   const favoritedBooks = useMemo((): EnrichedBook[] => {
@@ -249,12 +265,10 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
       const { cleanName: seriesName, sequence } = extractSeriesMetadata(metadata.seriesName || '');
       const download = downloadMap.get(bookId);
 
-      // Use SQLite progress if available
+      // Progress: progressStore (real-time) → SQLite → server
+      const pdProgress = progressMap.get(bookId);
       const sqliteProgress = sqliteProgressMap.get(bookId);
-      const progress = sqliteProgress?.progress ?? getProgress(item);
-      const lastPlayedAt = sqliteProgress?.lastPlayedAt
-        ? new Date(sqliteProgress.lastPlayedAt).getTime()
-        : item.userMediaProgress?.lastUpdate;
+      const progress = pdProgress?.progress ?? sqliteProgress?.progress ?? getProgress(item);
 
       result.push({
         id: bookId,
@@ -266,37 +280,13 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
         progress,
         duration: getDuration(item),
         totalBytes: download?.totalBytes || 0,
-        lastPlayedAt,
+        lastPlayedAt: getLastPlayedAt(bookId, item),
         addedAt: item.addedAt,
         isDownloaded: !!download,
       });
     }
     return result;
-  }, [libraryIds, cachedItems, isLoaded, downloadMap, getItem, sqliteProgressMap]);
-
-  // All library books (union with Kid Mode filter)
-  const allLibraryBooks = useMemo<EnrichedBook[]>(() => {
-    const bookMap = new Map<string, EnrichedBook>();
-
-    for (const book of enrichedBooks) {
-      if (kidModeEnabled && book.item && !isKidFriendly(book.item)) continue;
-      bookMap.set(book.id, book);
-    }
-    for (const book of serverInProgressBooks) {
-      if (!bookMap.has(book.id)) {
-        if (kidModeEnabled && book.item && !isKidFriendly(book.item)) continue;
-        bookMap.set(book.id, book);
-      }
-    }
-    for (const book of favoritedBooks) {
-      if (!bookMap.has(book.id)) {
-        if (kidModeEnabled && book.item && !isKidFriendly(book.item)) continue;
-        bookMap.set(book.id, book);
-      }
-    }
-
-    return Array.from(bookMap.values());
-  }, [enrichedBooks, serverInProgressBooks, favoritedBooks, kidModeEnabled]);
+  }, [libraryIds, cachedItems, isLoaded, downloadMap, getItem, sqliteProgressMap, getLastPlayedAt, progressMap]);
 
   // Marked finished books (non-downloaded)
   const markedFinishedBooks = useMemo<EnrichedBook[]>(() => {
@@ -312,12 +302,10 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
       const metadata = getMetadata(item);
       const { cleanName: seriesName, sequence } = extractSeriesMetadata(metadata.seriesName || '');
 
-      // Use SQLite progress if available
+      // Progress: progressStore (real-time) → SQLite → server
+      const pdProgress = progressMap.get(bookId);
       const sqliteProgress = sqliteProgressMap.get(bookId);
-      const progress = sqliteProgress?.progress ?? getProgress(item);
-      const lastPlayedAt = sqliteProgress?.lastPlayedAt
-        ? new Date(sqliteProgress.lastPlayedAt).getTime()
-        : item.userMediaProgress?.lastUpdate;
+      const progress = pdProgress?.progress ?? sqliteProgress?.progress ?? getProgress(item);
 
       result.push({
         id: bookId,
@@ -329,13 +317,65 @@ export function useLibraryData({ activeTab, sort, searchQuery }: UseLibraryDataP
         progress,
         duration: getDuration(item),
         totalBytes: 0,
-        lastPlayedAt,
+        lastPlayedAt: getLastPlayedAt(bookId, item),
         addedAt: item.addedAt,
         isDownloaded: false,
       });
     }
     return result;
-  }, [isLoaded, finishedBookIds, enrichedBooks, getItem, sqliteProgressMap]);
+  }, [isLoaded, finishedBookIds, enrichedBooks, getItem, sqliteProgressMap, getLastPlayedAt, progressMap]);
+
+  // All library books (union with Kid Mode filter)
+  // Includes downloaded + in-progress + favorited + finished (non-downloaded)
+  const allLibraryBooks = useMemo<EnrichedBook[]>(() => {
+    const bookMap = new Map<string, EnrichedBook>();
+
+    // Helper: add book, preferring entry with most recent lastPlayedAt
+    const addBook = (book: EnrichedBook) => {
+      if (kidModeEnabled && book.item && !isKidFriendly(book.item)) return;
+      const existing = bookMap.get(book.id);
+      if (!existing || (book.lastPlayedAt || 0) > (existing.lastPlayedAt || 0)) {
+        bookMap.set(book.id, book);
+      }
+    };
+
+    for (const book of enrichedBooks) addBook(book);
+    for (const book of serverInProgressBooks) addBook(book);
+    for (const book of favoritedBooks) addBook(book);
+    for (const book of markedFinishedBooks) addBook(book);
+
+    // Fallback: add any book from progressStore that's missing from all 4 collections.
+    // Covers the gap where a book auto-finishes (progress >= 0.95) but hasn't
+    // appeared in finishedBookIds yet (React Query 60s staleTime + 2s SQLite flush).
+    for (const [bookId, pd] of progressMap) {
+      if (bookMap.has(bookId)) continue;
+      if (pd.progress <= 0 && !pd.isInLibrary) continue;
+      const item = getItem(bookId);
+      if (!item) continue;
+      if (kidModeEnabled && !isKidFriendly(item)) continue;
+
+      const metadata = getMetadata(item);
+      const { cleanName: seriesName, sequence } = extractSeriesMetadata(metadata.seriesName || '');
+      const download = downloadMap.get(bookId);
+
+      bookMap.set(bookId, {
+        id: bookId,
+        item,
+        title: metadata.title || 'Unknown Title',
+        author: metadata.authorName || metadata.authors?.[0]?.name || 'Unknown Author',
+        seriesName,
+        sequence,
+        progress: pd.progress,
+        duration: pd.duration || getDuration(item),
+        totalBytes: download?.totalBytes || 0,
+        lastPlayedAt: pd.lastPlayedAt,
+        addedAt: item.addedAt,
+        isDownloaded: !!download,
+      });
+    }
+
+    return Array.from(bookMap.values());
+  }, [enrichedBooks, serverInProgressBooks, favoritedBooks, markedFinishedBooks, progressMap, progressVersion, kidModeEnabled, getItem, downloadMap]);
 
   // Get books for current tab
   const currentTabBooks = useMemo(() => {

@@ -279,13 +279,13 @@ export function SeriesListScreen() {
           {
             key: 'series',
             label: 'Series',
-            icon: <BookIcon size={10} color={colors.text.primary} />,
+            icon: <BookIcon size={13} color={colors.text.primary} />,
           },
         ]}
         circleButtons={[
           {
             key: 'back',
-            icon: <TopNavBackIcon color={colors.text.primary} size={14} />,
+            icon: <TopNavBackIcon color={colors.text.primary} size={16} />,
             onPress: handleBack,
           },
         ]}
@@ -346,7 +346,7 @@ export function SeriesListScreen() {
           maxToRenderPerBatch={8}
           windowSize={7}
         renderItem={({ item: series }) => {
-          const isFavorite = favoriteSeriesNames.includes(series.name);
+          const _isFavorite = favoriteSeriesNames.includes(series.name);
 
           // Build spine items from book IDs
           const bookIds = series.books.map(b => b.id);

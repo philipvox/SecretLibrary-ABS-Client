@@ -6,6 +6,15 @@
  */
 
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
+import {
+  getKidModeSettings,
+  AgeCategory,
+  AGE_CATEGORY_ORDER,
+  AGE_CATEGORY_TAGS,
+  ContentRating,
+  RATING_ORDER,
+  RATING_TAGS,
+} from '@/shared/stores/kidModeStore';
 
 // Helper to get book metadata safely
 function getBookMetadata(item: LibraryItem): BookMetadata | null {
@@ -17,16 +26,6 @@ function getBookMetadata(item: LibraryItem): BookMetadata | null {
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
   return media !== undefined && 'tags' in media;
 }
-import {
-  isKidModeEnabled,
-  getKidModeSettings,
-  AgeCategory,
-  AGE_CATEGORY_ORDER,
-  AGE_CATEGORY_TAGS,
-  ContentRating,
-  RATING_ORDER,
-  RATING_TAGS,
-} from '@/shared/stores/kidModeStore';
 
 /**
  * Settings for kid-friendly filtering

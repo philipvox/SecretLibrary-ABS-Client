@@ -27,7 +27,6 @@ import {
   scale,
   iconSizes,
   useTheme,
-  accentColors,
 } from '@/shared/theme';
 
 export type EmptyStateIcon =

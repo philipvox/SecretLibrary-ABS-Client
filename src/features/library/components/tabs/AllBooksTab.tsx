@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SectionHeader } from '@/shared/components/SectionHeader';
 import { useBookContextMenu } from '@/shared/components';
 import { ContinueListeningHero } from '../ContinueListeningHero';
@@ -15,8 +16,7 @@ import { BookRow } from '../BookRow';
 import { FannedSeriesCard } from '../FannedSeriesCard';
 import { PersonCard } from '../PersonCard';
 import { DownloadItem } from '@/features/downloads/components/DownloadItem';
-import { apiClient } from '@/core/api';
-import { scale, spacing } from '@/shared/theme';
+import { scale } from '@/shared/theme';
 import { EnrichedBook, FannedSeriesCardData } from '../../types';
 
 interface AllBooksTabProps {
@@ -59,14 +59,15 @@ export function AllBooksTab({
   onDownloadPause,
   onDownloadResume,
   onDownloadDelete,
-  onPauseAll,
-  onResumeAll,
+  _onPauseAll,
+  _onResumeAll,
   isMarkedFinished,
-  hasDownloading,
-  hasPaused,
+  _hasDownloading,
+  _hasPaused,
   onBrowse,
 }: AllBooksTabProps) {
-  const { showMenu } = useBookContextMenu();
+  const { _showMenu } = useBookContextMenu();
+  const navigation = useNavigation<any>();
 
   const hasContent = books.length > 0 || activeDownloads.length > 0 ||
     favoriteSeriesData.length > 0 || favoriteAuthorData.length > 0 ||
@@ -126,7 +127,7 @@ export function AllBooksTab({
               key={book.id}
               book={book}
               onPress={() => onBookPress(book.id)}
-              onLongPress={() => showMenu(book.item)}
+              onLongPress={() => navigation.navigate('BookDetail', { id: book.id })}
               onPlay={() => onBookPlay(book)}
               isMarkedFinished={isMarkedFinished(book.id)}
             />

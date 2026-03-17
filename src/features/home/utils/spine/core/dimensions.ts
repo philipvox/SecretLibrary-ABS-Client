@@ -141,36 +141,36 @@ function normalizeSeriesName(seriesName: string): string {
  */
 export const GENRE_HEIGHT_PROFILES = {
   // Tall, epic genres
-  'fantasy': 400,
-  'epic-fantasy': 420,
-  'historical-fiction': 380,
-  'classics': 400,
+  'fantasy': 500,
+  'epic-fantasy': 520,
+  'historical-fiction': 480,
+  'classics': 500,
 
   // Medium-tall genres
-  'science-fiction': 370,
-  'thriller': 330,
-  'mystery': 320,
-  'biography': 370,
-  'history': 390,
+  'science-fiction': 470,
+  'thriller': 430,
+  'mystery': 420,
+  'biography': 470,
+  'history': 490,
 
   // Medium genres
-  'romance': 290,
-  'contemporary-fiction': 310,
-  'literary-fiction': 380,
-  'non-fiction': 330,
+  'romance': 390,
+  'contemporary-fiction': 410,
+  'literary-fiction': 480,
+  'non-fiction': 430,
 
   // Short genres
-  'poetry': 260,
-  'short-stories': 300,
-  'essays': 310,
-  'humor': 270,
+  'poetry': 360,
+  'short-stories': 400,
+  'essays': 410,
+  'humor': 370,
 
   // Children's (age-banded)
-  'children-0-2': 180,
-  'children-3-5': 210,
-  'children-6-8': 250,
-  'children-9-12': 290,
-  'young-adult': 340,
+  'children-0-2': 280,
+  'children-3-5': 310,
+  'children-6-8': 350,
+  'children-9-12': 390,
+  'young-adult': 440,
 } as const;
 
 /**
@@ -352,4 +352,36 @@ export function widthToDuration(width: number): string {
   if (width <= 100) return '10-20 hours';
   if (width <= 150) return '20-35 hours';
   return 'Over 35 hours';
+}
+
+// =============================================================================
+// DURATION-BASED SCALE FACTOR
+// =============================================================================
+
+// Range: 0.70 (0 hours) to 1.15 (30 hours), then linear ramp to 1.40 (60+ hours)
+const DURATION_SCALE_MIN = 0.70;
+const DURATION_SCALE_MAX = 1.15;
+const DURATION_MAX_HOURS = 30;
+export const DURATION_SCALE_LONG_MAX = 1.40;
+const DURATION_LONG_CAP_HOURS = 60;
+
+/**
+ * Calculate a continuous scale factor based on book duration.
+ * Uses ease-out curve (square root) for smooth, natural distribution.
+ * Books over 30 hours continue scaling linearly up to 1.40 at 60+ hours.
+ *
+ * @param durationSeconds - Book duration in seconds
+ * @returns Scale multiplier (0.70 to 1.40)
+ */
+export function getDurationScale(durationSeconds: number): number {
+  const hours = Math.max(0, durationSeconds / 3600);
+
+  if (hours <= DURATION_MAX_HOURS) {
+    const t = Math.sqrt(hours / DURATION_MAX_HOURS);
+    return DURATION_SCALE_MIN + (DURATION_SCALE_MAX - DURATION_SCALE_MIN) * t;
+  }
+
+  const extraHours = Math.min(hours, DURATION_LONG_CAP_HOURS) - DURATION_MAX_HOURS;
+  const extraRange = DURATION_LONG_CAP_HOURS - DURATION_MAX_HOURS;
+  return DURATION_SCALE_MAX + (DURATION_SCALE_LONG_MAX - DURATION_SCALE_MAX) * (extraHours / extraRange);
 }

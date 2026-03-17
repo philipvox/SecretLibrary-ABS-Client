@@ -213,9 +213,10 @@ describe('spineCalculations', () => {
       expect(width).toBe(60); // MEDIAN_WIDTH
     });
 
-    it('returns minimum width for very short durations', () => {
+    it('returns a width for very short durations', () => {
       const width = calculateSpineWidth(60); // 1 minute
-      expect(width).toBeGreaterThanOrEqual(44); // MIN_WIDTH
+      // Piecewise formula: hours < 1 → 32 + (hours * 12) = 32 + 0.2 = ~32
+      expect(width).toBeGreaterThanOrEqual(32);
     });
 
     it('increases width with duration', () => {
@@ -226,7 +227,7 @@ describe('spineCalculations', () => {
 
     it('stays within bounds', () => {
       const veryLong = calculateSpineWidth(360000); // 100 hours
-      expect(veryLong).toBeGreaterThanOrEqual(44);  // MIN_WIDTH
+      expect(veryLong).toBeGreaterThanOrEqual(32);  // lowest possible from formula
       expect(veryLong).toBeLessThanOrEqual(380);    // MAX_WIDTH
     });
   });
@@ -234,8 +235,8 @@ describe('spineCalculations', () => {
   describe('calculateSpineHeight', () => {
     it('returns reasonable height for book without genres', () => {
       const height = calculateSpineHeight(undefined, 'book123');
-      expect(height).toBeGreaterThanOrEqual(290); // MIN_HEIGHT
-      expect(height).toBeLessThanOrEqual(450);    // MAX_HEIGHT
+      expect(height).toBeGreaterThanOrEqual(260); // MIN_HEIGHT (200 * HEIGHT_SCALE)
+      expect(height).toBeLessThanOrEqual(550);    // MAX_HEIGHT
     });
 
     it('returns consistent height for same bookId', () => {
@@ -253,8 +254,8 @@ describe('spineCalculations', () => {
       ];
 
       heights.forEach(height => {
-        expect(height).toBeGreaterThanOrEqual(290); // MIN_HEIGHT
-        expect(height).toBeLessThanOrEqual(450);    // MAX_HEIGHT
+        expect(height).toBeGreaterThanOrEqual(260); // MIN_HEIGHT (200 * HEIGHT_SCALE)
+        expect(height).toBeLessThanOrEqual(550);    // MAX_HEIGHT
       });
     });
   });

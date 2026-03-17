@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -22,7 +22,7 @@ import Animated, {
 import { usePlayerStore, usePlaybackRate } from '@/features/player';
 import { haptics } from '@/core/native/haptics';
 import { audioService } from '@/features/player/services/audioService';
-import { wp, accentColors, useTheme } from '@/shared/theme';
+import { wp, useTheme } from '@/shared/theme';
 import type { JoystickSeekSettings } from '@/features/player/stores/joystickSeekStore';
 import { calculateSeekSpeed, applyDeadzone } from '@/features/player/stores/joystickSeekStore';
 
@@ -129,7 +129,7 @@ function formatTimeOffset(seconds: number): string {
   return `${sign}${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-function formatTime(seconds: number): string {
+function _formatTime(seconds: number): string {
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
@@ -206,12 +206,12 @@ export function CoverPlayButton({
   const tooltipOpacity = useSharedValue(0);
 
   // State
-  const [tooltipText, setTooltipText] = useState('+00:00');
-  const [scrubPosition, setScrubPosition] = useState(0);
+  const [_tooltipText, setTooltipText] = useState('+00:00');
+  const [_scrubPosition, setScrubPosition] = useState(0);
   const [speedLabel, setSpeedLabel] = useState('');
-  const [scrubDirection, setScrubDirection] = useState<'forward' | 'backward' | null>(null);
-  const [currentSpeedMultiplier, setCurrentSpeedMultiplier] = useState(0);
-  const [isJogActive, setIsJogActive] = useState(false);
+  const [_scrubDirection, setScrubDirection] = useState<'forward' | 'backward' | null>(null);
+  const [_currentSpeedMultiplier, setCurrentSpeedMultiplier] = useState(0);
+  const [_isJogActive, setIsJogActive] = useState(false);
 
   // Refs
   const scrubIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -317,12 +317,10 @@ export function CoverPlayButton({
 
       // Calculate scrub speed based on whether joystickSettings is provided
       let baseSpeed: number;
-      let effectiveDeadzone: number;
       let hapticEnabled = true;
 
       if (joystickSettings && joystickSettings.enabled) {
         // Use curve-based calculation from joystick seek settings
-        effectiveDeadzone = joystickSettings.deadzone;
         hapticEnabled = joystickSettings.hapticEnabled;
 
         // Apply deadzone and normalize to 0-1
@@ -340,7 +338,6 @@ export function CoverPlayButton({
         }
       } else {
         // Use default zone-based calculation
-        effectiveDeadzone = SCRUB_CONFIG.DEAD_ZONE;
         baseSpeed = calculateScrubSpeed(translateX.value);
       }
 
@@ -666,7 +663,7 @@ export function CoverPlayButton({
     ],
   }));
 
-  const tooltipStyle = useAnimatedStyle(() => ({
+  const _tooltipStyle = useAnimatedStyle(() => ({
     opacity: tooltipOpacity.value,
     transform: [
       { translateY: interpolate(tooltipOpacity.value, [0, 1], [10, 0], Extrapolation.CLAMP) },

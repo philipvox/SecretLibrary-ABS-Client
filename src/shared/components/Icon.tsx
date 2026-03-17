@@ -65,6 +65,7 @@ export function Icon({
   strokeWidth = 2,
 }: IconProps) {
   const { colors } = useTheme();
+  // eslint-disable-next-line import/namespace
   const IconComponent = LucideIcons[name as keyof typeof LucideIcons] as LucideIcon;
 
   if (!IconComponent) {

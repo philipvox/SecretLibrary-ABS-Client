@@ -247,3 +247,13 @@ export type { CollapsibleSectionProps } from './CollapsibleSection';
 // NOTICE MODALS
 // =============================================================================
 export { LocalStorageNoticeModal } from './LocalStorageNoticeModal';
+
+// =============================================================================
+// COVER STARS
+// =============================================================================
+export { CoverStars } from './CoverStars';
+
+// =============================================================================
+// HOLOGRAPHIC STICKER
+// =============================================================================
+export { HolographicSticker } from './HolographicSticker';

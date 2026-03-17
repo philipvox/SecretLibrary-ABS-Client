@@ -20,7 +20,7 @@ const appStartTime = Date.now();
 // Get timestamp prefix showing ms since app start and ms since last log
 const getTimestamp = (): string => {
   const now = Date.now();
-  const sinceStart = now - appStartTime;
+  const _sinceStart = now - appStartTime;
   const sinceLastLog = now - lastLogTime;
   lastLogTime = now;
   return `+${sinceLastLog}ms`;
@@ -222,7 +222,7 @@ export async function testUrlAccessibility(url: string): Promise<{ accessible: b
 /**
  * Log chapter information for debugging
  */
-export function logChapters(chapters: Array<{ start: number; end: number; title: string }>): void {
+export function logChapters(chapters: { start: number; end: number; title: string }[]): void {
   if (!DEBUG) return;
 
   console.log('[Debug] Chapters:');
@@ -236,7 +236,7 @@ export function logChapters(chapters: Array<{ start: number; end: number; title:
 /**
  * Log audio track information for debugging
  */
-export function logTracks(tracks: Array<{ url: string; startOffset: number; duration: number; title?: string }>): void {
+export function logTracks(tracks: { url: string; startOffset: number; duration: number; title?: string }[]): void {
   if (!DEBUG) return;
 
   console.log('[Debug] Audio Tracks:');

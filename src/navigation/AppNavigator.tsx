@@ -33,9 +33,8 @@ import { SecretLibraryAuthorDetailScreen } from '@/features/author';
 import { SecretLibraryNarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { SecretLibraryBookDetailScreen } from '@/features/book-detail';
-import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, DataStorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen, ChapterCleaningSettingsScreen, HiddenItemsScreen, KidModeSettingsScreen, AppearanceSettingsScreen, LibrarySyncSettingsScreen, PlaylistSettingsScreen, DeveloperSettingsScreen } from '@/features/profile';
+import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, DataStorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen, ChapterCleaningSettingsScreen, HiddenItemsScreen, KidModeSettingsScreen, AppearanceSettingsScreen, DisplaySettingsScreen, LibrarySyncSettingsScreen, PlaylistSettingsScreen, DeveloperSettingsScreen, AboutScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
-import { MoodDiscoveryScreen, MoodResultsScreen } from '@/features/mood-discovery';
 import { SecretLibraryPlayerScreen, BookCompletionSheet } from '@/features/player';
 import { MarkBooksScreen, ReadingHistoryScreen } from '@/features/reading-history-wizard';
 import { QueueScreen, useQueueStore } from '@/features/queue';
@@ -48,7 +47,6 @@ import { downloadManager } from '@/core/services/downloadManager';
 import { networkMonitor } from '@/core/services/networkMonitor';
 import { imageCacheService } from '@/core/services/imageCacheService';
 import { navigationMonitor } from '@/utils/runtimeMonitor';
-import { NavigationBar } from './components/NavigationBar';
 import { GlobalMiniPlayer } from './components/GlobalMiniPlayer';
 import { NetworkStatusBar, ToastContainer, LocalStorageNoticeModal, GlobalCacheProgressBar, BookContextMenuProvider } from '@/shared/components';
 import { ErrorBoundary } from '@/core/errors/ErrorBoundary';
@@ -356,10 +354,12 @@ function AuthenticatedApp() {
         <Stack.Screen
           name="BookDetail"
           component={BookDetailScreenWithBoundary}
-          options={({ route }) => ({
-            // No animation for series carousel - we handle it ourselves
-            animation: (route.params as any)?.animationDirection ? 'none' : 'default',
-          })}
+          options={({ route }) => {
+            const dir = (route.params as any)?.animationDirection;
+            return {
+              animation: dir === 'none' ? 'none' : dir === 'fade' ? 'fade' : 'default',
+            };
+          }}
         />
         <Stack.Screen name="Preferences" component={PreferencesScreen} />
         <Stack.Screen name="QueueScreen" component={QueueScreen} />
@@ -376,8 +376,10 @@ function AuthenticatedApp() {
         <Stack.Screen name="HiddenItems" component={HiddenItemsScreen} />
         <Stack.Screen name="KidModeSettings" component={KidModeSettingsScreen} />
         <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} />
+        <Stack.Screen name="DisplaySettings" component={DisplaySettingsScreen} />
         <Stack.Screen name="LibrarySyncSettings" component={LibrarySyncSettingsScreen} />
         <Stack.Screen name="PlaylistSettings" component={PlaylistSettingsScreen} />
+        <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="CassetteTest" component={CassetteTestScreen} />
         <Stack.Screen name="SpineTemplatePreview" component={SpineTemplatePreviewScreen} />
         <Stack.Screen name="SpinePlayground" component={SpinePlaygroundScreen} />
@@ -392,17 +394,7 @@ function AuthenticatedApp() {
           component={PreferencesOnboardingScreen}
           options={{ presentation: 'modal' }}
         />
-        <Stack.Screen
-          name="MoodDiscovery"
-          component={MoodDiscoveryScreen}
-          options={{ presentation: 'modal' }}
-        />
-        <Stack.Screen
-          name="MoodResults"
-          component={MoodResultsScreen}
-          options={{ presentation: 'modal' }}
-        />
-        <Stack.Screen
+<Stack.Screen
           name="ReadingHistoryWizard"
           component={MarkBooksScreen}
           options={{ presentation: 'fullScreenModal' }}
@@ -442,7 +434,7 @@ function AuthenticatedApp() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, _isLoading } = useAuth();
 
   // No loading state - App.tsx handles splash screen via AnimatedSplash
   // isLoading should be false when using initialSession from AppInitializer
@@ -459,6 +451,3 @@ export function AppNavigator() {
 
   return <AuthenticatedApp />;
 }
-
-// Styles removed - no longer using CacheLoadingScreen
-const styles = StyleSheet.create({});
