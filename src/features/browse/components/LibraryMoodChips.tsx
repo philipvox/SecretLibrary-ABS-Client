@@ -19,13 +19,15 @@ import { filterByFeeling } from '@/shared/utils/bookDNA';
 import { useFeelingChipStore, FeelingChip } from '../stores/feelingChipStore';
 import { useLibraryMoods } from '../hooks/useLibraryMoods';
 import { SectionHeader } from './SectionHeader';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 interface LibraryMoodChipsProps {
   items: LibraryItem[];
   onBookPress: (bookId: string) => void;
 }
 
-export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items, _onBookPress }: LibraryMoodChipsProps) {
+export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items }: LibraryMoodChipsProps) {
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
   const colors = useSecretLibraryColors();
   const { moods } = useLibraryMoods(items);
   const activeChip = useFeelingChipStore((s) => s.activeChip);
@@ -52,7 +54,7 @@ export const LibraryMoodChips = React.memo(function LibraryMoodChips({ items, _o
 
   const activeLabel = visibleMoods.find((m) => m.key === activeChip)?.label || '';
 
-  if (visibleMoods.length === 0) return null;
+  if (!dnaEnabled || visibleMoods.length === 0) return null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.white }]}>

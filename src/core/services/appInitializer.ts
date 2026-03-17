@@ -232,6 +232,9 @@ class AppInitializer {
     // Don't await - this doesn't need to block app startup
     this.initAutomotive();
 
+    // Initialize Chromecast in background
+    this.initChromecast();
+
     // Connect WebSocket if user is authenticated
     // Don't await - this runs in background
     if (result.user) {
@@ -473,6 +476,16 @@ class AppInitializer {
       log.debug('Automotive service initialized');
     } catch (err) {
       log.warn('Automotive initialization failed:', err);
+    }
+  }
+
+  private async initChromecast(): Promise<void> {
+    try {
+      const { useCastStore } = await import('@/features/chromecast');
+      useCastStore.getState().initialize();
+      log.debug('Chromecast initialized');
+    } catch (err) {
+      log.warn('Chromecast initialization failed:', err);
     }
   }
 

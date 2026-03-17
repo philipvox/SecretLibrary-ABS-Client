@@ -401,15 +401,17 @@ export function SecretLibraryBookDetailScreen() {
     }
 
     if (hitIndex >= 0) {
+      // Remove star — rating = remaining count (0-4)
       removeStarAt(bookId, hitIndex);
       const remaining = currentStars.length - 1;
-      setBookRating.mutate({ bookId, rating: remaining > 0 ? 5 : 0 });
+      setBookRating.mutate({ bookId, rating: remaining });
       haptics.selection();
-    } else {
+    } else if (currentStars.length < 5) {
+      // Add star — rating = new count (1-5), max 5
       const rotation = (Math.random() - 0.5) * 30;
       const variant = Math.floor(Math.random() * 4);
       addStar(bookId, { x: xPct, y: yPct, rotation, variant });
-      setBookRating.mutate({ bookId, rating: 5 });
+      setBookRating.mutate({ bookId, rating: currentStars.length + 1 });
       haptics.impact();
     }
   }, [bookId, addStar, removeStarAt, setBookRating]);

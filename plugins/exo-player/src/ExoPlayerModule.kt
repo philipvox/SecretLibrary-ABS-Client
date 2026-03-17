@@ -69,10 +69,11 @@ class ExoPlayerModule(private val reactContext: ReactApplicationContext) :
 
         /**
          * Emit a named event with optional data to JS.
+         * Returns true if the event was successfully emitted, false if JS isn't ready.
          */
-        fun emitEvent(eventName: String, data: Bundle?) {
-            val instance = moduleInstance ?: return
-            if (!instance.reactContext.hasActiveReactInstance()) return
+        fun emitEvent(eventName: String, data: Bundle?): Boolean {
+            val instance = moduleInstance ?: return false
+            if (!instance.reactContext.hasActiveReactInstance()) return false
 
             try {
                 val params = Arguments.createMap()
@@ -101,8 +102,10 @@ class ExoPlayerModule(private val reactContext: ReactApplicationContext) :
                     .emit(targetEvent, params)
 
                 Log.d(TAG, "Emitted event: $targetEvent")
+                return true
             } catch (e: Exception) {
                 Log.e(TAG, "Error emitting event: $eventName", e)
+                return false
             }
         }
     }
@@ -194,6 +197,7 @@ class ExoPlayerModule(private val reactContext: ReactApplicationContext) :
         try {
             // If already initialized, resolve immediately
             if (AudioPlaybackService.instance != null) {
+                replayPendingCommand()
                 promise.resolve(true)
                 return
             }
@@ -207,6 +211,7 @@ class ExoPlayerModule(private val reactContext: ReactApplicationContext) :
                 override fun run() {
                     if (AudioPlaybackService.instance != null) {
                         Log.d(TAG, "Service ready after ${attempts * 50}ms")
+                        replayPendingCommand()
                         promise.resolve(true)
                     } else if (++attempts >= maxAttempts) {
                         Log.e(TAG, "Service did not start after 5s")
@@ -221,6 +226,20 @@ class ExoPlayerModule(private val reactContext: ReactApplicationContext) :
             Log.e(TAG, "Initialize failed", e)
             promise.reject("INIT_ERROR", e.message, e)
         }
+    }
+
+    /**
+     * Replay any pending play command that was queued while JS was not ready.
+     * Called after initialize() confirms the service is running and JS is active.
+     */
+    private fun replayPendingCommand() {
+        val pendingId = AudioPlaybackService.pendingPlayMediaId ?: return
+        AudioPlaybackService.pendingPlayMediaId = null
+        Log.d(TAG, "Replaying pending playFromMediaId: $pendingId")
+        emitEvent("onRemoteCommand", Bundle().apply {
+            putString("command", "playFromMediaId")
+            putString("param", pendingId)
+        })
     }
 
     /**

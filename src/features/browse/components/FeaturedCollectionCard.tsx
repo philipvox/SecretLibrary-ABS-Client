@@ -24,7 +24,7 @@ interface FeaturedCollectionCardProps {
   onPress: () => void;
 }
 
-export function FeaturedCollectionCard({ collection, onPress }: FeaturedCollectionCardProps) {
+export const FeaturedCollectionCard = React.memo(function FeaturedCollectionCard({ collection, onPress }: FeaturedCollectionCardProps) {
   const books = collection.books || [];
   const bookCount = books.length;
 
@@ -51,6 +51,7 @@ export function FeaturedCollectionCard({ collection, onPress }: FeaturedCollecti
                 source={{ uri: url }}
                 style={styles.mosaicQuarter}
                 contentFit="cover"
+                cachePolicy="memory-disk"
                 transition={200}
               />
             ))}
@@ -64,6 +65,7 @@ export function FeaturedCollectionCard({ collection, onPress }: FeaturedCollecti
                 source={{ uri: url }}
                 style={styles.mosaicThird}
                 contentFit="cover"
+                cachePolicy="memory-disk"
                 transition={200}
               />
             ))}
@@ -73,6 +75,7 @@ export function FeaturedCollectionCard({ collection, onPress }: FeaturedCollecti
             source={{ uri: coverUrls[0] }}
             style={styles.mosaicFull}
             contentFit="cover"
+            cachePolicy="memory-disk"
             transition={200}
           />
         ) : (
@@ -90,7 +93,7 @@ export function FeaturedCollectionCard({ collection, onPress }: FeaturedCollecti
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -30,6 +30,7 @@ import {
   getDNAMoodScore,
 } from '@/shared/utils/bookDNA';
 import { Mood } from '@/shared/utils/bookDNA';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 // Local types for mood session scoring (legacy, kept for compatibility)
 type Pace = 'slow' | 'steady' | 'fast' | 'any';
@@ -616,7 +617,8 @@ export function calculateComprehensiveScore(
 ): ComprehensiveScore {
   const metadata = getMetadata(item);
   const tags = getItemTags(item);
-  const dna = parseBookDNA(tags);
+  const dnaEnabled = useDNASettingsStore.getState().enableDNAFeatures;
+  const dna = dnaEnabled ? parseBookDNA(tags) : parseBookDNA([]);
   const era = getPublicationEra(item);
   const durationHours = getDurationHours(item);
 

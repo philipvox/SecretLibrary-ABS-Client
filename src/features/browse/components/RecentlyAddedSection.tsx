@@ -123,9 +123,11 @@ interface RecentlyAddedSectionProps {
   displayMode?: 'covers' | 'spines';
   /** Sort by: 'added' (default, addedAt) or 'published' (publishedYear/publishedDate) */
   sortBy?: 'added' | 'published';
+  /** Override container background color */
+  backgroundColor?: string;
 }
 
-export function RecentlyAddedSection({
+export const RecentlyAddedSection = React.memo(function RecentlyAddedSection({
   items,
   onBookPress,
   onBookLongPress,
@@ -134,6 +136,7 @@ export function RecentlyAddedSection({
   title: sectionTitle = 'Recently Added',
   displayMode = 'covers',
   sortBy = 'added',
+  backgroundColor: bgColor,
 }: RecentlyAddedSectionProps) {
   const recentBooks = useMemo(() => {
     if (!items?.length) return [];
@@ -176,7 +179,7 @@ export function RecentlyAddedSection({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
+    <View style={[styles.container, { backgroundColor: bgColor ?? colors.black }]}>
       <SectionHeader
         label={sectionTitle}
         onViewAll={onViewAll}
@@ -209,7 +212,7 @@ export function RecentlyAddedSection({
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

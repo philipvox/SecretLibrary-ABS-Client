@@ -27,6 +27,7 @@ interface AuthContextType {
   error: string | null;
   versionCheck: VersionCheckResult | null;  // Server version compatibility
   login: (serverUrl: string, username: string, password: string) => Promise<void>;
+  loginWithToken: (serverUrl: string, token: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
   dismissVersionWarning: () => void;  // Dismiss version mismatch warning
@@ -194,11 +195,69 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       // Sync finished books and preload recent book (same as app startup)
       // Don't await - runs in background
       appInitializer.syncFinishedBooks();
+
+      // Sync My Library with linked collection (populates librarySet)
+      appInitializer.syncLibrary();
     } catch (err: any) {
       log.error('Login failed:', err);
       const errorMessage = err.message || 'Login failed. Please try again.';
       setError(errorMessage);
       throw err; // Re-throw so UI can handle it
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Login with a pre-obtained token (from OAuth/SSO callback)
+   */
+  const loginWithToken = async (
+    serverUrl: string,
+    token: string
+  ): Promise<void> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setVersionCheck(null);
+      setVersionWarningDismissed(false);
+
+      const user = await authService.loginWithToken(serverUrl, token);
+
+      setUser(user);
+      setServerUrl(serverUrl);
+
+      // Set Sentry user context for error tracking
+      setSentryUser({ id: user.id, username: user.username });
+
+      // Check server version compatibility (non-blocking)
+      serverVersionService.checkServerVersion().then(result => {
+        if (!result.isCompatible) {
+          setVersionCheck(result);
+          log.warn('Server version mismatch:', result.message);
+        }
+      }).catch((err) => {
+        log.warn('Server version check failed:', err);
+      });
+
+      // Start token health monitoring
+      tokenHealthService.start();
+
+      // Prefetch main tab data in background
+      prefetchMainTabData();
+
+      // Connect WebSocket for real-time sync
+      appInitializer.connectWebSocket();
+
+      // Sync finished books (background)
+      appInitializer.syncFinishedBooks();
+
+      // Sync My Library with linked collection (populates librarySet)
+      appInitializer.syncLibrary();
+    } catch (err: any) {
+      log.error('Token login failed:', err);
+      const errorMessage = err.message || 'SSO login failed. Please try again.';
+      setError(errorMessage);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -262,6 +321,7 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
     error,
     versionCheck: versionWarningDismissed ? null : versionCheck,  // Hide if dismissed
     login,
+    loginWithToken,
     logout,
     clearError,
     dismissVersionWarning,

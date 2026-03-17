@@ -31,6 +31,7 @@ import { LibraryItem } from '@/core/types';
 import { filterByFeeling } from '@/shared/utils/bookDNA';
 import { useFeelingChipStore } from '../stores/feelingChipStore';
 import type { FeelingChip } from '../stores/feelingChipStore';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 // Sections — personalized (from For You)
 import { ActionNeededSection } from './ActionNeededSection';
@@ -67,7 +68,8 @@ interface BrowseContentProps {
   onAuthorPress: (authorName: string) => void;
   onCollectionPress: (collectionId: string) => void;
   onViewAllCollections: () => void;
-  onViewAllBooks: () => void;
+  onViewAllNewToLibrary: () => void;
+  onViewAllNewReleases: () => void;
   onVibePress: (slug: string) => void;
   onBrowseItemPress: (type: 'genres' | 'narrators' | 'series' | 'duration') => void;
   onMoodPress: (moodKey: FeelingChip) => void;
@@ -86,10 +88,11 @@ export function BrowseContent({
   onAuthorPress,
   onCollectionPress,
   onViewAllCollections,
-  onViewAllBooks,
+  onViewAllNewToLibrary,
+  onViewAllNewReleases,
   onVibePress,
   onBrowseItemPress,
-  _onMoodPress,
+  onMoodPress: _onMoodPress,
   onScrollPastHero,
 }: BrowseContentProps) {
   const insets = useSafeAreaInsets();
@@ -107,11 +110,12 @@ export function BrowseContent({
 
   // Mood chip filter — applied as a layer on top of filteredItems
   const activeChip = useFeelingChipStore((s) => s.activeChip);
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
 
   const displayItems = useMemo(() => {
-    if (!activeChip) return filteredItems;
+    if (!dnaEnabled || !activeChip) return filteredItems;
     return filterByFeeling(filteredItems, activeChip);
-  }, [filteredItems, activeChip]);
+  }, [filteredItems, activeChip, dnaEnabled]);
 
   // Collections data (for curated section)
   const { collections } = useCollections();
@@ -121,6 +125,7 @@ export function BrowseContent({
     <SkullRefreshControl refreshing={isRefreshing} onRefresh={onRefresh} progressViewOffset={headerHeight || 0}>
     <ScrollView
       showsVerticalScrollIndicator={false}
+      style={{ backgroundColor: 'transparent' }}
       contentContainerStyle={{ paddingBottom: BOTTOM_CLEARANCE + insets.bottom }}
       onScroll={handleScroll}
       scrollEventThrottle={16}
@@ -177,7 +182,7 @@ export function BrowseContent({
           items={displayItems}
           onBookPress={onBookPress}
           onBookLongPress={onBookLongPress}
-          onViewAll={onViewAllBooks}
+          onViewAll={onViewAllNewToLibrary}
           title="New To Library"
           displayMode="covers"
         />
@@ -187,7 +192,7 @@ export function BrowseContent({
           items={displayItems}
           onBookPress={onBookPress}
           onBookLongPress={onBookLongPress}
-          onViewAll={onViewAllBooks}
+          onViewAll={onViewAllNewReleases}
           title="New Releases"
           displayMode="covers"
           sortBy="published"

@@ -419,6 +419,16 @@ class AutomotiveService {
       // Retry after delay in case library isn't loaded yet
       setTimeout(() => this.syncBrowseDataToAndroidAuto(), 3000);
 
+      // Periodic browse sync every 30 min to refresh auth tokens in cover URLs
+      // and update recently played list while app is open
+      if (this.periodicSyncInterval) {
+        clearInterval(this.periodicSyncInterval);
+      }
+      this.periodicSyncInterval = setInterval(() => {
+        log('Periodic browse sync (30 min)');
+        this.syncBrowseDataToAndroidAuto();
+      }, 30 * 60 * 1000);
+
       log('Android Auto initialized successfully');
 
     } catch (error) {
@@ -1386,21 +1396,52 @@ class AutomotiveService {
 
     try {
       const { useLibraryCache } = await import('@/core/cache/libraryCache');
+      const { sqliteCache } = await import('@/core/services/sqliteCache');
 
       const libraryItems = useLibraryCache.getState().items;
       const playerState = usePlayerStore.getState();
 
       // =================================================================
-      // LAST PLAYED - Show the current/last book for quick resume
+      // CONTINUE LISTENING - Current book for quick resume
       // =================================================================
       if (playerState.currentBook) {
-        const lastPlayedItem = this.createBrowseItem(playerState.currentBook, { showProgress: true });
-
+        const continueItem = this.createBrowseItem(playerState.currentBook, { showProgress: true });
         sections.push({
-          id: 'last-played',
-          title: 'Last Played',
-          items: [lastPlayedItem],
+          id: 'continue-listening',
+          title: 'Continue Listening',
+          items: [continueItem],
         });
+      }
+
+      // =================================================================
+      // RECENTLY PLAYED - From SQLite, sorted by last_played_at DESC
+      // =================================================================
+      try {
+        const recentBooks = await sqliteCache.getInProgressUserBooks();
+        if (recentBooks.length > 0) {
+          const recentItems: BrowseItem[] = [];
+          const currentBookId = playerState.currentBook?.id;
+
+          for (const userBook of recentBooks.slice(0, 20)) {
+            // Skip the current book — it's already in "Continue Listening"
+            if (userBook.bookId === currentBookId) continue;
+
+            const item = libraryItems.find(i => i.id === userBook.bookId);
+            if (item) {
+              recentItems.push(this.createBrowseItem(item, { showProgress: true }));
+            }
+          }
+
+          if (recentItems.length > 0) {
+            sections.push({
+              id: 'recently-played',
+              title: 'Recently Played',
+              items: recentItems,
+            });
+          }
+        }
+      } catch (err) {
+        log('Error loading recently played books:', err);
       }
 
       // =================================================================

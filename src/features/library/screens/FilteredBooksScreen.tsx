@@ -32,6 +32,8 @@ import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { DURATION_RANGES } from '@/features/browse/hooks/useBrowseCounts';
 import { ShelfRow, BookSpineVerticalData } from '@/shared/spine';
 import { filterByFeeling } from '@/shared/utils/bookDNA/feelingScoring';
+import type { FeelingChip } from '@/features/browse/stores/feelingChipStore';
+import { useDNASettingsStore } from '@/features/profile/stores/dnaSettingsStore';
 
 // Type guard for book media
 function isBookMedia(media: LibraryItem['media'] | undefined): media is BookMedia {
@@ -157,6 +159,7 @@ export function FilteredBooksScreen() {
   const { isFinished, hasBeenStarted } = useReadingHistory();
   const { items: inProgressItems } = useContinueListening();
   const slColors = useSecretLibraryColors();
+  const dnaEnabled = useDNASettingsStore((s) => s.enableDNAFeatures);
 
   // Create series filter
   const isSeriesAppropriate = useMemo(() => {
@@ -233,10 +236,10 @@ export function FilteredBooksScreen() {
       }
 
       case 'feeling': {
-        // Filter by feeling chip scoring
+        // Filter by feeling chip scoring (skip when DNA disabled)
         const feelingKey = route.params?.feeling;
-        if (feelingKey) {
-          result = filterByFeeling(libraryItems, feelingKey);
+        if (dnaEnabled && feelingKey) {
+          result = filterByFeeling(libraryItems, feelingKey as FeelingChip);
         } else {
           result = [];
         }
@@ -345,13 +348,6 @@ export function FilteredBooksScreen() {
           return direction * titleA.localeCompare(titleB);
         });
         break;
-      case 'author':
-        result.sort((a, b) => {
-          const authorA = getMetadata(a).authorName || getMetadata(a).authors?.[0]?.name || '';
-          const authorB = getMetadata(b).authorName || getMetadata(b).authors?.[0]?.name || '';
-          return direction * authorA.localeCompare(authorB);
-        });
-        break;
       case 'duration':
         result.sort((a, b) => direction * (getBookDuration(a) - getBookDuration(b)));
         break;
@@ -372,6 +368,7 @@ export function FilteredBooksScreen() {
     maxDuration,
     sortBy,
     sortDirection,
+    dnaEnabled,
   ]);
 
   // Total duration and grouped lists

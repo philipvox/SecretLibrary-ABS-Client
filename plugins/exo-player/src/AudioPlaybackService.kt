@@ -67,6 +67,11 @@ class AudioPlaybackService : Service() {
         var instance: AudioPlaybackService? = null
             private set
 
+        // Pending play command from Android Auto when JS isn't ready yet.
+        // Stored here so ExoPlayerModule.initialize() can replay it once JS connects.
+        @Volatile
+        var pendingPlayMediaId: String? = null
+
         /**
          * Start the service from ExoPlayerModule.
          */
@@ -938,10 +943,14 @@ class AudioPlaybackService : Service() {
             Log.d(TAG, "MediaSession: onPlayFromMediaId: $mediaId")
             mediaId?.let { id ->
                 val itemId = if (id.startsWith("item:")) id.removePrefix("item:") else id
-                ExoPlayerModule.emitEvent("onRemoteCommand", Bundle().apply {
+                val emitted = ExoPlayerModule.emitEvent("onRemoteCommand", Bundle().apply {
                     putString("command", "playFromMediaId")
                     putString("param", itemId)
                 })
+                if (!emitted) {
+                    pendingPlayMediaId = itemId
+                    Log.w(TAG, "JS not ready, queued pendingPlayMediaId: $itemId")
+                }
             }
         }
 

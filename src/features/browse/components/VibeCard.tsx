@@ -24,7 +24,7 @@ interface VibeCardProps {
 const CARD_WIDTH = wp(100) * 0.68;
 const THUMB_SIZE = scale(42);
 
-export function VibeCard({ slug, bookCount, bookIds, onPress }: VibeCardProps) {
+export const VibeCard = React.memo(function VibeCard({ slug, bookCount, bookIds, onPress }: VibeCardProps) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -62,7 +62,7 @@ export function VibeCard({ slug, bookCount, bookIds, onPress }: VibeCardProps) {
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
