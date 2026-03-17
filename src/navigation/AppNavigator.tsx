@@ -434,7 +434,7 @@ function AuthenticatedApp() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, _isLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   // No loading state - App.tsx handles splash screen via AnimatedSplash
   // isLoading should be false when using initialSession from AppInitializer

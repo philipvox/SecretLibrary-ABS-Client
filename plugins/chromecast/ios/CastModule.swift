@@ -95,7 +95,11 @@ class CastModule: RCTEventEmitter {
         metadata.addImage(GCKImage(url: imageUrl, width: 800, height: 800))
       }
 
-      let builder = GCKMediaInformationBuilder(contentURL: URL(string: url)!)
+      guard let mediaURL = URL(string: url) else {
+        reject("INVALID_URL", "Invalid media URL", nil)
+        return
+      }
+      let builder = GCKMediaInformationBuilder(contentURL: mediaURL)
       builder.streamType = .buffered
       builder.contentType = "audio/mp4"
       builder.metadata = metadata

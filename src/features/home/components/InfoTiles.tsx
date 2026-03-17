@@ -101,7 +101,6 @@ export function InfoTiles({
   onTimePress,
   isSeeking,
   seekDelta,
-  _seekDirection,
   isPlaying = false,
 }: InfoTilesProps) {
   const { colors } = useTheme();

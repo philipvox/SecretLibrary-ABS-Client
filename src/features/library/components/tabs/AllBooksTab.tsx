@@ -9,7 +9,6 @@ import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SectionHeader } from '@/shared/components/SectionHeader';
-import { useBookContextMenu } from '@/shared/components';
 import { ContinueListeningHero } from '../ContinueListeningHero';
 import { LibraryEmptyState } from '../LibraryEmptyState';
 import { BookRow } from '../BookRow';
@@ -59,14 +58,9 @@ export function AllBooksTab({
   onDownloadPause,
   onDownloadResume,
   onDownloadDelete,
-  _onPauseAll,
-  _onResumeAll,
   isMarkedFinished,
-  _hasDownloading,
-  _hasPaused,
   onBrowse,
 }: AllBooksTabProps) {
-  const { _showMenu } = useBookContextMenu();
   const navigation = useNavigation<any>();
 
   const hasContent = books.length > 0 || activeDownloads.length > 0 ||

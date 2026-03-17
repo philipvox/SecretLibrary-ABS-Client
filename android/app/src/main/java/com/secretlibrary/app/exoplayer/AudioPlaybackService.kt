@@ -598,9 +598,8 @@ class AudioPlaybackService : Service() {
         exoPlayer?.release()
         exoPlayer = null
 
-        currentArtworkBitmap?.let {
-            if (!it.isRecycled) it.recycle()
-        }
+        // Don't recycle bitmap — it may still be referenced by NotificationCompat or MediaSession.
+        // Let GC handle it.
         currentArtworkBitmap = null
 
         isInitialized = false
@@ -695,8 +694,8 @@ class AudioPlaybackService : Service() {
                 }
                 // Re-check URL hasn't changed during async load
                 if (currentArtworkUrl == savedUrl) {
-                    // Recycle the previous bitmap before assigning the new one
-                    currentArtworkBitmap?.let { if (!it.isRecycled) it.recycle() }
+                    // Don't recycle previous bitmap — it may still be referenced by
+                    // NotificationCompat or MediaSession. Let GC handle it.
                     currentArtworkBitmap = bitmap
                     updateMediaSessionMetadata()
                     updateNotification()

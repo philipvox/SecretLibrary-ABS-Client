@@ -84,7 +84,6 @@ export function SeriesCard({
   author,
   bookCount,
   bookIds,
-  _variant = 'light',
   layout = 'list',
   maxDots = 12,
   onPress,

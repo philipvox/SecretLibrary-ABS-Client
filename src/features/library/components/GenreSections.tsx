@@ -61,7 +61,7 @@ export function MetaCategorySection({
   onToggle,
   onGenrePress,
 }: MetaCategorySectionProps) {
-  const { _colors, isDark } = useTheme();
+  const { isDark } = useTheme();
 
   const handleToggle = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
