@@ -192,7 +192,10 @@ class CastModule(reactContext: ReactApplicationContext) :
 
     /**
      * Show the native Cast device picker dialog.
-     * Uses MediaRouteButton.performClick() — the canonical Cast SDK approach.
+     *
+     * A MediaRouteButton must be attached to a window for its click handler
+     * to show the chooser dialog. We add a hidden button to the activity's
+     * decor view, click it, then remove it on the next frame.
      */
     @ReactMethod
     fun showCastPicker(promise: Promise) {
@@ -213,7 +216,20 @@ class CastModule(reactContext: ReactApplicationContext) :
             try {
                 val button = androidx.mediarouter.app.MediaRouteButton(activity)
                 CastButtonFactory.setUpMediaRouteButton(activity, button)
-                button.performClick()
+
+                // The button must be in the view hierarchy to show its dialog.
+                // Add it invisibly to the decor view, click, then remove.
+                button.visibility = android.view.View.GONE
+                val rootView = activity.window.decorView as android.view.ViewGroup
+                rootView.addView(button)
+
+                // showDialog() shows the route chooser when no device is
+                // connected, or the controller dialog when already connected.
+                button.showDialog()
+
+                // Clean up: remove from hierarchy on the next frame
+                button.post { rootView.removeView(button) }
+
                 promise.resolve(true)
             } catch (e: Exception) {
                 Log.e(TAG, "showCastPicker failed", e)
