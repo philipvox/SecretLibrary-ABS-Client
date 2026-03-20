@@ -9,6 +9,18 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.219] - 2026-03-20
+
+### Fixed
+- **Chromecast picker not opening on Android** — The Cast device picker dialog failed to appear when tapping the Cast button because `MediaRouteButton.performClick()` was called on a button not attached to the view hierarchy. Fixed by adding the button invisibly to the activity's decor view before calling `showDialog()`, then removing it on the next frame. The button must be in a window for the Cast SDK's internal provisioning logic to show the chooser dialog.
+
+### Files Modified
+- `plugins/chromecast/src/CastModule.kt` — Rewrote `showCastPicker()` to attach MediaRouteButton to decor view and use `showDialog()` instead of `performClick()`
+- `android/app/src/main/java/com/secretlibrary/app/chromecast/CastModule.kt` — Same fix applied to built copy
+- `src/constants/version.ts` — Version bump
+
+---
+
 ## [0.9.218] - 2026-03-17
 
 ### Fixed
