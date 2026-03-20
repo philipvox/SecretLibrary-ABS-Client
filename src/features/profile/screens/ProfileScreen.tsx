@@ -584,11 +584,7 @@ export function ProfileScreen() {
             Icon={Bug}
             label="Report a Bug"
             subtitle="Help us improve"
-            onPress={() => {
-              const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-              const url = `https://mysecretlibrary.com/bugs.html?version=${encodeURIComponent(APP_VERSION)}&platform=${encodeURIComponent(platform)}`;
-              Linking.openURL(url);
-            }}
+            onPress={() => navigation.navigate('BugReport')}
           />
         </View>
 

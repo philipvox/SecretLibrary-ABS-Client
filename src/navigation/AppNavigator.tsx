@@ -33,7 +33,7 @@ import { SecretLibraryAuthorDetailScreen } from '@/features/author';
 import { SecretLibraryNarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { SecretLibraryBookDetailScreen } from '@/features/book-detail';
-import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, DataStorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen, ChapterCleaningSettingsScreen, HiddenItemsScreen, KidModeSettingsScreen, AppearanceSettingsScreen, DisplaySettingsScreen, LibrarySyncSettingsScreen, PlaylistSettingsScreen, DeveloperSettingsScreen, AboutScreen } from '@/features/profile';
+import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, DataStorageSettingsScreen, JoystickSeekSettingsScreen, HapticSettingsScreen, ChapterCleaningSettingsScreen, HiddenItemsScreen, KidModeSettingsScreen, AppearanceSettingsScreen, DisplaySettingsScreen, LibrarySyncSettingsScreen, PlaylistSettingsScreen, DeveloperSettingsScreen, AboutScreen, BugReportScreen } from '@/features/profile';
 import { PreferencesScreen, PreferencesOnboardingScreen } from '@/features/recommendations';
 import { SecretLibraryPlayerScreen, BookCompletionSheet } from '@/features/player';
 import { MarkBooksScreen, ReadingHistoryScreen } from '@/features/reading-history-wizard';
@@ -380,6 +380,7 @@ function AuthenticatedApp() {
         <Stack.Screen name="LibrarySyncSettings" component={LibrarySyncSettingsScreen} />
         <Stack.Screen name="PlaylistSettings" component={PlaylistSettingsScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
+        <Stack.Screen name="BugReport" component={BugReportScreen} />
         <Stack.Screen name="CassetteTest" component={CassetteTestScreen} />
         <Stack.Screen name="SpineTemplatePreview" component={SpineTemplatePreviewScreen} />
         <Stack.Screen name="SpinePlayground" component={SpinePlaygroundScreen} />

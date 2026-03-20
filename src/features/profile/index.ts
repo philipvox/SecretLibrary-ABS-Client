@@ -13,6 +13,7 @@ export { LibrarySyncSettingsScreen } from './screens/LibrarySyncSettingsScreen';
 export { PlaylistSettingsScreen } from './screens/PlaylistSettingsScreen';
 export { DeveloperSettingsScreen } from './screens/DeveloperSettingsScreen';
 export { AboutScreen } from './screens/AboutScreen';
+export { BugReportScreen } from './screens/BugReportScreen';
 
 // Stores
 export { useHapticSettingsStore, useHapticSettings, isHapticEnabled } from './stores/hapticSettingsStore';
