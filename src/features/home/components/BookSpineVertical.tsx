@@ -102,27 +102,43 @@ const BLUR_RADIUS = 250;
 // =============================================================================
 
 /**
- * For titles > 3 words, split into two lines so line 2 has at least 2 words.
- * Returns [line1, line2] or [fullTitle] if no split needed.
+ * Split a title into one or two lines for spine display.
+ *
+ * Rules:
+ * - 1-3 words: always one line
+ * - 4+ words: split at the point that best balances character count between lines,
+ *   but only if splitting actually improves balance (the shorter line must be at
+ *   least 40% the length of the longer line, otherwise keep it as one line).
  */
 function splitSpineTitle(title: string): [string] | [string, string] {
   const words = title.split(' ');
   if (words.length <= 3) return [title];
 
-  const maxFirstLine = words.length - 2;
-  const half = title.length / 2;
+  // Find the split point that minimizes the difference in character count
+  const totalLen = title.length;
   let bestSplit = 1;
-  let charCount = words[0].length;
+  let bestDiff = Infinity;
+  let runningLen = 0;
 
-  for (let i = 1; i <= maxFirstLine; i++) {
-    if (charCount >= half) break;
-    bestSplit = i;
-    charCount += 1 + words[i].length;
+  for (let i = 0; i < words.length - 1; i++) {
+    runningLen += (i > 0 ? 1 : 0) + words[i].length; // chars in line 1
+    const line2Len = totalLen - runningLen - 1; // remaining chars (minus the space)
+    const diff = Math.abs(runningLen - line2Len);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestSplit = i + 1; // split after this word
+    }
   }
 
-  bestSplit = Math.min(bestSplit + 1, maxFirstLine);
+  const line1 = words.slice(0, bestSplit).join(' ');
+  const line2 = words.slice(bestSplit).join(' ');
 
-  return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')];
+  // Only split if it's reasonably balanced — shorter line must be ≥40% of longer
+  const shorter = Math.min(line1.length, line2.length);
+  const longer = Math.max(line1.length, line2.length);
+  if (shorter / longer < 0.4) return [title];
+
+  return [line1, line2];
 }
 
 function pickTexture(bookId: string): number {
@@ -418,7 +434,7 @@ export function BookSpineVertical({
                       letterSpacing: 0.5,
                     }}
                     numberOfLines={1}
-                    adjustsFontSizeToFit={i === 0}
+                    adjustsFontSizeToFit
                     minimumFontScale={0.3}
                   >
                     {line}
