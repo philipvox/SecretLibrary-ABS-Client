@@ -16,6 +16,8 @@ import {
   TouchableOpacity,
   Pressable,
   ActivityIndicator,
+  Linking,
+  Platform,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +30,7 @@ import {
   Vibrate,
   Palette,
   Info,
+  Bug,
   RefreshCw,
   Undo2,
   Redo2,
@@ -576,6 +579,16 @@ export function ProfileScreen() {
             label="About"
             subtitle={`v${APP_VERSION}`}
             onPress={() => navigation.navigate('About')}
+          />
+          <ProfileLink
+            Icon={Bug}
+            label="Report a Bug"
+            subtitle="Help us improve"
+            onPress={() => {
+              const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+              const url = `https://mysecretlibrary.com/bugs.html?version=${encodeURIComponent(APP_VERSION)}&platform=${encodeURIComponent(platform)}`;
+              Linking.openURL(url);
+            }}
           />
         </View>
 
