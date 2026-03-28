@@ -1,275 +1,243 @@
-# AudiobookShelf Mobile App
+<p align="center">
+  <img src="builds/play-store-assets/app-icon.png" width="120" alt="Secret Library">
+</p>
 
-A React Native mobile client for AudiobookShelf with enhanced features including offline playback, smart search, and improved UI for series, authors, and narrators.
+<h1 align="center">Secret Library</h1>
 
-## Table of Contents
+<p align="center">
+  An audiobook player for <a href="https://www.audiobookshelf.org/">AudiobookShelf</a>.<br>
+  iOS &middot; Android &middot; CarPlay &middot; Android Auto
+</p>
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Documentation](#documentation)
-- [Development](#development)
-- [Building](#building)
-- [Contributing](#contributing)
-- [License](#license)
+<p align="center">
+  <a href="https://testflight.apple.com/join/ah2XdVu6">iOS TestFlight</a> &middot;
+  <a href="https://mysecretlibrary.com/downloads/secret-library.apk">Android APK</a> &middot;
+  <a href="https://mysecretlibrary.com">Website</a> &middot;
+  <a href="https://mysecretlibrary.com/docs.html">Docs</a>
+</p>
+
+---
+
+## What Is This?
+
+Secret Library is a mobile client for [AudiobookShelf](https://www.audiobookshelf.org/) — the open-source, self-hosted audiobook server. It connects to your ABS server and plays your books. Your data stays on your server. No analytics, no tracking, no third-party anything.
+
+This was vibe coded. I'm not a professional developer — I built this with AI assistance. But it's not a one-shot prompt. This is build 1,262, iterated over months of daily use. Every feature was planned, tested, broken, and fixed.
+
+It's opinionated. Some things are designed for how I listen, not for mass appeal. If that bothers you, fork it and make it yours.
+
+## The Ecosystem
+
+Secret Library is actually three things:
+
+| Piece | What It Does |
+|-------|-------------|
+| **[Secret Library](https://mysecretlibrary.com)** (this repo) | Mobile audiobook player for iOS and Android |
+| **[Audiobook Tagger](https://mysecretlibrary.com/tagger.html)** | Desktop tool that fixes metadata in bulk — clean genres, find covers, detect series, generate DNA tags |
+| **[Secret Spines](https://spines.mysecretlibrary.com)** | Community spine image library — browse, upload, vote on book spine designs |
+
+The app works fine on its own. The Tagger makes your library discoverable. The spines make your shelf look real.
+
+## Screenshots
+
+<p align="center">
+  <img src="builds/play-store-assets/screenshot-home.png" width="200" alt="Home">
+  <img src="builds/play-store-assets/screenshot-library-spines.png" width="200" alt="Library Spines">
+  <img src="builds/play-store-assets/screenshot-player.png" width="200" alt="Player">
+  <img src="builds/play-store-assets/screenshot-book-detail.png" width="200" alt="Book Detail">
+</p>
+<p align="center">
+  <img src="builds/play-store-assets/screenshot-browse.png" width="200" alt="Browse">
+  <img src="builds/play-store-assets/screenshot-search.png" width="200" alt="Search">
+  <img src="builds/play-store-assets/screenshot-series.png" width="200" alt="Series">
+  <img src="builds/play-store-assets/screenshot-mood-1.png" width="200" alt="Mood Browse">
+</p>
 
 ## Features
 
-### Core Functionality
-- Browse your AudiobookShelf library with grid/list views
-- Audio playback with background support and lock screen controls
-- Download books for offline listening
-- Sync playback progress across devices
-- Secure authentication with token management
-
-### Library Management
-- Series browsing with sequence ordering
-- Author pages with biography and book listings
-- Narrator pages extracted from metadata
-- Collections and playlists support
-- Filter and sort by multiple criteria
-
-### Player Features
+### Playback
+- Background audio with lock screen controls
+- Per-book playback speed (0.5x–3.0x), remembered across sessions
 - Chapter navigation with visual timeline
-- Sleep timer with multiple presets
-- Playback speed control (0.5x - 3x)
-- Skip forward/backward with customizable intervals
-- Mini player with quick controls
-- Full-screen player with cover art
+- Smart rewind — longer pause means more rewind on resume
+- Sleep timer with shake-to-extend and gradual fade out
+- Bookmarks with notes
+- Playback queue with drag-to-reorder
 
-### Offline Support
-- Download entire audiobooks for offline listening
-- Automatic progress sync when back online
-- Download queue management
-- Storage usage tracking
+### Library
+- Book spines on a virtual shelf (the signature view)
+- Grid, list, and shelf view modes
+- Series browsing with reading order and gap detection
+- Author and narrator detail pages
+- Genre and collection browsing
+- Mood-based discovery ("What's the Vibe")
+- Recommendations powered by DNA tags
+- Fuzzy search across titles, authors, narrators, descriptions
 
-### Search
-- Fuzzy search across titles, authors, narrators, and descriptions
-- Search within series and collections
-- Recent search history
+### Offline
+- Download books for offline listening
+- Background downloads with queue management
+- Progress syncs automatically when back online
+- Works in airplane mode, tunnels, dead zones
 
-## Tech Stack
+### Car
+- CarPlay support (iOS)
+- Android Auto with full media browser
+- Browse library, resume playback, skip chapters — hands-free
 
-| Category | Technology |
-|----------|------------|
-| Framework | React Native + Expo SDK 54 |
-| Language | TypeScript (strict mode) |
-| Navigation | React Navigation v7 |
-| Server State | TanStack Query v5 |
-| Client State | Zustand v5 |
-| Local Storage | Expo SQLite + AsyncStorage |
-| Audio | expo-av / react-native-track-player |
-| Networking | Axios |
-| Search | Fuse.js |
+### Extras
+- Chromecast support
+- Community spine selection per book
+- Star ratings (double-tap covers)
+- Curated "My Library" playlist
+- Series and author favorites
+- Listening statistics
+- In-app bug reporting
+
+## DNA Tags
+
+The Audiobook Tagger generates rich metadata called DNA tags — mood, pacing, themes, tropes, comparable titles. The app reads these and uses them to power:
+
+- **Browse by vibe** — mood chips like "Dark & Atmospheric" or "Laugh Out Loud"
+- **"Because you listened to..."** — recommendations based on what you've finished
+- **Discover tab** — genre sections, collections, mood-based filtering
+- **Top picks** — personalized suggestions based on your taste profile
+
+Without the Tagger the app works fine as a player. With it, your library becomes something you can explore.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18 or later
-- npm or yarn
-- Expo Go app (for development) or development build
-- An AudiobookShelf server instance
+- An [AudiobookShelf](https://www.audiobookshelf.org/) server
+- Node.js 20+
+- npm
 
-### Installation
+### Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/audiobookshelf-app.git
+git clone https://github.com/philipvox/audiobookshelf-app.git
 cd audiobookshelf-app
-
-# Install dependencies
 npm install
-
-# Start the development server
-npm start
 ```
 
-### Running the App
+### Run
 
 ```bash
-# Start Expo development server
-npm start
-
-# Run on iOS simulator
-npm run ios
-
-# Run on Android emulator
-npm run android
-
-# Clear cache and restart
-npm run clean
+npm start              # Start Expo dev server
+npm run ios            # Run on iOS simulator
+npm run android        # Run on Android emulator
+npx expo run:ios       # Native iOS build
+npx expo run:android   # Native Android build
 ```
 
-### First Launch
+### Build
 
-1. Open the app on your device or simulator
-2. Enter your AudiobookShelf server URL (e.g., https://abs.example.com)
-3. Enter your username and password
-4. Select your default library
+```bash
+npm run build:android   # EAS production build (Android)
+npm run build:ios       # EAS production build (iOS)
+npm run build:all       # Both platforms
+npm run build:preview   # Internal testing builds
+```
+
+Builds use [EAS](https://expo.dev/eas) with three profiles in `eas.json`: `development`, `preview`, and `production`.
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Framework | React Native 0.81 + Expo SDK 54 |
+| Language | TypeScript (strict) |
+| Navigation | React Navigation v7 |
+| Server State | TanStack Query v5 |
+| Client State | Zustand v5 |
+| Storage | Expo SQLite + AsyncStorage + SecureStore |
+| Audio (iOS) | expo-av |
+| Audio (Android) | ExoPlayer (Media3) via custom plugin |
+| Networking | Axios + Socket.IO |
+| Search | Fuse.js |
+| Casting | Chromecast + react-native-carplay |
 
 ## Project Structure
 
 ```
 src/
-├── config/                 # App configuration
-│   ├── constants.ts        # API URLs, timeouts, limits
-│   └── features.ts         # Feature flags
+├── constants/          # Version, layout constants
+├── core/               # Foundation layer
+│   ├── api/            # HTTP client, endpoints, playback API
+│   ├── auth/           # Authentication context + service
+│   ├── cache/          # Library cache, search index, spine URLs
+│   ├── hooks/          # Core hooks (downloads, bootstrap)
+│   ├── services/       # SQLite, downloads, sync, websocket
+│   └── types/          # TypeScript definitions
 │
-├── core/                   # Foundation layer
-│   ├── api/                # HTTP client and endpoints
-│   │   ├── baseClient.ts   # Axios configuration
-│   │   ├── apiClient.ts    # API methods
-│   │   ├── endpoints.ts    # URL definitions
-│   │   ├── errors.ts       # Custom error classes
-│   │   ├── middleware.ts   # Request/response hooks
-│   │   └── endpoints/      # Domain-specific APIs
-│   ├── auth/               # Authentication
-│   ├── services/           # Core services
-│   │   ├── sqliteCache.ts  # SQLite database
-│   │   ├── syncQueue.ts    # Offline sync queue
-│   │   └── downloadManager.ts
-│   ├── hooks/              # Core hooks
-│   │   ├── useDownloads.ts
-│   │   └── useSyncStatus.ts
-│   ├── types/              # TypeScript definitions
-│   └── queryClient.ts      # React Query configuration
+├── features/           # Feature modules
+│   ├── player/         # Audio playback (stores, services, utils)
+│   ├── queue/          # Playback queue
+│   ├── home/           # Home screen + spine rendering
+│   ├── library/        # My Library tab
+│   ├── browse/         # Browse/discover tab
+│   ├── search/         # Search
+│   ├── book-detail/    # Book detail screen
+│   ├── series/         # Series detail
+│   ├── author/         # Author detail
+│   ├── narrator/       # Narrator detail
+│   ├── collections/    # Collections
+│   ├── downloads/      # Download management
+│   ├── profile/        # Settings + profile
+│   ├── stats/          # Listening statistics
+│   ├── chromecast/     # Chromecast casting
+│   ├── automotive/     # CarPlay + Android Auto bridge
+│   ├── recommendations/# Discovery + recommendations
+│   ├── completion/     # Book completion tracking
+│   └── playlists/      # Playlist management
 │
-├── features/               # Feature modules
-│   ├── author/             # Author pages
-│   ├── book-detail/        # Book detail screen
-│   ├── browse/             # Browse tab
-│   ├── collections/        # Collections feature
-│   ├── downloads/          # Download management
-│   ├── library/            # Library browsing
-│   ├── narrator/           # Narrator pages
-│   ├── player/             # Audio player
-│   ├── profile/            # User profile
-│   ├── recommendations/    # Book recommendations
-│   ├── search/             # Search feature
-│   ├── series/             # Series pages
-│   └── user/               # User features (favorites, etc.)
+├── navigation/         # React Navigation setup
+│   ├── AppNavigator.tsx
+│   └── components/     # MiniPlayer, global overlays
 │
-├── navigation/             # App navigation
-│   ├── AppNavigator.tsx    # Root navigator
-│   ├── types.ts            # Navigation types
-│   └── components/         # Nav components
-│
-└── shared/                 # Shared utilities
-    ├── components/         # Reusable UI components
-    │   ├── buttons/        # Button, IconButton
-    │   ├── cards/          # Card, GlassCard
-    │   ├── inputs/         # TextInput, SearchInput
-    │   └── feedback/       # Loading, Error, Empty states
-    ├── hooks/              # Shared hooks
-    ├── theme/              # Design tokens
-    └── utils/              # Utility functions
+└── shared/             # Reusable code
+    ├── components/     # ~30 UI components
+    ├── hooks/          # Shared hooks
+    ├── stores/         # Shared Zustand stores
+    ├── theme/          # Design tokens (colors, spacing, typography)
+    ├── spine/          # Spine rendering utilities
+    └── utils/          # Format, search, book DNA utilities
+
+plugins/                # Native Expo config plugins
+├── android-auto/       # Android Auto media browser service
+├── exo-player/         # ExoPlayer audio engine (Android)
+├── chromecast/         # Chromecast sender (iOS + Android)
+└── carplay/            # CarPlay support
 ```
+
+Features are self-contained modules. They don't import from each other — shared code goes in `src/shared/`.
+
+## Hidden Interactions
+
+Some things aren't obvious by design:
+
+| Action | What Happens |
+|--------|-------------|
+| Long-press the skull logo | Opens settings |
+| Double-tap a book cover | Adds/removes a gold star |
+| Swipe left/right on book detail | Browse series |
+| Book menu > spine icon | Pick a community spine |
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/GETTING_STARTED.md) | Setup and development guide |
-| [Architecture](docs/architecture.md) | Project structure and design patterns |
-| [API Reference](docs/api.md) | AudiobookShelf API documentation |
-| [Components](docs/COMPONENTS.md) | Shared component library |
-| [State Management](docs/STATE_MANAGEMENT.md) | State management patterns |
-| [Progress](docs/progress.md) | Development progress tracking |
+- **[Website](https://mysecretlibrary.com)** — Overview, downloads, the story
+- **[Docs](https://mysecretlibrary.com/docs.html)** — Full app + tagger documentation
+- **[Onboarding Guide](docs/ONBOARDING_GUIDE.md)** — Complete guide for new users (from zero to listening)
+- **[Changelog](CHANGELOG.md)** — Every version documented
+- **[Report a Bug](https://mysecretlibrary.com/bugs.html)** — Bug reports + feature requests
 
-## Development
+## Privacy
 
-### Available Scripts
-
-```bash
-npm start              # Start Expo dev server
-npm run ios            # Run on iOS
-npm run android        # Run on Android
-npm run clean          # Clear cache and restart
-npm run lint           # Run ESLint
-npm run typecheck      # Run TypeScript compiler
-npm run bundle:analyze # Analyze bundle size
-```
-
-### Code Quality
-
-```bash
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
-
-# Format code (if configured)
-npm run format
-```
-
-### Development Guidelines
-
-- Maximum 400 lines per file
-- Features should be self-contained modules
-- Use TypeScript strict mode
-- Export via index.ts barrel files
-- Follow the component hierarchy (Screen > Feature > UI)
-
-## Building
-
-### Development Build
-
-```bash
-# Build for all platforms
-npm run build:dev
-
-# Build preview (internal testing)
-npm run build:preview
-```
-
-### Production Build
-
-```bash
-# iOS production build
-npm run build:ios
-
-# Android production build
-npm run build:android
-
-# Both platforms
-npm run build:all
-```
-
-### EAS Build Configuration
-
-The project uses Expo Application Services (EAS) for builds. Configuration is in `eas.json`:
-
-- `development`: Development client with debugging
-- `preview`: Internal testing builds
-- `production`: App store builds
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes following the coding guidelines
-4. Commit your changes (`git commit -m 'Add amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-### Coding Standards
-
-- Use TypeScript for all new code
-- Follow existing patterns in the codebase
-- Write self-documenting code with clear naming
-- Keep components focused and single-purpose
-- Test on both iOS and Android
-
-## License
-
-MIT License - see LICENSE file for details.
+No data collection. No analytics. No tracking. The app talks directly to your AudiobookShelf server and nothing else. Full policy at [mysecretlibrary.com/privacy.html](https://mysecretlibrary.com/privacy.html).
 
 ## Acknowledgments
 
-- [AudiobookShelf](https://www.audiobookshelf.org/) - The server platform
-- [Expo](https://expo.dev/) - React Native development framework
-- [React Navigation](https://reactnavigation.org/) - Navigation library
-- [TanStack Query](https://tanstack.com/query) - Data fetching library
+- [AudiobookShelf](https://www.audiobookshelf.org/) — The server that makes all of this possible
+- [Expo](https://expo.dev/) — React Native framework
+- [Claude](https://claude.ai/) — AI assistance throughout development
