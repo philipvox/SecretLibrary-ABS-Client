@@ -41,16 +41,16 @@ The app works fine on its own. The Tagger makes your library discoverable. The s
 ## Screenshots
 
 <p align="center">
-  <img src="builds/play-store-assets/screenshot-home.png" width="200" alt="Home">
-  <img src="builds/play-store-assets/screenshot-library-spines.png" width="200" alt="Library Spines">
-  <img src="builds/play-store-assets/screenshot-player.png" width="200" alt="Player">
-  <img src="builds/play-store-assets/screenshot-book-detail.png" width="200" alt="Book Detail">
+  <img src="builds/play-store-assets/Home My Library.png" width="200" alt="Home">
+  <img src="builds/play-store-assets/Home My Series.png" width="200" alt="Series">
+  <img src="builds/play-store-assets/Book Detail Page.png" width="200" alt="Book Detail">
+  <img src="builds/play-store-assets/Discover Browse.png" width="200" alt="Browse">
 </p>
 <p align="center">
-  <img src="builds/play-store-assets/screenshot-browse.png" width="200" alt="Browse">
-  <img src="builds/play-store-assets/screenshot-search.png" width="200" alt="Search">
-  <img src="builds/play-store-assets/screenshot-series.png" width="200" alt="Series">
-  <img src="builds/play-store-assets/screenshot-mood-1.png" width="200" alt="Mood Browse">
+  <img src="builds/play-store-assets/Search Page.png" width="200" alt="Search">
+  <img src="builds/play-store-assets/Search Matt Dinniman Results.png" width="200" alt="Search Results">
+  <img src="builds/play-store-assets/Home My Library Alt Cover View.png" width="200" alt="Cover View">
+  <img src="builds/play-store-assets/Playlist View.png" width="200" alt="Playlist">
 </p>
 
 ## Features
@@ -116,8 +116,8 @@ Without the Tagger the app works fine as a player. With it, your library becomes
 ### Install
 
 ```bash
-git clone https://github.com/philipvox/audiobookshelf-app.git
-cd audiobookshelf-app
+git clone https://github.com/philipvox/SecretLibrary-ABS-Client.git
+cd SecretLibrary-ABS-Client
 npm install
 ```
 
