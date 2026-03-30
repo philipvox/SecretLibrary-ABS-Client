@@ -43,6 +43,7 @@ import { formatBytes } from '@/shared/utils/format';
 import { userApi, apiClient } from '@/core/api';
 import { endpoints } from '@/core/api/endpoints';
 import { useAuth } from '@/core/auth';
+import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { sqliteCache } from '@/core/services/sqliteCache';
 import { playbackCache } from '@/core/services/playbackCache';
 import { useIsFinished, useMarkFinished, useBookProgress, useBookRating, useSetBookRating, userBooksKeys } from '@/core/hooks/useUserBooks';
@@ -336,7 +337,9 @@ export function SecretLibraryBookDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [activeContentTab, setActiveContentTab] = useState<'chapters' | 'series' | 'info'>('chapters');
-  const [seriesViewMode, setSeriesViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [seriesViewMode, setSeriesViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setSeriesViewMode(defaultViewMode); }, [defaultViewMode]);
   const [chaptersExpanded, setChaptersExpanded] = useState(false);
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [sessionsExpanded, setSessionsExpanded] = useState(false);

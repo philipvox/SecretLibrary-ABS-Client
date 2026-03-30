@@ -46,8 +46,7 @@ function _looksLikeLocalhost(hostname: string): boolean {
 
 /**
  * Normalize server URL to standard format:
- * - Adds http:// for IP addresses and localhost (self-hosted servers)
- * - Adds https:// for domain names
+ * - Requires http:// or https:// (no auto-prepending)
  * - Removes trailing slashes
  * - Validates basic URL structure
  */
@@ -59,16 +58,12 @@ function _normalizeServerUrl(url: string): { normalized: string; corrected: bool
     return { normalized: '', corrected: false, error: 'Please enter a server URL' };
   }
 
-  // Add protocol if missing
+  // Require explicit protocol — don't guess
   if (!normalized.match(/^https?:\/\//i)) {
-    // Check if it looks like it has a protocol but wrong format
     if (normalized.includes('://')) {
       return { normalized, corrected: false, error: 'Invalid URL protocol. Use http:// or https://' };
     }
-    // Use http:// for IP addresses and localhost, https:// for domains
-    const protocol = _looksLikeLocalhost(normalized) ? 'http' : 'https';
-    normalized = `${protocol}://${normalized}`;
-    corrected = true;
+    return { normalized, corrected: false, error: 'Include http:// or https:// in your URL' };
   }
 
   // Remove trailing slashes
@@ -112,17 +107,16 @@ export function LoginScreen() {
     const trimmed = serverUrl.trim();
     if (!trimmed) return { ok: false, corrected: false };
 
-    if (trimmed.includes('://') && !trimmed.match(/^https?:\/\//i)) {
-      return { ok: false, corrected: false, error: 'Use http:// or https://' };
+    // Require explicit protocol
+    if (!trimmed.match(/^https?:\/\//i)) {
+      if (trimmed.includes('://')) {
+        return { ok: false, corrected: false, error: 'Use http:// or https://' };
+      }
+      return { ok: false, corrected: false, error: 'Include http:// or https://' };
     }
 
     let normalized = trimmed;
     let corrected = false;
-    if (!normalized.match(/^https?:\/\//i)) {
-      const protocol = _looksLikeLocalhost(normalized) ? 'http' : 'https';
-      normalized = `${protocol}://${normalized}`;
-      corrected = true;
-    }
     while (normalized.endsWith('/')) {
       normalized = normalized.slice(0, -1);
       corrected = true;
@@ -157,92 +151,29 @@ export function LoginScreen() {
       setAbsCheckStatus('checking');
       const controller = new AbortController();
       absCheckAbort.current = controller;
-      const tryUrl = async (url: string): Promise<boolean> => {
-        const res = await fetch(`${url}/api/status`, {
+
+      try {
+        const res = await fetch(`${normalizedUrl}/api/status`, {
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });
-        if (controller.signal.aborted) return false;
+        if (controller.signal.aborted) return;
         if (res.ok) {
           const data = await res.json();
           if (data && (data.isInit !== undefined || data.authMethods !== undefined)) {
             setAbsCheckStatus('valid');
             const methods: string[] = data.authMethods || [];
             setSsoAvailable(methods.includes('openid'));
-            return true;
+            return;
           }
         } else if (res.status === 401 || res.status === 403) {
-          setAbsCheckStatus('valid');
-          return true;
+          // Server exists but requires auth — still valid
+          if (!controller.signal.aborted) setAbsCheckStatus('valid');
+          return;
         }
-        return false;
-      };
-
-      // Helper: prompt user before downgrading from HTTPS to HTTP
-      const promptHttpFallback = (httpUrl: string) => {
-        if (controller.signal.aborted) return;
-        Alert.alert(
-          'Insecure Connection',
-          'The server was not reachable over HTTPS but responded over HTTP. '
-          + 'Your credentials and data will be sent unencrypted. Continue?',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => {
-                if (!controller.signal.aborted) setAbsCheckStatus('invalid');
-              },
-            },
-            {
-              text: 'Use HTTP',
-              style: 'destructive',
-              onPress: () => {
-                if (!controller.signal.aborted) setServerUrl(httpUrl);
-              },
-            },
-          ]
-        );
-      };
-
-      try {
-        const found = await tryUrl(normalizedUrl);
-        if (!found && !controller.signal.aborted) {
-          // If HTTPS failed, try HTTP as fallback (common for self-hosted servers)
-          if (normalizedUrl.startsWith('https://')) {
-            const httpUrl = normalizedUrl.replace(/^https:\/\//, 'http://');
-            const foundHttp = await tryUrl(httpUrl);
-            if (foundHttp && !controller.signal.aborted) {
-              // Warn user before downgrading to insecure HTTP
-              promptHttpFallback(httpUrl);
-            } else if (!controller.signal.aborted) {
-              setAbsCheckStatus('invalid');
-            }
-          } else {
-            setAbsCheckStatus('invalid');
-          }
-        }
+        if (!controller.signal.aborted) setAbsCheckStatus('invalid');
       } catch {
-        if (!controller.signal.aborted) {
-          // If primary protocol failed, try the other protocol as fallback
-          try {
-            if (normalizedUrl.startsWith('https://')) {
-              const httpUrl = normalizedUrl.replace(/^https:\/\//, 'http://');
-              const found = await tryUrl(httpUrl);
-              if (found && !controller.signal.aborted) {
-                // Warn user before downgrading to insecure HTTP
-                promptHttpFallback(httpUrl);
-              } else if (!controller.signal.aborted) {
-                setAbsCheckStatus('invalid');
-              }
-            } else {
-              setAbsCheckStatus('invalid');
-            }
-          } catch {
-            if (!controller.signal.aborted) {
-              setAbsCheckStatus('invalid');
-            }
-          }
-        }
+        if (!controller.signal.aborted) setAbsCheckStatus('invalid');
       }
     }, 600);
 
@@ -421,7 +352,7 @@ export function LoginScreen() {
                   urlValidation.status === 'invalid' && styles.inputError,
                   (urlValidation.status === 'valid' || urlValidation.status === 'correctable') && styles.inputValid,
                 ]}
-                placeholder="server.example.com:13378"
+                placeholder="http://your-server:13378"
                 placeholderTextColor={colors.text.tertiary}
                 value={serverUrl}
                 onChangeText={setServerUrl}

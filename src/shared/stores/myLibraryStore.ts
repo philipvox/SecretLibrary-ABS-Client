@@ -9,6 +9,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLibrarySyncStore } from './librarySyncStore';
 
+type ViewMode = 'shelf' | 'grid' | 'list';
+
 interface MyLibraryState {
   // Library items (book IDs)
   libraryIds: string[];
@@ -18,6 +20,7 @@ interface MyLibraryState {
 
   // Preferences
   hideSingleBookSeries: boolean;
+  defaultViewMode: ViewMode;
 
   // Actions
   addToLibrary: (bookId: string) => void;
@@ -31,6 +34,7 @@ interface MyLibraryState {
 
   // Preferences
   setHideSingleBookSeries: (hide: boolean) => void;
+  setDefaultViewMode: (mode: ViewMode) => void;
 
   clearAll: () => void;
 }
@@ -41,6 +45,7 @@ export const useMyLibraryStore = create<MyLibraryState>()(
       libraryIds: [],
       favoriteSeriesNames: [],
       hideSingleBookSeries: true, // Default to hiding single-book series
+      defaultViewMode: 'shelf' as ViewMode,
 
       addToLibrary: (bookId: string) => {
         const { libraryIds } = get();
@@ -101,6 +106,9 @@ export const useMyLibraryStore = create<MyLibraryState>()(
       setHideSingleBookSeries: (hide: boolean) => {
         set({ hideSingleBookSeries: hide });
       },
+      setDefaultViewMode: (mode: ViewMode) => {
+        set({ defaultViewMode: mode });
+      },
 
       clearAll: () => {
         const { libraryIds } = get();
@@ -158,6 +166,7 @@ export const useMyLibraryStore = create<MyLibraryState>()(
         libraryIds: state.libraryIds,
         favoriteSeriesNames: state.favoriteSeriesNames,
         hideSingleBookSeries: state.hideSingleBookSeries,
+        defaultViewMode: state.defaultViewMode,
       }),
     }
   )

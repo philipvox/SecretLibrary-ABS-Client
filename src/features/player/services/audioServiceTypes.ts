@@ -34,4 +34,4 @@ export interface AudioError {
 
 export type StatusCallback = (status: PlaybackState) => void;
 export type ErrorCallback = (error: AudioError) => void;
-export type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForward' | 'skipBackward' | 'seek', position?: number) => void;
+export type RemoteCommandCallback = (command: 'nextChapter' | 'prevChapter' | 'skipForward' | 'skipBackward' | 'seek' | 'play' | 'pause', position?: number) => void;

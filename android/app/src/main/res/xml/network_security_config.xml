@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext for local network (self-hosted ABS servers) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
-    <!-- Default: require HTTPS for all other connections -->
-    <base-config cleartextTrafficPermitted="false">
+    <!--
+      Allow cleartext (HTTP) to all hosts.
+      This app connects to user-specified self-hosted AudiobookShelf servers
+      which commonly run plain HTTP on local networks, VPNs (Tailscale, WireGuard),
+      and custom ports. Restricting cleartext by domain/IP is not feasible
+      because server addresses are arbitrary and user-defined.
+    -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

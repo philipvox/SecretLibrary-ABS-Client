@@ -113,7 +113,7 @@ interface LibraryCacheState {
   searchItems: (query: string) => LibraryItem[];
   filterItems: (filters: FilterOptions) => LibraryItem[];
   clearCache: (skipSqlite?: boolean) => Promise<void>;
-  loadSpineManifest: () => Promise<void>;
+  loadSpineManifest: (forceRefresh?: boolean) => Promise<void>;
   hasServerSpine: (bookId: string) => boolean;
 }
 
@@ -267,6 +267,9 @@ function buildIndexes(items: LibraryItem[]) {
     itemsById,
   };
 }
+
+// Track last community manifest fetch to throttle refetches (1 hour TTL)
+let _lastCommunityManifestFetchAt: number | null = null;
 
 export const useLibraryCache = create<LibraryCacheState>()(subscribeWithSelector((set, get) => ({
   items: [],
@@ -653,105 +656,117 @@ export const useLibraryCache = create<LibraryCacheState>()(subscribeWithSelector
     return items;
   },
 
-  loadSpineManifest: async () => {
+  loadSpineManifest: async (forceRefresh = false) => {
     const { spineServerUrl, useCommunitySpines, useServerSpines } = useSpineCacheStore.getState();
 
     // Load community manifest v2 (multi-key matching for universal compatibility)
+    // Throttle to once per hour unless forced — manifest rarely changes
+    const COMMUNITY_MANIFEST_TTL_MS = 60 * 60 * 1000; // 1 hour
     if (useCommunitySpines) {
-      try {
-        const COMMUNITY_URL = 'https://spines.mysecretlibrary.com';
-        const manifest = await apiClient.getCommunityManifestV2(COMMUNITY_URL);
+      const now = Date.now();
+      const lastFetch = _lastCommunityManifestFetchAt;
+      const hasCachedData = get().booksWithCommunitySpines.size > 0;
+      const shouldFetch = forceRefresh || !hasCachedData || !lastFetch || (now - lastFetch) >= COMMUNITY_MANIFEST_TTL_MS;
 
-        if (manifest.books.length > 0) {
-          // Build reverse lookup indexes from community manifest
-          const asinMap = new Map<string, { id: string; w: number; h: number }>();
-          const isbnMap = new Map<string, { id: string; w: number; h: number }>();
-          const hashMap = new Map<string, { id: string; w: number; h: number }>();
+      if (!shouldFetch) {
+        log.debug(`Community manifest: using cached data (${get().booksWithCommunitySpines.size} books, age ${Math.round((now - lastFetch!) / 60000)}m)`);
+      } else {
+        try {
+          const COMMUNITY_URL = 'https://spines.mysecretlibrary.com';
+          const manifest = await apiClient.getCommunityManifestV2(COMMUNITY_URL);
+          _lastCommunityManifestFetchAt = Date.now();
 
-          for (const book of manifest.books) {
-            const entry = { id: book.id, w: book.w || 0, h: book.h || 0 };
-            if (book.asin) asinMap.set(book.asin, entry);
-            if (book.isbn) isbnMap.set(book.isbn, entry);
-            if (book.hash) hashMap.set(book.hash, entry);
-          }
+          if (manifest.books.length > 0) {
+            // Build reverse lookup indexes from community manifest
+            const asinMap = new Map<string, { id: string; w: number; h: number }>();
+            const isbnMap = new Map<string, { id: string; w: number; h: number }>();
+            const hashMap = new Map<string, { id: string; w: number; h: number }>();
 
-          // Match local books against community manifest
-          const localItems = get().items;
-          const communityBookMap: Record<string, string> = {};
-          const matchedLocalIds: string[] = [];
-          const dimensions: Record<string, [number, number]> = {};
+            for (const book of manifest.books) {
+              const entry = { id: book.id, w: book.w || 0, h: book.h || 0 };
+              if (book.asin) asinMap.set(book.asin, entry);
+              if (book.isbn) isbnMap.set(book.isbn, entry);
+              if (book.hash) hashMap.set(book.hash, entry);
+            }
 
-          // Import hash function lazily to avoid circular deps
-          const { titleAuthorHash } = require('@/shared/utils/titleAuthorHash');
+            // Match local books against community manifest
+            const localItems = get().items;
+            const communityBookMap: Record<string, string> = {};
+            const matchedLocalIds: string[] = [];
+            const dimensions: Record<string, [number, number]> = {};
 
-          // Pre-compute hashes for all local books that weren't matched by ASIN/ISBN
-          const needsHash: { id: string; title: string; author: string }[] = [];
+            // Import hash function lazily to avoid circular deps
+            const { titleAuthorHash } = require('@/shared/utils/titleAuthorHash');
 
-          for (const item of localItems) {
-            const metadata = getBookMetadataTyped(item);
-            if (!metadata) continue;
+            // Pre-compute hashes for all local books that weren't matched by ASIN/ISBN
+            const needsHash: { id: string; title: string; author: string }[] = [];
 
-            // Priority 1: ASIN match
-            if (metadata.asin) {
-              const match = asinMap.get(metadata.asin);
-              if (match) {
-                communityBookMap[item.id] = match.id;
-                matchedLocalIds.push(item.id);
-                if (match.w && match.h) dimensions[item.id] = [match.w, match.h];
-                continue;
+            for (const item of localItems) {
+              const metadata = getBookMetadataTyped(item);
+              if (!metadata) continue;
+
+              // Priority 1: ASIN match
+              if (metadata.asin) {
+                const match = asinMap.get(metadata.asin);
+                if (match) {
+                  communityBookMap[item.id] = match.id;
+                  matchedLocalIds.push(item.id);
+                  if (match.w && match.h) dimensions[item.id] = [match.w, match.h];
+                  continue;
+                }
+              }
+
+              // Priority 2: ISBN match
+              if (metadata.isbn) {
+                const cleanIsbn = metadata.isbn.replace(/[^0-9X]/gi, '').toUpperCase();
+                const match = isbnMap.get(cleanIsbn);
+                if (match) {
+                  communityBookMap[item.id] = match.id;
+                  matchedLocalIds.push(item.id);
+                  if (match.w && match.h) dimensions[item.id] = [match.w, match.h];
+                  continue;
+                }
+              }
+
+              // Queue for hash matching
+              const title = metadata.title || '';
+              const author = metadata.authorName || '';
+              if (title) {
+                needsHash.push({ id: item.id, title, author });
               }
             }
 
-            // Priority 2: ISBN match
-            if (metadata.isbn) {
-              const cleanIsbn = metadata.isbn.replace(/[^0-9X]/gi, '').toUpperCase();
-              const match = isbnMap.get(cleanIsbn);
-              if (match) {
-                communityBookMap[item.id] = match.id;
-                matchedLocalIds.push(item.id);
-                if (match.w && match.h) dimensions[item.id] = [match.w, match.h];
-                continue;
+            // Priority 3: Fuzzy title+author hash (async due to crypto)
+            if (needsHash.length > 0 && hashMap.size > 0) {
+              const { batchTitleAuthorHash } = require('@/shared/utils/titleAuthorHash');
+              const hashResults: Map<string, string> = await batchTitleAuthorHash(needsHash);
+
+              for (const [localId, hash] of hashResults) {
+                const match = hashMap.get(hash);
+                if (match) {
+                  communityBookMap[localId] = match.id;
+                  matchedLocalIds.push(localId);
+                  if (match.w && match.h) dimensions[localId] = [match.w, match.h];
+                }
               }
             }
 
-            // Queue for hash matching
-            const title = metadata.title || '';
-            const author = metadata.authorName || '';
-            if (title) {
-              needsHash.push({ id: item.id, title, author });
+            // Update state
+            const communitySet = new Set(matchedLocalIds);
+            set({ booksWithCommunitySpines: communitySet });
+            useSpineCacheStore.getState().setCachedCommunityBookIds(matchedLocalIds);
+            useSpineCacheStore.getState().setCommunityBookMap(communityBookMap);
+
+            // Pre-populate spine dimensions
+            if (Object.keys(dimensions).length > 0) {
+              useSpineCacheStore.getState().batchSetServerSpineDimensions(dimensions);
             }
+
+            log.debug(`Community manifest v2: ${manifest.books.length} available, ${matchedLocalIds.length} matched locally`);
           }
-
-          // Priority 3: Fuzzy title+author hash (async due to crypto)
-          if (needsHash.length > 0 && hashMap.size > 0) {
-            const { batchTitleAuthorHash } = require('@/shared/utils/titleAuthorHash');
-            const hashResults: Map<string, string> = await batchTitleAuthorHash(needsHash);
-
-            for (const [localId, hash] of hashResults) {
-              const match = hashMap.get(hash);
-              if (match) {
-                communityBookMap[localId] = match.id;
-                matchedLocalIds.push(localId);
-                if (match.w && match.h) dimensions[localId] = [match.w, match.h];
-              }
-            }
-          }
-
-          // Update state
-          const communitySet = new Set(matchedLocalIds);
-          set({ booksWithCommunitySpines: communitySet });
-          useSpineCacheStore.getState().setCachedCommunityBookIds(matchedLocalIds);
-          useSpineCacheStore.getState().setCommunityBookMap(communityBookMap);
-
-          // Pre-populate spine dimensions
-          if (Object.keys(dimensions).length > 0) {
-            useSpineCacheStore.getState().batchSetServerSpineDimensions(dimensions);
-          }
-
-          log.debug(`Community manifest v2: ${manifest.books.length} available, ${matchedLocalIds.length} matched locally`);
+        } catch (err) {
+          log.warn('Failed to load community spine manifest:', err);
         }
-      } catch (err) {
-        log.warn('Failed to load community spine manifest:', err);
       }
     }
 

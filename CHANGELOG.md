@@ -9,6 +9,95 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.266] - 2026-03-30
+
+### Fixed — HTTP Connections Blocked on Android & iOS
+- **Android: Allow cleartext HTTP to all hosts** — The network security config only permitted HTTP
+  to literal domain entries (`10.0.0.0`, `192.168.0.0`) which don't match actual IP addresses like
+  `192.168.1.100`. Every HTTP user was silently blocked. Changed `base-config` to allow cleartext
+  globally since this app connects to user-specified self-hosted servers.
+- **iOS: Allow arbitrary loads (ATS)** — `NSAllowsArbitraryLoads` was `false` with only
+  `NSAllowsLocalNetworking` enabled. This blocked HTTP to VPN addresses (Tailscale 100.x.x.x,
+  WireGuard, etc.) and non-local servers. Changed to `true` since users need HTTP for self-hosted servers.
+
+### Files Modified
+- `android/app/src/main/res/xml/network_security_config.xml` — Allow cleartext to all hosts
+- `ios/SecretLibrary/Info.plist` — Set NSAllowsArbitraryLoads to true
+
+---
+
+## [0.9.265] - 2026-03-30
+
+### Fixed — Login URL Handling
+- **Removed auto-protocol prepending** — The login screen no longer guesses `http://` or `https://`.
+  Users must include the protocol in their server URL. This fixes connection failures where the app
+  would prepend the wrong protocol (e.g. `https://` for HTTP-only servers).
+- **Removed HTTPS→HTTP fallback logic** — Simplified server check to a single fetch attempt using
+  the exact URL the user entered. No more silent protocol switching.
+- **Updated placeholder** — Changed from `server.example.com:13378` to `http://your-server:13378`
+  to make the required format clear.
+
+### Files Modified
+- `src/features/auth/screens/LoginScreen.tsx` — All login URL changes
+
+---
+
+## [0.9.264] - 2026-03-29
+
+### Fixed — iOS Lock Screen / Control Center Controls
+Four fixes for lock screen controls sometimes not appearing or not responding:
+1. **Play/Pause handled natively first** — Remote commands from lock screen now act on AVPlayer
+   instantly in native code, then notify JS for state tracking. Previously they round-tripped
+   through the JS bridge, adding latency or silently failing when the bridge was slow.
+2. **Now Playing Info preserved during book transitions** — `cleanupPlayback()` no longer sets
+   `nowPlayingInfo = nil`. Instead it marks playbackRate=0 (paused), keeping the book info
+   visible on the lock screen while the next book loads.
+3. **Periodic Now Playing sync** — The lock screen position now refreshes every 10 seconds
+   during playback, preventing drift after seeks, chapter transitions, or buffering stalls.
+4. **Audio session re-activated on track load** — `loadTracks()` now ensures the audio session
+   is active before starting playback, fixing cases where the session was deactivated between books.
+
+### Files Modified
+- `modules/avplayer-module/ios/AVPlayerModule.swift` — All four native fixes
+- `src/features/player/services/audioService.ios.ts` — Route play/pause through remoteCommandCallback
+- `src/features/player/services/audioServiceTypes.ts` — Add play/pause to RemoteCommandCallback type
+- `src/features/player/stores/playerStore.ts` — Handle play/pause remote commands
+
+---
+
+## [0.9.263] - 2026-03-29
+
+### Fixed — Community Spine Loading on Mobile Data
+Three optimizations for faster spine loading on slow connections:
+1. Removed cache busters from community spine image URLs — images are immutable, so expo-image
+   can serve from disk cache indefinitely instead of re-downloading every library refresh
+2. Throttled community manifest re-fetches to once per hour (was every `loadSpineManifest` call)
+   — cached book IDs from AsyncStorage hydrate instantly on startup
+3. Rounded manifest HTTP cache buster to hourly buckets so CDN/HTTP caching works across calls
+
+### Fixed — Android Auto Playback Sync Gap
+ExoPlayer now emits its current position immediately before pausing, and the playerStore queries
+the native player for a fresh position on pause. Prevents ~10 minute position drift when
+resuming after car-off.
+
+### Fixed — Android Auto Cold Start
+MediaBrowserService now launches the main Activity on cold start so React Native boots and
+writes browse data. Returns a "Loading library..." placeholder immediately instead of blocking.
+
+### Files Modified
+- `src/core/cache/useSpineUrl.ts` — stable community spine URLs (no cache buster)
+- `src/core/cache/libraryCache.ts` — 1-hour throttle on community manifest fetches
+- `src/core/api/apiClient.ts` — hourly cache buster for manifest HTTP requests
+- `src/features/profile/screens/DisplaySettingsScreen.tsx` — force refresh on settings toggle
+- `src/features/profile/screens/DataStorageSettingsScreen.tsx` — force refresh on manual refresh
+- `plugins/exo-player/src/AudioPlaybackService.kt` — emitCurrentPosition before pause
+- `plugins/android-auto/src/AndroidAutoMediaBrowserService.kt` — launchMainApp, loading placeholder
+- `src/features/player/stores/playerStore.ts` — getFreshPosition on pause
+- `src/features/player/services/audioService.android.ts` — getFreshPosition via native getCurrentState
+- `src/features/player/services/audioService.ios.ts` — getFreshPosition stub
+
+---
+
 ## [0.9.262] - 2026-03-28
 
 ### Added — Car Mode for Player

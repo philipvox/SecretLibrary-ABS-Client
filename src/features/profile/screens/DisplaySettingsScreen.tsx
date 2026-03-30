@@ -32,6 +32,7 @@ import {
   Check,
   Globe,
   Upload,
+  LayoutGrid,
 } from 'lucide-react-native';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -55,6 +56,18 @@ const DEFAULT_VIEW_LABELS: Record<string, string> = {
   mySeries: 'My Series',
   lastPlayed: 'Last Played',
   finished: 'Finished',
+};
+
+const VIEW_MODE_LABELS: Record<string, string> = {
+  shelf: 'Shelf (Spines)',
+  grid: 'Grid (Covers)',
+  list: 'List',
+};
+
+const VIEW_MODE_CYCLE: Record<string, string> = {
+  shelf: 'grid',
+  grid: 'list',
+  list: 'shelf',
 };
 
 function getDefaultViewLabel(defaultView: DefaultViewType): string {
@@ -92,6 +105,10 @@ export function DisplaySettingsScreen() {
   const hideSingleBookSeries = useMyLibraryStore((s) => s.hideSingleBookSeries);
   const setHideSingleBookSeries = useMyLibraryStore((s) => s.setHideSingleBookSeries);
 
+  // Default view mode
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode);
+  const setDefaultViewMode = useMyLibraryStore((s) => s.setDefaultViewMode);
+
   // Home screen view — for status text
   const defaultView = usePlaylistSettingsStore((s) => s.defaultView);
   const hiddenBuiltInViews = usePlaylistSettingsStore((s) => s.hiddenBuiltInViews);
@@ -105,7 +122,7 @@ export function DisplaySettingsScreen() {
     (value: boolean) => {
       setUseServerSpines(value);
       // Reload manifest so booksWithServerSpines + dimensions update
-      useLibraryCache.getState().loadSpineManifest();
+      useLibraryCache.getState().loadSpineManifest(true);
     },
     [setUseServerSpines],
   );
@@ -114,7 +131,7 @@ export function DisplaySettingsScreen() {
     (value: boolean) => {
       setUseCommunitySpines(value);
       // Reload manifest so booksWithCommunitySpines + dimensions update
-      useLibraryCache.getState().loadSpineManifest();
+      useLibraryCache.getState().loadSpineManifest(true);
     },
     [setUseCommunitySpines],
   );
@@ -228,6 +245,19 @@ export function DisplaySettingsScreen() {
             </View>
           </View>
         )}
+
+        {/* Default View Mode */}
+        <SectionHeader title="Default View" />
+        <SettingsRow
+          Icon={LayoutGrid}
+          label="Default View Mode"
+          description="Choose whether screens open in shelf, grid, or list view"
+          value={VIEW_MODE_LABELS[defaultViewMode] || 'Shelf (Spines)'}
+          onPress={() => {
+            const next = VIEW_MODE_CYCLE[defaultViewMode] || 'shelf';
+            setDefaultViewMode(next as any);
+          }}
+        />
 
         {/* Series Display */}
         <SectionHeader title="Series Display" />

@@ -13,7 +13,7 @@
  * - Footer stats
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,7 @@ import { apiClient } from '@/core/api';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { BookSpineVertical, BookSpineVerticalData, useBookRowLayout, useSpineCacheStore } from '@/shared/spine';
 import { BookGrid } from '@/shared/components/BookGrid';
 import Svg, { Path } from 'react-native-svg';
@@ -215,7 +216,9 @@ export function GenreDetailScreen() {
   const genreName = route.params?.genreName || '';
 
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setViewMode(defaultViewMode); }, [defaultViewMode]);
   const [sortMode, setSortMode] = useState<DetailSortMode>('publishedYear');
   const [sortDirection, setSortDirection] = useState<DetailSortDirection>('desc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);

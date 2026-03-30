@@ -13,7 +13,7 @@
  * - Footer stats
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -168,7 +168,9 @@ export function SecretLibrarySeriesDetailScreen() {
   const seriesName = route.params.seriesName || route.params.name || '';
 
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setViewMode(defaultViewMode); }, [defaultViewMode]);
   const [sortMode, setSortMode] = useState<DetailSortMode>('publishedYear');
   const [sortDirection, setSortDirection] = useState<DetailSortDirection>('desc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);

@@ -196,10 +196,12 @@ class IOSAudioService {
             }
             break;
           case 'play':
-            this.play();
+            // Native already called play() — notify playerStore for state tracking
+            this.remoteCommandCallback?.('play');
             break;
           case 'pause':
-            this.pause();
+            // Native already called pause() — notify playerStore for state tracking
+            this.remoteCommandCallback?.('pause');
             break;
         }
       }
@@ -474,6 +476,10 @@ class IOSAudioService {
   }
 
   async getPosition(): Promise<number> {
+    return this.lastKnownGoodPosition;
+  }
+
+  async getFreshPosition(): Promise<number> {
     return this.lastKnownGoodPosition;
   }
 

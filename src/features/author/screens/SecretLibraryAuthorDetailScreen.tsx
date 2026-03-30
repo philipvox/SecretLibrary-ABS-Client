@@ -39,6 +39,7 @@ import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { logger } from '@/shared/utils/logger';
 import { BookSpineVerticalData, ShelfRow } from '@/shared/spine';
 import { BookGrid } from '@/shared/components/BookGrid';
@@ -167,7 +168,9 @@ export function SecretLibraryAuthorDetailScreen() {
   const authorName = route.params.authorName || route.params.name || '';
 
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setViewMode(defaultViewMode); }, [defaultViewMode]);
   const [sortMode, setSortMode] = useState<DetailSortMode>('publishedYear');
   const [sortDirection, setSortDirection] = useState<DetailSortDirection>('desc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);

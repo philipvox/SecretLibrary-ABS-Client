@@ -26,6 +26,8 @@ public class AVPlayerModule: Module {
     // Position tracking
     private var timeObserverToken: Any?
     private var lastEmittedPosition: Double = 0.0
+    private var lastNowPlayingUpdateTime: TimeInterval = 0.0
+    private let nowPlayingUpdateInterval: TimeInterval = 10.0  // Update lock screen every 10s
 
     // Stuck detection
     private var stuckCheckTimer: Timer?
@@ -173,6 +175,13 @@ public class AVPlayerModule: Module {
         guard isInitialized, let player = player else {
             promise.reject("NOT_INITIALIZED", "AVPlayerModule not initialized. Call initialize() first.")
             return
+        }
+
+        // Ensure audio session is active before loading (may have been deactivated between books)
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            // Best effort — play() will retry
         }
 
         // Clean up previous playback
@@ -505,6 +514,15 @@ public class AVPlayerModule: Module {
             "didJustFinish": false,
             "isStuck": false
         ])
+
+        // Periodically sync lock screen / Control Center position to prevent drift
+        // (iOS interpolates from elapsedPlaybackTime + playbackRate, but drifts after
+        // seeks, buffering stalls, or chapter transitions)
+        let now = Date.timeIntervalSinceReferenceDate
+        if isPlaying && (now - lastNowPlayingUpdateTime) >= nowPlayingUpdateInterval {
+            lastNowPlayingUpdateTime = now
+            updateNowPlayingPlaybackInfo()
+        }
     }
 
     // MARK: - Item End (track transition / book end)
@@ -691,15 +709,17 @@ public class AVPlayerModule: Module {
     private func setupRemoteCommandCenter() {
         let center = MPRemoteCommandCenter.shared()
 
-        // Play — emit event to JS, let JS handle play (same pattern as skip/seek)
+        // Play — act natively first for instant response, then notify JS
         playCommandTarget = center.playCommand.addTarget { [weak self] _ in
+            self?.play()
             self?.sendEvent("AVPlayerRemoteCommand", ["command": "play"])
             return .success
         }
         center.playCommand.isEnabled = true
 
-        // Pause — emit event to JS, let JS handle pause (same pattern as skip/seek)
+        // Pause — act natively first for instant response, then notify JS
         pauseCommandTarget = center.pauseCommand.addTarget { [weak self] _ in
+            self?.pause()
             self?.sendEvent("AVPlayerRemoteCommand", ["command": "pause"])
             return .success
         }
@@ -916,12 +936,20 @@ public class AVPlayerModule: Module {
         totalDuration = 0
         lastEmittedPosition = 0
 
-        // Clear now playing
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        // Mark now playing as paused instead of clearing entirely.
+        // Clearing to nil makes lock screen controls vanish; keeping the info
+        // with rate=0 preserves visibility during book transitions.
+        if var info = MPNowPlayingInfoCenter.default().nowPlayingInfo {
+            info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        }
     }
 
     private func destroy() {
         cleanupPlayback()
+
+        // Full teardown — clear now playing entirely
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
 
         // Remove audio session observers
         if let observer = interruptionObserver {

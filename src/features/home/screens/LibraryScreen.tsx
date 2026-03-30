@@ -327,7 +327,9 @@ export function LibraryScreen() {
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
 
-  const [viewMode, setViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setViewMode(defaultViewMode); }, [defaultViewMode]);
   const [sortMode, setSortMode] = useState<SortMode>(
     usePlaylistSettingsStore.getState().defaultView === 'mySeries' ? 'series' : 'lastPlayed'
   );

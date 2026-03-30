@@ -6,7 +6,7 @@
  * collection title, stats, and book list.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
+import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { BookSpineVerticalData, ShelfRow } from '@/shared/spine';
 import { BookGrid } from '@/shared/components/BookGrid';
 import Svg, { Path } from 'react-native-svg';
@@ -128,7 +129,9 @@ export function CollectionDetailScreen() {
   const { collection, isLoading, error: _error } = useCollectionDetails(collectionId);
 
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setViewMode(defaultViewMode); }, [defaultViewMode]);
   const [sortMode, setSortMode] = useState<DetailSortMode>('publishedYear');
   const [sortDirection, setSortDirection] = useState<DetailSortDirection>('desc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);

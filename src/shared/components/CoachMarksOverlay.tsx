@@ -18,7 +18,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale } from '@/shared/theme';
 import { haptics } from '@/core/native/haptics';
@@ -77,6 +77,12 @@ const TIPS: CoachTip[] = [
     title: 'Community Spines',
     description: 'Tap any book to open its menu, then tap the book icon to browse and pick a new spine design from the community.',
     gestureLabel: 'TAP',
+  },
+  {
+    id: 'default-view',
+    title: 'Choose Your View',
+    description: 'Prefer covers over spines? Go to Display Settings and set your default view to Grid, List, or Shelf. Every screen will open that way.',
+    gestureLabel: 'SETTINGS',
   },
 ];
 
@@ -589,6 +595,106 @@ function CommunitySpinesIllustration() {
   );
 }
 
+/** Default view — three view mode columns cycle with sliding highlight */
+function DefaultViewIllustration() {
+  const t = useLoopAnim(3200);
+
+  const iconSize = scale(22);
+  const colW = scale(26);        // Each column width
+  const colGap = scale(2);       // Gap between columns
+  const ringSize = colW + scale(4);
+  // Total row width = 3 columns + 2 gaps
+  const rowW = colW * 3 + colGap * 2;
+
+  // Each mode gets a ~1s hold with smooth transitions
+  // shelf: 0–0.30, transition: 0.30–0.36, grid: 0.36–0.63, transition: 0.63–0.69, list: 0.69–0.93, transition: 0.93–1
+  const shelfOpacity = t.interpolate({
+    inputRange: [0, 0.28, 0.36, 0.90, 1],
+    outputRange: [1, 1, 0.2, 0.2, 1],
+  });
+  const gridOpacity = t.interpolate({
+    inputRange: [0, 0.28, 0.36, 0.61, 0.69, 1],
+    outputRange: [0.2, 0.2, 1, 1, 0.2, 0.2],
+  });
+  const listOpacity = t.interpolate({
+    inputRange: [0, 0.61, 0.69, 0.90, 1],
+    outputRange: [0.2, 0.2, 1, 1, 0.2],
+  });
+
+  // Active icon scales up slightly
+  const shelfScale = t.interpolate({
+    inputRange: [0, 0.28, 0.36, 0.90, 1],
+    outputRange: [1.15, 1.15, 1, 1, 1.15],
+  });
+  const gridScale = t.interpolate({
+    inputRange: [0, 0.28, 0.36, 0.61, 0.69, 1],
+    outputRange: [1, 1, 1.15, 1.15, 1, 1],
+  });
+  const listScale = t.interpolate({
+    inputRange: [0, 0.61, 0.69, 0.90, 1],
+    outputRange: [1, 1, 1.15, 1.15, 1],
+  });
+
+  // Highlight ring translateX: center of col 0, 1, 2
+  const col0X = 0;
+  const col1X = colW + colGap;
+  const col2X = (colW + colGap) * 2;
+  const ringX = t.interpolate({
+    inputRange: [0, 0.30, 0.36, 0.63, 0.69, 0.93, 1],
+    outputRange: [col0X, col0X, col1X, col1X, col2X, col2X, col0X],
+  });
+
+  return (
+    <View style={illStyles.container}>
+      {/* Icons + labels row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: colGap }}>
+        {/* Shelf column */}
+        <Animated.View style={{ width: colW, alignItems: 'center', opacity: shelfOpacity, transform: [{ scale: shelfScale }] }}>
+          <Svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={ILL_WHITE}>
+            <Rect x={4} y={4} width={3.5} height={13} rx={1} />
+            <Rect x={10} y={6} width={3.5} height={11} rx={1} />
+            <Rect x={16} y={3} width={3.5} height={14} rx={1} />
+            <Rect x={3} y={18} width={18} height={2} rx={0.5} />
+          </Svg>
+          <Text style={{ color: ILL_WHITE, fontSize: scale(7), fontWeight: '600', marginTop: scale(5) }}>Shelf</Text>
+        </Animated.View>
+        {/* Grid column */}
+        <Animated.View style={{ width: colW, alignItems: 'center', opacity: gridOpacity, transform: [{ scale: gridScale }] }}>
+          <Svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={ILL_WHITE}>
+            <Rect x={3} y={3} width={8} height={8} rx={1.5} />
+            <Rect x={13} y={3} width={8} height={8} rx={1.5} />
+            <Rect x={3} y={13} width={8} height={8} rx={1.5} />
+            <Rect x={13} y={13} width={8} height={8} rx={1.5} />
+          </Svg>
+          <Text style={{ color: ILL_WHITE, fontSize: scale(7), fontWeight: '600', marginTop: scale(5) }}>Grid</Text>
+        </Animated.View>
+        {/* List column */}
+        <Animated.View style={{ width: colW, alignItems: 'center', opacity: listOpacity, transform: [{ scale: listScale }] }}>
+          <Svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={ILL_WHITE}>
+            <Rect x={3} y={4.5} width={3} height={3} rx={1.5} />
+            <Rect x={3} y={10.5} width={3} height={3} rx={1.5} />
+            <Rect x={3} y={16.5} width={3} height={3} rx={1.5} />
+            <Rect x={8} y={5} width={13} height={2} rx={1} />
+            <Rect x={8} y={11} width={13} height={2} rx={1} />
+            <Rect x={8} y={17} width={13} height={2} rx={1} />
+          </Svg>
+          <Text style={{ color: ILL_WHITE, fontSize: scale(7), fontWeight: '600', marginTop: scale(5) }}>List</Text>
+        </Animated.View>
+      </View>
+      {/* Sliding highlight ring — positioned behind icons */}
+      <Animated.View style={{
+        position: 'absolute',
+        width: ringSize, height: ringSize,
+        borderRadius: scale(8), borderWidth: 1.5,
+        borderColor: ILL_WHITE,
+        top: (scale(90) - ringSize) / 2 - scale(5),
+        left: (scale(90) - rowW) / 2 - (ringSize - colW) / 2,
+        transform: [{ translateX: ringX }],
+      }} />
+    </View>
+  );
+}
+
 const ILLUSTRATIONS: Record<string, React.ComponentType> = {
   'hold-skull': LongPressIllustration,
   'quick-bookmark': TapHoldIllustration,
@@ -597,6 +703,7 @@ const ILLUSTRATIONS: Record<string, React.ComponentType> = {
   'my-library': MyLibraryIllustration,
   'my-series': MySeriesIllustration,
   'community-spines': CommunitySpinesIllustration,
+  'default-view': DefaultViewIllustration,
 };
 
 // =============================================================================

@@ -268,8 +268,9 @@ class ApiClient extends BaseApiClient {
    */
   async getCommunityManifestV2(communityBaseUrl: string): Promise<CommunityManifestV2> {
     try {
-      const cacheBuster = `?_=${Date.now()}`;
-      const url = `${communityBaseUrl}${endpoints.spines.manifestV2}${cacheBuster}`;
+      // Round cache buster to nearest hour so HTTP/CDN caching works
+      const hourBucket = Math.floor(Date.now() / 3600000);
+      const url = `${communityBaseUrl}${endpoints.spines.manifestV2}?_=${hourBucket}`;
       const { data } = await axios.get(url, { timeout: 15000 });
       return {
         version: data.version || 2,

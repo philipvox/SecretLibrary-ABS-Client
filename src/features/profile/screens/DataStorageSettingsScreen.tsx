@@ -259,7 +259,7 @@ export function DataStorageSettingsScreen() {
     setIsRefreshingSpines(true);
     try {
       // 1. Reload spine manifest from server (which books have spines)
-      await useLibraryCache.getState().loadSpineManifest();
+      await useLibraryCache.getState().loadSpineManifest(true);
       // 2. Refresh library cache - this updates lastRefreshed, busting all spine URLs
       //    MUST happen BEFORE clearing dimensions so old-URL images can't race ahead
       //    and re-set stale dimensions from expo-image cache

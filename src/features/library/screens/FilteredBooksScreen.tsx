@@ -5,7 +5,7 @@
  * Large title, filter tabs (All/Author/Narrator/Genre), shelf/book view toggle.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,7 @@ import { ShelfRow, BookSpineVerticalData } from '@/shared/spine';
 import { BookGrid } from '@/shared/components/BookGrid';
 import { filterByFeeling } from '@/shared/utils/bookDNA/feelingScoring';
 import type { FeelingChip } from '@/shared/types/feelingChip';
+import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { useDNASettingsStore } from '@/shared/stores/dnaSettingsStore';
 import Svg, { Path } from 'react-native-svg';
 
@@ -186,7 +187,9 @@ export function FilteredBooksScreen() {
     : 'duration';
   const _legacySortDirection: SortDirection = 'asc';
   const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'author' | 'narrator' | 'genre'>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('shelf');
+  const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  useEffect(() => { setViewMode(defaultViewMode); }, [defaultViewMode]);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [detailSortMode, setDetailSortMode] = useState<DetailSortMode>('publishedYear');
   const [detailSortDirection, setDetailSortDirection] = useState<DetailSortDirection>('desc');

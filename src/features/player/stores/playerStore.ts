@@ -1238,6 +1238,12 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
             get().skipBackward();
           } else if (command === 'seek' && position !== undefined) {
             get().seekTo(position);
+          } else if (command === 'play') {
+            // Native already triggered playback — sync store state
+            get().play();
+          } else if (command === 'pause') {
+            // Native already triggered pause — sync store state
+            get().pause();
           }
         });
 
@@ -1870,21 +1876,37 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       if (!currentBook) return;
 
+      // Query ExoPlayer for the CURRENT position (not the stale store value).
+      // On Android Auto disconnect, store position can be seconds behind ExoPlayer.
+      // getFreshPosition() calls native getCurrentState() for the real position.
+      let savePosition = storePosition;
+      try {
+        const freshPos = await audioService.getFreshPosition();
+        if (freshPos > 0 && Math.abs(freshPos - storePosition) < 600) {
+          // Use fresh position if it's reasonable (within 10 minutes of store)
+          savePosition = freshPos;
+          if (freshPos !== storePosition) {
+            log(`[Player] pause: using fresh position ${freshPos.toFixed(1)}s (store was ${storePosition.toFixed(1)}s, delta ${(freshPos - storePosition).toFixed(1)}s)`);
+          }
+        }
+      } catch (e) {
+        log('[Player] getFreshPosition failed, using store position', e);
+      }
+
       // Record pause state for smart rewind (fire and forget)
       // BUT NOT during scrubbing - user is manually seeking, not pausing
       if (smartRewindEnabled && !audioService.getIsScrubbing()) {
-        persistSmartRewindState(currentBook.id, storePosition).catch((e) => log('[SmartRewind] Failed to persist state on pause', e));
+        persistSmartRewindState(currentBook.id, savePosition).catch((e) => log('[SmartRewind] Failed to persist state on pause', e));
       }
 
       // End listening session tracking (fire and forget)
-      endListeningSession(storePosition).catch((e) => log('[Player] Failed to end listening session', e));
+      endListeningSession(savePosition).catch((e) => log('[Player] Failed to end listening session', e));
 
-      // Fire-and-forget — don't block pause return (avoids 50-200ms stutter on
-      // Android Auto). Progress is also saved every 5s during playback, so worst
-      // case on app kill is losing ~5s of position.
+      // Save progress with fresh position — await the local save to ensure
+      // it reaches SQLite before the app can be killed (Android Auto disconnect).
       backgroundSyncService.saveProgressLocal(
         currentBook.id,
-        storePosition,
+        savePosition,
         duration
       ).catch((e) => log('[Player] Failed to save progress locally on pause', e));
 
@@ -1892,7 +1914,7 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
       const session = sessionService.getCurrentSession();
       backgroundSyncService.saveProgress(
         currentBook.id,
-        storePosition,
+        savePosition,
         duration,
         session?.id
       ).catch((e) => log('[Player] Failed to sync progress to server on pause', e));
