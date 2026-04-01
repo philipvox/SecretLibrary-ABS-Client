@@ -12,14 +12,14 @@ import { ChevronRight } from 'lucide-react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { scale, wp } from '@/shared/theme';
+import { scale, wp, wpCapped } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/shared/components/CompleteBadge';
 import { useReadingHistory } from '@/shared/hooks/useReadingHistory';
 
 // Carousel layout constants
 const PADDING = 16;
 const GAP = 12;
-const CARD_WIDTH = Math.floor((wp(100) - PADDING - GAP) * 0.42);
+const CARD_WIDTH = Math.floor((wpCapped(100) - PADDING - GAP) * 0.42);
 const COVER_HEIGHT = CARD_WIDTH;
 
 // Helper to get book metadata safely

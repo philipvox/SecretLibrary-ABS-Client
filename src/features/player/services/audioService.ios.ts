@@ -479,7 +479,21 @@ class IOSAudioService {
     return this.lastKnownGoodPosition;
   }
 
+  /**
+   * Query AVPlayer's current position directly (not the cached value).
+   * Use this on pause/background to get the most accurate position before saving progress.
+   * Critical for iOS where JS thread can be suspended during background audio playback.
+   */
   async getFreshPosition(): Promise<number> {
+    try {
+      const state = await AVPlayerModule.getCurrentState();
+      if (state && typeof state.position === 'number' && state.position > 0) {
+        this.lastKnownGoodPosition = state.position;
+        return state.position;
+      }
+    } catch (e) {
+      log('getFreshPosition failed, using lastKnownGoodPosition:', e);
+    }
     return this.lastKnownGoodPosition;
   }
 

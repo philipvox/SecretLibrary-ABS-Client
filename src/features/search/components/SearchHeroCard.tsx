@@ -442,6 +442,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(8),
     borderRadius: scale(12),
     overflow: 'hidden',
+    ...(Platform.OS === 'web' ? { maxWidth: 700 } : {}),
   },
   content: {
     padding: scale(16),

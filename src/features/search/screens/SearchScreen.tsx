@@ -91,8 +91,8 @@ function useDebounce<T>(value: T, delay: number): T {
  * Previously computed once at module load via wp(100) — now a function
  * so it can be called with the live window width inside components.
  */
-function getSeriesCardWidth(screenWidth: number): number {
-  return (screenWidth - PADDING * 2 - GAP) / 2;
+function getSeriesCardWidth(screenWidth: number, cols: number = 2): number {
+  return (screenWidth - PADDING * 2 - GAP * (cols - 1)) / cols;
 }
 
 const COVER_SIZE = 60;

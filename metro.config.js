@@ -74,18 +74,25 @@ config.resolver = {
 
   // Asset extensions
   assetExts: [
-    ...config.resolver.assetExts,
-    // Add any additional asset types here
+    ...config.resolver.assetExts.filter(ext => ext !== 'wasm'),
+    'wasm', // Required for expo-sqlite web support (wa-sqlite WASM binary)
   ],
 
-  // Source extensions (prioritize .native.ts for RN-specific code)
-  sourceExts: [
-    'native.tsx',
-    'native.ts',
-    'native.jsx',
-    'native.js',
-    ...config.resolver.sourceExts,
-  ],
+  // Source extensions — filter out 'wasm' so Metro doesn't parse WASM as JS.
+  // NOTE: Do NOT add 'native.*' extensions here. Metro handles .native.ts/.native.js
+  // resolution automatically via its platform system (only for ios/android).
+  // Adding them to sourceExts gives them priority on ALL platforms including web,
+  // which causes web builds to incorrectly load native-only code (e.g. AsyncStorage).
+  sourceExts: config.resolver.sourceExts.filter(ext => ext !== 'wasm'),
+
+  // Package exports conditions per platform.
+  // Web default is ["browser"] which causes zustand (and similar packages) to
+  // resolve to ESM builds using `import.meta` — a syntax error in a regular
+  // <script> tag. Adding "react-native" makes them resolve to CJS instead.
+  unstable_conditionsByPlatform: {
+    ...config.resolver.unstable_conditionsByPlatform,
+    web: ['browser', 'react-native'],
+  },
 
   // Block list - exclude test files from bundle
   blockList: [

@@ -356,7 +356,7 @@ const LAST_PLAYED_BOOK_ID_KEY = 'playerLastPlayedBookId';
 //   SKIP_FORWARD/BACK_INTERVAL_KEY, DISC_ANIMATION_KEY, STANDARD_PLAYER_KEY → playerSettingsStore
 //   SMART_REWIND_PAUSE_*_KEY → smartRewind utils
 //   SHOW_COMPLETION_PROMPT_KEY, AUTO_MARK_FINISHED_KEY → completionStore
-const PROGRESS_SAVE_INTERVAL = 5000; // Save progress every 5 seconds (SQLite only, no UI updates)
+const PROGRESS_SAVE_INTERVAL = 2000; // Save progress every 2 seconds (SQLite only, no UI updates)
 const MIN_PAUSE_FOR_REWIND_MS = 3000; // Minimum pause before smart rewind applies
 const PREV_CHAPTER_THRESHOLD = 3;     // Seconds before going to prev vs restart
 const AUTO_DOWNLOAD_THRESHOLD = 0.8;  // Trigger auto-download at 80% progress
@@ -1904,11 +1904,15 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
 
       // Save progress with fresh position — await the local save to ensure
       // it reaches SQLite before the app can be killed (Android Auto disconnect).
-      backgroundSyncService.saveProgressLocal(
-        currentBook.id,
-        savePosition,
-        duration
-      ).catch((e) => log('[Player] Failed to save progress locally on pause', e));
+      try {
+        await backgroundSyncService.saveProgressLocal(
+          currentBook.id,
+          savePosition,
+          duration
+        );
+      } catch (e) {
+        log('[Player] Failed to save progress locally on pause', e);
+      }
 
       // Queue server sync (fire and forget — local save is already durable)
       const session = sessionService.getCurrentSession();

@@ -150,7 +150,7 @@ export interface UserBook {
   isFavorite: boolean;
   isFinished: boolean;
   isInLibrary: boolean; // Explicitly added to library
-  finishSource: 'manual' | 'progress' | 'bulk_author' | 'bulk_series' | null;
+  finishSource: 'manual' | 'progress' | 'bulk_author' | 'bulk_series' | 'remote' | null;
 
   // Timestamps
   lastPlayedAt: string | null;
@@ -631,6 +631,15 @@ class SQLiteCache {
         }
       } catch (err) {
         log.warn('Failed to drop legacy playback_progress table:', err);
+      }
+
+      // Migration: Add offline_listening_seconds to user_books for tracking
+      // listening time accumulated while offline (flushed to server on reconnect)
+      try {
+        await this.db.execAsync(`ALTER TABLE user_books ADD COLUMN offline_listening_seconds INTEGER DEFAULT 0`);
+        log.info('Added offline_listening_seconds column to user_books');
+      } catch {
+        // Column already exists, ignore
       }
 
       this.isInitialized = true;
@@ -3053,7 +3062,7 @@ class SQLiteCache {
         isFavorite: row.is_favorite === 1,
         isFinished: row.is_finished === 1,
         isInLibrary: row.is_in_library === 1,
-        finishSource: row.finish_source as 'manual' | 'progress' | 'bulk_author' | 'bulk_series' | null,
+        finishSource: row.finish_source as 'manual' | 'progress' | 'bulk_author' | 'bulk_series' | 'remote' | null,
         lastPlayedAt: row.last_played_at,
         startedAt: row.started_at,
         finishedAt: row.finished_at,
@@ -3427,6 +3436,85 @@ class SQLiteCache {
         }),
       }),
     });
+  }
+
+  // ===========================================================================
+  // OFFLINE LISTENING TIME
+  // ===========================================================================
+
+  /**
+   * Increment accumulated offline listening time for a book.
+   * Called when a session sync fails due to no connectivity.
+   */
+  async incrementOfflineListeningTime(bookId: string, seconds: number): Promise<void> {
+    if (seconds <= 0) return;
+    const db = await this.ensureReady();
+    try {
+      // Ensure row exists (upsert-like: update if exists, insert if not)
+      const existing = await db.getFirstAsync<any>(
+        'SELECT book_id FROM user_books WHERE book_id = ?',
+        [bookId]
+      );
+      if (existing) {
+        await db.runAsync(
+          `UPDATE user_books SET offline_listening_seconds = offline_listening_seconds + ? WHERE book_id = ?`,
+          [Math.round(seconds), bookId]
+        );
+      } else {
+        await db.runAsync(
+          `INSERT INTO user_books (book_id, offline_listening_seconds, local_updated_at) VALUES (?, ?, datetime('now'))`,
+          [bookId, Math.round(seconds)]
+        );
+      }
+      log.debug(`Accumulated ${Math.round(seconds)}s offline listening for ${bookId}`);
+    } catch (err) {
+      log.warn('incrementOfflineListeningTime error:', err);
+    }
+  }
+
+  /**
+   * Get all books with pending offline listening time.
+   * Returns array of { bookId, seconds, currentTime, duration }.
+   */
+  async getAllPendingOfflineListeningTime(): Promise<
+    Array<{ bookId: string; seconds: number; currentTime: number; duration: number }>
+  > {
+    const db = await this.ensureReady();
+    try {
+      const rows = await db.getAllAsync<{
+        book_id: string;
+        offline_listening_seconds: number;
+        current_time: number;
+        duration: number;
+      }>(
+        `SELECT book_id, offline_listening_seconds, current_time, duration
+         FROM user_books WHERE offline_listening_seconds > 0`
+      );
+      return rows.map((row) => ({
+        bookId: row.book_id,
+        seconds: row.offline_listening_seconds,
+        currentTime: row.current_time ?? 0,
+        duration: row.duration ?? 0,
+      }));
+    } catch (err) {
+      log.warn('getAllPendingOfflineListeningTime error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Reset offline listening time for a book after successful flush to server.
+   */
+  async resetOfflineListeningTime(bookId: string): Promise<void> {
+    const db = await this.ensureReady();
+    try {
+      await db.runAsync(
+        `UPDATE user_books SET offline_listening_seconds = 0 WHERE book_id = ?`,
+        [bookId]
+      );
+    } catch (err) {
+      log.warn('resetOfflineListeningTime error:', err);
+    }
   }
 
   /**
@@ -3829,7 +3917,7 @@ class SQLiteCache {
       isFavorite: row.is_favorite === 1,
       isFinished: row.is_finished === 1,
       isInLibrary: row.is_in_library === 1,
-      finishSource: row.finish_source as 'manual' | 'progress' | 'bulk_author' | 'bulk_series' | null,
+      finishSource: row.finish_source as 'manual' | 'progress' | 'bulk_author' | 'bulk_series' | 'remote' | null,
       lastPlayedAt: row.last_played_at,
       startedAt: row.started_at,
       finishedAt: row.finished_at,

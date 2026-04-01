@@ -9,6 +9,277 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.280] - 2026-03-31
+
+### Added — Real-Time WebSocket Progress Sync
+When you listen on another device (web UI, another phone), your progress now updates instantly on this device via WebSocket — no app restart needed. The currently-playing book is protected from remote position jumps.
+
+### Added — Offline Listening Time Tracking
+Listening time accumulated while offline is now stored locally and flushed to the ABS server when connectivity returns. Server listening stats stay accurate even after extended offline sessions.
+
+### Added — Community Spine Pre-Fetch
+Community spine manifest is now pre-fetched during app initialization (in parallel with library cache load), eliminating the flash of procedural spines on first login.
+
+### Improved — Faster Back Navigation
+- Stack animation reduced from 350ms to 250ms with slide_from_right
+- Full-screen back gesture enabled (swipe from anywhere, not just left edge)
+- MiniPlayer pan gesture no longer conflicts with horizontal back swipe
+
+### Improved — More Resilient Session Persistence
+- Session restore retries increased (3→5 attempts, 100→200ms delay) for Android KeyStore cold start
+- Token health checks made less aggressive (15min interval, 5 failures to logout vs 5min/3)
+
+### Fixed — Spine Picker Infinite Loading
+Spine picker sheet could get stuck on "Loading spines..." if the FileSystem check or network fetch hung. Now both are independently error-handled with a 10-second fetch timeout.
+
+### Fixed — TypeScript: LinearGradient color tuple type
+Fixed pre-existing TS error in SpinePickerSheet where hueGradientColors returned string[] instead of the required tuple type.
+
+### Files Modified
+- `src/core/stores/progressStore.ts` — New `updateProgressFromRemote()` method
+- `src/core/events/listeners.ts` — WebSocket progress handler + offline flush wiring
+- `src/core/events/types.ts` — New offline event type
+- `src/core/services/sqliteCache.ts` — offline_listening_seconds column + helpers
+- `src/features/player/services/sessionService.ts` — Offline time accumulation + flush + 10s sync interval
+- `src/core/services/appInitializer.ts` — Community spine pre-fetch
+- `src/core/cache/libraryCache.ts` — Pre-fetch manifest support
+- `src/navigation/AppNavigator.tsx` — Faster stack animations + full-screen gesture
+- `src/navigation/components/GlobalMiniPlayer.tsx` — Gesture conflict fix
+- `src/core/auth/authService.ts` — More resilient session restore
+- `src/core/services/tokenHealthService.ts` — Less aggressive health checks
+- `src/shared/components/SpinePickerSheet.tsx` — Infinite loading fix + TS fix
+- `src/constants/version.ts` — Version bump
+- `android/app/build.gradle` — Version code bump to 1280
+
+---
+
+## [0.9.278] - 2026-03-31
+
+### Fixed — Android Auto shows sign-in prompt instead of empty "No items" (Google Play rejection fix)
+
+Google Play rejected the app because Android Auto showed "Loading library..." then "No items" when reviewers tested without an authenticated server. Now when the library fails to load (unauthenticated or no server configured):
+
+- **Native side**: After polling timeout, shows "Open Secret Library to get started" with subtitle "Sign in to your server to browse audiobooks" instead of an empty list
+- **JS side**: Writes a placeholder browse section with sign-in instructions so the native browse tree has content to display
+
+This satisfies the Auto App Quality Guidelines requirement that the app "performs all functions properly" — it now provides clear user guidance when not configured, rather than an empty state.
+
+### Files Modified
+- `plugins/android-auto/src/AndroidAutoMediaBrowserService.kt` — Sign-in prompt after polling timeout
+- `android/app/src/main/java/com/secretlibrary/app/automotive/AndroidAutoMediaBrowserService.kt` — Same (build copy)
+- `src/features/automotive/automotiveService.ts` — Write placeholder browse data on max retries
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.277] - 2026-03-30
+
+### Added — Tap listening log sessions to sync position
+
+Tapping a session row in the Listening Log on the book detail page now shows an alert with options to jump to the session's start or end position. Syncs both locally (SQLite) and to the server, and seeks the player if the book is currently loaded.
+
+### Files Modified
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx` — Added `handleSessionPositionSync`, made session rows tappable with Alert prompt
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.276] - 2026-03-30
+
+### Fixed — "Because You Finished" scoring allowed unrelated books
+
+The similarity scoring in `useRecentlyCompletedSeries` used a dynamic `maxScore` that excluded mood weight (40 points) when books shared zero mood keys. This let spectrum-only matches score ~0.85 even for completely unrelated books (e.g., The Photographer's Wife vs Cradle — similar spectrums, zero content overlap).
+
+**Fixed**: Changed to fixed `maxScore = 100` so missing dimensions penalize the score (0/40 for moods) instead of being excluded from the denominator.
+
+**Added genre gate**: DNA matching now requires at least 1 shared non-broad genre before scoring. Books with no genre overlap fall back to genre-only scoring (requires 2+).
+
+### Files Modified
+- `src/features/browse/hooks/useRecentlyCompletedSeries.ts` — Fixed scoring, added genre gate
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.275] - 2026-03-30
+
+### Fixed — BookDNA schema mismatch causing broken recommendations
+
+The BookDNA parser had a massive schema mismatch with actual server data, causing "Because You Finished" and comparable book recommendations to produce garbage results. Almost none of the DNA data was being read correctly.
+
+**Mood scores**: Changed from 6 fixed keys (`thrills`, `drama`, `laughs`, `wonder`, `heart`, `ideas`) to a dynamic `Record<string, number>`. Actual server data has 40+ mood names (`tension`, `warmth`, `propulsive`, `melancholy`, `whimsical`, `hope`, `emotional`, `adventure`, `wonder`, `funny`, `dread`, `mysterious`, etc.) — all now parsed correctly.
+
+**Spectrum keys**: Updated to match actual server tag names:
+- `serious-humorous` → `serious-funny`
+- `dense-accessible` → `simple-complex`
+- Added: `action-contemplative`, `intimate-epic-scope`, `world-density`
+- Removed: `bleak-hopeful`, `familiar-challenging`
+
+**Scoring improvements**:
+- `scoreDNASimilarity`: Now compares shared dynamic mood keys between books (requires 2+ shared keys)
+- `scoreDNAMoodSimilarity` (comparables engine): Same dynamic key comparison
+- Added minimum DNA score threshold (0.3) in "Because You Finished" to prevent weak matches
+- Feeling chips updated to use actual mood names (`tension` for thrilling, `warmth`/`hope` for heartwarming, etc.)
+- Quiz mood mapping updated: each quiz mood maps to multiple actual server mood keys
+
+### Files Modified
+- `src/shared/utils/bookDNA/parseBookDNA.ts` — Interface, parser, mood mapping, helpers
+- `src/shared/utils/bookDNA/feelingScoring.ts` — Updated mood/spectrum references
+- `src/shared/utils/bookDNA/vibeScoring.ts` — Updated spectrum reference
+- `src/shared/utils/bookDNA/index.ts` — Export SPECTRUM_KEYS
+- `src/features/browse/hooks/useRecentlyCompletedSeries.ts` — Dynamic moods, new spectrums, min threshold
+- `src/features/recommendations/utils/comparableBooksEngine.ts` — Dynamic moods, new spectrums
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.274] - 2026-03-30
+
+### Fixed — Community spines not loading + spurious logouts
+
+- **spineCache.ts**: Fixed v15 migration that unconditionally cleared `communityBookMap` to `{}`, wiping all community-to-local book ID mappings. Now preserves existing map with `communityBookMap: persistedState.communityBookMap || {}`
+- **authService.ts**: `verifyToken()` no longer treats network errors as invalid tokens. Previously, any error (including timeouts, 5xx, DNS failures) returned `false`, causing the token health service to trigger logout after 3 consecutive network blips. Now only explicit 401 responses return `false` — network/server errors assume the token is still valid
+
+### Files Modified
+- `src/features/home/stores/spineCache.ts` — Preserve communityBookMap in v15 migration
+- `src/core/auth/authService.ts` — Distinguish 401 from network errors in verifyToken()
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.273] - 2026-03-30
+
+### Changed — Spine Source picker replaces confusing toggles
+
+- **DisplaySettingsScreen**: Replaced three independent spine toggles (Community, Suggest Custom, Server) with a single **Spine Source** radio picker with four clear options:
+  - **Community & Server** (recommended) — tries community first, then server, then generated
+  - **Community Only** — community library, then generated
+  - **Server Only** — your server spines, then generated
+  - **Generated Only** — all spines are procedurally designed
+- **DisplaySettingsScreen**: "Contribute to Community" toggle (renamed from "Suggest Custom Spines") only appears when community source is active
+- **DisplaySettingsScreen**: "Spine Server URL" input only appears when server source is active
+- **DisplaySettingsScreen**: Removed static info note — each radio option now self-documents its fallback chain
+- **ProfileScreen**: Display subtitle updated to show combined mode (e.g., "Community & Server")
+- No store changes — the picker maps to the existing `useCommunitySpines` and `useServerSpines` booleans
+
+### Files Modified
+- `src/features/profile/screens/DisplaySettingsScreen.tsx` — Spine source radio picker
+- `src/features/profile/screens/ProfileScreen.tsx` — Subtitle label update
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.272] - 2026-03-30
+
+### Fixed — New playlists now appear in library dropdown immediately
+
+- **playlistSettingsStore**: `syncWithAvailablePlaylists` now auto-adds newly created playlists to `visiblePlaylistIds`, `playlistOrder`, and `allItemOrder` so they appear in the library view dropdown right after creation
+- **playlistSettingsStore**: Added `hiddenPlaylistIds` field to track playlists explicitly hidden by the user, preventing them from being re-added on sync
+- **playlistSettingsStore**: `togglePlaylistVisibility` now maintains `hiddenPlaylistIds` — hiding a playlist adds it, showing removes it
+
+### Files Modified
+- `src/shared/stores/playlistSettingsStore.ts` — Auto-add new playlists, track hidden playlists
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.271] - 2026-03-30
+
+### Changed — Consistency Polish (Phase 5)
+
+- **ProfileScreen**: DNA toggle now shows contextual explainer text ("Mood & vibe recommendations" when on, "Tap to enable mood matching" when off, "Tag books with dna: to unlock" when no DNA tags exist)
+- **ProfileScreen**: Display subtitle now accurately shows spine source (Community/Server/Generated) instead of cleaning level, since chapter cleaning moved to Playback
+- **ProfileScreen**: Playback subtitle now includes cleaning level (e.g., "1x · 30s/15s · Standard")
+- **Audit complete**: All toggles across all 5 settings screens have description text. All nav links show current-value subtitles.
+
+### Files Modified
+- `src/features/profile/screens/ProfileScreen.tsx` — DNA explainer, subtitle corrections
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.270] - 2026-03-30
+
+### Changed — Merge About & Bug Report into single screen
+
+- **AboutScreen**: Now "About & Help" — combines app identity, version info, bug report form, and open source licenses into one screen. Eliminates a separate navigation destination.
+- **ProfileScreen**: Replaced separate "About" and "Report a Bug" links with single "About & Help" link
+- **AppNavigator**: Removed `BugReport` standalone screen registration
+- **Navigation types**: Removed `BugReport` route from `RootStackParamList`
+
+### Rationale
+Settings reorganization Phase 3: reduce navigation depth. Bug reporting is infrequent — embedding it in About keeps it discoverable without a dedicated hub slot. Two fewer taps for the common "check version" + "report issue" flow.
+
+### Files Modified
+- `src/features/profile/screens/AboutScreen.tsx` — Merged bug report form into About screen
+- `src/features/profile/screens/ProfileScreen.tsx` — Single "About & Help" link
+- `src/navigation/AppNavigator.tsx` — Removed BugReport screen + error boundary
+- `src/navigation/types.ts` — Removed BugReport route type
+- `src/features/profile/index.ts` — Removed BugReportScreen export
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.269] - 2026-03-30
+
+### Changed — Absorb Chapter Cleaning into Playback Settings
+
+- **PlaybackSettingsScreen**: Added "Chapter Names" section with cleaning level radio selector, before/after example transformations, and Show Original Names toggle — all previously on a separate screen
+- **DisplaySettingsScreen**: Removed Chapter Names navigation link (now lives in Playback)
+- **AppNavigator**: Removed `ChapterCleaningSettings` standalone screen registration
+- **Navigation types**: Removed `ChapterCleaningSettings` route from `RootStackParamList`
+
+### Rationale
+Settings reorganization Phase 3: two-level max hierarchy (NNGroup progressive disclosure). Chapter cleaning is a playback behavior setting — grouping it with skip intervals, speed, and smart rewind reduces navigation depth from 3 taps to 2.
+
+### Files Modified
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx` — Added chapter cleaning section
+- `src/features/profile/screens/DisplaySettingsScreen.tsx` — Removed chapter cleaning nav link
+- `src/navigation/AppNavigator.tsx` — Removed screen + error boundary
+- `src/navigation/types.ts` — Removed route type
+- `src/features/profile/index.ts` — Removed screen export
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.268] - 2026-03-30
+
+### Changed — Standardize Control Patterns
+
+- **PlaybackSettings**: Replaced modal pickers for skip forward/back intervals with inline pill buttons, matching the Smart Rewind max selector pattern. Fewer taps, consistent control style across all small option sets (NNGroup/Material Design consistency guideline).
+
+### Files Modified
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx` — Skip interval pill selectors, removed forward/back modal pickers
+- `src/constants/version.ts` — Version bump
+
+---
+
+## [0.9.267] - 2026-03-30
+
+### Changed — Settings Reorganization
+
+- **ProfileScreen**: Added "APP" and "SYSTEM" section headers to group settings links
+- **DataStorageSettings**: Deleted duplicate `StorageSettingsScreen`, moved Auto-Download Series toggle here, separated destructive actions into "Danger Zone" section
+- **Sleep timer memory**: Remembers the last-used timer duration and pre-highlights it when reopening the sleep timer sheet
+- **Keep Screen Awake**: New toggle in Playback Settings to prevent screen dimming during playback (uses `expo-keep-awake`)
+- **Navigation cleanup**: Removed all references to deleted `StorageSettingsScreen`, updated `LocalStorageNoticeModal` to navigate to `DataStorageSettings`
+
+### Files Modified
+- `src/features/profile/screens/ProfileScreen.tsx` — Section headers, reordered links
+- `src/features/profile/screens/DataStorageSettingsScreen.tsx` — Auto-Download Series toggle, Danger Zone section
+- `src/features/profile/screens/StorageSettingsScreen.tsx` — Deleted
+- `src/features/profile/screens/PlaybackSettingsScreen.tsx` — Keep Screen Awake toggle
+- `src/features/profile/index.ts` — Removed StorageSettingsScreen export
+- `src/navigation/AppNavigator.tsx` — Removed StorageSettings screen registration
+- `src/navigation/types.ts` — Removed StorageSettings type
+- `src/shared/components/LocalStorageNoticeModal.tsx` — Navigate to DataStorageSettings
+- `src/features/player/stores/sleepTimerStore.ts` — Timer memory (lastTimerMinutes, lastTimerType)
+- `src/features/player/stores/playerSettingsStore.ts` — keepScreenAwake setting
+- `src/features/player/sheets/SleepTimerSheet.tsx` — Pre-highlight last-used timer, save on set
+- `src/navigation/components/GlobalMiniPlayer.tsx` — Keep-awake effect during playback
+- `CLAUDE.md` — Updated navigation docs
+
+---
+
 ## [0.9.266] - 2026-03-30
 
 ### Fixed — HTTP Connections Blocked on Android & iOS

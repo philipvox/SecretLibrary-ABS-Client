@@ -21,6 +21,11 @@ import { networkMonitor } from '@/core/services/networkMonitor';
 import { getErrorMessage } from '@/shared/utils/errorUtils';
 import { useToastStore } from '@/shared/hooks/useToast';
 import { validatePositionForSync } from '../utils/progressCalculator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Emergency position backup key — AsyncStorage is simpler/faster than SQLite
+// and more likely to survive process termination during background
+const EMERGENCY_POSITION_KEY = 'emergency_position_backup';
 
 
 const _DEBUG = __DEV__;
@@ -72,6 +77,9 @@ class BackgroundSyncService {
     this.initPromise = (async () => {
       await sqliteCache.init();
 
+      // Recover any emergency position backup from a previous force-close
+      await this.recoverEmergencyPosition();
+
       this.isInitialized = true;
 
       // Listen for app state changes
@@ -87,6 +95,70 @@ class BackgroundSyncService {
       await this.initPromise;
     } finally {
       this.initPromise = null;
+    }
+  }
+
+  /**
+   * Save position to AsyncStorage as emergency backup.
+   * This is faster and more crash-resilient than SQLite for the
+   * "app killed while in background" scenario.
+   */
+  private async saveEmergencyPosition(bookId: string, position: number, duration: number): Promise<void> {
+    try {
+      await AsyncStorage.setItem(EMERGENCY_POSITION_KEY, JSON.stringify({
+        bookId,
+        position,
+        duration,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // Best-effort — don't let this block other saves
+    }
+  }
+
+  /**
+   * Recover position from emergency backup if it's newer than what SQLite has.
+   * Called on app init/foreground to recover from force-close scenarios.
+   */
+  async recoverEmergencyPosition(): Promise<void> {
+    try {
+      const raw = await AsyncStorage.getItem(EMERGENCY_POSITION_KEY);
+      if (!raw) return;
+
+      const backup = JSON.parse(raw) as {
+        bookId: string;
+        position: number;
+        duration: number;
+        savedAt: number;
+      };
+
+      // Only recover if backup is less than 24 hours old
+      if (Date.now() - backup.savedAt > 24 * 60 * 60 * 1000) {
+        await AsyncStorage.removeItem(EMERGENCY_POSITION_KEY);
+        return;
+      }
+
+      // Check if SQLite has a newer position for this book
+      const sqliteProgress = await sqliteCache.getPlaybackProgress(backup.bookId);
+      const sqlitePosition = sqliteProgress?.position || 0;
+
+      // Use emergency backup if it's ahead of SQLite
+      if (backup.position > sqlitePosition + 5) {
+        log(`Emergency recovery: ${backup.bookId} backup=${formatDuration(backup.position)} sqlite=${formatDuration(sqlitePosition)}`);
+        await sqliteCache.setPlaybackProgress(backup.bookId, backup.position, backup.duration, false);
+        playbackCache.setProgress(backup.bookId, {
+          currentTime: backup.position,
+          duration: backup.duration,
+          progress: backup.duration > 0 ? backup.position / backup.duration : 0,
+          updatedAt: backup.savedAt,
+        });
+        log(`Emergency recovery: restored ${formatDuration(backup.position)} for ${backup.bookId}`);
+      }
+
+      // Clear the backup after recovery attempt
+      await AsyncStorage.removeItem(EMERGENCY_POSITION_KEY);
+    } catch (error) {
+      log('Emergency position recovery failed:', getErrorMessage(error));
     }
   }
 
@@ -138,6 +210,9 @@ class BackgroundSyncService {
 
     // SQLite write only - no network, no queue processing
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
+
+    // Emergency backup — fast AsyncStorage write that survives force-close
+    this.saveEmergencyPosition(itemId, position, duration);
 
     // Keep playbackCache in sync so progressService.getProgressData()
     // returns current position instead of stale startup-time value.
@@ -621,20 +696,32 @@ class BackgroundSyncService {
       // Use IIFE to handle async in callback
       (async () => {
         try {
-          // FIX: Save current playing position to SQLite FIRST (instant, guaranteed)
-          // This ensures progress is durably saved even if the 4s server timeout fires
+          // FIX: Get FRESH position from native audio player, not stale store value.
+          // On iOS, the JS thread can be suspended while audio plays in background.
+          // The store position may be minutes behind the actual playback position.
+          // On Android, ExoPlayer's native position is also more accurate than the
+          // cached JS-side value which only updates via 100ms callbacks.
           try {
             const { usePlayerStore } = require('../stores/playerStore');
-            const { currentBook, position, duration } = usePlayerStore.getState();
-            if (currentBook && position > 0) {
-              await sqliteCache.setPlaybackProgress(currentBook.id, position, duration, false);
-              playbackCache.setProgress(currentBook.id, {
-                currentTime: position,
-                duration,
-                progress: duration > 0 ? position / duration : 0,
-                updatedAt: Date.now(),
-              });
-              log(`Saved position locally before background sync: ${currentBook.id} @ ${formatDuration(position)}`);
+            const { currentBook, duration } = usePlayerStore.getState();
+            if (currentBook) {
+              // Query native player for real position — critical for accuracy
+              const freshPosition = await audioService.getFreshPosition();
+              if (freshPosition > 0) {
+                // Emergency backup FIRST — fastest write path, survives force-close
+                this.saveEmergencyPosition(currentBook.id, freshPosition, duration);
+
+                await sqliteCache.setPlaybackProgress(currentBook.id, freshPosition, duration, false);
+                playbackCache.setProgress(currentBook.id, {
+                  currentTime: freshPosition,
+                  duration,
+                  progress: duration > 0 ? freshPosition / duration : 0,
+                  updatedAt: Date.now(),
+                });
+                // Also update the store so the sync queue picks up the fresh position
+                usePlayerStore.setState({ position: freshPosition });
+                log(`Saved FRESH position locally before background sync: ${currentBook.id} @ ${formatDuration(freshPosition)}`);
+              }
             }
           } catch (localSaveError) {
             audioLog.warn('Pre-background local save failed:', getErrorMessage(localSaveError));
@@ -666,14 +753,43 @@ class BackgroundSyncService {
         }
       })();
     } else if (nextState === 'active') {
-      // App coming to foreground - check for unsynced
+      // App coming to foreground - save fresh position FIRST, then sync
       logSection('APP FOREGROUNDING');
-      log('Checking for unsynced progress...');
 
-      // FIX: Handle async properly with error logging
-      this.syncUnsyncedFromStorage().catch((error) => {
-        audioLog.error('Foreground sync failed:', getErrorMessage(error));
-      });
+      // FIX: On foreground return, the native player may have been playing
+      // in the background while JS was suspended (especially iOS).
+      // Get the REAL position from native and save to SQLite BEFORE
+      // any server sync runs — this prevents stale server data from
+      // overwriting newer local progress.
+      (async () => {
+        try {
+          const { usePlayerStore } = require('../stores/playerStore');
+          const { currentBook, duration, isPlaying } = usePlayerStore.getState();
+          if (currentBook) {
+            const freshPosition = await audioService.getFreshPosition();
+            if (freshPosition > 0) {
+              await sqliteCache.setPlaybackProgress(currentBook.id, freshPosition, duration, false);
+              playbackCache.setProgress(currentBook.id, {
+                currentTime: freshPosition,
+                duration,
+                progress: duration > 0 ? freshPosition / duration : 0,
+                updatedAt: Date.now(),
+              });
+              // Update store so UI shows correct position immediately
+              usePlayerStore.setState({ position: freshPosition });
+              log(`Foreground: saved fresh position ${currentBook.id} @ ${formatDuration(freshPosition)}`);
+            }
+          }
+        } catch (error) {
+          audioLog.warn('Foreground position save failed:', getErrorMessage(error));
+        }
+
+        // Now sync unsynced items to server
+        log('Checking for unsynced progress...');
+        this.syncUnsyncedFromStorage().catch((error) => {
+          audioLog.error('Foreground sync failed:', getErrorMessage(error));
+        });
+      })();
     }
   }
 

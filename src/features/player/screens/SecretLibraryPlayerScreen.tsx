@@ -94,6 +94,7 @@ type ActiveSheet = 'speed' | 'sleep' | 'queue' | 'chapters' | 'bookmarks' | null
 // =============================================================================
 
 const MAX_CONTENT_WIDTH = 500; // Max width on iPad to prevent overly stretched layouts
+const WEB_PLAYER_MAX_WIDTH = 800; // Wider on desktop web — side-by-side layout
 
 // =============================================================================
 // ICONS
@@ -287,14 +288,17 @@ export function SecretLibraryPlayerScreen() {
   const responsive = useResponsive();
   const { width: screenWidth, height: screenHeight, isTablet } = responsive;
 
-  // Content width constraint for iPad (center content)
+  const { isWeb, isDesktopWeb } = responsive;
+
+  // Content width constraint — wider on desktop web, narrower on iPad
   const contentStyle = useMemo(() => {
-    if (isTablet && screenWidth > MAX_CONTENT_WIDTH) {
-      const padding = (screenWidth - MAX_CONTENT_WIDTH) / 2;
+    const maxW = isWeb ? WEB_PLAYER_MAX_WIDTH : MAX_CONTENT_WIDTH;
+    if ((isTablet || isDesktopWeb) && screenWidth > maxW) {
+      const padding = (screenWidth - maxW) / 2;
       return { paddingHorizontal: padding };
     }
     return { paddingHorizontal: scale(20) };
-  }, [isTablet, screenWidth]);
+  }, [isTablet, isDesktopWeb, isWeb, screenWidth]);
 
   // Theme-aware colors
   const colors = useSecretLibraryColors();
@@ -557,8 +561,9 @@ export function SecretLibraryPlayerScreen() {
   //
   const miniCoverSize = scale(40);       // mini player cover dimensions
   const miniPlayerPadH = scale(20);      // mini player paddingHorizontal
-  const fullContentPad = isTablet && screenWidth > MAX_CONTENT_WIDTH
-    ? (screenWidth - MAX_CONTENT_WIDTH) / 2
+  const playerMaxW = isWeb ? WEB_PLAYER_MAX_WIDTH : MAX_CONTENT_WIDTH;
+  const fullContentPad = (isTablet || isDesktopWeb) && screenWidth > playerMaxW
+    ? (screenWidth - playerMaxW) / 2
     : scale(20);
   const fullCoverWidth = screenWidth - 2 * fullContentPad;
   const scaleRatio = miniCoverSize / fullCoverWidth;
@@ -1331,11 +1336,12 @@ export function SecretLibraryPlayerScreen() {
             <View style={{ height: insets.bottom + scale(24) }} />
           </View>
         ) : (
-        <View style={[styles.screen, contentStyle]}>
+        <View style={[styles.screen, Platform.OS !== 'web' && contentStyle, Platform.OS === 'web' && { flexDirection: 'row' as const, alignItems: 'center' as const, paddingHorizontal: 64, gap: 48, paddingTop: 0 }]}>
           {/* ============ NORMAL MODE ============ */}
-          <View style={styles.mainContent}>
+          {/* On web: cover is in a fixed-width left column */}
+          <View style={[styles.mainContent, Platform.OS === 'web' && { width: '30%' as any, maxWidth: 400, flexShrink: 0, flex: undefined as any }]}>
             {/* Cover Image */}
-            <RAnimated.View style={coverAnimStyle}>
+            <RAnimated.View style={Platform.OS === 'web' ? undefined : coverAnimStyle}>
               <Pressable
                 ref={coverRef}
                 style={styles.coverWrapper}
@@ -1390,11 +1396,15 @@ export function SecretLibraryPlayerScreen() {
             />
           </Pressable>
             </RAnimated.View>
+          </View>{/* close mainContent / left column */}
 
-          {/* Title, chapter, byline — below cover */}
-          <RAnimated.View style={controlsAnimStyle}>
-            {/* Title + Chapter centered */}
-            <View style={styles.titleChapterColumn}>
+          {/* Right column on web: title, controls, slider. On mobile: flows below cover */}
+          <View style={Platform.OS === 'web' ? { flex: 1, paddingTop: 8 } : undefined}>
+
+          {/* Title, chapter, byline */}
+          <RAnimated.View style={Platform.OS === 'web' ? undefined : controlsAnimStyle}>
+            {/* Title + Chapter — left-aligned on web */}
+            <View style={[styles.titleChapterColumn, Platform.OS === 'web' && { alignItems: 'flex-start' as const }]}>
               <TouchableOpacity
                 onPress={handleTitlePress}
                 activeOpacity={0.7}
@@ -1405,7 +1415,8 @@ export function SecretLibraryPlayerScreen() {
                 <Text
                   style={[
                     styles.bookTitle,
-                    { fontFamily: titleFontFamily, fontWeight: titleFontWeight as TextStyle['fontWeight'], color: colors.black }
+                    { fontFamily: titleFontFamily, fontWeight: titleFontWeight as TextStyle['fontWeight'], color: colors.black },
+                    Platform.OS === 'web' && { fontSize: 32, lineHeight: 38, textAlign: 'left' as const },
                   ]}
                   numberOfLines={3}
                 >
@@ -1420,14 +1431,14 @@ export function SecretLibraryPlayerScreen() {
                 accessibilityLabel={`Current chapter: ${chapterTitle}`}
                 accessibilityHint="Double tap to open chapter list"
               >
-                <Text style={[styles.chapterText, { color: colors.black }]} numberOfLines={2}>
+                <Text style={[styles.chapterText, { color: colors.black }, Platform.OS === 'web' && { textAlign: 'left' as const }]} numberOfLines={2}>
                   {chapterTitle}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Byline - Author · Series centered */}
-            <View style={styles.byline}>
+            {/* Byline - Author · Series — left-aligned on web */}
+            <View style={[styles.byline, Platform.OS === 'web' && { justifyContent: 'flex-start' as const }]}>
               <TouchableOpacity
                 onPress={authorId ? handleAuthorPress : undefined}
                 activeOpacity={authorId ? 0.7 : 1}
@@ -1449,8 +1460,8 @@ export function SecretLibraryPlayerScreen() {
           </RAnimated.View>
 
           {/* Controls Section — flows right after byline */}
-          <RAnimated.View style={controlsAnimStyle}>
-          <View style={{ height: scale(44) }} />
+          <RAnimated.View style={Platform.OS === 'web' ? undefined : controlsAnimStyle}>
+          <View style={{ height: Platform.OS === 'web' ? 24 : scale(44) }} />
 
           {/* 5-Button Controls Row: |< ⏪ ▶ ⏩ >| */}
           <View style={styles.controlsRow}>
@@ -1607,7 +1618,7 @@ export function SecretLibraryPlayerScreen() {
           </RAnimated.View>
 
           {/* Settings Row — pinned to bottom */}
-          <RAnimated.View style={controlsAnimStyle}>
+          <RAnimated.View style={Platform.OS === 'web' ? undefined : controlsAnimStyle}>
             <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + scale(20) }]}>
           <View style={styles.settingsRow}>
             <TouchableOpacity
@@ -1681,7 +1692,7 @@ export function SecretLibraryPlayerScreen() {
             </View>
             </View>
           </RAnimated.View>
-        </View>
+        </View>{/* close right column */}
         </View>
         )}
 
@@ -1928,12 +1939,13 @@ const styles = StyleSheet.create({
 
   // Cover - Full width, larger
   coverWrapper: {
-    width: '85%',
+    width: Platform.OS === 'web' ? '100%' : '85%',
     aspectRatio: 1,
     alignSelf: 'center',
     position: 'relative',
-    marginBottom: scale(16),
+    marginBottom: Platform.OS === 'web' ? 0 : scale(16),
     overflow: 'hidden',
+    borderRadius: Platform.OS === 'web' ? 4 : 0,
   },
   tapCircle: {
     position: 'absolute',

@@ -457,18 +457,19 @@ export const TopPickHero = React.memo(function TopPickHero({ items, onBookPress,
         pointerEvents="none"
       />
 
-      {/* Hero Section - Centered like book detail */}
-      <View style={[styles.hero, headerHeight ? { paddingTop: headerHeight + scale(20) } : undefined]}>
-        {/* Centered Cover */}
-        <TouchableOpacity style={styles.heroCover} onPress={handleCoverPress} onLongPress={handleCoverLongPress} activeOpacity={0.9} accessibilityLabel={`Cover art for ${displayLine1}${displayLine2 ? ` ${displayLine2}` : ''}`} accessibilityRole="button">
+      {/* Hero Section — side-by-side on web, centered on mobile */}
+      <View style={[styles.hero, headerHeight ? { paddingTop: headerHeight + scale(20) } : undefined, Platform.OS === 'web' && { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 32, paddingHorizontal: 48, paddingTop: headerHeight ? headerHeight + 16 : 16, paddingBottom: 16 }]}>
+        {/* Cover */}
+        <TouchableOpacity style={[styles.heroCover, Platform.OS === 'web' && { width: 200, maxWidth: 200, marginTop: 0, marginBottom: 0, borderRadius: 8, overflow: 'hidden' as const }]} onPress={handleCoverPress} onLongPress={handleCoverLongPress} activeOpacity={0.9} accessibilityLabel={`Cover art for ${displayLine1}${displayLine2 ? ` ${displayLine2}` : ''}`} accessibilityRole="button">
           <Image source={{ uri: coverUrl }} style={styles.coverImage} contentFit="cover" cachePolicy="memory-disk" />
           <CoverStars bookId={bookId} starSize={scale(28)} />
         </TouchableOpacity>
 
-        {/* Title + Author */}
-        <View style={styles.titleSection}>
+        {/* Title + Author + Buttons column (flex: 1 on web for side-by-side) */}
+        <View style={Platform.OS === 'web' ? { flex: 1 } : undefined}>
+        <View style={[styles.titleSection, Platform.OS === 'web' && { alignItems: 'flex-start' as const, width: '100%' as any }]}>
           <Text
-            style={styles.titleText}
+            style={[styles.titleText, Platform.OS === 'web' && { textAlign: 'left' as const, fontSize: 28 }]}
             numberOfLines={2}
           >
             {displayLine1}{displayLine2 ? ` ${displayLine2}` : ''}
@@ -541,6 +542,7 @@ export const TopPickHero = React.memo(function TopPickHero({ items, onBookPress,
             </Text>
           </TouchableOpacity>
         </View>
+        </View>{/* close info column */}
       </View>
 
     </View>
@@ -591,10 +593,13 @@ const styles = StyleSheet.create({
     paddingBottom: scale(20),
   },
   heroCover: {
-    width: '85%',
+    width: Platform.OS === 'web' ? '40%' : '85%',
+    maxWidth: Platform.OS === 'web' ? 500 : undefined,
     aspectRatio: 1,
     marginTop: scale(8),
     marginBottom: scale(24),
+    borderRadius: Platform.OS === 'web' ? 8 : 0,
+    overflow: 'hidden' as const,
   },
   coverImage: {
     width: '100%',
@@ -655,6 +660,8 @@ const styles = StyleSheet.create({
     gap: scale(10),
     marginTop: scale(20),
     width: '100%',
+    maxWidth: Platform.OS === 'web' ? 600 : undefined,
+    alignSelf: 'center',
     paddingHorizontal: scale(16),
   },
   actionBtn: {

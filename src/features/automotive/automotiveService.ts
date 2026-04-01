@@ -387,6 +387,35 @@ class AutomotiveService {
         return;
       }
 
+      // Check auth state — if not signed in, write sign-in placeholder immediately
+      // (DR-3: must load content within 10 seconds)
+      const { apiClient: client } = await import('@/core/api');
+      const authToken = client.getAuthToken();
+      if (!authToken) {
+        log('User not authenticated — writing sign-in placeholder immediately');
+        const placeholder = [{
+          id: 'sign-in',
+          title: 'Open Secret Library to get started',
+          items: [{
+            id: 'sign-in-prompt',
+            title: 'Sign in to your server',
+            subtitle: 'Open the app and connect to your AudiobookShelf server',
+            imageUrl: null,
+            isPlayable: false,
+            isBrowsable: false,
+            progress: 0,
+            durationMs: 0,
+          }],
+        }];
+        try {
+          await AndroidAutoModule.writeBrowseData(JSON.stringify(placeholder));
+          log('Wrote sign-in placeholder to browse data');
+        } catch (err) {
+          log('Failed to write sign-in placeholder:', err);
+        }
+        return;
+      }
+
       // Check if library data is available
       const { useLibraryCache } = await import('@/core/cache/libraryCache');
       const libraryItems = useLibraryCache.getState().items;

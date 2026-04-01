@@ -6,7 +6,7 @@
  */
 
 import React, { memo } from 'react';
-import { Text, StyleSheet, Pressable } from 'react-native';
+import { Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { Icon } from '@/shared/components/Icon';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -52,7 +52,7 @@ export const BrowseGridItem = memo(BrowseGridItemComponent);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    aspectRatio: 1,
+    aspectRatio: Platform.OS === 'web' ? 3.5 : 1,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,

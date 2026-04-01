@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { Collection } from '@/core/types';
 import { CollectionSquareCard } from './CollectionSquareCard';
@@ -36,7 +36,8 @@ export const CollectionsSection = React.memo(function CollectionsSection({
   skipFirst = false,
 }: CollectionsSectionProps) {
   const { width: screenWidth } = useWindowDimensions();
-  const cardSize = (screenWidth - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
+  const effectiveWidth = Platform.OS === 'web' ? Math.min(screenWidth, 960) : screenWidth;
+  const cardSize = (effectiveWidth - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
   // Theme-aware colors (used for header)
   const _colors = useSecretLibraryColors();
 

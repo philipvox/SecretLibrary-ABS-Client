@@ -33,6 +33,7 @@ const SMART_REWIND_ENABLED_KEY = 'playerSmartRewindEnabled';
 const SMART_REWIND_MAX_SECONDS_KEY = 'playerSmartRewindMaxSeconds';
 const BLUETOOTH_AUTO_RESUME_KEY = 'playerBluetoothAutoResume';
 const SHOW_TIME_REMAINING_KEY = 'playerShowTimeRemaining';
+const KEEP_SCREEN_AWAKE_KEY = 'playerKeepScreenAwake';
 
 // =============================================================================
 // TYPES
@@ -63,6 +64,9 @@ interface PlayerSettingsState {
 
   // Display
   showTimeRemaining: boolean;         // Show remaining time instead of elapsed (default false)
+
+  // Screen
+  keepScreenAwake: boolean;           // Prevent screen dimming during playback (default false)
 }
 
 interface PlayerSettingsActions {
@@ -77,6 +81,7 @@ interface PlayerSettingsActions {
   setSmartRewindMaxSeconds: (seconds: number) => Promise<void>;
   setBluetoothAutoResume: (enabled: boolean) => Promise<void>;
   setShowTimeRemaining: (enabled: boolean) => Promise<void>;
+  setKeepScreenAwake: (enabled: boolean) => Promise<void>;
 
   // Bulk load
   loadSettings: () => Promise<void>;
@@ -102,6 +107,7 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
     smartRewindMaxSeconds: 30,
     bluetoothAutoResume: false,
     showTimeRemaining: false,
+    keepScreenAwake: false,
 
     // =========================================================================
     // ACTIONS
@@ -201,6 +207,15 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
       }
     },
 
+    setKeepScreenAwake: async (enabled: boolean) => {
+      set({ keepScreenAwake: enabled });
+      try {
+        await AsyncStorage.setItem(KEEP_SCREEN_AWAKE_KEY, enabled.toString());
+      } catch (err) {
+        log.debug('Failed to persist keepScreenAwake:', err);
+      }
+    },
+
     loadSettings: async () => {
       try {
         const [
@@ -214,6 +229,7 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           smartRewindMaxSecondsStr,
           bluetoothAutoResumeStr,
           showTimeRemainingStr,
+          keepScreenAwakeStr,
         ] = await Promise.all([
           AsyncStorage.getItem(CONTROL_MODE_KEY),
           AsyncStorage.getItem(PROGRESS_MODE_KEY),
@@ -225,6 +241,7 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           AsyncStorage.getItem(SMART_REWIND_MAX_SECONDS_KEY),
           AsyncStorage.getItem(BLUETOOTH_AUTO_RESUME_KEY),
           AsyncStorage.getItem(SHOW_TIME_REMAINING_KEY),
+          AsyncStorage.getItem(KEEP_SCREEN_AWAKE_KEY),
         ]);
 
         // Fix: Add NaN guards to parseInt calls to prevent invalid values
@@ -239,6 +256,7 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
         const smartRewindMaxSeconds = !isNaN(parsedSmartRewindMax) ? parsedSmartRewindMax : 30;
         const bluetoothAutoResume = bluetoothAutoResumeStr === 'true'; // Default false
         const showTimeRemaining = showTimeRemainingStr === 'true'; // Default false
+        const keepScreenAwake = keepScreenAwakeStr === 'true'; // Default false
 
         set({
           controlMode: (controlMode as ControlMode) || 'rewind',
@@ -251,6 +269,7 @@ export const usePlayerSettingsStore = create<PlayerSettingsState & PlayerSetting
           smartRewindMaxSeconds,
           bluetoothAutoResume,
           showTimeRemaining,
+          keepScreenAwake,
         });
       } catch (error) {
         // Fix: Log error instead of silently swallowing

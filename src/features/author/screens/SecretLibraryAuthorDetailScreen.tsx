@@ -828,6 +828,9 @@ export function SecretLibraryAuthorDetailScreen() {
       >
         {headerContent}
 
+        {/* On web: content flows full-width with padding */}
+        <View style={Platform.OS === 'web' ? { paddingHorizontal: 32 } : undefined}>
+
         {/* Loading state while fetching author books from API */}
         {isFetchingBooks && allBooks.length === 0 && (
           <Text style={[styles.emptyText, { color: colors.gray }]}>Loading books...</Text>
@@ -1021,6 +1024,7 @@ export function SecretLibraryAuthorDetailScreen() {
         )}
 
         {footerContent}
+        </View>
       </ScrollView>
     </View>
   );

@@ -260,6 +260,8 @@ function AuthorVertical({
             textTransform: 'uppercase',
           }}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
         >
           {first.toUpperCase()}
         </Text>
@@ -274,6 +276,8 @@ function AuthorVertical({
           textTransform: 'uppercase',
         }}
         numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
       >
         {last.toUpperCase()}
       </Text>

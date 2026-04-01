@@ -7,22 +7,24 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { ChevronRight } from 'lucide-react-native';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useCoverUrl } from '@/core/cache';
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { scale, wp } from '@/shared/theme';
+import { scale, wp, wpCapped } from '@/shared/theme';
 import { CompleteBadgeOverlay } from '@/shared/components/CompleteBadge';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { useReadingHistory } from '@/shared/hooks/useReadingHistory';
 import { useProgressStore } from '@/core/stores/progressStore';
+import { useResponsive } from '@/shared/hooks/useResponsive';
 
-// Grid layout: 2 columns
+// Grid layout constants
 const PADDING = 16;
 const GAP = 12;
-const CARD_WIDTH = Math.floor((wp(100) - PADDING * 2 - GAP) / 2);
+// Fallback for module-level usage (native only). On web, computed dynamically inside component.
+const CARD_WIDTH = Math.floor((wpCapped(100) - PADDING * 2 - GAP) / 2);
 const COVER_HEIGHT = CARD_WIDTH;
 const DISPLAY_LIMIT = 4;
 
@@ -46,19 +48,22 @@ interface CardProps {
   item: LibraryItem;
   onPress: () => void;
   onLongPress?: () => void;
+  cardWidth?: number;
 }
 
 const colors = secretLibraryColors;
 
-const GridBookCard = React.memo(function GridBookCard({ item, onPress, onLongPress }: CardProps) {
+const GridBookCard = React.memo(function GridBookCard({ item, onPress, onLongPress, cardWidth: cw }: CardProps) {
+  const cardWidth = cw || CARD_WIDTH;
+  const coverHeight = cardWidth;
   const coverUrl = useCoverUrl(item.id, { width: 300 });
   const metadata = getMetadata(item);
   const title = metadata.title || 'Untitled';
   const author = metadata.authorName || metadata.authors?.[0]?.name || '';
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} onLongPress={onLongPress} activeOpacity={0.8} accessibilityLabel={`Open ${title}${author ? ` by ${author}` : ''}`} accessibilityRole="button">
-      <View style={[styles.coverContainer, { backgroundColor: colors.grayLine }]}>
+    <TouchableOpacity style={[styles.card, { width: cardWidth }]} onPress={onPress} onLongPress={onLongPress} activeOpacity={0.8} accessibilityLabel={`Open ${title}${author ? ` by ${author}` : ''}`} accessibilityRole="button">
+      <View style={[styles.coverContainer, { width: cardWidth, height: coverHeight, backgroundColor: colors.grayLine }]}>
         <Image
           source={coverUrl}
           style={styles.cover}
@@ -173,6 +178,13 @@ export const BecauseYouListenedSection = React.memo(function BecauseYouListenedS
   const sourceMetadata = getMetadata(sourceBook);
   const sourceTitle = sourceMetadata.title || 'Unknown';
 
+  // On web, show more columns and compute card width dynamically
+  const { coverGridColumns } = useResponsive();
+  const { width: viewportWidth } = useWindowDimensions();
+  const cols = Platform.OS === 'web' ? coverGridColumns : 2;
+  const dynamicCardWidth = Math.floor((viewportWidth - PADDING * 2 - GAP * (cols - 1)) / cols);
+  const webDisplayLimit = Platform.OS === 'web' ? cols * 2 : DISPLAY_LIMIT;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.black }]}>
       {/* Section Header */}
@@ -183,7 +195,7 @@ export const BecauseYouListenedSection = React.memo(function BecauseYouListenedS
             {sourceTitle}
           </Text>
         </View>
-        {onViewMore && recommendations.length > DISPLAY_LIMIT && (
+        {onViewMore && recommendations.length > webDisplayLimit && (
           <TouchableOpacity style={styles.viewAllButton} onPress={() => onViewMore(sourceBook.id, sourceTitle)} accessibilityLabel={`View all recommendations based on ${sourceTitle}`} accessibilityRole="button">
             <Text style={[styles.viewAllText, { color: colors.gray }]}>View All</Text>
             <ChevronRight size={16} color={colors.gray} />
@@ -191,14 +203,15 @@ export const BecauseYouListenedSection = React.memo(function BecauseYouListenedS
         )}
       </View>
 
-      {/* 2×2 Grid */}
+      {/* Responsive Grid */}
       <View style={styles.grid}>
-        {recommendations.slice(0, DISPLAY_LIMIT).map((item) => (
+        {recommendations.slice(0, webDisplayLimit).map((item) => (
           <GridBookCard
             key={item.id}
             item={item}
             onPress={() => handleBookPress(item.id)}
             onLongPress={() => handleBookLongPress(item.id)}
+            cardWidth={Platform.OS === 'web' ? dynamicCardWidth : CARD_WIDTH}
           />
         ))}
       </View>

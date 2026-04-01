@@ -12,7 +12,7 @@
 
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { COMPARABLE_WEIGHTS, COMPARABLE_WEIGHTS_BYL, getTemporalDecay } from './scoreWeights';
-import { parseBookDNA, BookDNA } from '@/shared/utils/bookDNA';
+import { parseBookDNA, BookDNA, SPECTRUM_KEYS } from '@/shared/utils/bookDNA';
 import { getPublicationEra, PublicationEra } from './publicationEra';
 
 // ============================================================================
@@ -177,26 +177,22 @@ export type ComparableScoringContext = 'BECAUSE_YOU_LISTENED' | 'MORE_LIKE_THIS'
 
 /** Calculate mood similarity between two BookDNA profiles (0–1) */
 function scoreDNAMoodSimilarity(a: BookDNA, b: BookDNA): number {
-  const keys: (keyof BookDNA['moodScores'])[] = ['thrills', 'drama', 'laughs', 'wonder', 'heart', 'ideas'];
+  // Dynamic mood keys — find shared keys between both profiles
+  const sharedKeys = Object.keys(a.moodScores).filter((k) => b.moodScores[k] !== undefined);
+  if (sharedKeys.length < 2) return 0;
+
   let totalSim = 0;
-  let count = 0;
-  for (const key of keys) {
-    const va = a.moodScores[key];
-    const vb = b.moodScores[key];
-    if (va !== null && vb !== null) {
-      totalSim += 1 - Math.abs(va - vb);
-      count++;
-    }
+  for (const key of sharedKeys) {
+    totalSim += 1 - Math.abs(a.moodScores[key] - b.moodScores[key]);
   }
-  return count > 0 ? totalSim / count : 0;
+  return totalSim / sharedKeys.length;
 }
 
 /** Calculate spectrum similarity between two BookDNA profiles (0–1) */
 function scoreDNASpectrumSimilarity(a: BookDNA, b: BookDNA): number {
-  const keys: (keyof BookDNA['spectrums'])[] = ['darkLight', 'seriousHumorous', 'denseAccessible', 'plotCharacter', 'bleakHopeful', 'familiarChallenging'];
   let totalSim = 0;
   let count = 0;
-  for (const key of keys) {
+  for (const key of SPECTRUM_KEYS) {
     const va = a.spectrums[key];
     const vb = b.spectrums[key];
     if (va !== null && vb !== null) {

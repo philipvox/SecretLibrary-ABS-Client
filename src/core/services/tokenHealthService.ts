@@ -14,9 +14,9 @@ import { createLogger } from '@/shared/utils/logger';
 const log = createLogger('TokenHealth');
 
 // Configuration
-const CHECK_INTERVAL_MS = 5 * 60 * 1000;  // Check every 5 minutes
-const BACKGROUND_CHECK_THRESHOLD_MS = 30 * 60 * 1000;  // Check after 30 min in background
-const MAX_FAILED_CHECKS = 3;  // Consecutive failures before triggering re-auth
+const CHECK_INTERVAL_MS = 15 * 60 * 1000;  // Check every 15 minutes (was 5)
+const BACKGROUND_CHECK_THRESHOLD_MS = 60 * 60 * 1000;  // Check after 60 min in background (was 30)
+const MAX_FAILED_CHECKS = 5;  // Consecutive failures before triggering re-auth (was 3)
 
 export interface TokenHealthStatus {
   isValid: boolean;

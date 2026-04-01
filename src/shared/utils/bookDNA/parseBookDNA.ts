@@ -5,11 +5,17 @@
  * BookDNA tags use a `dna:` prefix with structured categories:
  *
  * Examples:
- *   dna:mood:thrills:8      -> moodScores.thrills = 0.8
+ *   dna:mood:tension:8        -> moodScores.tension = 0.8
+ *   dna:mood:warmth:6         -> moodScores.warmth = 0.6
  *   dna:spectrum:dark-light:-5 -> spectrums.darkLight = -0.5
- *   dna:pacing:fast         -> pacing = 'fast'
- *   dna:trope:found-family  -> tropes = ['found-family']
- *   dna:theme:redemption    -> themes = ['redemption']
+ *   dna:pacing:fast           -> pacing = 'fast'
+ *   dna:trope:found-family    -> tropes = ['found-family']
+ *   dna:theme:redemption      -> themes = ['redemption']
+ *
+ * Mood scores are dynamic — any mood name is accepted (tension, warmth,
+ * propulsive, melancholy, whimsical, etc.). The 7 spectrums are fixed:
+ * dark-light, serious-funny, plot-character, simple-complex,
+ * action-contemplative, intimate-epic-scope, world-density.
  *
  * Books WITH BookDNA get accurate, multi-dimensional scoring.
  * Books WITHOUT BookDNA fall back to genre/tag inference (lower confidence).
@@ -34,11 +40,12 @@ export interface BookDNA {
   // Spectrums (-1 to 1, where 0 is neutral)
   spectrums: {
     darkLight: number | null;           // -1 = very dark, +1 = very light
-    seriousHumorous: number | null;     // -1 = dead serious, +1 = comedy
-    denseAccessible: number | null;     // -1 = dense prose, +1 = easy read
+    seriousFunny: number | null;        // -1 = dead serious, +1 = comedy
     plotCharacter: number | null;       // -1 = plot-driven, +1 = character-driven
-    bleakHopeful: number | null;        // -1 = bleak ending, +1 = hopeful ending
-    familiarChallenging: number | null; // -1 = familiar tropes, +1 = subversive
+    simpleComplex: number | null;       // -1 = simple/accessible, +1 = complex/dense
+    actionContemplative: number | null; // -1 = action-heavy, +1 = contemplative
+    intimateEpicScope: number | null;   // -1 = intimate/personal, +1 = epic scope
+    worldDensity: number | null;        // -1 = sparse worldbuilding, +1 = rich worldbuilding
   };
 
   // Categorical arrays
@@ -50,15 +57,10 @@ export interface BookDNA {
   narratorStyle: 'theatrical' | 'subtle' | 'warm' | 'dry' | 'intense' | null;
   production: 'full-cast' | 'single-voice' | 'duet' | 'soundscape' | null;
 
-  // Mood scores (0 to 1, where 0 = none, 1 = primary mood)
-  moodScores: {
-    thrills: number | null;
-    drama: number | null;
-    laughs: number | null;
-    wonder: number | null;
-    heart: number | null;
-    ideas: number | null;
-  };
+  // Mood scores — dynamic map of mood name → score (0-1).
+  // Any mood name is valid (tension, warmth, propulsive, melancholy, etc.)
+  // Empty object means no mood data.
+  moodScores: Record<string, number>;
 
   // Recommendation helpers
   comparableTitles: string[];
@@ -68,6 +70,12 @@ export interface BookDNA {
   hasDNA: boolean;
   tagCount: number;
 }
+
+/** All spectrum keys in the BookDNA interface */
+export const SPECTRUM_KEYS: (keyof BookDNA['spectrums'])[] = [
+  'darkLight', 'seriousFunny', 'plotCharacter', 'simpleComplex',
+  'actionContemplative', 'intimateEpicScope', 'worldDensity',
+];
 
 // ============================================================================
 // PARSER FUNCTIONS
@@ -90,25 +98,19 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
     pubEra: null,
     spectrums: {
       darkLight: null,
-      seriousHumorous: null,
-      denseAccessible: null,
+      seriousFunny: null,
       plotCharacter: null,
-      bleakHopeful: null,
-      familiarChallenging: null,
+      simpleComplex: null,
+      actionContemplative: null,
+      intimateEpicScope: null,
+      worldDensity: null,
     },
     tropes: [],
     themes: [],
     settings: [],
     narratorStyle: null,
     production: null,
-    moodScores: {
-      thrills: null,
-      drama: null,
-      laughs: null,
-      wonder: null,
-      heart: null,
-      ideas: null,
-    },
+    moodScores: {},
     comparableTitles: [],
     vibe: null,
     hasDNA: false,
@@ -165,18 +167,19 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
     return Math.max(-1, Math.min(1, value / 10));
   };
 
-  // Helper to get a mood score (0 to 10 in tag, normalized to 0 to 1)
-  const getMood = (name: string): number | null => {
-    const tag = dnaTags.find(t =>
-      t.toLowerCase().startsWith(`dna:mood:${name}:`)
-    );
-    if (!tag) return null;
+  // Collect ALL mood scores dynamically (dna:mood:NAME:VALUE)
+  const moodScores: Record<string, number> = {};
+  const moodPrefix = 'dna:mood:';
+  for (const tag of dnaTags) {
+    const lower = tag.toLowerCase();
+    if (!lower.startsWith(moodPrefix)) continue;
     const parts = tag.split(':');
-    const value = parseInt(parts[3], 10);
-    if (isNaN(value)) return null;
+    const name = parts[2]?.toLowerCase();
+    const rawValue = parseInt(parts[3], 10);
+    if (!name || isNaN(rawValue)) continue;
     // Normalize from 0..10 to 0..1
-    return Math.max(0, Math.min(1, value / 10));
-  };
+    moodScores[name] = Math.max(0, Math.min(1, rawValue / 10));
+  }
 
   // Helper to get all values from a category (for arrays like tropes, themes)
   const getArray = (category: string): string[] => {
@@ -199,11 +202,12 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
 
     spectrums: {
       darkLight: getSpectrum('dark-light'),
-      seriousHumorous: getSpectrum('serious-humorous'),
-      denseAccessible: getSpectrum('dense-accessible'),
+      seriousFunny: getSpectrum('serious-funny'),
       plotCharacter: getSpectrum('plot-character'),
-      bleakHopeful: getSpectrum('bleak-hopeful'),
-      familiarChallenging: getSpectrum('familiar-challenging'),
+      simpleComplex: getSpectrum('simple-complex'),
+      actionContemplative: getSpectrum('action-contemplative'),
+      intimateEpicScope: getSpectrum('intimate-epic-scope'),
+      worldDensity: getSpectrum('world-density'),
     },
 
     tropes: getArray('trope'),
@@ -213,14 +217,7 @@ export function parseBookDNA(tags: string[] | undefined): BookDNA {
     narratorStyle: validate(getSimple('narrator-style'), VALID_NARRATOR_STYLE),
     production: validate(getSimple('production'), VALID_PRODUCTION),
 
-    moodScores: {
-      thrills: getMood('thrills'),
-      drama: getMood('drama'),
-      laughs: getMood('laughs'),
-      wonder: getMood('wonder'),
-      heart: getMood('heart'),
-      ideas: getMood('ideas'),
-    },
+    moodScores,
 
     comparableTitles: getArray('comparable'),
     vibe: getSimple('vibe'),
@@ -265,15 +262,7 @@ export function getDNAQuality(dna: BookDNA): 'excellent' | 'good' | 'minimal' | 
  * Check if DNA has mood scores (the most important for mood matching).
  */
 export function hasMoodScores(dna: BookDNA): boolean {
-  const scores = dna.moodScores;
-  return (
-    scores.thrills !== null ||
-    scores.drama !== null ||
-    scores.laughs !== null ||
-    scores.wonder !== null ||
-    scores.heart !== null ||
-    scores.ideas !== null
-  );
+  return Object.keys(dna.moodScores).length > 0;
 }
 
 // ============================================================================
@@ -281,28 +270,35 @@ export function hasMoodScores(dna: BookDNA): boolean {
 // ============================================================================
 
 /**
- * Maps quiz moods to BookDNA mood score keys.
- * Quiz uses different names than BookDNA for UX reasons.
- * Note: Mood type has 4 values (comfort, thrills, escape, feels).
- * BookDNA has 6 mood scores (thrills, drama, laughs, wonder, heart, ideas).
+ * Maps quiz moods to arrays of actual DNA mood keys.
+ * Quiz uses 4 broad categories; DNA has 40+ specific mood names.
+ * Returns the max score across matching keys for the quiz mood.
  */
-export const QUIZ_MOOD_TO_DNA_MOOD: Record<Mood, keyof BookDNA['moodScores']> = {
-  thrills: 'thrills',
-  comfort: 'heart',    // "comfort" maps to "heart" in DNA
-  feels: 'drama',      // "feels" maps to "drama" in DNA
-  escape: 'wonder',    // "escape" maps to "wonder" in DNA
+export const QUIZ_MOOD_TO_DNA_KEYS: Record<Mood, string[]> = {
+  thrills: ['tension', 'suspenseful', 'dread', 'propulsive', 'dark'],
+  comfort: ['warmth', 'hope', 'whimsical', 'funny', 'humor'],
+  feels: ['emotional', 'melancholy', 'romance', 'warmth', 'hope'],
+  escape: ['adventure', 'wonder', 'whimsical', 'mysterious'],
 };
 
 /**
  * Get the DNA mood score for a quiz mood selection.
+ * Returns the highest score among the matching mood keys.
  *
  * @param dna - Parsed BookDNA
  * @param quizMood - User's selected mood from the quiz
- * @returns Score (0-1) or null if not available
+ * @returns Score (0-1) or null if no matching moods
  */
 export function getDNAMoodScore(dna: BookDNA, quizMood: Mood): number | null {
-  const dnaKey = QUIZ_MOOD_TO_DNA_MOOD[quizMood];
-  return dna.moodScores[dnaKey];
+  const keys = QUIZ_MOOD_TO_DNA_KEYS[quizMood];
+  let maxScore: number | null = null;
+  for (const key of keys) {
+    const score = dna.moodScores[key];
+    if (score !== undefined) {
+      if (maxScore === null || score > maxScore) maxScore = score;
+    }
+  }
+  return maxScore;
 }
 
 // ============================================================================
@@ -632,8 +628,8 @@ export function getDNASummary(dna: BookDNA): string[] {
 
   // Primary mood
   const moodScores = Object.entries(dna.moodScores)
-    .filter(([_, score]) => score !== null && score >= 0.5)
-    .sort((a, b) => (b[1] || 0) - (a[1] || 0));
+    .filter(([_, score]) => score >= 0.5)
+    .sort((a, b) => b[1] - a[1]);
 
   if (moodScores.length > 0) {
     const primaryMood = moodScores[0][0];
@@ -713,10 +709,10 @@ export function calculateDNACompleteness(dna: BookDNA): number {
   const maxScore = 100;
 
   // Mood scores (30 points max)
-  const moodCount = Object.values(dna.moodScores).filter(v => v !== null).length;
+  const moodCount = Object.keys(dna.moodScores).length;
   score += Math.min(moodCount * 5, 30);
 
-  // Spectrums (18 points max)
+  // Spectrums (21 points max — 7 spectrums × 3)
   const spectrumCount = Object.values(dna.spectrums).filter(v => v !== null).length;
   score += spectrumCount * 3;
 

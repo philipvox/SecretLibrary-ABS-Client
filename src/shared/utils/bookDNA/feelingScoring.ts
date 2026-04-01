@@ -69,58 +69,63 @@ export function scoreFeelingChip(item: LibraryItem, chip: FeelingChip): number {
 
   let score = 0;
 
+  // Helper to get a mood score from the dynamic mood map
+  const mood = (key: string) => dna.moodScores[key] ?? 0;
+  const hasMood = (key: string, threshold: number) => mood(key) >= threshold;
+  const hasAnyMood = (keys: string[], threshold: number) => keys.some(k => hasMood(k, threshold));
+
   switch (chip) {
     case 'thrilling':
-      if ((dna.moodScores.thrills ?? 0) >= 0.6) score += 2;
+      if (hasAnyMood(['tension', 'suspenseful', 'dread', 'propulsive'], 0.6)) score += 2;
       if (hasAnyGenre(genres, ['thriller', 'suspense', 'mystery'])) score += 1;
       if (hasAnyTag(plainTags, ['suspenseful', 'tense'])) score += 1;
       if ((dna.spectrums.darkLight ?? 0) < -0.3) score += 1;
       break;
 
     case 'funny':
-      if ((dna.moodScores.laughs ?? 0) >= 0.5) score += 2;
+      if (hasAnyMood(['funny', 'humor', 'whimsical'], 0.5)) score += 2;
       if (hasAnyGenre(genres, ['humor', 'comedy', 'satire'])) score += 1;
       if (hasAnyTag(plainTags, ['funny', 'lighthearted', 'witty'])) score += 1;
-      if ((dna.spectrums.seriousHumorous ?? 0) > 0.3) score += 1;
+      if ((dna.spectrums.seriousFunny ?? 0) > 0.3) score += 1;
       break;
 
     case 'dark':
       if ((dna.spectrums.darkLight ?? 0) < -0.5) score += 2;
       if (hasAnyGenre(genres, ['horror', 'gothic', 'noir', 'crime'])) score += 1;
       if (hasAnyTag(plainTags, ['dark', 'haunting', 'gritty'])) score += 1;
-      if ((dna.moodScores.thrills ?? 0) >= 0.5) score += 1;
+      if (hasAnyMood(['tension', 'dread', 'dark'], 0.5)) score += 1;
       break;
 
     case 'heartwarming':
-      if ((dna.moodScores.heart ?? 0) >= 0.6) score += 2;
+      if (hasAnyMood(['warmth', 'hope', 'romance'], 0.6)) score += 2;
       if (hasAnyGenre(genres, ['romance', 'family'])) score += 1;
       if (hasAnyTag(plainTags, ['heartwarming', 'uplifting', 'feel-good'])) score += 1;
-      if ((dna.moodScores.drama ?? 0) >= 0.4) score += 1;
+      if (hasAnyMood(['emotional', 'inspiring'], 0.4)) score += 1;
       break;
 
     case 'escapist':
-      if ((dna.moodScores.wonder ?? 0) >= 0.6) score += 2;
+      if (hasAnyMood(['adventure', 'wonder', 'whimsical'], 0.6)) score += 2;
       if (hasAnyGenre(genres, ['fantasy', 'sci-fi', 'science fiction', 'adventure'])) score += 1;
       if (hasAnyTag(plainTags, ['adventurous', 'whimsical', 'escapist'])) score += 1;
       if ((dna.spectrums.darkLight ?? 0) > 0.3) score += 1;
       break;
 
     case 'thought-provoking':
-      if ((dna.moodScores.ideas ?? 0) >= 0.5) score += 2;
+      if (hasAnyMood(['thought-provoking', 'inspiring'], 0.5)) score += 2;
       if (hasAnyGenre(genres, ['literary', 'literary fiction', 'philosophy', 'history'])) score += 1;
       if (hasAnyTag(plainTags, ['thought-provoking', 'inspiring'])) score += 1;
-      if ((dna.spectrums.seriousHumorous ?? 0) < -0.3) score += 1;
+      if ((dna.spectrums.seriousFunny ?? 0) < -0.3) score += 1;
       break;
 
     case 'cozy':
       if (hasAnyTag(plainTags, ['cozy', 'lighthearted', 'feel-good'])) score += 2;
       if (hasAnyGenre(genres, ['romance', 'cozy mystery', 'cozy'])) score += 1;
-      if ((dna.moodScores.heart ?? 0) >= 0.4) score += 1;
+      if (hasAnyMood(['warmth', 'whimsical', 'hope'], 0.4)) score += 1;
       if ((dna.spectrums.darkLight ?? 0) > 0.2) score += 1;
       break;
 
     case 'intense':
-      if ((dna.moodScores.thrills ?? 0) >= 0.5 && (dna.moodScores.drama ?? 0) >= 0.5) score += 2;
+      if (hasAnyMood(['tension', 'propulsive'], 0.5) && hasAnyMood(['emotional', 'dread', 'suspenseful'], 0.5)) score += 2;
       if (hasAnyGenre(genres, ['thriller', 'war', 'crime'])) score += 1;
       if (hasAnyTag(plainTags, ['intense', 'tense', 'suspenseful'])) score += 1;
       if ((dna.spectrums.darkLight ?? 0) < -0.2) score += 1;

@@ -10,7 +10,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { ChevronRight } from 'lucide-react-native';
 import { secretLibraryColors as colors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { scale, wp } from '@/shared/theme';
+import { scale, wp, wpCapped } from '@/shared/theme';
 import { formatCompVibe } from '@/shared/utils/bookDNA';
 import { apiClient } from '@/core/api';
 
@@ -21,7 +21,7 @@ interface VibeCardProps {
   onPress: (slug: string) => void;
 }
 
-const CARD_WIDTH = wp(100) * 0.68;
+const CARD_WIDTH = wpCapped(100) * 0.68;
 const THUMB_SIZE = scale(42);
 
 export const VibeCard = React.memo(function VibeCard({ slug, bookCount, bookIds, onPress }: VibeCardProps) {

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { usePlayerStore, useCurrentChapterIndex, useSleepTimer } from '../stores';
+import { useSleepTimerStore } from '../stores/sleepTimerStore';
 import { haptics } from '@/core/native/haptics';
 import { scale } from '@/shared/theme';
 import {
@@ -86,8 +87,15 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
   const clearSleepTimer = usePlayerStore((s) => s.clearSleepTimer);
   const chapterIndex = useCurrentChapterIndex();
 
-  // Local state
-  const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
+  // Timer memory
+  const lastTimerMinutes = useSleepTimerStore((s) => s.lastTimerMinutes);
+  const lastTimerType = useSleepTimerStore((s) => s.lastTimerType);
+  const setLastTimer = useSleepTimerStore((s) => s.setLastTimer);
+
+  // Local state - initialize from memory if no timer is active
+  const [selectedMinutes, setSelectedMinutes] = useState<number | null>(
+    !sleepTimer && lastTimerType === 'minutes' ? lastTimerMinutes : null
+  );
   const [timerMode, setTimerMode] = useState<TimerMode>(null);
   const [customHours, setCustomHours] = useState('0');
   const [customMins, setCustomMins] = useState('0');
@@ -157,9 +165,9 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
     haptics.selection();
     setSelectedMinutes(minutes);
     setTimerMode('minutes');
-    // Immediately set the timer
     setSleepTimer(minutes);
-  }, [setSleepTimer]);
+    setLastTimer(minutes, 'minutes');
+  }, [setSleepTimer, setLastTimer]);
 
   const handleEndOfChapter = useCallback(() => {
     haptics.selection();
@@ -168,8 +176,9 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
     setSelectedMinutes(null);
     if (chapterRemaining > 0) {
       setSleepTimer(chapterRemaining);
+      setLastTimer(chapterRemaining, 'end-of-chapter');
     }
-  }, [setSleepTimer, chapters, chapterIndex, position]);
+  }, [setSleepTimer, setLastTimer, chapters, chapterIndex, position]);
 
   const handleEndOfBook = useCallback(() => {
     haptics.selection();
@@ -179,8 +188,9 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
     setSelectedMinutes(null);
     if (totalMins > 0) {
       setSleepTimer(totalMins);
+      setLastTimer(totalMins, 'end-of-book');
     }
-  }, [setSleepTimer, duration, position]);
+  }, [setSleepTimer, setLastTimer, duration, position]);
 
   const handleCustomSet = useCallback(() => {
     const hours = parseInt(customHours) || 0;
@@ -192,7 +202,8 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
     setTimerMode('custom');
     setSelectedMinutes(null);
     setSleepTimer(totalMins);
-  }, [customHours, customMins, setSleepTimer]);
+    setLastTimer(totalMins, 'custom');
+  }, [customHours, customMins, setSleepTimer, setLastTimer]);
 
   const handleCancelTimer = useCallback(() => {
     haptics.impact('light');
@@ -241,18 +252,28 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
       </View>
 
       {/* Quick Set Options */}
-      <Text style={styles.sectionLabel}>Quick Set</Text>
+      <Text style={styles.sectionLabel}>
+        Quick Set
+        {!isTimerActive && lastTimerType === 'minutes' && lastTimerMinutes && (
+          <Text style={styles.lastUsedHint}> · last used {lastTimerMinutes} min</Text>
+        )}
+      </Text>
       <View style={styles.optionsGrid}>
         {QUICK_OPTIONS.map((option) => {
           const isSelected = timerMode === 'minutes' && selectedMinutes === option.value;
+          const isLastUsed = !isTimerActive && !timerMode && lastTimerType === 'minutes' && lastTimerMinutes === option.value;
           return (
             <TouchableOpacity
               key={option.value}
-              style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+              style={[
+                styles.optionButton,
+                isSelected && styles.optionButtonSelected,
+                isLastUsed && styles.optionButtonLastUsed,
+              ]}
               onPress={() => handleQuickSelect(option.value)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={`${option.label} ${option.unit === 'hr' ? (option.label === '1' ? 'hour' : 'hours') : 'minutes'}`}
+              accessibilityLabel={`${option.label} ${option.unit === 'hr' ? (option.label === '1' ? 'hour' : 'hours') : 'minutes'}${isLastUsed ? ', last used' : ''}`}
               accessibilityState={{ selected: isSelected }}
             >
               <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
@@ -518,6 +539,15 @@ const styles = StyleSheet.create({
   optionButtonSelected: {
     backgroundColor: colors.white,
     borderColor: colors.white,
+  },
+  optionButtonLastUsed: {
+    borderColor: colors.orange,
+  },
+  lastUsedHint: {
+    fontSize: scale(9),
+    color: colors.orange,
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   optionText: {
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),

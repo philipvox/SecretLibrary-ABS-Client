@@ -10,7 +10,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, useWindowDimensions } from 'react-native';
 import {
   secretLibraryColors as staticColors,
   secretLibraryFonts,
@@ -124,8 +124,11 @@ export function DiscoverMoreCard({
   onBookPress,
 }: DiscoverMoreCardProps) {
   const { width: screenWidth } = useWindowDimensions();
-  // The row height (spine height) becomes on-screen width after rotation
-  const SPINE_HEIGHT = screenWidth - CARD_MARGIN * 2;
+  // The row height (spine height) becomes on-screen width after rotation.
+  // On web, cap to a reasonable card size so spines don't stretch across
+  // the entire desktop viewport.
+  const effectiveWidth = Platform.OS === 'web' ? Math.min(screenWidth, 500) : screenWidth;
+  const SPINE_HEIGHT = effectiveWidth - CARD_MARGIN * 2;
   const colors = useSecretLibraryColors();
   const useServerSpines = useSpineCacheStore((s) => s.useServerSpines);
   const useCommunitySpines = useSpineCacheStore((s) => s.useCommunitySpines);
@@ -144,7 +147,7 @@ export function DiscoverMoreCard({
     onBookPress?.(book);
   }, [onBookPress]);
 
-  const booksToShow = recommendations.slice(0, 6);
+  const booksToShow = recommendations.slice(0, 3);
 
   // Pre-calculate dimensions for all spines with a common scale factor.
   // For server spines, use actual image dimensions so the layout matches
@@ -216,6 +219,7 @@ export function DiscoverMoreCard({
       <Pressable style={styles.titleSection} onPress={handleDiscoverPress} accessibilityLabel="Discover more books" accessibilityRole="button">
         <Text style={[styles.title, { color: colors.black }]}>Discover</Text>
         <Text style={[styles.titleItalic, { color: colors.black }]}>More →</Text>
+        <Text style={[styles.subtitle, { color: colors.black }]}>add books to your My Library playlist{'\n'}and watch your bookshelf grow</Text>
       </Pressable>
 
       {/* Container sized to post-rotation dimensions */}
@@ -278,6 +282,13 @@ const styles = StyleSheet.create({
     fontSize: scale(56),
     color: staticColors.black,
     lineHeight: scale(54),
+    textAlign: 'left',
+  },
+  subtitle: {
+    fontFamily: secretLibraryFonts.playfair.regular,
+    fontSize: scale(14),
+    opacity: 0.5,
+    marginTop: scale(4),
     textAlign: 'left',
   },
 });

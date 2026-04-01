@@ -33,7 +33,7 @@ No account needed. Install, point it at your AudiobookShelf server, and go.
 
 Secret Library is a mobile client for [AudiobookShelf](https://www.audiobookshelf.org/) — the open-source, self-hosted audiobook server. It connects to your ABS server and plays your books. Your data stays on your server. No analytics, no tracking, no third-party anything.
 
-This was vibe coded. I'm not a professional developer — I built this with AI assistance. But it's not a one-shot prompt. This is build 1,262, iterated over months of daily use. Every feature was planned, tested, broken, and fixed.
+This was vibe coded. I'm not a professional developer — I built this with AI assistance. But it's not a one-shot prompt. This is build 1,280, iterated over months of daily use. Every feature was planned, tested, broken, and fixed.
 
 It's opinionated. Some things are designed for how I listen, not for mass appeal. If that bothers you, fork it and make it yours.
 
@@ -89,7 +89,13 @@ The app works fine on its own. The Tagger makes your library discoverable. The s
 - Download books for offline listening
 - Background downloads with queue management
 - Progress syncs automatically when back online
+- Offline listening time tracked and reported to server on reconnect
 - Works in airplane mode, tunnels, dead zones
+
+### Real-Time Sync
+- WebSocket connection to ABS server for instant cross-device progress sync
+- Listen on the web UI, pick up your phone — position is already updated
+- Conflict-safe: active player is never interrupted by remote updates
 
 ### Car
 - CarPlay support (iOS)

@@ -498,6 +498,23 @@ class AndroidAudioService {
     return this.lastKnownGoodPosition;
   }
 
+  /**
+   * Query ExoPlayer's current position directly (not the cached value).
+   * Use this on pause to get the most accurate position before saving progress.
+   */
+  async getFreshPosition(): Promise<number> {
+    try {
+      const state = await requireExoPlayer().getCurrentState();
+      if (state && typeof state.position === 'number' && state.position > 0) {
+        this.lastKnownGoodPosition = state.position;
+        return state.position;
+      }
+    } catch (e) {
+      log('getFreshPosition failed, using lastKnownGoodPosition:', e);
+    }
+    return this.lastKnownGoodPosition;
+  }
+
   async getDuration(): Promise<number> {
     return this.totalDuration;
   }

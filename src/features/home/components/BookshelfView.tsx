@@ -10,6 +10,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { View, StyleSheet, FlatList, Platform } from 'react-native';
+import { useWebHorizontalScroll } from '@/shared/hooks/useWebHorizontalScroll';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -297,6 +298,9 @@ export function BookshelfView({
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [containerHeight, setContainerHeight] = useState(0);
+
+  // Web: enable mouse wheel + click-drag horizontal scrolling
+  const webScrollRef = useWebHorizontalScroll();
 
   const handleContainerLayout = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
     setContainerHeight(e.nativeEvent.layout.height);
@@ -625,29 +629,31 @@ export function BookshelfView({
           windowSize={5}
         />
       ) : (
-        <FlatList
-          horizontal
-          data={enrichedBooks}
-          renderItem={renderShelfItem}
-          keyExtractor={keyExtractor}
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.scrollContentShelf,
-            {
-              paddingRight: insets.right + SHELF_PADDING_H,
-              paddingBottom: 0,
-            },
-          ]}
-          showsHorizontalScrollIndicator={false}
-          ListFooterComponent={shelfFooter}
-          // Spines are narrow — keep a large window so scrolling back doesn't
-          // unmount/remount and cause visible image reloads
-          removeClippedSubviews={Platform.OS === 'android'}
-          maxToRenderPerBatch={15}
-          updateCellsBatchingPeriod={50}
-          initialNumToRender={15}
-          windowSize={21}
-        />
+        <View ref={webScrollRef} style={{ flex: 1 }}>
+          <FlatList
+            horizontal
+            data={enrichedBooks}
+            renderItem={renderShelfItem}
+            keyExtractor={keyExtractor}
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContentShelf,
+              {
+                paddingRight: insets.right + SHELF_PADDING_H,
+                paddingBottom: 0,
+              },
+            ]}
+            showsHorizontalScrollIndicator={Platform.OS === 'web'}
+            ListFooterComponent={shelfFooter}
+            // Spines are narrow — keep a large window so scrolling back doesn't
+            // unmount/remount and cause visible image reloads
+            removeClippedSubviews={Platform.OS === 'android'}
+            maxToRenderPerBatch={15}
+            updateCellsBatchingPeriod={50}
+            initialNumToRender={15}
+            windowSize={21}
+          />
+        </View>
       )}
     </View>
   );

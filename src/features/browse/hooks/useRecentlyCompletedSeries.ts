@@ -15,7 +15,7 @@
 import { useMemo } from 'react';
 import { useProgressStore } from '@/core/stores/progressStore';
 import { LibraryItem, BookMetadata, BookMedia } from '@/core/types';
-import { parseBookDNA, BookDNA, getDNAQuality } from '@/shared/utils/bookDNA';
+import { parseBookDNA, BookDNA, getDNAQuality, SPECTRUM_KEYS } from '@/shared/utils/bookDNA';
 import { useDNASettingsStore } from '@/shared/stores/dnaSettingsStore';
 
 function getMetadata(item: LibraryItem): BookMetadata | Record<string, never> {
@@ -66,17 +66,6 @@ function buildSeriesDNAProfile(books: LibraryItem[]): BookDNA | null {
     return { dna: d, weight };
   });
 
-  // Weighted average mood scores
-  const avgMood = (key: keyof BookDNA['moodScores']) => {
-    let sum = 0;
-    let w = 0;
-    for (const { dna, weight } of weighted) {
-      const val = dna.moodScores[key];
-      if (val !== null) { sum += val * weight; w += weight; }
-    }
-    return w > 0 ? sum / w : null;
-  };
-
   // Weighted average spectrum values
   const avgSpectrum = (key: keyof BookDNA['spectrums']) => {
     let sum = 0;
@@ -87,6 +76,22 @@ function buildSeriesDNAProfile(books: LibraryItem[]): BookDNA | null {
     }
     return w > 0 ? sum / w : null;
   };
+
+  // Collect all unique mood keys and compute weighted average for each
+  const allMoodKeys = new Set<string>();
+  for (const d of dnas) {
+    for (const key of Object.keys(d.moodScores)) allMoodKeys.add(key);
+  }
+  const avgMoods: Record<string, number> = {};
+  for (const key of allMoodKeys) {
+    let sum = 0;
+    let w = 0;
+    for (const { dna, weight } of weighted) {
+      const val = dna.moodScores[key];
+      if (val !== undefined) { sum += val * weight; w += weight; }
+    }
+    if (w > 0) avgMoods[key] = sum / w;
+  }
 
   // Collect all tropes/themes (union)
   const allTropes = new Set<string>();
@@ -118,25 +123,19 @@ function buildSeriesDNAProfile(books: LibraryItem[]): BookDNA | null {
     pubEra: null,
     spectrums: {
       darkLight: avgSpectrum('darkLight'),
-      seriousHumorous: avgSpectrum('seriousHumorous'),
-      denseAccessible: avgSpectrum('denseAccessible'),
+      seriousFunny: avgSpectrum('seriousFunny'),
       plotCharacter: avgSpectrum('plotCharacter'),
-      bleakHopeful: avgSpectrum('bleakHopeful'),
-      familiarChallenging: avgSpectrum('familiarChallenging'),
+      simpleComplex: avgSpectrum('simpleComplex'),
+      actionContemplative: avgSpectrum('actionContemplative'),
+      intimateEpicScope: avgSpectrum('intimateEpicScope'),
+      worldDensity: avgSpectrum('worldDensity'),
     },
     tropes: Array.from(allTropes),
     themes: Array.from(allThemes),
     settings: Array.from(allSettings),
     narratorStyle: null,
     production: null,
-    moodScores: {
-      thrills: avgMood('thrills'),
-      drama: avgMood('drama'),
-      laughs: avgMood('laughs'),
-      wonder: avgMood('wonder'),
-      heart: avgMood('heart'),
-      ideas: avgMood('ideas'),
-    },
+    moodScores: avgMoods,
     comparableTitles: [],
     vibe: null,
     hasDNA: true,
@@ -144,59 +143,75 @@ function buildSeriesDNAProfile(books: LibraryItem[]): BookDNA | null {
   };
 }
 
-/** Score how similar a book's DNA is to a series DNA profile (0-1) */
+/**
+ * Score how similar a book's DNA is to a series DNA profile (0-1).
+ *
+ * Uses FIXED maxScore (100) so missing dimensions penalize rather than
+ * being excluded. Without this, a book with no mood overlap but similar
+ * spectrums would score ~0.85 instead of ~0.25.
+ */
 function scoreDNASimilarity(bookDNA: BookDNA, seriesProfile: BookDNA): number {
   let score = 0;
-  let maxScore = 0;
+  const maxScore = 100;
 
-  // Mood similarity (weight: 40)
-  const moodKeys: (keyof BookDNA['moodScores'])[] = ['thrills', 'drama', 'laughs', 'wonder', 'heart', 'ideas'];
-  for (const key of moodKeys) {
-    const seriesVal = seriesProfile.moodScores[key];
-    const bookVal = bookDNA.moodScores[key];
-    if (seriesVal !== null && bookVal !== null) {
-      // Both have this mood — score by proximity (closer = higher)
-      const diff = Math.abs(seriesVal - bookVal);
-      score += (1 - diff) * 6.67; // ~40 total across 6 moods
-      maxScore += 6.67;
+  // Mood similarity (40 points) — dynamic mood keys
+  // If series has moods but book shares none, score stays 0/40
+  const seriesMoodKeys = Object.keys(seriesProfile.moodScores);
+  if (seriesMoodKeys.length > 0) {
+    const sharedMoodKeys = seriesMoodKeys
+      .filter((k) => bookDNA.moodScores[k] !== undefined);
+
+    if (sharedMoodKeys.length >= 2) {
+      let moodSim = 0;
+      for (const key of sharedMoodKeys) {
+        const diff = Math.abs(seriesProfile.moodScores[key] - bookDNA.moodScores[key]);
+        moodSim += 1 - diff;
+      }
+      score += (moodSim / sharedMoodKeys.length) * 40;
     }
+    // else: 0 points — no shared moods is a strong negative signal
   }
 
-  // Spectrum similarity (weight: 25)
-  const specKeys: (keyof BookDNA['spectrums'])[] = ['darkLight', 'seriousHumorous', 'denseAccessible', 'plotCharacter', 'bleakHopeful'];
-  for (const key of specKeys) {
+  // Spectrum similarity (25 points) — 7 spectrums
+  let spectrumScore = 0;
+  let spectrumCount = 0;
+  for (const key of SPECTRUM_KEYS) {
     const seriesVal = seriesProfile.spectrums[key];
     const bookVal = bookDNA.spectrums[key];
     if (seriesVal !== null && bookVal !== null) {
-      const diff = Math.abs(seriesVal - bookVal) / 2; // spectrums are -1 to 1, so range is 2
-      score += (1 - diff) * 5; // ~25 total across 5 spectrums
-      maxScore += 5;
+      const diff = Math.abs(seriesVal - bookVal) / 2; // range is 2
+      spectrumScore += 1 - diff;
+      spectrumCount++;
     }
   }
-
-  // Shared tropes (weight: 15)
-  if (seriesProfile.tropes.length > 0 && bookDNA.tropes.length > 0) {
-    const shared = bookDNA.tropes.filter((t) => seriesProfile.tropes.includes(t)).length;
-    const overlap = shared / Math.max(seriesProfile.tropes.length, 1);
-    score += overlap * 15;
-    maxScore += 15;
+  if (spectrumCount > 0) {
+    score += (spectrumScore / spectrumCount) * 25;
   }
 
-  // Shared themes (weight: 15)
-  if (seriesProfile.themes.length > 0 && bookDNA.themes.length > 0) {
-    const shared = bookDNA.themes.filter((t) => seriesProfile.themes.includes(t)).length;
-    const overlap = shared / Math.max(seriesProfile.themes.length, 1);
-    score += overlap * 15;
-    maxScore += 15;
+  // Shared tropes (15 points)
+  if (seriesProfile.tropes.length > 0) {
+    if (bookDNA.tropes.length > 0) {
+      const shared = bookDNA.tropes.filter((t) => seriesProfile.tropes.includes(t)).length;
+      score += (shared / seriesProfile.tropes.length) * 15;
+    }
+    // else: 0 points — series has tropes, book doesn't
   }
 
-  // Pacing match (weight: 5)
+  // Shared themes (15 points)
+  if (seriesProfile.themes.length > 0) {
+    if (bookDNA.themes.length > 0) {
+      const shared = bookDNA.themes.filter((t) => seriesProfile.themes.includes(t)).length;
+      score += (shared / seriesProfile.themes.length) * 15;
+    }
+    // else: 0 points — series has themes, book doesn't
+  }
+
+  // Pacing match (5 points)
   if (seriesProfile.pacing && bookDNA.pacing) {
     score += seriesProfile.pacing === bookDNA.pacing ? 5 : 0;
-    maxScore += 5;
   }
 
-  return maxScore > 0 ? score / maxScore : 0;
+  return score / maxScore;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -341,26 +356,26 @@ export function useRecentlyCompletedSeries(
       // Skip mid-series books unless user has read preceding entries
       if (!isSeriesEntryPoint(item)) continue;
 
+      // Genre check (used as gate for DNA and as fallback)
+      const metadata = getMetadata(item);
+      const genres = (metadata.genres || []).map((g: string) => g.toLowerCase());
+      const genreMatchCount = topSeries.genres.filter((g) => genres.includes(g)).length;
+
       let score = 0;
 
       if (seriesDNAProfile) {
-        // DNA matching (high confidence)
         const bookDNA = parseBookDNA(getTags(item));
-        if (bookDNA.hasDNA) {
-          score = scoreDNASimilarity(bookDNA, seriesDNAProfile);
-        } else {
-          // Book has no DNA — fall back to genre matching with lower weight
-          const metadata = getMetadata(item);
-          const genres = (metadata.genres || []).map((g: string) => g.toLowerCase());
-          const matchCount = topSeries.genres.filter((g) => genres.includes(g)).length;
-          score = matchCount >= 2 ? 0.2 + (matchCount * 0.05) : 0; // Low base score for genre-only
+        if (bookDNA.hasDNA && genreMatchCount >= 1) {
+          // DNA matching gated by at least 1 shared genre
+          const rawScore = scoreDNASimilarity(bookDNA, seriesDNAProfile);
+          score = rawScore >= 0.3 ? rawScore : 0;
+        } else if (genreMatchCount >= 2) {
+          // No DNA or no genre overlap — fall back to genre-only with lower weight
+          score = 0.2 + (genreMatchCount * 0.05);
         }
       } else {
         // No series DNA — pure genre matching (require 2+)
-        const metadata = getMetadata(item);
-        const genres = (metadata.genres || []).map((g: string) => g.toLowerCase());
-        const matchCount = topSeries.genres.filter((g) => genres.includes(g)).length;
-        score = matchCount >= 2 ? 0.3 + (matchCount * 0.1) : 0;
+        score = genreMatchCount >= 2 ? 0.3 + (genreMatchCount * 0.1) : 0;
       }
 
       if (score > 0) {

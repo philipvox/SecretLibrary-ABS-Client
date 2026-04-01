@@ -22,6 +22,8 @@ const ALL_BUILT_IN_KEYS: BuiltInViewKey[] = ['library', 'mySeries', 'lastPlayed'
 interface PlaylistSettingsState {
   // Which playlists to show in VIEW dropdown (by ID)
   visiblePlaylistIds: string[];
+  // Playlists explicitly hidden by user (not shown, won't auto-re-add)
+  hiddenPlaylistIds: string[];
   // Order of playlists in dropdown (subset of visiblePlaylistIds)
   playlistOrder: string[];
   // Default view when opening Library screen
@@ -42,7 +44,7 @@ interface PlaylistSettingsState {
   movePlaylist: (fromIndex: number, toIndex: number) => void;
   isBuiltInVisible: (key: BuiltInViewKey) => boolean;
 
-  // Sync visible playlists with available playlists (removes deleted ones)
+  // Sync visible playlists with available playlists (removes deleted, auto-adds new)
   syncWithAvailablePlaylists: (availableIds: string[]) => void;
 }
 
@@ -50,6 +52,7 @@ export const usePlaylistSettingsStore = create<PlaylistSettingsState>()(
   persist(
     (set, get) => ({
       visiblePlaylistIds: [],
+      hiddenPlaylistIds: [],
       playlistOrder: [],
       defaultView: 'library',
       hiddenBuiltInViews: [],
@@ -64,17 +67,19 @@ export const usePlaylistSettingsStore = create<PlaylistSettingsState>()(
       },
 
       togglePlaylistVisibility: (playlistId) => {
-        const { visiblePlaylistIds, playlistOrder } = get();
+        const { visiblePlaylistIds, hiddenPlaylistIds, playlistOrder } = get();
         const isVisible = visiblePlaylistIds.includes(playlistId);
 
         if (isVisible) {
           set({
             visiblePlaylistIds: visiblePlaylistIds.filter(id => id !== playlistId),
+            hiddenPlaylistIds: [...hiddenPlaylistIds.filter(id => id !== playlistId), playlistId],
             playlistOrder: playlistOrder.filter(id => id !== playlistId),
           });
         } else {
           set({
             visiblePlaylistIds: [...visiblePlaylistIds, playlistId],
+            hiddenPlaylistIds: hiddenPlaylistIds.filter(id => id !== playlistId),
             playlistOrder: [...playlistOrder, playlistId],
           });
         }
@@ -140,16 +145,29 @@ export const usePlaylistSettingsStore = create<PlaylistSettingsState>()(
       },
 
       syncWithAvailablePlaylists: (availableIds) => {
-        const { visiblePlaylistIds, playlistOrder, allItemOrder, defaultView } = get();
+        const { visiblePlaylistIds, hiddenPlaylistIds, playlistOrder, allItemOrder, defaultView } = get();
         const availableSet = new Set(availableIds);
+        const visibleSet = new Set(visiblePlaylistIds);
+        const hiddenSet = new Set(hiddenPlaylistIds);
 
+        // Remove deleted playlists
         const newVisibleIds = visiblePlaylistIds.filter(id => availableSet.has(id));
+        const newHiddenIds = hiddenPlaylistIds.filter(id => availableSet.has(id));
         const newOrder = playlistOrder.filter(id => availableSet.has(id));
         const newAllOrder = allItemOrder.filter(id =>
           ALL_BUILT_IN_KEYS.includes(id as BuiltInViewKey) ||
           ALL_BUILT_IN_KEYS.includes(id.replace('__', '') as BuiltInViewKey) ||
           availableSet.has(id)
         );
+
+        // Auto-add newly created playlists (not previously visible or explicitly hidden)
+        for (const id of availableIds) {
+          if (!visibleSet.has(id) && !hiddenSet.has(id)) {
+            newVisibleIds.push(id);
+            newOrder.push(id);
+            newAllOrder.push(id);
+          }
+        }
 
         let newDefaultView = defaultView;
         if (defaultView.startsWith('playlist:')) {
@@ -161,6 +179,7 @@ export const usePlaylistSettingsStore = create<PlaylistSettingsState>()(
 
         set({
           visiblePlaylistIds: newVisibleIds,
+          hiddenPlaylistIds: newHiddenIds,
           playlistOrder: newOrder,
           allItemOrder: newAllOrder,
           defaultView: newDefaultView,

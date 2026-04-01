@@ -99,6 +99,25 @@ interface ProgressStoreActions {
   ) => Promise<void>;
 
   /**
+   * Update progress from a remote source (WebSocket, server sync).
+   * Writes directly to SQLite with progress_synced=1 to prevent sync-back loops.
+   * Bypasses the pendingWrites debounce queue.
+   *
+   * @param bookId - Book ID
+   * @param currentTime - Position in seconds
+   * @param duration - Total duration in seconds
+   * @param isFinished - Whether the book is finished on the server
+   * @param serverTimestamp - Server's lastUpdate timestamp (seconds since epoch)
+   */
+  updateProgressFromRemote: (
+    bookId: string,
+    currentTime: number,
+    duration: number,
+    isFinished: boolean,
+    serverTimestamp: number
+  ) => Promise<void>;
+
+  /**
    * Mark a book as finished.
    * Sets progress to 1.0 and isFinished to true.
    */
@@ -280,6 +299,64 @@ export const useProgressStore = create<ProgressStoreState & ProgressStoreActions
         if (writeToSqlite) {
           pendingWrites.set(bookId, progressData);
           scheduledFlush();
+        }
+      },
+
+      updateProgressFromRemote: async (
+        bookId: string,
+        currentTime: number,
+        duration: number,
+        isFinished: boolean,
+        serverTimestamp: number
+      ) => {
+        const progress = duration > 0 ? currentTime / duration : 0;
+        // Server timestamp is in seconds, convert to milliseconds
+        const lastPlayedAt = serverTimestamp * 1000;
+
+        // Preserve existing library membership
+        const existing = get().progressMap.get(bookId);
+
+        const progressData: ProgressData = {
+          bookId,
+          currentTime,
+          duration,
+          progress,
+          lastPlayedAt,
+          isFinished,
+          isInLibrary: existing?.isInLibrary ?? false,
+          addedToLibraryAt: existing?.addedToLibraryAt ?? null,
+        };
+
+        // Update in-memory state immediately
+        const { progressMap } = get();
+        progressMap.set(bookId, progressData);
+        set({ version: get().version + 1 });
+
+        // Write directly to SQLite with fromServer=true (sets progress_synced=1,
+        // preventing backgroundSyncService from syncing this back to the server)
+        try {
+          await sqliteCache.updateUserBookProgress(
+            bookId,
+            currentTime,
+            duration,
+            0, // currentTrackIndex (not provided by WebSocket)
+            true // fromServer — sets progress_synced=1
+          );
+
+          // If server says finished but we didn't know, update finish status
+          if (isFinished && !existing?.isFinished) {
+            await sqliteCache.setUserBook({
+              bookId,
+              isFinished: true,
+              finishSource: 'remote',
+              finishedAt: new Date(lastPlayedAt).toISOString(),
+              finishedSynced: true, // Already synced — came from server
+            });
+          }
+
+          log.debug(`Remote progress update for ${bookId}: ${currentTime.toFixed(1)}s (${(progress * 100).toFixed(1)}%)`);
+        } catch (error) {
+          log.error(`Failed to write remote progress for ${bookId}:`, error);
         }
       },
 

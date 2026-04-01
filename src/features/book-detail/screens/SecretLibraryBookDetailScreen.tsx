@@ -969,6 +969,30 @@ export function SecretLibraryBookDetailScreen() {
     }
   }, [bookId, currentTime, duration, liveServerProgress, isThisBookLoaded, queryClient, refetch]);
 
+  // Sync to a specific position from the listening log
+  const handleSessionPositionSync = useCallback(async (targetTime: number) => {
+    const targetProgress = duration > 0 ? targetTime / duration : 0;
+    try {
+      await sqliteCache.updateUserBookProgress(bookId, targetTime, duration, 0, true);
+      await apiClient.updateProgress(bookId, {
+        currentTime: targetTime,
+        duration,
+        progress: targetProgress,
+      });
+      setLiveServerProgress({ currentTime: targetTime, progress: targetProgress });
+      queryClient.invalidateQueries({ queryKey: userBooksKeys.one(bookId) });
+      refetch();
+      if (isThisBookLoaded) {
+        const { seekTo } = usePlayerStore.getState();
+        seekTo(targetTime);
+      }
+      haptics.success();
+    } catch (e: unknown) {
+      logger.warn('handleSessionPositionSync failed:', e);
+      Alert.alert('Sync Failed', 'Could not update position. Try again.');
+    }
+  }, [bookId, duration, isThisBookLoaded, queryClient, refetch]);
+
   // Get normalized chapter names
   const normalizedChapters = useNormalizedChapters(chapters, { bookTitle: title });
 
@@ -1071,283 +1095,8 @@ export function SecretLibraryBookDetailScreen() {
     );
   }
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.white }]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.white} />
-
-      {/* Fixed header — stays in place during series swipe */}
-      <TopNav
-        variant={isDarkMode ? 'dark' : 'light'}
-        showLogo={true}
-        onLogoPress={handleLogoPress}
-        style={{ backgroundColor: colors.white }}
-        pills={[
-          {
-            key: 'library',
-            label: isInLibrary ? 'In Library' : 'Add to Library',
-            icon: isInLibrary
-              ? <LibraryCheckIcon color={colors.white} size={12} />
-              : <LibraryPlusIcon color={colors.black} size={10} />,
-            active: isInLibrary,
-            onPress: handleLibraryToggle,
-          },
-          {
-            key: 'queue',
-            label: isInQueue ? 'Queued' : 'Queue',
-            icon: isInQueue
-              ? <QueueCheckIcon color={colors.white} size={10} />
-              : <QueueIcon color={colors.black} size={10} />,
-            active: isInQueue,
-            onPress: handleQueueToggle,
-          },
-        ]}
-        circleButtons={[
-          {
-            key: 'share',
-            icon: <TopNavShareIcon color={colors.black} size={14} />,
-            onPress: handleShare,
-          },
-          {
-            key: 'back',
-            icon: <TopNavBackIcon color={colors.black} size={14} />,
-            onPress: handleClose,
-          },
-        ]}
-      />
-
-      <SeriesSwipeContainer book={book}>
-        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.scrollView}
-            contentContainerStyle={{ paddingBottom: insets.bottom + scale(40) }}
-            showsVerticalScrollIndicator={false}
-          >
-
-        {/* Hero Section - Centered Cover */}
-        <View style={styles.hero}>
-          {/* Centered Cover - Double-tap to place/remove gold star */}
-          <GestureDetector gesture={doubleTapGesture}>
-          <Animated.View style={styles.heroCover}>
-            {coverUrl ? (
-              <Image
-                source={{ uri: coverUrl }}
-                placeholder={coverPlaceholderUrl ? { uri: coverPlaceholderUrl } : undefined}
-                placeholderContentFit="cover"
-                style={styles.coverImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={0}
-              />
-            ) : (
-              <View style={[styles.coverImage, styles.coverPlaceholder]}>
-                <Text style={styles.coverPlaceholderText}>
-                  {title.substring(0, 3).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            {/* Gold star sticker overlays */}
-            <CoverStarStickers stars={stars} />
-          </Animated.View>
-          </GestureDetector>
-
-          {/* Title with Series Navigation Arrows */}
-          <View style={styles.titleContainer}>
-            <SeriesNavigationArrows />
-            <Text
-              style={[
-                styles.titleLine1,
-                {
-                  fontFamily: titleFontFamily,
-                  fontWeight: titleFontWeight,
-                  color: colors.black,
-                }
-              ]}
-              numberOfLines={3}
-            >
-              {title}
-            </Text>
-          </View>
-
-          {/* Byline: Author · Narrator (matches player format) */}
-          <View style={styles.byline}>
-            <TouchableOpacity
-              onPress={() => {
-                haptics.selection();
-                navigation.navigate('AuthorDetail', { authorName: author.split(',')[0].trim() });
-              }}
-              activeOpacity={0.7}
-              accessibilityRole="link"
-              accessibilityLabel={`Go to author ${author}`}
-            >
-              <Text style={[styles.bylineText, { color: colors.gray }]}>{author}</Text>
-            </TouchableOpacity>
-            {narrator ? (
-              <>
-                <Text style={[styles.bylineDot, { color: colors.gray }]}>  ·  </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    haptics.selection();
-                    navigation.navigate('NarratorDetail', { narratorName: narrator.split(',')[0].trim() });
-                  }}
-                  activeOpacity={0.7}
-                  accessibilityRole="link"
-                  accessibilityLabel={`Go to narrator ${narrator}`}
-                >
-                  <Text style={[styles.bylineText, { color: colors.gray }]}>{narrator}</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-          </View>
-
-          {/* Series link */}
-          {seriesInfo && (
-            <View style={styles.byline}>
-              <TouchableOpacity onPress={handleSeriesPress} activeOpacity={0.7} accessibilityRole="link" accessibilityLabel={`Go to series ${seriesInfo.name}`}>
-                <Text style={[styles.bylineText, { color: colors.gray }]}>
-                  {seriesInfo.name}{seriesInfo.sequence ? ` · Book ${seriesInfo.sequence}` : ''}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Meta Grid: Duration | Chapters (clickable) | Year */}
-        <View style={[styles.metaGrid, { borderColor: colors.grayLine }]}>
-          <View style={styles.metaItem}>
-            <Text style={[styles.metaLabel, { color: colors.gray }]}>Duration</Text>
-            <Text style={[styles.metaValue, { color: colors.black }]}>{formattedDuration}</Text>
-          </View>
-          <TouchableOpacity style={[styles.metaItemCenter, { borderColor: colors.grayLine }]} onPress={handleScrollToChapters} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${chapterCount} chapters, scroll to chapter list`}>
-            <Text style={[styles.metaLabel, { color: colors.gray }]}>Chapters</Text>
-            <Text style={[styles.metaValue, styles.metaValueLink, { color: colors.black }]}>{chapterCount}</Text>
-          </TouchableOpacity>
-          <View style={styles.metaItem}>
-            <Text style={[styles.metaLabel, { color: colors.gray }]}>Published</Text>
-            <Text style={[styles.metaValue, { color: colors.black }]}>{publishedYear || '—'}</Text>
-          </View>
-        </View>
-
-        {/* Action Buttons: Play + Download */}
-        <View style={styles.actionRow}>
-          {/* Play Button - 30% width */}
-          <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black }]} onPress={handlePlay} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={isThisBookPlaying ? `Pause ${title}` : `Play ${title}`}>
-            {isThisBookPlaying ? <PauseIcon color={colors.white} size={16} /> : <PlayIcon color={colors.white} size={16} />}
-            <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>
-              {isThisBookPlaying ? 'Pause' : 'Play'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Download Button - 70% width - supports pause/resume */}
-          <TouchableOpacity
-            style={[
-              styles.btnDownload,
-              { borderColor: colors.black },
-              isDownloaded && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }],
-              (isDownloading || isPaused || isWaitingWifi) && { backgroundColor: '#FFFFFF' },
-            ]}
-            onPress={handleDownload}
-            disabled={isDownloaded}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={isDownloaded ? `${title} downloaded` : isDownloading ? `Downloading ${title}, ${Math.round(downloadProgress * 100)}%` : isPaused ? `Download paused, ${Math.round(downloadProgress * 100)}%` : isWaitingWifi ? `Waiting for WiFi to download ${title}` : isPending ? `Download queued for ${title}` : `Download ${title}`}
-            accessibilityState={{ disabled: isDownloaded }}
-          >
-            {isDownloaded ? (
-              <>
-                <CheckIcon color={colors.white} size={16} />
-                <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text>
-              </>
-            ) : isPaused || isDownloading ? (
-              <Text style={[styles.btnText, { color: '#000' }]}>
-                {isPaused ? 'Paused' : 'Downloading'} {Math.round(downloadProgress * 100)}%
-              </Text>
-            ) : isWaitingWifi ? (
-              <Text style={[styles.btnText, { color: colors.black }]}>Waiting for WiFi</Text>
-            ) : isPending ? (
-              <Text style={[styles.btnText, { color: colors.black }]}>Queued</Text>
-            ) : (
-              <>
-                <DownloadIcon color={colors.black} size={16} />
-                <Text style={[styles.btnText, { color: colors.black }]}>Download</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Progress Section - Compact */}
-        <View style={styles.progressSection}>
-          {/* Progress header: left = label + %, right = mark as finished */}
-          <View style={styles.progressHeader}>
-            <View style={styles.progressLeft}>
-              <Text style={[styles.progressLabel, { color: colors.gray }]}>Progress</Text>
-              <Text style={[styles.progressPercent, { color: colors.black }]}>
-                {isFinished ? 'Complete' : `${progressPercent}%`}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.markFinishedBtn}
-              onPress={isFinished ? handleUnmarkFinished : handleMarkFinished}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={isFinished ? 'Unmark as finished' : 'Mark as finished'}
-            >
-              <Text style={[styles.markFinishedText, { color: colors.gray }]}>
-                {isFinished ? 'Unmark Finished' : 'Mark as Finished'}
-              </Text>
-              <DoubleCheckIcon color={isFinished ? colors.black : colors.gray} size={12} />
-            </TouchableOpacity>
-          </View>
-          {/* Progress bar */}
-          <View style={[styles.progressBar, { backgroundColor: colors.grayLine }]}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: colors.black }]} />
-          </View>
-          {/* Time stats with inline clear button */}
-          <View style={styles.progressTimes}>
-            <View style={styles.timeWithClear}>
-              <TouchableOpacity
-                onPress={handleClearProgress}
-                accessibilityRole="button"
-                accessibilityLabel="Clear progress"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <ResetIcon color={colors.gray} size={12} />
-              </TouchableOpacity>
-              <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeListened)} listened</Text>
-            </View>
-            <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeRemaining)} remaining</Text>
-          </View>
-        </View>
-
-        {/* About Section - with Drop Cap (3-box layout) */}
-        {description ? (
-          <DropCapParagraph
-            text={description}
-            expanded={descriptionExpanded}
-            onToggleExpand={() => setDescriptionExpanded(!descriptionExpanded)}
-            colors={colors}
-          />
-        ) : null}
-
-        {/* Genre Pills - Under About Section */}
-        {(metadata?.genres || []).length > 0 && (
-          <View style={styles.genreRow}>
-            {(metadata?.genres || []).map((genre: string, idx: number) => (
-              <TouchableOpacity
-                key={`genre-${idx}`}
-                style={[styles.genrePill, { borderColor: colors.grayLine }]}
-                onPress={() => handleGenrePress(genre)}
-                activeOpacity={0.7}
-                accessibilityRole="link"
-                accessibilityLabel={`Go to genre ${genre}`}
-              >
-                <Text style={[styles.genrePillText, { color: colors.gray }]}>{genre}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Chapters/Series Section */}
+  // Chapters/Series/Info tabs — extracted so it can render in both desktop right col and mobile layout
+  const chaptersTabsBlock = (
         <View
           style={styles.chaptersSection}
           onLayout={(e) => { chaptersYRef.current = e.nativeEvent.layout.y; }}
@@ -1453,6 +1202,7 @@ export function SecretLibraryBookDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+              <View style={Platform.OS === 'web' ? { flexDirection: 'row', flexWrap: 'wrap', columnGap: 24 } as any : undefined}>
               {visibleChapters.map((index) => {
                 const chapter = normalizedChapters[index];
                 const chapterStart = chapters[index]?.start ?? 0;
@@ -1464,7 +1214,7 @@ export function SecretLibraryBookDetailScreen() {
                 return (
                   <TouchableOpacity
                     key={index}
-                    style={[styles.chapterItem, { borderBottomColor: colors.grayLine }]}
+                    style={[styles.chapterItem, { borderBottomColor: colors.grayLine }, Platform.OS === 'web' && { width: 'calc(50% - 12px)' as any }]}
                     onPress={() => handleChapterPress(index)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
@@ -1511,6 +1261,7 @@ export function SecretLibraryBookDetailScreen() {
                   </TouchableOpacity>
                 );
               })}
+              </View>
             </>
           )}
 
@@ -1717,11 +1468,32 @@ export function SecretLibraryBookDetailScreen() {
                         const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
                         const listened = session.timeListening || 0;
                         const endPos = session.currentTime || 0;
-                        const startPos = endPos - listened;
+                        const startPos = Math.max(0, endPos - listened);
                         return (
                           <View key={session.id}>
                             {i > 0 && <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />}
-                            <View style={styles.sessionRow}>
+                            <TouchableOpacity
+                              style={styles.sessionRow}
+                              activeOpacity={0.6}
+                              onPress={() => {
+                                haptics.selection();
+                                Alert.alert(
+                                  'Sync to Session Position',
+                                  `Jump to a position from this session?`,
+                                  [
+                                    {
+                                      text: `Start (${formatDuration(startPos)})`,
+                                      onPress: () => handleSessionPositionSync(startPos),
+                                    },
+                                    {
+                                      text: `End (${formatDuration(endPos)})`,
+                                      onPress: () => handleSessionPositionSync(endPos),
+                                    },
+                                    { text: 'Cancel', style: 'cancel' },
+                                  ]
+                                );
+                              }}
+                            >
                               <View>
                                 <Text style={[styles.sessionDate, { color: colors.black }]}>{dateStr}</Text>
                                 <Text style={[styles.sessionTime, { color: colors.gray }]}>{timeStr}</Text>
@@ -1731,10 +1503,10 @@ export function SecretLibraryBookDetailScreen() {
                                   {formatDuration(listened)}
                                 </Text>
                                 <Text style={[styles.sessionRange, { color: colors.gray }]}>
-                                  {formatDuration(Math.max(0, startPos))} → {formatDuration(endPos)}
+                                  {formatDuration(startPos)} → {formatDuration(endPos)}
                                 </Text>
                               </View>
-                            </View>
+                            </TouchableOpacity>
                           </View>
                         );
                       })
@@ -1893,6 +1665,286 @@ export function SecretLibraryBookDetailScreen() {
             </View>
           )}
         </View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.white }]}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.white} />
+
+      {/* Fixed header — stays in place during series swipe */}
+      <TopNav
+        variant={isDarkMode ? 'dark' : 'light'}
+        showLogo={true}
+        onLogoPress={handleLogoPress}
+        style={{ backgroundColor: colors.white }}
+        pills={[
+          {
+            key: 'library',
+            label: isInLibrary ? 'In Library' : 'Add to Library',
+            icon: isInLibrary
+              ? <LibraryCheckIcon color={colors.white} size={12} />
+              : <LibraryPlusIcon color={colors.black} size={10} />,
+            active: isInLibrary,
+            onPress: handleLibraryToggle,
+          },
+          {
+            key: 'queue',
+            label: isInQueue ? 'Queued' : 'Queue',
+            icon: isInQueue
+              ? <QueueCheckIcon color={colors.white} size={10} />
+              : <QueueIcon color={colors.black} size={10} />,
+            active: isInQueue,
+            onPress: handleQueueToggle,
+          },
+        ]}
+        circleButtons={[
+          {
+            key: 'share',
+            icon: <TopNavShareIcon color={colors.black} size={14} />,
+            onPress: handleShare,
+          },
+          {
+            key: 'back',
+            icon: <TopNavBackIcon color={colors.black} size={14} />,
+            onPress: handleClose,
+          },
+        ]}
+      />
+
+      <SeriesSwipeContainer book={book}>
+        <SkullRefreshControl refreshing={isRefreshing} onRefresh={handleRefresh}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingBottom: insets.bottom + scale(40) }}
+            showsVerticalScrollIndicator={false}
+          >
+
+        {/* ============ DESKTOP WEB: Two-column layout ============ */}
+        {Platform.OS === 'web' && (
+        <View style={styles.desktopLayout}>
+          {/* LEFT COLUMN: Cover + Buttons */}
+          <View style={styles.desktopLeftCol}>
+            <GestureDetector gesture={doubleTapGesture}>
+            <Animated.View style={styles.desktopCover}>
+              {coverUrl ? (
+                <Image source={{ uri: coverUrl }} placeholder={coverPlaceholderUrl ? { uri: coverPlaceholderUrl } : undefined} placeholderContentFit="cover" style={styles.coverImage} contentFit="cover" cachePolicy="memory-disk" transition={0} />
+              ) : (
+                <View style={[styles.coverImage, styles.coverPlaceholder]}>
+                  <Text style={styles.coverPlaceholderText}>{title.substring(0, 3).toUpperCase()}</Text>
+                </View>
+              )}
+              <CoverStarStickers stars={stars} />
+            </Animated.View>
+            </GestureDetector>
+
+            {/* Buttons under cover */}
+            <View style={styles.desktopBtnRow}>
+              <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black, flex: 1 }]} onPress={handlePlay} activeOpacity={0.8}>
+                {isThisBookPlaying ? <PauseIcon color={colors.white} size={16} /> : <PlayIcon color={colors.white} size={16} />}
+                <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{isThisBookPlaying ? 'Pause' : 'Play'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnDownload, { borderColor: colors.black, flex: 1 }, isDownloaded && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }]]}
+                onPress={handleDownload} disabled={isDownloaded} activeOpacity={0.8}
+              >
+                {isDownloaded ? (
+                  <><CheckIcon color={colors.white} size={16} /><Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text></>
+                ) : (
+                  <><DownloadIcon color={colors.black} size={16} /><Text style={[styles.btnText, { color: colors.black }]}>Download</Text></>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* RIGHT COLUMN: Title, description, meta, progress */}
+          <View style={styles.desktopRightCol}>
+            {/* Title */}
+            <Text style={{ fontSize: 32, lineHeight: 38, fontFamily: titleFontFamily, fontWeight: titleFontWeight as any, color: colors.black, marginBottom: 8 }} numberOfLines={3}>{title}</Text>
+
+            {/* Author · Narrator */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+              <TouchableOpacity onPress={() => { haptics.selection(); navigation.navigate('AuthorDetail', { authorName: author.split(',')[0].trim() }); }} activeOpacity={0.7}>
+                <Text style={{ fontSize: 15, color: colors.gray }}>{author}</Text>
+              </TouchableOpacity>
+              {narrator ? (<><Text style={{ fontSize: 15, color: colors.gray }}>{'  ·  '}</Text><TouchableOpacity onPress={() => { haptics.selection(); navigation.navigate('NarratorDetail', { narratorName: narrator.split(',')[0].trim() }); }} activeOpacity={0.7}><Text style={{ fontSize: 15, color: colors.gray }}>{narrator}</Text></TouchableOpacity></>) : null}
+            </View>
+
+            {/* Series */}
+            {seriesInfo && (
+              <TouchableOpacity onPress={handleSeriesPress} activeOpacity={0.7} style={{ marginBottom: 4 }}>
+                <Text style={{ fontSize: 14, color: colors.gray }}>{seriesInfo.name}{seriesInfo.sequence ? ` · Book ${seriesInfo.sequence}` : ''}</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Meta stats */}
+            <View style={[styles.metaRowDesktop, { marginTop: 12, marginBottom: 20 }]}>
+              <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{formattedDuration}</Text>
+              <Text style={[styles.metaDotDesktop, { color: colors.grayLine }]}>·</Text>
+              <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{chapterCount} chapters</Text>
+              <Text style={[styles.metaDotDesktop, { color: colors.grayLine }]}>·</Text>
+              <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{publishedYear || '—'}</Text>
+            </View>
+
+            {/* Description */}
+            {description ? (
+              <DropCapParagraph text={description} expanded={descriptionExpanded} onToggleExpand={() => setDescriptionExpanded(!descriptionExpanded)} colors={colors} />
+            ) : null}
+
+            {/* Genre Pills */}
+            {(metadata?.genres || []).length > 0 && (
+              <View style={[styles.genreRow, { paddingHorizontal: 0, marginTop: 12, marginBottom: 20 }]}>
+                {(metadata?.genres || []).map((genre: string, idx: number) => (
+                  <TouchableOpacity key={`genre-${idx}`} style={[styles.genrePill, { borderColor: colors.grayLine }]} onPress={() => handleGenrePress(genre)} activeOpacity={0.7}>
+                    <Text style={[styles.genrePillText, { color: colors.gray }]}>{genre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Progress */}
+            <View style={[styles.progressSection, { marginBottom: 8 }]}>
+              <View style={styles.progressHeader}>
+                <View style={styles.progressLeft}>
+                  <Text style={[styles.progressLabel, { color: colors.gray }]}>Progress</Text>
+                  <Text style={[styles.progressPercent, { color: colors.black }]}>{isFinished ? 'Complete' : `${progressPercent}%`}</Text>
+                </View>
+                <TouchableOpacity style={styles.markFinishedBtn} onPress={isFinished ? handleUnmarkFinished : handleMarkFinished} activeOpacity={0.7}>
+                  <Text style={[styles.markFinishedText, { color: colors.gray }]}>{isFinished ? 'Unmark Finished' : 'Mark as Finished'}</Text>
+                  <DoubleCheckIcon color={isFinished ? colors.black : colors.gray} size={12} />
+                </TouchableOpacity>
+              </View>
+              <View style={[styles.progressBar, { backgroundColor: colors.grayLine }]}>
+                <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: colors.black }]} />
+              </View>
+              <View style={styles.progressTimes}>
+                <View style={styles.timeWithClear}>
+                  <TouchableOpacity onPress={handleClearProgress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <ResetIcon color={colors.gray} size={12} />
+                  </TouchableOpacity>
+                  <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeListened)} listened</Text>
+                </View>
+                <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeRemaining)} remaining</Text>
+              </View>
+            </View>
+            {/* Chapters tabs — inside the right column on desktop */}
+            {chaptersTabsBlock}
+          </View>
+        </View>
+        )}
+        {Platform.OS !== 'web' && (
+        <>
+        {/* ============ MOBILE: Original stacked layout ============ */}
+        <View style={styles.hero}>
+          <GestureDetector gesture={doubleTapGesture}>
+          <Animated.View style={styles.heroCover}>
+            {coverUrl ? (
+              <Image source={{ uri: coverUrl }} placeholder={coverPlaceholderUrl ? { uri: coverPlaceholderUrl } : undefined} placeholderContentFit="cover" style={styles.coverImage} contentFit="cover" cachePolicy="memory-disk" transition={0} />
+            ) : (
+              <View style={[styles.coverImage, styles.coverPlaceholder]}>
+                <Text style={styles.coverPlaceholderText}>{title.substring(0, 3).toUpperCase()}</Text>
+              </View>
+            )}
+            <CoverStarStickers stars={stars} />
+          </Animated.View>
+          </GestureDetector>
+
+          <View style={styles.titleContainer}>
+            <SeriesNavigationArrows />
+            <Text style={[styles.titleLine1, { fontFamily: titleFontFamily, fontWeight: titleFontWeight, color: colors.black }]} numberOfLines={3}>{title}</Text>
+          </View>
+
+          <View style={styles.byline}>
+            <TouchableOpacity onPress={() => { haptics.selection(); navigation.navigate('AuthorDetail', { authorName: author.split(',')[0].trim() }); }} activeOpacity={0.7} accessibilityRole="link" accessibilityLabel={`Go to author ${author}`}>
+              <Text style={[styles.bylineText, { color: colors.gray }]}>{author}</Text>
+            </TouchableOpacity>
+            {narrator ? (
+              <>
+                <Text style={[styles.bylineDot, { color: colors.gray }]}>  ·  </Text>
+                <TouchableOpacity onPress={() => { haptics.selection(); navigation.navigate('NarratorDetail', { narratorName: narrator.split(',')[0].trim() }); }} activeOpacity={0.7} accessibilityRole="link" accessibilityLabel={`Go to narrator ${narrator}`}>
+                  <Text style={[styles.bylineText, { color: colors.gray }]}>{narrator}</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+          </View>
+
+          {seriesInfo && (
+            <View style={styles.byline}>
+              <TouchableOpacity onPress={handleSeriesPress} activeOpacity={0.7} accessibilityRole="link" accessibilityLabel={`Go to series ${seriesInfo.name}`}>
+                <Text style={[styles.bylineText, { color: colors.gray }]}>{seriesInfo.name}{seriesInfo.sequence ? ` · Book ${seriesInfo.sequence}` : ''}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.metaGrid, { borderColor: colors.grayLine }]}>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors.gray }]}>Duration</Text>
+            <Text style={[styles.metaValue, { color: colors.black }]}>{formattedDuration}</Text>
+          </View>
+          <TouchableOpacity style={[styles.metaItemCenter, { borderColor: colors.grayLine }]} onPress={handleScrollToChapters} activeOpacity={0.7}>
+            <Text style={[styles.metaLabel, { color: colors.gray }]}>Chapters</Text>
+            <Text style={[styles.metaValue, styles.metaValueLink, { color: colors.black }]}>{chapterCount}</Text>
+          </TouchableOpacity>
+          <View style={styles.metaItem}>
+            <Text style={[styles.metaLabel, { color: colors.gray }]}>Published</Text>
+            <Text style={[styles.metaValue, { color: colors.black }]}>{publishedYear || '—'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black }]} onPress={handlePlay} activeOpacity={0.8}>
+            {isThisBookPlaying ? <PauseIcon color={colors.white} size={16} /> : <PlayIcon color={colors.white} size={16} />}
+            <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{isThisBookPlaying ? 'Pause' : 'Play'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.btnDownload, { borderColor: colors.black }, isDownloaded && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }], (isDownloading || isPaused || isWaitingWifi) && { backgroundColor: '#FFFFFF' }]} onPress={handleDownload} disabled={isDownloaded} activeOpacity={0.8}>
+            {isDownloaded ? (<><CheckIcon color={colors.white} size={16} /><Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text></>) : isPaused || isDownloading ? (<Text style={[styles.btnText, { color: '#000' }]}>{isPaused ? 'Paused' : 'Downloading'} {Math.round(downloadProgress * 100)}%</Text>) : isWaitingWifi ? (<Text style={[styles.btnText, { color: colors.black }]}>Waiting for WiFi</Text>) : isPending ? (<Text style={[styles.btnText, { color: colors.black }]}>Queued</Text>) : (<><DownloadIcon color={colors.black} size={16} /><Text style={[styles.btnText, { color: colors.black }]}>Download</Text></>)}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <View style={styles.progressLeft}>
+              <Text style={[styles.progressLabel, { color: colors.gray }]}>Progress</Text>
+              <Text style={[styles.progressPercent, { color: colors.black }]}>{isFinished ? 'Complete' : `${progressPercent}%`}</Text>
+            </View>
+            <TouchableOpacity style={styles.markFinishedBtn} onPress={isFinished ? handleUnmarkFinished : handleMarkFinished} activeOpacity={0.7}>
+              <Text style={[styles.markFinishedText, { color: colors.gray }]}>{isFinished ? 'Unmark Finished' : 'Mark as Finished'}</Text>
+              <DoubleCheckIcon color={isFinished ? colors.black : colors.gray} size={12} />
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.progressBar, { backgroundColor: colors.grayLine }]}>
+            <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: colors.black }]} />
+          </View>
+          <View style={styles.progressTimes}>
+            <View style={styles.timeWithClear}>
+              <TouchableOpacity onPress={handleClearProgress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><ResetIcon color={colors.gray} size={12} /></TouchableOpacity>
+              <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeListened)} listened</Text>
+            </View>
+            <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeRemaining)} remaining</Text>
+          </View>
+        </View>
+        </>
+        )}
+
+        {/* ============ MOBILE ONLY: Description + Genres + Chapters ============ */}
+        {Platform.OS !== 'web' && (
+        <>
+          {description ? (
+            <DropCapParagraph text={description} expanded={descriptionExpanded} onToggleExpand={() => setDescriptionExpanded(!descriptionExpanded)} colors={colors} />
+          ) : null}
+          {(metadata?.genres || []).length > 0 && (
+            <View style={styles.genreRow}>
+              {(metadata?.genres || []).map((genre: string, idx: number) => (
+                <TouchableOpacity key={`genre-${idx}`} style={[styles.genrePill, { borderColor: colors.grayLine }]} onPress={() => handleGenrePress(genre)} activeOpacity={0.7} accessibilityRole="link" accessibilityLabel={`Go to genre ${genre}`}>
+                  <Text style={[styles.genrePillText, { color: colors.gray }]}>{genre}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {chaptersTabsBlock}
+        </>
+        )}
           </ScrollView>
         </SkullRefreshControl>
       </SeriesSwipeContainer>
@@ -1921,6 +1973,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(24),
     paddingBottom: scale(20),
   },
+  // Desktop web: full-width two-column layout
+  desktopLayout: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    paddingHorizontal: 48,
+    paddingTop: 32,
+    paddingBottom: 16,
+    gap: 48,
+  },
+  desktopLeftCol: {
+    width: '38%' as any,
+    flexShrink: 0,
+  },
+  desktopCover: {
+    width: '100%' as any,
+    aspectRatio: 1,
+    shadowColor: staticColors.black,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 8,
+    borderRadius: 4,
+    overflow: 'hidden' as const,
+  },
+  desktopBtnRow: {
+    flexDirection: 'row' as const,
+    gap: 10,
+    marginTop: 16,
+  },
+  desktopRightCol: {
+    flex: 1,
+    minWidth: 0,
+    paddingTop: 4,
+  },
+  // Keep heroDesktop for backwards compat but unused now
+  heroDesktop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 48,
+    paddingTop: 32,
+    paddingBottom: 16,
+    paddingHorizontal: 48,
+  },
   heroCover: {
     width: scale(320),
     height: scale(320),
@@ -1930,6 +2025,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
+  },
+  // Desktop web: tall cover, no bottom margin
+  heroCoverDesktop: {
+    width: 320,
+    height: 320,
+    marginBottom: 0,
+    flexShrink: 0,
+    borderRadius: 4,
+  },
+  // Desktop web: info column — don't let it stretch infinitely.
+  // flex: 1 takes remaining space but maxWidth keeps buttons reasonable.
+  heroInfoDesktop: {
+    flex: 1,
+    maxWidth: 560,
+    justifyContent: 'flex-start' as const,
+    paddingTop: 4,
+  },
+  // Desktop web: inline meta stats (replaces the mobile metaGrid)
+  metaRowDesktop: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  metaStatDesktop: {
+    fontSize: 14,
+    fontFamily: Platform.select({ ios: 'System', default: 'sans-serif' }),
+  },
+  metaDotDesktop: {
+    fontSize: 14,
+  },
+  // unused — kept for safety
+  _contentBelowHeroDesktop: {
+    paddingHorizontal: 48,
   },
   coverImage: {
     width: '100%',

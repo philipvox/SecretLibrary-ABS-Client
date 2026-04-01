@@ -656,6 +656,9 @@ export function SecretLibrarySeriesDetailScreen() {
       >
         {headerContent}
 
+        {/* On web: two-column layout — tabs/filters left, books right */}
+        <View style={Platform.OS === 'web' ? { flexDirection: 'row' as const, paddingHorizontal: 32, gap: 32, flex: 1 } : undefined}>
+
         {/* Content based on tab and view mode */}
         {activeTab === 'all' && viewMode === 'shelf' && (
           <View style={styles.groupedList}>
@@ -819,6 +822,7 @@ export function SecretLibrarySeriesDetailScreen() {
         )}
 
         {footerContent}
+        </View>
       </ScrollView>
     </View>
   );

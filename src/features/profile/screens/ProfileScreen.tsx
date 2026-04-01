@@ -30,7 +30,6 @@ import {
   Vibrate,
   Palette,
   Info,
-  Bug,
   HelpCircle,
   RefreshCw,
   Undo2,
@@ -43,6 +42,7 @@ import { useDownloads } from '@/core/hooks/useDownloads';
 import { useDefaultLibrary } from '@/shared/hooks/useDefaultLibrary';
 import { haptics } from '@/core/native/haptics';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { WebContentContainer } from '@/shared/components/WebContentContainer';
 import { APP_VERSION } from '@/constants/version';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import {
@@ -218,14 +218,17 @@ export function ProfileScreen() {
 
   // Display Settings subtitle
   const useServerSpines = useSpineCacheStore((s) => s.useServerSpines);
-  const cleaningLevelInfo = CLEANING_LEVEL_INFO[chapterLevel] ?? CLEANING_LEVEL_INFO['standard'];
-  const displaySubtitle = `${useServerSpines ? 'Server spines' : 'Generated'} · ${cleaningLevelInfo.label}`;
+  const useCommunitySpines = useSpineCacheStore((s) => s.useCommunitySpines);
+  const spineSource = useCommunitySpines && useServerSpines ? 'Community & Server'
+    : useCommunitySpines ? 'Community' : useServerSpines ? 'Server' : 'Generated';
+  const displaySubtitle = spineSource;
 
   // Data & Storage subtitle
   const libraryPlaylistId = useLibrarySyncStore((s) => s.libraryPlaylistId);
   const dataStorageSubtitle = `${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}${libraryPlaylistId ? ' · Synced' : ''}`;
 
-  const playbackSubtitle = `${globalDefaultRate ?? 1}x · ${skipForwardInterval}s/${skipBackInterval}s`;
+  const cleaningLevelInfo = CLEANING_LEVEL_INFO[chapterLevel] ?? CLEANING_LEVEL_INFO['standard'];
+  const playbackSubtitle = `${globalDefaultRate ?? 1}x · ${skipForwardInterval}s/${skipBackInterval}s · ${cleaningLevelInfo.label}`;
   const hapticsSubtitle = hapticsEnabled ? `On · ${enabledHapticCount} of 8` : 'Off';
 
   const handleLibrarySwitch = useCallback((id: string) => {
@@ -352,6 +355,7 @@ export function ProfileScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+      <WebContentContainer variant="narrow">
 
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.cream, borderColor: colors.borderLight }]}>
@@ -380,29 +384,34 @@ export function ProfileScreen() {
                 <LogOut size={scale(12)} color={colors.gray} strokeWidth={1.5} />
                 <Text style={[styles.signOutText, { color: colors.gray }]}>Log out</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dnaPill, {
-                  backgroundColor: !hasDNA ? colors.grayLight
-                    : dnaEnabled ? colors.orange : colors.grayLight,
-                }]}
-                onPress={() => {
-                  if (!hasDNA) return;
-                  haptics.buttonPress();
-                  toggleDNA();
-                }}
-                activeOpacity={hasDNA ? 0.7 : 1}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="switch"
-                accessibilityLabel={`DNA features${!hasDNA ? ', not available' : ''}`}
-                accessibilityState={{ checked: dnaEnabled }}
-              >
-                <Text style={[styles.dnaPillText, {
-                  color: !hasDNA ? colors.gray
-                    : dnaEnabled ? colors.white : colors.gray,
-                }]}>
-                  {!hasDNA ? 'No DNA' : dnaEnabled ? 'DNA' : 'DNA off'}
+              <View style={styles.dnaContainer}>
+                <TouchableOpacity
+                  style={[styles.dnaPill, {
+                    backgroundColor: !hasDNA ? colors.grayLight
+                      : dnaEnabled ? colors.orange : colors.grayLight,
+                  }]}
+                  onPress={() => {
+                    if (!hasDNA) return;
+                    haptics.buttonPress();
+                    toggleDNA();
+                  }}
+                  activeOpacity={hasDNA ? 0.7 : 1}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="switch"
+                  accessibilityLabel={`DNA features${!hasDNA ? ', not available' : ''}`}
+                  accessibilityState={{ checked: dnaEnabled }}
+                >
+                  <Text style={[styles.dnaPillText, {
+                    color: !hasDNA ? colors.gray
+                      : dnaEnabled ? colors.white : colors.gray,
+                  }]}>
+                    {!hasDNA ? 'No DNA' : dnaEnabled ? 'DNA' : 'DNA off'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.dnaExplainer, { color: colors.textMuted }]}>
+                  {!hasDNA ? 'Tag books with dna: to unlock' : dnaEnabled ? 'Mood & vibe recommendations' : 'Tap to enable mood matching'}
                 </Text>
-              </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -572,7 +581,8 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        {/* All Settings */}
+        {/* APP Section */}
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>APP</Text>
         <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
           <ProfileLink
             Icon={PlayCircle}
@@ -581,17 +591,22 @@ export function ProfileScreen() {
             onPress={() => navigation.navigate('PlaybackSettings')}
           />
           <ProfileLink
-            Icon={Vibrate}
-            label="Haptics"
-            subtitle={hapticsSubtitle}
-            onPress={() => navigation.navigate('HapticSettings')}
-          />
-          <ProfileLink
             Icon={Palette}
             label="Display Settings"
             subtitle={displaySubtitle}
             onPress={() => navigation.navigate('DisplaySettings')}
           />
+          <ProfileLink
+            Icon={Vibrate}
+            label="Haptics"
+            subtitle={hapticsSubtitle}
+            onPress={() => navigation.navigate('HapticSettings')}
+          />
+        </View>
+
+        {/* SYSTEM Section */}
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>SYSTEM</Text>
+        <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
           <ProfileLink
             Icon={Folder}
             label="Data & Storage"
@@ -600,15 +615,9 @@ export function ProfileScreen() {
           />
           <ProfileLink
             Icon={Info}
-            label="About"
-            subtitle={`v${APP_VERSION}`}
+            label="About & Help"
+            subtitle={`v${APP_VERSION} · Bug reports`}
             onPress={() => navigation.navigate('About')}
-          />
-          <ProfileLink
-            Icon={Bug}
-            label="Report a Bug"
-            subtitle="Help us improve"
-            onPress={() => navigation.navigate('BugReport')}
           />
           <ProfileLink
             Icon={HelpCircle}
@@ -628,6 +637,7 @@ export function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+      </WebContentContainer>
       </ScrollView>
     </View>
   );
@@ -706,6 +716,10 @@ const styles = StyleSheet.create({
     fontSize: scale(9),
     marginTop: 6,
   },
+  dnaContainer: {
+    alignItems: 'flex-end',
+    gap: 3,
+  },
   dnaPill: {
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -715,6 +729,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.jetbrainsMono.regular,
     fontSize: scale(8),
     fontWeight: '600',
+  },
+  dnaExplainer: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(7),
+    textAlign: 'right',
+    maxWidth: scale(100),
   },
   // Library Picker
   libraryPicker: {
@@ -846,6 +866,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
+  },
+  sectionLabel: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+    paddingLeft: 4,
   },
   sectionContent: {
     marginBottom: 28,

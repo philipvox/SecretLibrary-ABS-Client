@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { scale, wp, useSecretLibraryColors } from '@/shared/theme';
@@ -21,7 +21,8 @@ import { useDNASettingsStore } from '@/shared/stores/dnaSettingsStore';
 // Layout constants for 2-row horizontal scroll
 const PADDING = 24;
 const GAP = 10;
-const CARD_WIDTH = Math.floor(wp(100) * 0.32);
+const _VP = Platform.OS === 'web' ? Math.min(Dimensions.get('window').width, 500) : wp(100);
+const CARD_WIDTH = Math.floor(_VP * 0.32);
 const COVER_HEIGHT = CARD_WIDTH;
 const TEXT_HEIGHT = scale(30); // title + author
 const ROW_HEIGHT = COVER_HEIGHT + scale(6) + TEXT_HEIGHT;

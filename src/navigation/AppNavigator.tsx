@@ -31,7 +31,7 @@ import { SecretLibraryAuthorDetailScreen } from '@/features/author';
 import { SecretLibraryNarratorDetailScreen } from '@/features/narrator';
 import { CollectionDetailScreen } from '@/features/collections';
 import { SecretLibraryBookDetailScreen } from '@/features/book-detail';
-import { ProfileScreen, PlaybackSettingsScreen, StorageSettingsScreen, DataStorageSettingsScreen, HapticSettingsScreen, ChapterCleaningSettingsScreen, DisplaySettingsScreen, PlaylistSettingsScreen, DeveloperSettingsScreen, AboutScreen, BugReportScreen } from '@/features/profile';
+import { ProfileScreen, PlaybackSettingsScreen, DataStorageSettingsScreen, HapticSettingsScreen, DisplaySettingsScreen, PlaylistSettingsScreen, DeveloperSettingsScreen, AboutScreen } from '@/features/profile';
 import { SecretLibraryPlayerScreen, BookCompletionSheet } from '@/features/player';
 import { useQueueStore } from '@/shared/stores/queueFacade';
 import { DownloadsScreen } from '@/features/downloads/screens/DownloadsScreen';
@@ -250,14 +250,6 @@ function PlaybackSettingsScreenWithBoundary() {
   );
 }
 
-function StorageSettingsScreenWithBoundary() {
-  return (
-    <ErrorBoundary context="StorageSettingsScreen" level="screen">
-      <StorageSettingsScreen />
-    </ErrorBoundary>
-  );
-}
-
 function DataStorageSettingsScreenWithBoundary() {
   return (
     <ErrorBoundary context="DataStorageSettingsScreen" level="screen">
@@ -274,13 +266,6 @@ function HapticSettingsScreenWithBoundary() {
   );
 }
 
-function ChapterCleaningSettingsScreenWithBoundary() {
-  return (
-    <ErrorBoundary context="ChapterCleaningSettingsScreen" level="screen">
-      <ChapterCleaningSettingsScreen />
-    </ErrorBoundary>
-  );
-}
 
 function DisplaySettingsScreenWithBoundary() {
   return (
@@ -306,13 +291,6 @@ function AboutScreenWithBoundary() {
   );
 }
 
-function BugReportScreenWithBoundary() {
-  return (
-    <ErrorBoundary context="BugReportScreen" level="screen">
-      <BugReportScreen />
-    </ErrorBoundary>
-  );
-}
 
 function SpinePlaygroundScreenWithBoundary() {
   return (
@@ -488,7 +466,13 @@ function AuthenticatedApp() {
         theme={AppTheme}
       >
         <BookContextMenuProvider>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          animationDuration: 250,
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}>
         <Stack.Screen name="Main" component={MainTabs} />
         <Stack.Screen name="Search" component={SearchScreenWithBoundary} />
         <Stack.Screen name="SeriesList" component={SeriesListScreenWithBoundary} />
@@ -519,14 +503,11 @@ function AuthenticatedApp() {
         <Stack.Screen name="Downloads" component={DownloadsScreenWithBoundary} />
         <Stack.Screen name="Stats" component={StatsScreenWithBoundary} />
         <Stack.Screen name="PlaybackSettings" component={PlaybackSettingsScreenWithBoundary} />
-        <Stack.Screen name="StorageSettings" component={StorageSettingsScreenWithBoundary} />
         <Stack.Screen name="DataStorageSettings" component={DataStorageSettingsScreenWithBoundary} />
         <Stack.Screen name="HapticSettings" component={HapticSettingsScreenWithBoundary} />
-        <Stack.Screen name="ChapterCleaningSettings" component={ChapterCleaningSettingsScreenWithBoundary} />
         <Stack.Screen name="DisplaySettings" component={DisplaySettingsScreenWithBoundary} />
         <Stack.Screen name="PlaylistSettings" component={PlaylistSettingsScreenWithBoundary} />
         <Stack.Screen name="About" component={AboutScreenWithBoundary} />
-        <Stack.Screen name="BugReport" component={BugReportScreenWithBoundary} />
         <Stack.Screen name="SpinePlayground" component={SpinePlaygroundScreenWithBoundary} />
         {__DEV__ && (
           <>

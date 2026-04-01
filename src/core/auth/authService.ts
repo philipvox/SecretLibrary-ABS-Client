@@ -524,8 +524,8 @@ class AuthService {
     user: User | null;
     serverUrl: string | null;
   }> {
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY_MS = 100;
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_MS = 200;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -636,9 +636,18 @@ class AuthService {
       // Try to fetch current user as token verification
       await apiClient.getCurrentUser();
       return true;
-    } catch (error) {
-      log.error('Token verification failed:', error);
-      return false;
+    } catch (error: any) {
+      // Only treat explicit 401 as invalid token.
+      // Network errors, timeouts, 5xx etc. should NOT invalidate —
+      // the token may still be valid, we just can't reach the server.
+      const status = error?.response?.status;
+      if (status === 401) {
+        log.error('Token verification failed: 401 Unauthorized');
+        return false;
+      }
+
+      log.warn('Token verification inconclusive (network/server error), assuming valid:', error?.message || error);
+      return true;
     }
   }
 }

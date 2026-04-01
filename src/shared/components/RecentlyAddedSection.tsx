@@ -10,7 +10,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useCoverUrl } from '@/core/cache';
@@ -24,7 +24,9 @@ import { SectionHeader } from '@/shared/components/SectionHeader';
 // Carousel layout constants
 const PADDING = 24;
 const GAP = 12;
-const CARD_WIDTH = Math.floor((wp(100) - PADDING - GAP) * 0.42);
+// Cap the effective width on web so cards don't become enormous in horizontal scroll
+const EFFECTIVE_VP = Platform.OS === 'web' ? Math.min(Dimensions.get('window').width, 500) : wp(100);
+const CARD_WIDTH = Math.floor((EFFECTIVE_VP - PADDING - GAP) * 0.42);
 const COVER_HEIGHT = CARD_WIDTH;
 
 const colors = secretLibraryColors;

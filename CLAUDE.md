@@ -273,7 +273,7 @@ AppNavigator
 Modal Stacks:
 ├── BookDetail, SeriesDetail, AuthorDetail, NarratorDetail
 ├── Search, Downloads, Stats, QueueScreen
-├── PlaybackSettings, StorageSettings, Preferences
+├── PlaybackSettings, DataStorageSettings, DisplaySettings
 └── CDPlayerScreen (full-screen player)
 
 Global Overlays:
@@ -297,25 +297,60 @@ npx expo run:ios       # Build and run iOS
 
 ## Pre-Build Checklist (MANDATORY)
 
-**ALWAYS run these checks before building an APK:**
+**ALWAYS run these checks before building an APK or AAB:**
 
-### 1. Critical Files Integrity
+### 1. Upload Keystore
+
+The release signing keystore MUST exist at `android/upload.keystore`. Backup copy at `~/Desktop/upload.keystore.backup`.
 
 ```bash
-# Run this command to verify critical files are intact:
-git diff --name-status HEAD -- \
-  android/app/src/main/AndroidManifest.xml \
-  android/app/src/main/res/xml/automotive_app_desc.xml \
-  android/app/build.gradle \
-  app.json
+# Verify keystore exists
+test -f android/upload.keystore && echo "✓ Keystore OK" || echo "✗ KEYSTORE MISSING - restore from ~/Desktop/upload.keystore.backup"
 ```
 
-If any of these show as Modified (M) or Deleted (D) unexpectedly, restore them:
-```bash
-git checkout HEAD -- <file_path>
+**Signing properties** must be in `android/gradle.properties`:
+```properties
+RELEASE_STORE_FILE=../upload.keystore
+RELEASE_STORE_PASSWORD=secretlibrary
+RELEASE_KEY_ALIAS=upload
+RELEASE_KEY_PASSWORD=secretlibrary
 ```
 
-### 2. Android Auto Must Have
+**Release signing config** must be in `android/app/build.gradle` (expo prebuild may reset this):
+```gradle
+signingConfigs {
+    release {
+        if (project.hasProperty('RELEASE_STORE_FILE')) {
+            storeFile file(RELEASE_STORE_FILE)
+            storePassword RELEASE_STORE_PASSWORD
+            keyAlias RELEASE_KEY_ALIAS
+            keyPassword RELEASE_KEY_PASSWORD
+        }
+    }
+}
+buildTypes {
+    release {
+        signingConfig project.hasProperty('RELEASE_STORE_FILE') ? signingConfigs.release : signingConfigs.debug
+    }
+}
+```
+
+### 2. AndroidManifest.xml Fixes
+
+The manifest MUST include these `tools:node="remove"` entries to strip unwanted permissions/services from `react-native-carplay`:
+
+```xml
+<uses-permission android:name="androidx.car.app.MAP_TEMPLATES" tools:node="remove"/>
+<uses-permission android:name="androidx.car.app.ACCESS_SURFACE" tools:node="remove"/>
+<uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" tools:node="remove"/>
+<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" tools:node="remove"/>
+<!-- Inside <application>: -->
+<service android:name="org.birkir.carplay.CarPlayService" tools:node="remove"/>
+```
+
+Without these, Google Play will reject the upload.
+
+### 3. Android Auto Must Have
 
 Verify these exist in `AndroidManifest.xml`:
 - [ ] `<service android:name=".automotive.AndroidAutoMediaBrowserService"` declaration
@@ -324,21 +359,41 @@ Verify these exist in `AndroidManifest.xml`:
 Verify file exists:
 - [ ] `android/app/src/main/res/xml/automotive_app_desc.xml`
 
-### 3. Quick Verification Command
+### 4. Quick Verification Command
 
 ```bash
-# One-liner to verify Android Auto config:
+# Full pre-build verification:
 grep -q "AndroidAutoMediaBrowserService" android/app/src/main/AndroidManifest.xml && \
   test -f android/app/src/main/res/xml/automotive_app_desc.xml && \
-  echo "✓ Android Auto config OK" || echo "✗ Android Auto config MISSING"
+  test -f android/upload.keystore && \
+  grep -q "RELEASE_STORE_FILE" android/gradle.properties && \
+  grep -q "CarPlayService.*tools:node=\"remove\"" android/app/src/main/AndroidManifest.xml && \
+  grep -q "ACTIVITY_RECOGNITION.*tools:node=\"remove\"" android/app/src/main/AndroidManifest.xml && \
+  echo "✓ All pre-build checks passed" || echo "✗ Pre-build check FAILED"
 ```
 
-### 4. Build Command
+### 5. Build Commands
 
 Only after verification passes:
 ```bash
+# AAB for Google Play (internal testing or production):
+cd android && ./gradlew bundleRelease
+
+# APK for sideloading:
 cd android && ./gradlew assembleRelease
 ```
+
+Output locations:
+- AAB: `android/app/build/outputs/bundle/release/app-release.aab`
+- APK: `android/app/build/outputs/apk/release/app-release.apk`
+- Mapping file (for Play Console): `android/app/build/outputs/mapping/release/mapping.txt`
+
+### 6. After `expo prebuild`
+
+Running `npx expo prebuild --platform android` will reset `build.gradle`. You MUST re-check:
+- Release signing config in `build.gradle` (step 1)
+- Manifest removal entries (step 2)
+- The keystore file itself is NOT deleted by prebuild, but verify anyway
 
 ---
 

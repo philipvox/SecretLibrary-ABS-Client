@@ -29,6 +29,7 @@ import {
   Info,
   Cloud,
   CloudOff,
+  Library,
   List,
   Plus,
   Check,
@@ -48,6 +49,7 @@ import { librarySyncService } from '@/core/services/librarySyncService';
 import { playlistsApi } from '@/core/api/endpoints/playlists';
 import { Playlist } from '@/core/types/library';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
+import { WebContentContainer } from '@/shared/components/WebContentContainer';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { SettingsHeader } from '../components/SettingsHeader';
@@ -191,6 +193,9 @@ export function DataStorageSettingsScreen() {
 
   // Network settings
   const [wifiOnlyEnabled, setWifiOnlyEnabled] = useState(networkMonitor.isWifiOnlyEnabled());
+  const [autoDownloadSeriesEnabled, setAutoDownloadSeriesEnabled] = useState(
+    networkMonitor.isAutoDownloadSeriesEnabled()
+  );
   // Cloud sync
   const libraryPlaylistId = useLibrarySyncStore(s => s.libraryPlaylistId);
   const seriesPlaylistId = useLibrarySyncStore(s => s.seriesPlaylistId);
@@ -380,6 +385,11 @@ export function DataStorageSettingsScreen() {
     await networkMonitor.setWifiOnlyEnabled(enabled);
   }, []);
 
+  const handleAutoDownloadSeriesToggle = useCallback(async (enabled: boolean) => {
+    setAutoDownloadSeriesEnabled(enabled);
+    await networkMonitor.setAutoDownloadSeriesEnabled(enabled);
+  }, []);
+
   const handleManageDownloads = useCallback(() => {
     navigation.navigate('Downloads');
   }, [navigation]);
@@ -554,6 +564,7 @@ export function DataStorageSettingsScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: SCREEN_BOTTOM_PADDING + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
+        <WebContentContainer variant="narrow">
         {/* Storage Overview — tap to manage downloads */}
         <TouchableOpacity
           style={[styles.storageOverview, { backgroundColor: colors.white }]}
@@ -591,6 +602,13 @@ export function DataStorageSettingsScreen() {
           switchValue={wifiOnlyEnabled}
           onSwitchChange={handleWifiOnlyToggle}
           description="Restricts downloads to Wi-Fi networks"
+        />
+        <SettingsRow
+          Icon={Library}
+          label="Auto-Download Series"
+          switchValue={autoDownloadSeriesEnabled}
+          onSwitchChange={handleAutoDownloadSeriesToggle}
+          description="Queue next book at 80% progress"
         />
         {/* Cloud Sync */}
         <SectionHeader title="Cloud Sync" />
@@ -657,6 +675,16 @@ export function DataStorageSettingsScreen() {
           loading={isRefreshingSpines}
           description="Reload spine images from server"
         />
+        <SettingsRow
+          Icon={Trash2}
+          label="Clear Temporary Files"
+          onPress={handleClearTempFiles}
+          loading={isClearingCache}
+          description="Frees space without deleting books"
+        />
+
+        {/* Danger Zone */}
+        <SectionHeader title="Danger Zone" />
         {isCloudSyncEnabled && (
           <SettingsRow
             Icon={RefreshCw}
@@ -667,16 +695,6 @@ export function DataStorageSettingsScreen() {
             loading={isSyncing}
           />
         )}
-
-        {/* Clear Data */}
-        <SectionHeader title="Clear Data" />
-        <SettingsRow
-          Icon={Trash2}
-          label="Clear Temporary Files"
-          onPress={handleClearTempFiles}
-          loading={isClearingCache}
-          description="Frees space without deleting books"
-        />
         <SettingsRow
           Icon={Trash2}
           label="Remove All Downloads"
@@ -700,6 +718,7 @@ export function DataStorageSettingsScreen() {
             Your listening progress is always saved to the server. Downloads and library data are stored locally on this device.
           </Text>
         </View>
+        </WebContentContainer>
       </ScrollView>
 
       {/* Playlist Picker Modal (Library) */}

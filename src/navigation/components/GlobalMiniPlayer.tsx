@@ -6,7 +6,7 @@
  * Positioned at the bottom of the screen above the tab bar.
  */
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -88,6 +88,25 @@ export function GlobalMiniPlayer() {
     }))
   );
 
+  // Keep screen awake during playback
+  const keepScreenAwake = usePlayerSettingsStore((s) => s.keepScreenAwake);
+  useEffect(() => {
+    if (isPlaying && keepScreenAwake) {
+      import('expo-keep-awake').then(({ activateKeepAwakeAsync }) => {
+        activateKeepAwakeAsync('playback');
+      }).catch(() => {});
+    } else {
+      import('expo-keep-awake').then(({ deactivateKeepAwake }) => {
+        deactivateKeepAwake('playback');
+      }).catch(() => {});
+    }
+    return () => {
+      import('expo-keep-awake').then(({ deactivateKeepAwake }) => {
+        deactivateKeepAwake('playback');
+      }).catch(() => {});
+    };
+  }, [isPlaying, keepScreenAwake]);
+
   // Current chapter - read chapters from store snapshot (avoids subscribing to the array reference)
   const currentChapterIndex = useCurrentChapterIndex();
   const chapters = usePlayerStore.getState().chapters;
@@ -145,6 +164,8 @@ export function GlobalMiniPlayer() {
 
   // Pan gesture: drag up to continuously reveal full player
   const panGesture = Gesture.Pan()
+    .activeOffsetY(-10) // Require 10px vertical movement before activating
+    .failOffsetX([-15, 15]) // Abandon if user swipes horizontally (back gesture)
     .onUpdate((event) => {
       'worklet';
       // Convert upward drag to 0→1 progress
@@ -197,7 +218,7 @@ export function GlobalMiniPlayer() {
 
   return (
     <View
-      style={[styles.wrapper, shouldHide && styles.hidden]}
+      style={[styles.wrapper, shouldHide && styles.hidden, Platform.OS === 'web' && isPlayerVisible && { display: 'none' as any }]}
       pointerEvents={shouldHide || isPlayerVisible ? 'none' : 'auto'}
     >
       <GestureDetector gesture={panGesture}>

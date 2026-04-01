@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { apiClient } from '@/core/api';
+import type { CommunityManifestV2 } from '@/core/api/apiClient';
 import { LibraryItem, BookMedia, BookMetadata } from '@/core/types';
 import { searchIndex } from './searchIndex';
 import { normalizeForSearch } from '@/features/search/utils/fuzzySearch';
@@ -270,6 +271,32 @@ function buildIndexes(items: LibraryItem[]) {
 
 // Track last community manifest fetch to throttle refetches (1 hour TTL)
 let _lastCommunityManifestFetchAt: number | null = null;
+
+// Pre-fetched community manifest (populated by prefetchCommunityManifest during app init)
+let _prefetchedCommunityManifest: CommunityManifestV2 | null = null;
+
+/**
+ * Pre-fetch the community spine manifest during app initialization.
+ * Call this early (e.g., appInitializer) so the manifest is already in memory
+ * by the time loadSpineManifest() runs after library cache loads.
+ * This eliminates the flash of procedural spines on first login.
+ */
+export async function prefetchCommunityManifest(): Promise<void> {
+  try {
+    const { useCommunitySpines } = useSpineCacheStore.getState();
+    if (!useCommunitySpines) return;
+
+    const COMMUNITY_URL = 'https://spines.mysecretlibrary.com';
+    const manifest = await apiClient.getCommunityManifestV2(COMMUNITY_URL);
+    if (manifest.books.length > 0) {
+      _prefetchedCommunityManifest = manifest;
+      _lastCommunityManifestFetchAt = Date.now();
+      log.debug(`Pre-fetched community manifest: ${manifest.books.length} books`);
+    }
+  } catch (err) {
+    log.warn('Community manifest pre-fetch failed (non-blocking):', err);
+  }
+}
 
 export const useLibraryCache = create<LibraryCacheState>()(subscribeWithSelector((set, get) => ({
   items: [],
@@ -672,8 +699,16 @@ export const useLibraryCache = create<LibraryCacheState>()(subscribeWithSelector
         log.debug(`Community manifest: using cached data (${get().booksWithCommunitySpines.size} books, age ${Math.round((now - lastFetch!) / 60000)}m)`);
       } else {
         try {
-          const COMMUNITY_URL = 'https://spines.mysecretlibrary.com';
-          const manifest = await apiClient.getCommunityManifestV2(COMMUNITY_URL);
+          // Use pre-fetched manifest if available (from prefetchCommunityManifest)
+          let manifest: CommunityManifestV2;
+          if (_prefetchedCommunityManifest) {
+            manifest = _prefetchedCommunityManifest;
+            _prefetchedCommunityManifest = null; // Consume it — next call fetches fresh
+            log.debug('Using pre-fetched community manifest');
+          } else {
+            const COMMUNITY_URL = 'https://spines.mysecretlibrary.com';
+            manifest = await apiClient.getCommunityManifestV2(COMMUNITY_URL);
+          }
           _lastCommunityManifestFetchAt = Date.now();
 
           if (manifest.books.length > 0) {

@@ -456,8 +456,29 @@ class AudioPlaybackService : Service() {
     fun pause() {
         val player = exoPlayer ?: return
         if (!player.isPlaying && !player.playWhenReady) return  // Already paused — skip
+        // Emit final position update BEFORE pausing so JS has the most accurate position.
+        // This prevents the ~10s sync gap on Android Auto disconnect.
+        emitCurrentPosition()
         player.pause()
         updateMediaSessionState()
+    }
+
+    /**
+     * Emit the current playback position to JS immediately.
+     * Called on pause to ensure JS has the latest position before saving progress.
+     */
+    private fun emitCurrentPosition() {
+        val player = exoPlayer ?: return
+        val pos = getCurrentPositionSec()
+        val dur = totalDuration
+        ExoPlayerModule.emitPlaybackState(
+            isPlaying = player.isPlaying,
+            position = pos,
+            duration = dur,
+            isBuffering = player.playbackState == Player.STATE_BUFFERING,
+            didJustFinish = false,
+            isStuck = false
+        )
     }
 
     /**

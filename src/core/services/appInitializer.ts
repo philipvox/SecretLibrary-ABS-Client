@@ -248,6 +248,9 @@ class AppInitializer {
     // Don't await - this runs in background
     if (result.user) {
       this.connectWebSocket();
+      // Pre-fetch community spine manifest so spines are ready before first render
+      // This runs in parallel with library cache load, eliminating the procedural spine flash
+      this.prefetchCommunitySpines();
       // Sync finished books with server
       this.syncFinishedBooks();
       // Sync My Library with linked collection
@@ -657,6 +660,20 @@ class AppInitializer {
       log.debug('Recommendations cache preloaded');
     } catch (err) {
       log.warn('Recommendations cache preload failed:', err);
+    }
+  }
+
+  /**
+   * Pre-fetch community spine manifest so it's ready before the library renders.
+   * This eliminates the flash of procedural spines on first login by ensuring
+   * the manifest data is in memory before loadSpineManifest() runs.
+   */
+  async prefetchCommunitySpines(): Promise<void> {
+    try {
+      const { prefetchCommunityManifest } = await import('@/core/cache/libraryCache');
+      await prefetchCommunityManifest();
+    } catch (err) {
+      log.warn('Community spine prefetch failed:', err);
     }
   }
 

@@ -359,9 +359,10 @@ class SessionService {
    */
   syncProgress(currentTime: number): void {
     if (!this.currentSession) {
-      log('syncProgress: No active session');
+      audioLog.warn('syncProgress: No active session — sync skipped');
       return;
     }
+    log(`syncProgress: ${formatDuration(currentTime)} (session: ${this.currentSession.id.substring(0, 8)}...)`);
 
     // VALIDATION: Prevent corrupted position data from being synced
     // This fixes the bug where position from one book gets applied to another
@@ -412,14 +413,27 @@ class SessionService {
           currentTime,
           timeListened,
         });
-        if (attempt > 1) {
-          log(`Progress synced successfully (attempt ${attempt})`);
-        }
+        log(`Session sync OK: ${formatDuration(currentTime)} (listened: ${timeListened.toFixed(0)}s)${attempt > 1 ? ` [attempt ${attempt}]` : ''}`);
         return;
       } catch (error) {
         const message = getErrorMessage(error);
         if (attempt === maxRetries) {
           audioLog.warn(`Sync progress failed after ${maxRetries} attempts:`, message);
+
+          // All retries exhausted — accumulate listening time in SQLite
+          // so it can be flushed to the server when connectivity returns
+          if (timeListened > 0 && this.currentSession) {
+            try {
+              const { sqliteCache } = await import('@/core/services/sqliteCache');
+              await sqliteCache.incrementOfflineListeningTime(
+                this.currentSession.libraryItemId,
+                timeListened
+              );
+              log(`Accumulated ${timeListened.toFixed(0)}s offline listening time`);
+            } catch (accErr) {
+              audioLog.warn('Failed to accumulate offline listening time:', getErrorMessage(accErr));
+            }
+          }
         } else {
           // Wait before retry (500ms, 1000ms)
           await new Promise(resolve => setTimeout(resolve, 500 * attempt));
@@ -485,13 +499,15 @@ class SessionService {
 
   startAutoSync(getCurrentTime: () => number): void {
     this.stopAutoSync();
-    log('Starting auto-sync (interval: 30s)');
+    log('Starting auto-sync (interval: 10s)');
     this.syncIntervalId = setInterval(() => {
       const time = getCurrentTime();
       if (time > 0) {
         this.syncProgress(time); // Non-blocking
+      } else {
+        audioLog.warn('Auto-sync: getCurrentTime() returned 0, skipping');
       }
-    }, 30000);
+    }, 10000);
   }
 
   stopAutoSync(): void {
@@ -711,6 +727,74 @@ class SessionService {
    */
   isClosingSession(): boolean {
     return this.closingSessionId !== null || this.pendingClosePromise !== null;
+  }
+
+  /**
+   * Flush accumulated offline listening time to the server.
+   * Opens a temporary session for each book with pending time,
+   * syncs the accumulated seconds, then closes the session.
+   *
+   * Called when network connectivity is restored (network:online event).
+   */
+  async flushOfflineListeningTime(): Promise<void> {
+    const { sqliteCache } = await import('@/core/services/sqliteCache');
+
+    const pending = await sqliteCache.getAllPendingOfflineListeningTime();
+    if (pending.length === 0) return;
+
+    log(`Flushing offline listening time for ${pending.length} book(s)`);
+
+    // Skip the currently playing book — its active session will handle its own time
+    const currentBookId = this.currentSession?.libraryItemId;
+
+    for (const item of pending) {
+      if (item.bookId === currentBookId) {
+        log(`Skipping ${item.bookId} — currently playing`);
+        continue;
+      }
+
+      if (item.seconds <= 0) continue;
+
+      try {
+        // Open a temporary session
+        const response = await apiClient.post<{ id: string }>(`/api/items/${item.bookId}/play`, {
+          deviceInfo: {
+            deviceId: `${Platform.OS}-offline-flush`,
+            clientName: 'Secret Library',
+            clientVersion: APP_VERSION,
+          },
+          mediaPlayer: 'offline-flush',
+          forceDirectPlay: true,
+        });
+
+        const sessionId = response?.id;
+        if (!sessionId) {
+          audioLog.warn(`Failed to open flush session for ${item.bookId}: no session ID`);
+          continue;
+        }
+
+        // Sync with accumulated listening time
+        await apiClient.post(`/api/session/${sessionId}/sync`, {
+          currentTime: item.currentTime,
+          timeListened: item.seconds,
+        });
+
+        // Close the temporary session
+        await apiClient.post(`/api/session/${sessionId}/close`, {
+          currentTime: item.currentTime,
+          timeListened: 0, // Already reported in sync
+        });
+
+        // Reset local counter
+        await sqliteCache.resetOfflineListeningTime(item.bookId);
+
+        log(`Flushed ${item.seconds}s offline listening for ${item.bookId}`);
+      } catch (error) {
+        // Network error — stop the batch (we're likely offline again)
+        audioLog.warn(`Offline listening flush failed for ${item.bookId}:`, getErrorMessage(error));
+        break;
+      }
+    }
   }
 }
 

@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { BookOpen } from 'lucide-react-native';
 import { Collection } from '@/core/types';
@@ -24,7 +24,9 @@ interface FeaturedCollectionCardProps {
 
 export const FeaturedCollectionCard = React.memo(function FeaturedCollectionCard({ collection, onPress }: FeaturedCollectionCardProps) {
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = screenWidth - CARD_PADDING * 2;
+  // On web, cap the card width so it doesn't stretch across the full desktop viewport
+  const effectiveWidth = Platform.OS === 'web' ? Math.min(screenWidth, 960) : screenWidth;
+  const cardWidth = effectiveWidth - CARD_PADDING * 2;
   const books = collection.books || [];
   const bookCount = books.length;
 

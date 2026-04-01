@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useWebHorizontalScroll } from '@/shared/hooks/useWebHorizontalScroll';
 import { BookSpineVertical, BookSpineVerticalData } from '@/features/home/components/BookSpineVertical';
 import { useBookRowLayout, UseBookRowLayoutOptions } from '@/features/home/hooks/useBookRowLayout';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
@@ -63,8 +64,10 @@ export const ShelfRow = React.memo(function ShelfRow({
   }, [books, getSpineData, toSpineData]);
 
   const layouts = useBookRowLayout(spineDataList, resolvedOptions);
+  const webScrollRef = useWebHorizontalScroll();
 
   return (
+    <View ref={webScrollRef}>
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -83,6 +86,7 @@ export const ShelfRow = React.memo(function ShelfRow({
         </View>
       ))}
     </ScrollView>
+    </View>
   );
 });
 

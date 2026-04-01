@@ -35,8 +35,8 @@ export function scoreBookByVibe(
   }
 
   // Serious ↔ Funny axis
-  if (seriousFunny !== 0 && bookDNA.spectrums.seriousHumorous !== null) {
-    const distance = Math.abs(seriousFunny - bookDNA.spectrums.seriousHumorous);
+  if (seriousFunny !== 0 && bookDNA.spectrums.seriousFunny !== null) {
+    const distance = Math.abs(seriousFunny - bookDNA.spectrums.seriousFunny);
     totalDistance += distance / 2;
     totalWeight += 1;
   }

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Secret Library",
     "slug": "audiobookshelf-app",
-    "version": "0.9.262",
+    "version": "0.9.266",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
     "scheme": "secretlibrary",
@@ -26,7 +26,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.secretlibrary.audiobooks",
-      "buildNumber": "1262",
+      "buildNumber": "24",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio",
@@ -46,7 +46,7 @@
         "backgroundColor": "#231f20"
       },
       "package": "com.secretlibrary.app",
-      "versionCode": 1262,
+      "versionCode": 1266,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.FOREGROUND_SERVICE",

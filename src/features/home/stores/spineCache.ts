@@ -620,8 +620,8 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
           return { ...persistedState, useCommunitySpines: true, communityBookMap: {} };
         }
         if (version < 15) {
-          // v15: Add communityBookMap for universal matching
-          return { ...persistedState, communityBookMap: {} };
+          // v15: Add communityBookMap for universal matching (preserve existing)
+          return { ...persistedState, communityBookMap: persistedState.communityBookMap || {} };
         }
         if (version < 16) {
           // v16: Add per-book spine overrides

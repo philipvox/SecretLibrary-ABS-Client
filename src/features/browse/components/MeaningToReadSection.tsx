@@ -10,7 +10,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { scale, wp, useSecretLibraryColors } from '@/shared/theme';
+import { scale, wp, wpCapped, useSecretLibraryColors } from '@/shared/theme';
 import { LibraryItem, BookMetadata } from '@/core/types';
 import { useCoverUrl } from '@/core/cache';
 import { CoverStars } from '@/shared/components/CoverStars';
@@ -18,7 +18,7 @@ import { useProgressStore } from '@/core/stores/progressStore';
 import { SectionHeader } from './SectionHeader';
 import { useMeaningToRead } from '../hooks/useMeaningToRead';
 
-const CARD_WIDTH = Math.floor(wp(100) * 0.36);
+const CARD_WIDTH = Math.floor(wpCapped(100) * 0.36);
 const COVER_HEIGHT = Math.floor(CARD_WIDTH * 0.55);
 
 interface MeaningToReadSectionProps {

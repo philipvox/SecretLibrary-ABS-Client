@@ -9,7 +9,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
-import { scale, wp, useSecretLibraryColors } from '@/shared/theme';
+import { scale, wp, wpCapped, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useCoverUrl } from '@/core/cache';
 import { useProgressStore } from '@/core/stores/progressStore';
@@ -21,7 +21,7 @@ import { SectionHeader } from './SectionHeader';
 // Layout constants for single-row horizontal scroll
 const PADDING = 24;
 const GAP = 10;
-const CARD_WIDTH = Math.floor(wp(100) * 0.32);
+const CARD_WIDTH = Math.floor(wpCapped(100) * 0.32);
 const COVER_HEIGHT = CARD_WIDTH;
 const TEXT_HEIGHT = scale(20);
 const ROW_HEIGHT = COVER_HEIGHT + scale(6) + TEXT_HEIGHT; // cover + margin + title

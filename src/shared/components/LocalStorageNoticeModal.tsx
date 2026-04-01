@@ -41,7 +41,7 @@ export function LocalStorageNoticeModal({ visible, onDismiss }: LocalStorageNoti
     dismissNotice(neverShowAgain);
     onDismiss();
     // Navigate to storage settings
-    navigation.navigate('StorageSettings');
+    navigation.navigate('DataStorageSettings');
   };
 
   const toggleNeverShow = () => {

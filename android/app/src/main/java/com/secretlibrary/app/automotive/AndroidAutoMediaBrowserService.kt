@@ -61,7 +61,7 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
 
         // Retry constants for browse data polling
         private const val BROWSE_DATA_POLL_INTERVAL_MS = 500L
-        private const val BROWSE_DATA_POLL_MAX_ATTEMPTS = 20  // 10 seconds total
+        private const val BROWSE_DATA_POLL_MAX_ATTEMPTS = 60  // 30 seconds total
 
         // Instance reference for module communication
         @Volatile
@@ -72,6 +72,8 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
     // NO own MediaSession — we share the one from AudioPlaybackService
     private var browseData: JSONArray? = null
     private var browseDataLoaded = false  // true once we have non-empty data
+    private var isPollingForData = false  // prevents duplicate poll loops
+    private var hasPolledOnce = false     // true after first polling cycle completes
 
     // Coroutine scope for async operations
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -85,8 +87,15 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         // If ExoPlayer hasn't initialized yet, we'll retry in onGetRoot
         trySetSessionToken()
 
-        // Load initial browse data
+        // Load initial browse data (may exist from previous session)
         loadBrowseData()
+
+        // On cold start, Android Auto only starts this service — React Native
+        // doesn't boot automatically. Launch the main activity so JS can write
+        // fresh browse data and initialize ExoPlayer for playback.
+        if (!hasBrowseData() || sessionToken == null) {
+            launchMainApp()
+        }
     }
 
     override fun onDestroy() {
@@ -131,27 +140,87 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
         // Lazily set session token if ExoPlayer became ready after onGetRoot
         trySetSessionToken()
 
-        // Detach result so we can load async
-        result.detach()
-
-        serviceScope.launch {
+        // If we already have browse data, serve it immediately
+        if (hasBrowseData()) {
             val items = try {
-                // If browse data is empty and this is the root, poll for data
-                // JS side may still be writing the file (race condition on first connect)
-                if (parentId == MEDIA_ROOT_ID && !hasBrowseData()) {
-                    Log.d(TAG, "No browse data yet — polling for file (up to ${BROWSE_DATA_POLL_MAX_ATTEMPTS * BROWSE_DATA_POLL_INTERVAL_MS}ms)")
-                    waitForBrowseData()
-                }
                 loadChildrenAsync(parentId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load children for $parentId", e)
                 mutableListOf()
             }
-            try {
-                result.sendResult(items)
-            } catch (e: IllegalStateException) {
-                Log.w(TAG, "sendResult failed (framework timeout?): ${e.message}")
+            result.sendResult(items)
+            return
+        }
+
+        // No data yet — return a placeholder immediately so Android Auto
+        // doesn't hang. A background poll will call notifyChildrenChanged when data arrives.
+        if (parentId == MEDIA_ROOT_ID) {
+            val placeholder = if (isPollingForData || !hasPolledOnce) {
+                // Still waiting for data — show loading
+                Log.d(TAG, "No browse data yet — returning loading placeholder, starting background poll")
+                MediaBrowserCompat.MediaItem(
+                    MediaDescriptionCompat.Builder()
+                        .setMediaId("loading")
+                        .setTitle("Loading library...")
+                        .setSubtitle("Please wait")
+                        .build(),
+                    MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
+                )
+            } else {
+                // Polling completed but no data — user not signed in
+                Log.d(TAG, "No browse data after polling — showing sign-in prompt")
+                MediaBrowserCompat.MediaItem(
+                    MediaDescriptionCompat.Builder()
+                        .setMediaId("sign_in")
+                        .setTitle("Open Secret Library to get started")
+                        .setSubtitle("Sign in to your server to browse audiobooks")
+                        .build(),
+                    MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
+                )
             }
+            result.sendResult(mutableListOf(placeholder))
+
+            // Start background polling — when data arrives, notify Android Auto to refresh
+            if (!isPollingForData) {
+                isPollingForData = true
+                serviceScope.launch {
+                    waitForBrowseData()
+                    isPollingForData = false
+                    hasPolledOnce = true
+                    if (hasBrowseData()) {
+                        notifyChildrenChanged(MEDIA_ROOT_ID)
+                    } else {
+                        // Polling timed out — show sign-in prompt instead of empty list
+                        notifyChildrenChanged(MEDIA_ROOT_ID)
+                    }
+                }
+            }
+            return
+        }
+
+        // Non-root request with no data — return empty
+        result.sendResult(mutableListOf())
+    }
+
+    /**
+     * Launch the main app activity so React Native boots and writes browse data.
+     * Uses the package manager's launch intent so it works regardless of activity name.
+     * Won't bring the app to the foreground if it's already running.
+     */
+    private fun launchMainApp() {
+        try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // Don't bring to foreground — just ensure the process starts
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                startActivity(launchIntent)
+                Log.d(TAG, "Launched main app for cold start initialization")
+            } else {
+                Log.w(TAG, "Could not find launch intent for $packageName")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch main app", e)
         }
     }
 

@@ -33,14 +33,11 @@ export type RootStackParamList = {
   Downloads: undefined;
   Stats: undefined;
   PlaybackSettings: undefined;
-  StorageSettings: undefined;
   DataStorageSettings: undefined;
   HapticSettings: undefined;
-  ChapterCleaningSettings: undefined;
   DisplaySettings: undefined;
   PlaylistSettings: undefined;
   About: undefined;
-  BugReport: undefined;
   SpinePlayground: undefined;
   DeveloperSettings: undefined;
   DebugStressTest: undefined;

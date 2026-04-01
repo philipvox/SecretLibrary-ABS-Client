@@ -18,6 +18,7 @@ import { scale, spacing } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { Collection } from '@/core/types';
+import { useResponsive } from '@/shared/hooks/useResponsive';
 
 const HORIZONTAL_PADDING = 24;
 const CARD_GAP = 12;
@@ -26,7 +27,9 @@ export function CollectionsListScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const cardSize = (screenWidth - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
+  const { coverGridColumns } = useResponsive();
+  const cols = coverGridColumns;
+  const cardSize = (screenWidth - HORIZONTAL_PADDING * 2 - CARD_GAP * (cols - 1)) / cols;
   const inputRef = useRef<TextInput>(null);
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,10 +158,11 @@ export function CollectionsListScreen() {
       {/* Collections grid */}
       <SkullRefreshControl refreshing={isLoading} onRefresh={refetch}>
         <FlatList
+          key={`collections-${cols}`}
           data={filteredCollections}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          numColumns={2}
+          numColumns={cols}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={[

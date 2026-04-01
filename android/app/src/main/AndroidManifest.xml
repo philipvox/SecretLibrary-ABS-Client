@@ -1,7 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" tools:node="remove"/>
+  <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" tools:node="remove"/>
+  <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" tools:node="remove"/>
+  <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" tools:node="remove"/>
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
   <uses-permission android:name="android.permission.CAMERA"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
@@ -9,6 +16,7 @@
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
   <queries>
@@ -27,6 +35,7 @@
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/6f946d03-1d57-4474-bac2-516532b4c2f6"/>
     <service android:name=".exoplayer.AudioPlaybackService" android:exported="false" android:foregroundServiceType="mediaPlayback"/>
+    <service android:name="org.birkir.carplay.CarPlayService" tools:node="remove"/>
     <service android:name=".automotive.AndroidAutoMediaBrowserService" android:exported="true">
       <intent-filter>
         <action android:name="android.media.browse.MediaBrowserService"/>

@@ -3,9 +3,15 @@
  * Based on 402pt design canvas with proportional scaling
  */
 
-import { Dimensions } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// On web (desktop), the viewport can be 1920px+ wide. The proportional
+// scale() function would blow up all sizes (e.g. scale(16) → 76px).
+// On phones, SCREEN_WIDTH ≈ DESIGN_WIDTH so scale() is ~identity.
+// On web, we skip proportional scaling entirely — sizes stay as designed.
+const IS_WEB = Platform.OS === 'web';
 
 /** Design canvas dimensions (Figma base) */
 export const DESIGN_WIDTH = 402;
@@ -15,25 +21,39 @@ export const DESIGN_HEIGHT = 874;
 // CORE SCALE FUNCTIONS
 // =============================================================================
 
-/** Scale a value proportionally to screen width (base: 402pt design canvas) */
-export const scale = (size: number): number => (size / DESIGN_WIDTH) * SCREEN_WIDTH;
+/** Scale a value proportionally to screen width (base: 402pt design canvas).
+ *  On web, returns the raw value — no proportional scaling needed since
+ *  desktop viewports are not phone-sized and layouts use flex/percentage. */
+export const scale = (size: number): number =>
+  IS_WEB ? size : (size / DESIGN_WIDTH) * SCREEN_WIDTH;
 
 /** Width-percentage: returns X% of screen width */
 export const wp = (percent: number): number => SCREEN_WIDTH * (percent / 100);
 
+/** Width-percentage capped for web — for module-level card size constants.
+ *  On web, caps the effective viewport to 500px so horizontal scroll cards
+ *  don't become oversized. Use this instead of wp() for card width constants. */
+export const wpCapped = (percent: number): number => {
+  const effectiveWidth = IS_WEB ? Math.min(SCREEN_WIDTH, 500) : SCREEN_WIDTH;
+  return effectiveWidth * (percent / 100);
+};
+
 /** Height-percentage: returns X% of screen height */
 export const hp = (percent: number): number => SCREEN_HEIGHT * (percent / 100);
 
-/** Scale for vertical measurements relative to design height */
-export const verticalScale = (size: number): number => (size / DESIGN_HEIGHT) * SCREEN_HEIGHT;
+/** Scale for vertical measurements relative to design height.
+ *  On web, returns the raw value (same rationale as scale). */
+export const verticalScale = (size: number): number =>
+  IS_WEB ? size : (size / DESIGN_HEIGHT) * SCREEN_HEIGHT;
 
 /**
- * Moderate scale for text - doesn't scale as aggressively
+ * Moderate scale for text - doesn't scale as aggressively.
+ * On web, returns the raw value.
  * @param size Base size in points
  * @param factor Scaling intensity (0-1, default 0.5)
  */
 export const moderateScale = (size: number, factor = 0.5): number =>
-  size + (scale(size) - size) * factor;
+  IS_WEB ? size : size + (scale(size) - size) * factor;
 
 // =============================================================================
 // SPACING TOKENS

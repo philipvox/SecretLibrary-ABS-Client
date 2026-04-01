@@ -30,6 +30,7 @@ import { getGenreVisualConfig } from '../utils/spine/genreVisualConfig';
 import { COMPOSITIONS, pickComposition } from '../utils/spine/compositions';
 import { hashString, hashToPick } from '../utils/spine/core/hashing';
 import { secretLibraryColors } from '@/shared/theme/secretLibrary';
+import { isLightColor } from '../services/colorExtractor';
 
 // =============================================================================
 // TYPES
@@ -65,6 +66,8 @@ interface BookSpineVerticalProps {
   onPressOut?: () => void;
   showShadow?: boolean;
   isHorizontalDisplay?: boolean;
+  /** Force procedural rendering only — skip spine image overlays */
+  proceduralOnly?: boolean;
   style?: ViewStyle;
 }
 
@@ -127,6 +130,7 @@ export function BookSpineVertical({
   onPressOut,
   showShadow = false,
   isHorizontalDisplay = false,
+  proceduralOnly = false,
   style: styleProp,
 }: BookSpineVerticalProps) {
   // --- Spine image support (community + server, independent) ---
@@ -149,9 +153,13 @@ export function BookSpineVertical({
     if (!cachedDimEntry || (Date.now() - cachedDimEntry.cachedAt >= 24 * 60 * 60 * 1000)) return undefined;
     return { width: cachedDimEntry.width, height: cachedDimEntry.height };
   }, [cachedDimEntry?.width, cachedDimEntry?.height, cachedDimEntry?.cachedAt]);
+  const hasSpineOverride = useSpineCacheStore(
+    useCallback((state) => !!state.spineOverrides[book.id], [book.id])
+  );
   const spineImageUrlRaw = useSpineUrl(book.id);
-  // Try spine image if either source has it
-  const shouldTrySpineImage = bookHasCommunitySpine || bookHasServerSpine;
+  // Try spine image if either source has it, or if user explicitly picked one
+  // proceduralOnly skips all spine images (used in spine picker preview)
+  const shouldTrySpineImage = !proceduralOnly && (bookHasCommunitySpine || bookHasServerSpine || hasSpineOverride);
   const spineImageUrl = shouldTrySpineImage ? spineImageUrlRaw : null;
   const [spineImageFailed, setSpineImageFailed] = useState(false);
 
@@ -164,10 +172,19 @@ export function BookSpineVertical({
   const bookStars = useStarPositionStore((s) => s.positions[book.id]);
   const hasStars = Array.isArray(bookStars) && bookStars.length > 0;
 
+  // --- Cover accent color (extracted from cover art) ---
+  const accentColor = useSpineCacheStore(
+    useCallback((state) => state.accentColors[book.id], [book.id])
+  );
+  // Subscribe to colorVersion so spines re-render when background extraction completes
+  const _colorVersion = useSpineCacheStore((state) => state.colorVersion);
+
   // --- Genre visual config ---
   const genres = useMemo(() => book.genres || EMPTY_GENRES, [book.genres]);
   const visualConfig = useMemo(() => getGenreVisualConfig(genres), [genres]);
-  const bgColor = useMemo(() => hashToPick(book.id + '-bg', visualConfig.backgrounds), [book.id, visualConfig]);
+  const genreBgColor = useMemo(() => hashToPick(book.id + '-bg', visualConfig.backgrounds), [book.id, visualConfig]);
+  const bgColor = accentColor || genreBgColor;
+  const isDark = useMemo(() => accentColor ? !isLightColor(accentColor) : visualConfig.isDark, [accentColor, visualConfig.isDark]);
   const titleFont = useMemo(() => hashToPick(book.id + '-tf', visualConfig.titleFonts), [book.id, visualConfig]);
   const authorFont = useMemo(() => hashToPick(book.id + '-af', visualConfig.authorFonts), [book.id, visualConfig]);
   const compositionIndex = useMemo(() => pickComposition(book.id, book.title), [book.id, book.title]);
@@ -339,7 +356,7 @@ export function BookSpineVertical({
 
           {/* Top shadow */}
           <LinearGradient
-            colors={[`rgba(0,0,0,${visualConfig.isDark ? 0.25 : 0.04})`, 'transparent']}
+            colors={[`rgba(0,0,0,${isDark ? 0.25 : 0.04})`, 'transparent']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5 }}
@@ -355,7 +372,7 @@ export function BookSpineVertical({
               author: book.author,
               titleFont,
               authorFont,
-              isDark: visualConfig.isDark,
+              isDark,
               hash: hashString(book.id),
               isHorizontalDisplay,
             })}
@@ -384,7 +401,7 @@ export function BookSpineVertical({
 
           {/* Thin white spine-edge highlight on left */}
           <LinearGradient
-            colors={[`rgba(255,255,255,${visualConfig.isDark ? 0.05 : 0.28})`, 'rgba(255,255,255,0)']}
+            colors={[`rgba(255,255,255,${isDark ? 0.05 : 0.28})`, 'rgba(255,255,255,0)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '15%' as ViewStyle['width'] }}
@@ -393,7 +410,7 @@ export function BookSpineVertical({
 
           {/* Thin black shadow on right */}
           <LinearGradient
-            colors={['rgba(0,0,0,0)', `rgba(0,0,0,${visualConfig.isDark ? 0.22 : 0.07})`]}
+            colors={['rgba(0,0,0,0)', `rgba(0,0,0,${isDark ? 0.22 : 0.07})`]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: '12%' as ViewStyle['width'] }}
@@ -486,6 +503,7 @@ export default React.memo(BookSpineVertical, (prevProps, nextProps) => {
     prevProps.isPushedLeft === nextProps.isPushedLeft &&
     prevProps.isPushedRight === nextProps.isPushedRight &&
     prevProps.showShadow === nextProps.showShadow &&
-    prevProps.isHorizontalDisplay === nextProps.isHorizontalDisplay
+    prevProps.isHorizontalDisplay === nextProps.isHorizontalDisplay &&
+    prevProps.proceduralOnly === nextProps.proceduralOnly
   );
 });

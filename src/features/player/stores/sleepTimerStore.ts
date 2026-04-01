@@ -22,6 +22,8 @@ import { createLogger } from '@/shared/utils/logger';
 // =============================================================================
 
 const SHAKE_TO_EXTEND_KEY = 'playerShakeToExtend';
+const LAST_TIMER_MINUTES_KEY = 'sleepTimerLastMinutes';
+const LAST_TIMER_TYPE_KEY = 'sleepTimerLastType';
 const SLEEP_TIMER_SHAKE_THRESHOLD = 60; // Start shake detection when < 60 seconds remaining
 const SLEEP_TIMER_EXTEND_MINUTES = 15;  // Add 15 minutes on shake
 
@@ -32,11 +34,15 @@ let currentTimerId = 0;
 // TYPES
 // =============================================================================
 
+type TimerType = 'minutes' | 'end-of-chapter' | 'end-of-book' | 'custom';
+
 interface SleepTimerState {
   sleepTimer: number | null;            // Remaining seconds (null = no timer)
   sleepTimerInterval: NodeJS.Timeout | null;
   shakeToExtendEnabled: boolean;        // User preference
   isShakeDetectionActive: boolean;      // Currently listening for shakes
+  lastTimerMinutes: number | null;      // Last-used timer duration (persisted)
+  lastTimerType: TimerType | null;      // Last-used timer type (persisted)
 }
 
 interface SleepTimerActions {
@@ -61,6 +67,11 @@ interface SleepTimerActions {
    * Toggle shake-to-extend feature
    */
   setShakeToExtendEnabled: (enabled: boolean) => Promise<void>;
+
+  /**
+   * Save last-used timer for memory feature
+   */
+  setLastTimer: (minutes: number, type: TimerType) => void;
 
   /**
    * Load shake-to-extend setting from storage
@@ -88,6 +99,8 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
     sleepTimerInterval: null,
     shakeToExtendEnabled: true, // Default enabled
     isShakeDetectionActive: false,
+    lastTimerMinutes: null,
+    lastTimerType: null,
 
     // =========================================================================
     // ACTIONS
@@ -258,6 +271,12 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
       set({ sleepTimer: null, sleepTimerInterval: null, isShakeDetectionActive: false });
     },
 
+    setLastTimer: (minutes: number, type: TimerType) => {
+      set({ lastTimerMinutes: minutes, lastTimerType: type });
+      AsyncStorage.setItem(LAST_TIMER_MINUTES_KEY, minutes.toString()).catch(() => {});
+      AsyncStorage.setItem(LAST_TIMER_TYPE_KEY, type).catch(() => {});
+    },
+
     setShakeToExtendEnabled: async (enabled: boolean) => {
       set({ shakeToExtendEnabled: enabled });
       try {
@@ -282,12 +301,21 @@ export const useSleepTimerStore = create<SleepTimerState & SleepTimerActions>()(
 
     loadShakeToExtendSetting: async () => {
       try {
-        const value = await AsyncStorage.getItem(SHAKE_TO_EXTEND_KEY);
+        const [value, lastMinutesStr, lastType] = await Promise.all([
+          AsyncStorage.getItem(SHAKE_TO_EXTEND_KEY),
+          AsyncStorage.getItem(LAST_TIMER_MINUTES_KEY),
+          AsyncStorage.getItem(LAST_TIMER_TYPE_KEY),
+        ]);
         const enabled = value !== 'false'; // Default true
-        set({ shakeToExtendEnabled: enabled });
+        const lastTimerMinutes = lastMinutesStr ? parseInt(lastMinutesStr, 10) : null;
+        set({
+          shakeToExtendEnabled: enabled,
+          lastTimerMinutes: lastTimerMinutes && !isNaN(lastTimerMinutes) ? lastTimerMinutes : null,
+          lastTimerType: (lastType as TimerType) || null,
+        });
       } catch (err) {
         // Fix Low #1: Log but use default
-        log.debug('Failed to load shake-to-extend setting, using default:', err);
+        log.debug('Failed to load sleep timer settings, using defaults:', err);
       }
     },
   }))
@@ -330,3 +358,5 @@ export const useSleepTimerState = () =>
       isShakeDetectionActive: s.isShakeDetectionActive,
     }))
   );
+
+export type { TimerType };

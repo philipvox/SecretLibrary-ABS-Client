@@ -9,14 +9,14 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { secretLibraryFonts } from '@/shared/theme/secretLibrary';
-import { scale, wp, useSecretLibraryColors } from '@/shared/theme';
+import { scale, wp, wpCapped, useSecretLibraryColors } from '@/shared/theme';
 import { Collection } from '@/core/types';
 import { useCollections } from '@/shared/hooks/useCollections';
 import { useCoverUrl } from '@/core/cache';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { SectionHeader } from './SectionHeader';
 
-const CARD_WIDTH = Math.floor(wp(100) * 0.38);
+const CARD_WIDTH = Math.floor(wpCapped(100) * 0.38);
 const COVER_HEIGHT = CARD_WIDTH;
 
 interface AwardWinnersSectionProps {

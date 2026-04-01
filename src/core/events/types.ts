@@ -98,6 +98,12 @@ export type EventMap = {
     itemsAdded: number;
     itemsUpdated: number;
   };
+
+  // === OFFLINE EVENTS ===
+  'offline:listening_time_flushed': {
+    bookId: string;
+    seconds: number;
+  };
 };
 
 // Helper type to get payload for a specific event

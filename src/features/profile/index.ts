@@ -1,14 +1,11 @@
 export { ProfileScreen } from './screens/ProfileScreen';
 export { PlaybackSettingsScreen } from './screens/PlaybackSettingsScreen';
-export { StorageSettingsScreen } from './screens/StorageSettingsScreen';
 export { DataStorageSettingsScreen } from './screens/DataStorageSettingsScreen';
 export { HapticSettingsScreen } from './screens/HapticSettingsScreen';
-export { ChapterCleaningSettingsScreen } from './screens/ChapterCleaningSettingsScreen';
 export { DisplaySettingsScreen } from './screens/DisplaySettingsScreen';
 export { PlaylistSettingsScreen } from './screens/PlaylistSettingsScreen';
 export { DeveloperSettingsScreen } from './screens/DeveloperSettingsScreen';
 export { AboutScreen } from './screens/AboutScreen';
-export { BugReportScreen } from './screens/BugReportScreen';
 
 // Stores
 export { useHapticSettingsStore, useHapticSettings, isHapticEnabled } from './stores/hapticSettingsStore';

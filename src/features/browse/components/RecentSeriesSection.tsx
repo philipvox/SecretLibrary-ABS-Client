@@ -14,14 +14,14 @@ import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLi
 import { useLibraryCache, useCoverUrl } from '@/core/cache';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { LibraryItem, BookMetadata } from '@/core/types';
-import { scale, wp } from '@/shared/theme';
+import { scale, wp, wpCapped } from '@/shared/theme';
 import { useContentFilterStore, filterByAudience } from '../stores/contentFilterStore';
 import { useReadingHistory } from '@/shared/hooks/useReadingHistory';
 
 // Carousel layout constants
 const PADDING = 16;
 const GAP = 12;
-const CARD_WIDTH = Math.floor((wp(100) - PADDING - GAP) * 0.42);
+const CARD_WIDTH = Math.floor((wpCapped(100) - PADDING - GAP) * 0.42);
 const COVER_HEIGHT = CARD_WIDTH;
 
 // Helper to get book metadata safely

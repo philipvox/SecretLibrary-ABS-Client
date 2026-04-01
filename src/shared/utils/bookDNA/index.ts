@@ -9,6 +9,7 @@ export {
   getDNAQuality,
   hasMoodScores,
   getDNAMoodScore,
+  SPECTRUM_KEYS,
   DNA_QUALITY_THRESHOLDS,
   getDNASummary,
   parseComparableTitles,

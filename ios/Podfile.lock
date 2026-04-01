@@ -232,7 +232,7 @@ PODS:
     - SDWebImageSVGCoder (~> 1.7.0)
   - ExpoImagePicker (17.0.10):
     - ExpoModulesCore
-  - ExpoKeepAwake (15.0.7):
+  - ExpoKeepAwake (15.0.8):
     - ExpoModulesCore
   - ExpoLinearGradient (15.0.7):
     - ExpoModulesCore
@@ -2757,7 +2757,7 @@ SPEC CHECKSUMS:
   EXManifests: 26e15640538c3d5ef028077ebcaf004b744d4932
   Expo: bdc609f18fd5b7250cd8109787cf719a2c5d2463
   expo-dev-client: 8c7ea59b34bfe0a89bd78b831c067605c7868523
-  expo-dev-launcher: 49e6fea30787e412a121654f8793741e9009c16e
+  expo-dev-launcher: 5479a1d96f5619b5cb80aafc543eecc2add43e73
   expo-dev-menu: cf3e52f2e4402e54e9a36a25c7b38569a82c2c54
   expo-dev-menu-interface: 600df12ea01efecdd822daaf13cc0ac091775533
   ExpoAsset: f867e55ceb428aab99e1e8c082b5aee7c159ea18
@@ -2769,7 +2769,7 @@ SPEC CHECKSUMS:
   ExpoHaptics: 8d199b2f33245ea85289ff6c954c7ee7c00a5b5d
   ExpoImage: d840b256050f4428d2942bc2b6e9251f9e0d7021
   ExpoImagePicker: 1af3e4e31512d2f34c95c2a3018a3edc40aee748
-  ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
+  ExpoKeepAwake: 55f75eca6499bb9e4231ebad6f3e9cb8f99c0296
   ExpoLinearGradient: a464898cb95153125e3b81894fd479bcb1c7dd27
   ExpoLinking: 8f0aaf69aa56f832913030503b6263dc6f647f37
   ExpoMediaControl: 48b9c858514bd4ebde9c5a7f817918a42a7591ac

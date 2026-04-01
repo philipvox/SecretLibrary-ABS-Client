@@ -111,18 +111,66 @@ export function initializeEventListeners(): () => void {
 
   // === WEBSOCKET: PROGRESS UPDATES FROM OTHER DEVICES ===
   unsubscribers.push(
-    eventBus.on('websocket:progress_updated', async ({ libraryItemId, currentTime, duration }) => {
-      const isFinished = currentTime >= duration;
+    eventBus.on('websocket:progress_updated', async ({ libraryItemId, currentTime, duration, isFinished, lastUpdate }) => {
       logger.debug('[EventListeners] WebSocket progress update:', libraryItemId);
 
       // Track for analytics
       trackEvent('websocket_progress_received', { libraryItemId, isFinished });
 
-      // Invalidate book progress queries
+      // --- Real-time local state sync ---
+      // Skip local state update if this is the currently playing book
+      // (the active player owns position — don't jump the scrubber)
+      let isCurrentlyPlaying = false;
+      try {
+        const { usePlayerStore } = await import('@/features/player/stores/playerStore');
+        isCurrentlyPlaying = usePlayerStore.getState().currentBook?.id === libraryItemId;
+      } catch {
+        // Player store not available — safe to update
+      }
+
+      if (!isCurrentlyPlaying) {
+        // Check if remote update is newer than our local data
+        const { useProgressStore } = await import('@/core/stores/progressStore');
+        const localProgress = useProgressStore.getState().getProgress(libraryItemId);
+        // ABS lastUpdate is in seconds, our lastPlayedAt is in milliseconds
+        const remoteTimestampMs = lastUpdate * 1000;
+        const localTimestampMs = localProgress?.lastPlayedAt ?? 0;
+
+        if (remoteTimestampMs >= localTimestampMs) {
+          // Update progressStore + SQLite (with progress_synced=1 to prevent sync loop)
+          await useProgressStore.getState().updateProgressFromRemote(
+            libraryItemId,
+            currentTime,
+            duration,
+            isFinished,
+            lastUpdate
+          );
+
+          // Update playback cache for instant access
+          try {
+            const { playbackCache } = await import('@/core/services/playbackCache');
+            playbackCache.setProgress(libraryItemId, {
+              currentTime,
+              duration,
+              progress: duration > 0 ? currentTime / duration : 0,
+              updatedAt: remoteTimestampMs,
+            });
+          } catch {
+            // Non-critical — progressStore is the source of truth
+          }
+
+          logger.debug('[EventListeners] Applied remote progress for', libraryItemId);
+        } else {
+          logger.debug('[EventListeners] Skipping stale remote progress for', libraryItemId,
+            `(remote: ${remoteTimestampMs}, local: ${localTimestampMs})`);
+        }
+      } else {
+        logger.debug('[EventListeners] Skipping remote progress for currently playing book:', libraryItemId);
+      }
+
+      // --- React Query invalidation (always, even for current book) ---
       queryClient.invalidateQueries({ queryKey: queryKeys.user.progress(libraryItemId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.book.progress(libraryItemId) });
-
-      // Invalidate user progress lists (continue listening, in progress)
       queryClient.invalidateQueries({ queryKey: queryKeys.user.inProgress() });
       queryClient.invalidateQueries({ queryKey: queryKeys.user.continueListening() });
 
@@ -247,11 +295,21 @@ export function initializeEventListeners(): () => void {
     })
   );
 
-  // Connect WebSocket when network comes online
+  // Connect WebSocket when network comes online + flush offline listening time
   unsubscribers.push(
     eventBus.on('network:online', () => {
       logger.debug('[EventListeners] Network online - reconnecting WebSocket');
       websocketService.reconnect();
+
+      // Flush accumulated offline listening time (fire-and-forget)
+      (async () => {
+        try {
+          const { sessionService } = await import('@/features/player/services/sessionService');
+          await sessionService.flushOfflineListeningTime();
+        } catch (err) {
+          logger.warn('[EventListeners] Failed to flush offline listening time:', err);
+        }
+      })();
     })
   );
 

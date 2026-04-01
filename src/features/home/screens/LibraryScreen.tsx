@@ -57,6 +57,7 @@ import { BookSpineVerticalData } from '../components/BookSpineVertical';
 import { RecommendedBook } from '../components/DiscoverMoreCard';
 import { useHomeData } from '../hooks/useHomeData';
 import { useInProgressBooks, useFinishedBooks } from '@/core/hooks/useUserBooks';
+import { useResponsive } from '@/shared/hooks/useResponsive';
 import { useShallow } from 'zustand/react/shallow';
 import { useProgressStore } from '@/core/stores/progressStore';
 import { usePlayerStore } from '@/shared/stores/playerFacade';
@@ -326,6 +327,10 @@ export function LibraryScreen() {
   // Theme-aware colors
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
+
+  // Responsive grid columns for web desktop
+  const { coverGridColumns, isWeb } = useResponsive();
+  const gridCols = isWeb ? coverGridColumns : 2;
 
   const defaultViewMode = useMyLibraryStore((s) => s.defaultViewMode) ?? 'shelf';
   const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
@@ -993,7 +998,7 @@ export function LibraryScreen() {
 
     return (
       <Pressable
-        style={[styles.verticalListItem, { borderBottomColor: colors.grayLine }]}
+        style={[styles.verticalListItem, { borderBottomColor: colors.grayLine }, listCols > 1 && { flex: 1 }]}
         onPress={() => handleBookPress(book)}
         onLongPress={() => handleBookLongPress(book)}
         accessibilityLabel={`Open ${book.title} by ${book.author}`}
@@ -1019,22 +1024,27 @@ export function LibraryScreen() {
   const listKeyExtractor = useCallback((item: LibraryBook) => item.id, []);
 
   // Render list view (virtualized FlatList)
+  // On web desktop, list view shows 2 columns so the narrow rows fill the wide screen
+  const listCols = isWeb && gridCols >= 3 ? 2 : 1;
+
   const renderListView = () => {
     return (
       <FlatList
-        key="list-view"
+        key={`list-view-${listCols}`}
         data={allBooks}
         renderItem={renderListItem}
         keyExtractor={listKeyExtractor}
         style={styles.listScrollView}
-        contentContainerStyle={{ paddingBottom: getBottomPadding('list') }}
+        contentContainerStyle={{ paddingBottom: getBottomPadding('list'), paddingHorizontal: listCols > 1 ? 16 : 0 }}
         showsVerticalScrollIndicator={false}
         refreshing={isCacheLoading || isRefreshing}
         onRefresh={handleRefreshPress}
+        numColumns={listCols}
+        columnWrapperStyle={listCols > 1 ? { gap: 16 } : undefined}
         initialNumToRender={15}
         maxToRenderPerBatch={10}
         windowSize={5}
-        removeClippedSubviews
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     );
   };
@@ -1046,9 +1056,12 @@ export function LibraryScreen() {
     const narrator = item ? getNarratorName(item) : '';
     const durationText = formatDurationCompact(book.durationSeconds);
 
+    // Dynamic width: for N columns with space-between, each card is ~(100/N - gap)%
+    const cardWidthPct = `${Math.floor(100 / gridCols) - 2}%` as any;
+
     return (
       <Pressable
-        style={styles.gridCard}
+        style={[styles.gridCard, { width: cardWidthPct }]}
         onPress={() => handleBookPress(book)}
         onLongPress={() => handleBookLongPress(book)}
         accessibilityLabel={`Open ${book.title} by ${book.author}`}
@@ -1087,11 +1100,11 @@ export function LibraryScreen() {
     );
   }, [colors, libraryItemsMap, handleBookPress, handleBookLongPress]);
 
-  // Render grid view (virtualized 2-column FlatList)
+  // Render grid view (virtualized multi-column FlatList)
   const renderGridView = () => {
     return (
       <FlatList
-        key="grid-view"
+        key={`grid-view-${gridCols}`}
         data={allBooks}
         renderItem={renderGridItem}
         keyExtractor={listKeyExtractor}
@@ -1100,12 +1113,12 @@ export function LibraryScreen() {
         showsVerticalScrollIndicator={false}
         refreshing={isCacheLoading || isRefreshing}
         onRefresh={handleRefreshPress}
-        numColumns={2}
+        numColumns={gridCols}
         columnWrapperStyle={styles.gridRow}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
         windowSize={5}
-        removeClippedSubviews
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     );
   };
