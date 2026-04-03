@@ -6,6 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from './authService';
 import { apiClient } from '../api/apiClient';
 import { User } from '../types';
@@ -15,6 +16,10 @@ import { authLogger as log } from '@/shared/utils/logger';
 import { serverVersionService, VersionCheckResult } from '../services/serverVersionService';
 import { tokenHealthService } from '../services/tokenHealthService';
 import { setUser as setSentryUser } from '../monitoring/sentry';
+
+// Same keys used by LoginScreen — persisted across logout so the form pre-fills
+const SAVED_SERVER_URL_KEY = 'login_saved_server_url';
+const SAVED_USERNAME_KEY = 'login_saved_username';
 
 /**
  * Authentication context state and operations
@@ -125,6 +130,15 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   }, [handleAuthFailure]);
 
   /**
+   * Persist server URL and username so the LoginScreen pre-fills after logout.
+   * Best-effort — failures are non-fatal.
+   */
+  const saveLoginHint = (url: string, username: string) => {
+    AsyncStorage.setItem(SAVED_SERVER_URL_KEY, url).catch(() => {});
+    if (username) AsyncStorage.setItem(SAVED_USERNAME_KEY, username).catch(() => {});
+  };
+
+  /**
    * Restore session from stored credentials
    */
   const restoreSession = async () => {
@@ -137,6 +151,11 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       if (session) {
         setUser(session.user);
         setServerUrl(session.serverUrl);
+
+        // Ensure login hints are populated for future logouts
+        if (session.serverUrl) {
+          saveLoginHint(session.serverUrl, session.user?.username || '');
+        }
 
         // Set Sentry user context for error tracking
         if (session.user) {
@@ -186,6 +205,9 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
 
       setUser(user);
       setServerUrl(serverUrl);
+
+      // Persist URL/username so LoginScreen pre-fills after future logout
+      saveLoginHint(serverUrl, username);
 
       // Set Sentry user context for error tracking
       setSentryUser({ id: user.id, username: user.username });
@@ -244,6 +266,9 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       setUser(user);
       setServerUrl(serverUrl);
 
+      // Persist URL so LoginScreen pre-fills after future logout
+      saveLoginHint(serverUrl, user.username || '');
+
       // Set Sentry user context for error tracking
       setSentryUser({ id: user.id, username: user.username });
 
@@ -282,7 +307,10 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
   };
 
   /**
-   * Logout and clear session
+   * Logout and clear session.
+   *
+   * State is cleared in a finally block so the user always lands on the
+   * login screen, even if the server call or storage cleanup times out.
    */
   const logout = async (): Promise<void> => {
     try {
@@ -296,23 +324,17 @@ export function AuthProvider({ children, initialSession }: AuthProviderProps) {
       tokenHealthService.stop();
 
       await authService.logout();
-
-      // Clear version cache on logout
+    } catch (err: any) {
+      // Log but don't re-throw — the user must still land on the login screen.
+      log.error('Logout cleanup error (non-fatal):', err);
+    } finally {
+      // Always clear in-memory state so the app navigates to LoginScreen.
       serverVersionService.clearCache();
-
       setUser(null);
       setServerUrl(null);
       setVersionCheck(null);
       setVersionWarningDismissed(false);
-
-      // Clear Sentry user context
       setSentryUser(null);
-    } catch (err: any) {
-      log.error('Logout failed:', err);
-      const errorMessage = err.message || 'Logout failed. Please try again.';
-      setError(errorMessage);
-      throw err;
-    } finally {
       setIsLoading(false);
     }
   };

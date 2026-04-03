@@ -9,6 +9,31 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.281] - 2026-04-02
+
+### Fixed — Logout Hang
+- Server logout call now times out after 5 seconds instead of hanging indefinitely
+- Storage cleanup times out after 8 seconds if SQLite locks stall it
+- In-memory auth state always clears (via finally block), so the user always reaches the login screen even if cleanup partially fails
+- Logout no longer throws on error — the user is logged out regardless
+
+### Fixed — Login Screen Pre-Fill
+- Server URL and username are now saved on every successful login (including session restore and SSO), so the login screen always pre-fills after logout
+- Previously, saved values were only written when the user submitted the login form directly
+
+### Improved — Login Error Visibility
+- Error messages now use a red-tinted background with a visible border instead of the nearly-invisible 8% white overlay
+- Error icon changed to red for better contrast on dark backgrounds
+
+### Files Modified
+- `src/core/auth/authService.ts` — withTimeout utility, timeout on server logout + clearStorage
+- `src/core/auth/authContext.tsx` — non-throwing logout, saveLoginHint on all auth paths
+- `src/features/auth/screens/LoginScreen.tsx` — error container styling
+- `src/constants/version.ts` — version bump
+- `CHANGELOG.md` — this entry
+
+---
+
 ## [0.9.280] - 2026-03-31
 
 ### Added — Real-Time WebSocket Progress Sync

@@ -21,6 +21,24 @@ const TOKEN_KEY = 'auth_token';
 const SERVER_URL_KEY = 'server_url';
 const USER_KEY = 'user_data';
 
+// Timeouts
+const SERVER_LOGOUT_TIMEOUT_MS = 5000;
+const CLEAR_STORAGE_TIMEOUT_MS = 8000;
+
+/**
+ * Race a promise against a timeout. Resolves with the promise result or
+ * rejects with a timeout error — whichever comes first.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 /**
  * Cross-platform secure storage wrapper
  *
@@ -613,18 +631,22 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      // Try to notify server (best effort)
+      // Try to notify server (best effort, 5s timeout to prevent hang)
       try {
-        await apiClient.logout();
+        await withTimeout(apiClient.logout(), SERVER_LOGOUT_TIMEOUT_MS, 'Server logout');
       } catch (err) {
-        log.warn('Failed to notify server of logout:', err);
+        log.warn('Failed to notify server of logout (continuing):', err);
       }
 
       // Clear API client token
       apiClient.clearAuthToken();
 
-      // Clear stored data
-      await this.clearStorage();
+      // Clear stored data (8s timeout — SQLite lock contention can stall this)
+      try {
+        await withTimeout(this.clearStorage(), CLEAR_STORAGE_TIMEOUT_MS, 'Clear storage');
+      } catch (err) {
+        log.warn('Clear storage timed out (continuing):', err);
+      }
     } catch (error) {
       log.error('Logout failed:', error);
       throw error;

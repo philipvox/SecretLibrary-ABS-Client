@@ -6,9 +6,9 @@
  * See CHANGELOG.md in project root for detailed change history.
  */
 
-export const APP_VERSION = '0.9.280';
-export const BUILD_NUMBER = 1280;
-export const VERSION_DATE = '2026-03-31';
+export const APP_VERSION = '0.9.281';
+export const BUILD_NUMBER = 1281;
+export const VERSION_DATE = '2026-04-02';
 
 // iOS App Store uses a separate version scheme
 export const IOS_VERSION = '1.0.4';

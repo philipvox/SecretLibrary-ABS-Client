@@ -447,16 +447,16 @@ export function LoginScreen() {
 
           {/* Validation Error */}
           {validationError ? (
-            <View style={[styles.errorContainer, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
-              <AlertCircle size={scale(16)} color={colors.text.primary} strokeWidth={2} />
+            <View style={[styles.errorContainer, { backgroundColor: 'rgba(220,38,38,0.15)', borderColor: 'rgba(220,38,38,0.3)', borderWidth: 1 }]}>
+              <AlertCircle size={scale(16)} color="#F87171" strokeWidth={2} />
               <Text style={[styles.errorText, { color: colors.text.primary }]}>{validationError}</Text>
             </View>
           ) : null}
 
           {/* Auth Error (from server) */}
           {error && !validationError ? (
-            <View style={[styles.errorContainer, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
-              <AlertCircle size={scale(16)} color={colors.text.primary} strokeWidth={2} />
+            <View style={[styles.errorContainer, { backgroundColor: 'rgba(220,38,38,0.15)', borderColor: 'rgba(220,38,38,0.3)', borderWidth: 1 }]}>
+              <AlertCircle size={scale(16)} color="#F87171" strokeWidth={2} />
               <Text style={[styles.errorText, { color: colors.text.primary }]}>{error}</Text>
             </View>
           ) : null}
