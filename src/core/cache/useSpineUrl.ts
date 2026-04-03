@@ -11,6 +11,10 @@
  *
  * Community spines use the communityBookId (not local UUID) in the URL,
  * since the community server doesn't know about individual ABS instance UUIDs.
+ *
+ * IMPORTANT: Community spine URLs are built directly (not via apiClient.getItemSpineUrl)
+ * to avoid the ?v=N cache buster. Community spines are immutable — the cache buster
+ * would cause expo-image to re-fetch on every library refresh, flashing black.
  */
 
 import { useMemo } from 'react';
@@ -19,6 +23,14 @@ import { useLibraryCache } from './libraryCache';
 import { useSpineCacheStore } from '@/shared/spine';
 
 const COMMUNITY_SPINE_URL = 'https://spines.mysecretlibrary.com';
+
+/**
+ * Build a stable community spine URL. No cache buster — immutable images.
+ * Always requests ?h=800 (pre-generated small version, ~5KB vs ~30KB).
+ */
+function buildCommunitySpineUrl(communityBookId: string): string {
+  return `${COMMUNITY_SPINE_URL}/api/items/${communityBookId}/spine?h=800`;
+}
 
 /**
  * Get a spine image URL with cache busting based on library refresh timestamp.
@@ -44,15 +56,11 @@ export function useSpineUrl(
     const override = spineOverrides[itemId];
     if (override) return override;
 
-    // Community spines: use communityBookId in the URL (not local UUID)
-    // No cache buster — community spines are immutable, expo-image caches on disk
+    // Community spines: stable URL, no cache buster (immutable images)
     if (useCommunitySpines && booksWithCommunitySpines.has(itemId)) {
       const communityBookId = useSpineCacheStore.getState().communityBookMap[itemId];
       if (communityBookId) {
-        return apiClient.getItemSpineUrl(communityBookId, {
-          ...options,
-          customBaseUrl: COMMUNITY_SPINE_URL,
-        });
+        return buildCommunitySpineUrl(communityBookId);
       }
     }
 
@@ -79,7 +87,7 @@ export function useSpineUrl(
 export function getCommunitySpineUrl(itemId: string): string {
   const communityBookId = useSpineCacheStore.getState().communityBookMap[itemId];
   const id = communityBookId || itemId;
-  return `${COMMUNITY_SPINE_URL}/api/items/${id}/spine`;
+  return buildCommunitySpineUrl(id);
 }
 
 /**
@@ -96,15 +104,11 @@ export function getSpineUrl(
   const override = spineOverrides[itemId];
   if (override) return override;
 
-  // Community spines: use communityBookId
-  // No cache buster — community spines are immutable, expo-image caches on disk
+  // Community spines: stable URL, no cache buster (immutable images)
   if (useCommunitySpines && booksWithCommunitySpines.has(itemId)) {
     const communityBookId = communityBookMap[itemId];
     if (communityBookId) {
-      return apiClient.getItemSpineUrl(communityBookId, {
-        ...options,
-        customBaseUrl: COMMUNITY_SPINE_URL,
-      });
+      return buildCommunitySpineUrl(communityBookId);
     }
   }
 

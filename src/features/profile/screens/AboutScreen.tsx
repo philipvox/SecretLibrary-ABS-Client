@@ -19,6 +19,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -77,12 +78,12 @@ interface CategoryDef {
 }
 
 const CATEGORIES: CategoryDef[] = [
-  { key: 'playback', label: 'Playback' },
-  { key: 'downloads', label: 'Downloads' },
-  { key: 'sync', label: 'Sync / Progress' },
-  { key: 'ui', label: 'UI / Display' },
-  { key: 'crash', label: 'Crash / Freeze' },
-  { key: 'other', label: 'Other' },
+  { key: 'playback', label: 'about.bugReport.categoryPlayback' },
+  { key: 'downloads', label: 'about.bugReport.categoryDownloads' },
+  { key: 'sync', label: 'about.bugReport.categorySync' },
+  { key: 'ui', label: 'about.bugReport.categoryUi' },
+  { key: 'crash', label: 'about.bugReport.categoryCrash' },
+  { key: 'other', label: 'about.bugReport.categoryOther' },
 ];
 
 const CATEGORY_SEVERITY: Record<string, string> = {
@@ -110,6 +111,7 @@ function buildDiagnostics(serverUrl: string | null): string {
 export function AboutScreen() {
   const insets = useSafeAreaInsets();
   const colors = useSecretLibraryColors();
+  const { t } = useTranslation();
   const { serverUrl } = useAuth();
 
   // Bug report form state
@@ -123,7 +125,7 @@ export function AboutScreen() {
 
   const diagnostics = useMemo(() => buildDiagnostics(serverUrl), [serverUrl]);
   const canSubmit = title.trim().length > 0 && description.trim().length > 0;
-  const selectedCategoryLabel = CATEGORIES.find((c) => c.key === category)?.label ?? 'Other';
+  const selectedCategoryLabel = t(CATEGORIES.find((c) => c.key === category)?.label ?? 'about.bugReport.categoryOther');
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || isSending) return;
@@ -172,16 +174,16 @@ export function AboutScreen() {
         const errorMsg =
           typeof result === 'object' && result !== null && 'error' in result
             ? String((result as { error: unknown }).error)
-            : 'Something went wrong. Try again.';
+            : t('about.bugReport.defaultErrorMessage');
         setErrorMessage(errorMsg);
       }
     } catch {
       setSubmitResult('error');
-      setErrorMessage('Could not reach the server. Try again later.');
+      setErrorMessage(t('about.bugReport.networkErrorMessage'));
     } finally {
       setIsSending(false);
     }
-  }, [canSubmit, isSending, title, description, category, selectedCategoryLabel, diagnostics]);
+  }, [canSubmit, isSending, title, description, category, selectedCategoryLabel, diagnostics, t]);
 
   const handleOpenWebsite = useCallback(() => {
     Linking.openURL(
@@ -192,7 +194,7 @@ export function AboutScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
       <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
-      <SettingsHeader title="About & Help" />
+      <SettingsHeader title={t('about.title')} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -208,38 +210,38 @@ export function AboutScreen() {
           {/* App Identity */}
           <View style={styles.identity}>
             <SkullLogo size={80} color={colors.black} />
-            <Text style={[styles.appName, { color: colors.black }]}>Secret Library</Text>
-            <Text style={[styles.tagline, { color: colors.gray }]}>Your personal audiobook companion</Text>
+            <Text style={[styles.appName, { color: colors.black }]}>{t('about.appName')}</Text>
+            <Text style={[styles.tagline, { color: colors.gray }]}>{t('about.tagline')}</Text>
           </View>
 
           {/* Version Info */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.gray }]}>Version</Text>
+            <Text style={[styles.sectionTitle, { color: colors.gray }]}>{t('about.sectionVersion')}</Text>
             <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
               <View style={[styles.infoRow, { borderBottomColor: colors.borderLight }]}>
-                <Text style={[styles.infoLabel, { color: colors.black }]}>Version</Text>
+                <Text style={[styles.infoLabel, { color: colors.black }]}>{t('about.version')}</Text>
                 <Text style={[styles.infoValue, { color: colors.gray }]}>{APP_VERSION}</Text>
               </View>
               <View style={[styles.infoRow, { borderBottomColor: colors.borderLight }]}>
-                <Text style={[styles.infoLabel, { color: colors.black }]}>Build</Text>
+                <Text style={[styles.infoLabel, { color: colors.black }]}>{t('about.build')}</Text>
                 <Text style={[styles.infoValue, { color: colors.gray }]}>{BUILD_NUMBER}</Text>
               </View>
               <View style={[styles.infoRow, { borderBottomColor: colors.borderLight }]}>
-                <Text style={[styles.infoLabel, { color: colors.black }]}>Date</Text>
+                <Text style={[styles.infoLabel, { color: colors.black }]}>{t('about.date')}</Text>
                 <Text style={[styles.infoValue, { color: colors.gray }]}>{VERSION_DATE}</Text>
               </View>
             </View>
           </View>
 
           {/* Bug Report */}
-          <SectionHeader title="Report a Bug" />
+          <SectionHeader title={t('about.sectionReportABug')} />
 
           {/* Success Banner */}
           {submitResult === 'success' && (
             <View style={[styles.banner, { backgroundColor: '#E8F5E9', borderColor: '#66BB6A' }]}>
               <CheckCircle size={scale(18)} color="#2E7D32" strokeWidth={1.5} />
               <Text style={[styles.bannerText, { color: '#2E7D32' }]}>
-                Bug report submitted. Thank you!
+                {t('about.bugReport.successMessage')}
               </Text>
             </View>
           )}
@@ -255,7 +257,7 @@ export function AboutScreen() {
           )}
 
           {/* Category Picker */}
-          <Text style={[styles.formLabel, { color: colors.gray }]}>Category</Text>
+          <Text style={[styles.formLabel, { color: colors.gray }]}>{t('about.bugReport.categoryLabel')}</Text>
           <TouchableOpacity
             style={[styles.pickerButton, { backgroundColor: colors.white, borderColor: colors.borderLight }]}
             onPress={() => setShowCategories((v) => !v)}
@@ -284,11 +286,11 @@ export function AboutScreen() {
                       setShowCategories(false);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`${cat.label}${isActive ? ', currently selected' : ''}`}
+                    accessibilityLabel={`${t(cat.label)}${isActive ? ', currently selected' : ''}`}
                     accessibilityState={{ selected: isActive }}
                   >
                     <Text style={[styles.categoryItemText, { color: isActive ? colors.black : colors.gray }]}>
-                      {cat.label}
+                      {t(cat.label)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -297,34 +299,34 @@ export function AboutScreen() {
           )}
 
           {/* Title */}
-          <Text style={[styles.formLabel, { color: colors.gray }]}>Title</Text>
+          <Text style={[styles.formLabel, { color: colors.gray }]}>{t('about.bugReport.titleLabel')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.white, borderColor: colors.borderLight, color: colors.black }]}
-            placeholder="Brief summary of the issue"
+            placeholder={t('about.bugReport.titlePlaceholder')}
             placeholderTextColor={colors.gray}
             value={title}
             onChangeText={setTitle}
             maxLength={120}
             returnKeyType="next"
-            accessibilityLabel="Bug report title"
+            accessibilityLabel={t('about.bugReport.titleLabel')}
           />
 
           {/* Description */}
-          <Text style={[styles.formLabel, { color: colors.gray }]}>Description</Text>
+          <Text style={[styles.formLabel, { color: colors.gray }]}>{t('about.bugReport.descriptionLabel')}</Text>
           <TextInput
             style={[styles.textArea, { backgroundColor: colors.white, borderColor: colors.borderLight, color: colors.black }]}
-            placeholder="What happened? What did you expect to happen?"
+            placeholder={t('about.bugReport.descriptionPlaceholder')}
             placeholderTextColor={colors.gray}
             value={description}
             onChangeText={setDescription}
             multiline
             numberOfLines={6}
             textAlignVertical="top"
-            accessibilityLabel="Bug report description"
+            accessibilityLabel={t('about.bugReport.descriptionLabel')}
           />
 
           {/* Diagnostics Preview */}
-          <Text style={[styles.formLabel, { color: colors.gray }]}>Attached Diagnostics</Text>
+          <Text style={[styles.formLabel, { color: colors.gray }]}>{t('about.bugReport.attachedDiagnostics')}</Text>
           <View style={[styles.diagnosticsCard, { backgroundColor: colors.white, borderColor: colors.borderLight }]}>
             <Text style={[styles.diagnosticsText, { color: colors.textMuted }]}>{diagnostics}</Text>
           </View>
@@ -339,7 +341,7 @@ export function AboutScreen() {
             disabled={!canSubmit || isSending}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={isSending ? 'Submitting bug report' : 'Submit bug report'}
+            accessibilityLabel={isSending ? t('about.bugReport.submittingReport') : t('about.bugReport.submitReport')}
           >
             {isSending ? (
               <ActivityIndicator size="small" color={colors.white} />
@@ -347,7 +349,7 @@ export function AboutScreen() {
               <>
                 <Send size={scale(16)} color={canSubmit ? colors.white : colors.gray} strokeWidth={1.5} />
                 <Text style={[styles.submitText, { color: canSubmit ? colors.white : colors.gray }]}>
-                  Submit Report
+                  {t('about.bugReport.submitReport')}
                 </Text>
               </>
             )}
@@ -359,17 +361,17 @@ export function AboutScreen() {
             onPress={handleOpenWebsite}
             activeOpacity={0.7}
             accessibilityRole="link"
-            accessibilityLabel="Report on our website instead"
+            accessibilityLabel={t('about.bugReport.reportOnWebsite')}
           >
             <ExternalLink size={scale(14)} color={colors.gray} strokeWidth={1.5} />
             <Text style={[styles.websiteLinkText, { color: colors.gray }]}>
-              Report on our website instead
+              {t('about.bugReport.reportOnWebsite')}
             </Text>
           </TouchableOpacity>
 
           {/* Licenses */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.gray }]}>Open Source Licenses</Text>
+            <Text style={[styles.sectionTitle, { color: colors.gray }]}>{t('about.sectionOpenSourceLicenses')}</Text>
             <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
               {LICENSES.map((dep, index) => (
                 <View key={dep.name} style={[styles.licenseRow, { borderBottomColor: colors.borderLight }, index === LICENSES.length - 1 && styles.lastRow]}>

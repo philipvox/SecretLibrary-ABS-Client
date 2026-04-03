@@ -262,9 +262,11 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
 
     /**
      * Check if we have non-empty browse data.
+     * Thread-safe: captures @Volatile field in local val to avoid TOCTOU race.
      */
     private fun hasBrowseData(): Boolean {
-        return browseDataLoaded && browseData != null && browseData!!.length() > 0
+        val data = browseData  // snapshot volatile field
+        return browseDataLoaded && data != null && data.length() > 0
     }
 
     /**
@@ -288,15 +290,18 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
 
     private fun loadChildrenAsync(parentId: String): MutableList<MediaBrowserCompat.MediaItem> {
         val items = mutableListOf<MediaBrowserCompat.MediaItem>()
+        // Snapshot volatile field once — all reads in this method use the same reference,
+        // preventing TOCTOU crashes if another thread updates browseData mid-iteration.
+        val sections = browseData ?: return items
 
         when {
             parentId == MEDIA_ROOT_ID -> {
                 // Root level: return sections
-                browseData?.let { sections ->
-                    for (i in 0 until sections.length()) {
+                for (i in 0 until sections.length()) {
+                    try {
                         val section = sections.getJSONObject(i)
-                        val sectionId = section.getString("id")
-                        val sectionTitle = section.getString("title")
+                        val sectionId = section.optString("id", "unknown")
+                        val sectionTitle = section.optString("title", "")
                         val itemCount = section.optJSONArray("items")?.length() ?: 0
 
                         val description = MediaDescriptionCompat.Builder()
@@ -309,24 +314,31 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
                             description,
                             MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
                         ))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Skipping malformed section at index $i", e)
                     }
                 }
             }
             parentId.startsWith(PREFIX_SECTION) -> {
                 // Section level: return items in that section with cover art
                 val sectionId = parentId.removePrefix(PREFIX_SECTION)
-                browseData?.let { sections ->
-                    for (i in 0 until sections.length()) {
+                for (i in 0 until sections.length()) {
+                    try {
                         val section = sections.getJSONObject(i)
-                        if (section.getString("id") == sectionId) {
-                            val sectionItems = section.getJSONArray("items")
-
+                        if (section.optString("id") == sectionId) {
+                            val sectionItems = section.optJSONArray("items") ?: break
                             for (j in 0 until sectionItems.length()) {
-                                val item = sectionItems.getJSONObject(j)
-                                items.add(createMediaItemWithArt(item))
+                                try {
+                                    val item = sectionItems.getJSONObject(j)
+                                    items.add(createMediaItemWithArt(item))
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Skipping malformed item at index $j in section $sectionId", e)
+                                }
                             }
                             break
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error reading section at index $i", e)
                     }
                 }
             }
@@ -443,11 +455,16 @@ class AndroidAutoMediaBrowserService : MediaBrowserServiceCompat() {
             Log.d(TAG, "Browse data updated — notifying all children")
         }
         notifyChildrenChanged(MEDIA_ROOT_ID)
-        browseData?.let { sections ->
-            for (i in 0 until sections.length()) {
-                val section = sections.getJSONObject(i)
-                val sectionId = section.getString("id")
-                notifyChildrenChanged("$PREFIX_SECTION$sectionId")
+        // Snapshot volatile field to avoid TOCTOU race during iteration
+        val sections = browseData ?: return
+        for (i in 0 until sections.length()) {
+            try {
+                val sectionId = sections.getJSONObject(i).optString("id", "")
+                if (sectionId.isNotEmpty()) {
+                    notifyChildrenChanged("$PREFIX_SECTION$sectionId")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error notifying section at index $i", e)
             }
         }
     }

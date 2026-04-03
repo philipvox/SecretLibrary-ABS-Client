@@ -18,6 +18,7 @@ import expo.modules.ReactNativeHostWrapper
 import com.secretlibrary.app.chromecast.CastPackage
 import com.secretlibrary.app.exoplayer.ExoPlayerPackage
 import com.secretlibrary.app.automotive.AndroidAutoPackage
+import com.secretlibrary.app.nativehttp.NativeHttpPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -29,6 +30,7 @@ class MainApplication : Application(), ReactApplication {
               add(CastPackage())
               add(ExoPlayerPackage())
               add(AndroidAutoPackage())
+              add(NativeHttpPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"

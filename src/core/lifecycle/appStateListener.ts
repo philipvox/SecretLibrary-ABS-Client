@@ -13,8 +13,10 @@ import { queryClient, queryKeys } from '@/core/queryClient';
 import { useLibraryCache } from '@/core/cache/libraryCache';
 import { logger } from '@/shared/utils/logger';
 
-// Minimum time in background before triggering refetch (5 seconds)
-const MIN_BACKGROUND_TIME = 5000;
+// Minimum time in background before triggering progress refetch (30 seconds)
+const MIN_BACKGROUND_TIME = 30000;
+// Minimum time in background before refreshing library/series data (5 minutes)
+const LIBRARY_REFRESH_THRESHOLD = 300000;
 
 // Track background timing
 let backgroundedAt: number | null = null;
@@ -111,8 +113,8 @@ async function handleForegroundReturn(timeInBackground: number): Promise<void> {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.continueListening() }),
     ];
 
-    // If backgrounded for more than 1 minute, also refresh library data
-    if (timeInBackground > 60000) {
+    // If backgrounded for more than 5 minutes, also refresh library data
+    if (timeInBackground > LIBRARY_REFRESH_THRESHOLD) {
       invalidations.push(
         queryClient.invalidateQueries({ queryKey: queryKeys.library.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.series.all })

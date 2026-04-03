@@ -44,6 +44,7 @@ import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { BookSpineVerticalData, ShelfRow } from '@/shared/spine';
 import { BookGrid } from '@/shared/components/BookGrid';
 import Svg, { Path } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 
 // Sort types for detail screens
 type DetailSortMode = 'publishedYear' | 'title' | 'duration' | 'progress';
@@ -163,6 +164,7 @@ export function SecretLibrarySeriesDetailScreen() {
   const colors = useSecretLibraryColors();
   const _isDarkMode = colors.isDark;
   const { showMenu } = useBookContextMenu();
+  const { t } = useTranslation();
 
   // Handle both param formats
   const seriesName = route.params.seriesName || route.params.name || '';
@@ -204,7 +206,13 @@ export function SecretLibrarySeriesDetailScreen() {
     setShowSortDropdown(false);
   }, [sortMode]);
 
-  const currentSortLabel = DETAIL_SORT_OPTIONS.find(o => o.key === sortMode)?.label || 'Published';
+  const sortLabelMap: Record<string, string> = {
+    publishedYear: t('seriesDetail.sortPublished'),
+    title: t('seriesDetail.sortTitle'),
+    duration: t('seriesDetail.sortDuration'),
+    progress: t('seriesDetail.sortProgress'),
+  };
+  const currentSortLabel = sortLabelMap[sortMode] || t('seriesDetail.sortPublished');
 
   // Get series data from cache
   const seriesInfo = useMemo(() => {
@@ -384,7 +392,7 @@ export function SecretLibrarySeriesDetailScreen() {
           <Text style={[styles.verticalTitle, { color: colors.black }]} numberOfLines={1}>{title}</Text>
           {seriesSeq !== undefined && (
             <Text style={[styles.verticalSeries, { color: colors.gray }]} numberOfLines={1}>
-              Book {seriesSeq}
+              {t('seriesDetail.bookSequence', { number: seriesSeq })}
             </Text>
           )}
         </View>
@@ -420,7 +428,7 @@ export function SecretLibrarySeriesDetailScreen() {
         />
         <View style={[styles.emptyContainer, { backgroundColor: colors.white }]}>
           <BookIcon size={48} color={colors.gray} />
-          <Text style={[styles.emptyTitle, { color: colors.black }]}>Series not found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.black }]}>{t('seriesDetail.seriesNotFound')}</Text>
         </View>
       </View>
     );
@@ -437,7 +445,7 @@ export function SecretLibrarySeriesDetailScreen() {
         />
         <View style={[styles.emptyContainer, { backgroundColor: colors.white }]}>
           <BookIcon size={48} color={colors.gray} />
-          <Text style={[styles.emptyTitle, { color: colors.black }]}>Series not found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.black }]}>{t('seriesDetail.seriesNotFound')}</Text>
         </View>
       </View>
     );
@@ -459,7 +467,7 @@ export function SecretLibrarySeriesDetailScreen() {
           pills={[
             {
               key: 'all-series',
-              label: 'All Series',
+              label: t('seriesDetail.allSeries'),
               icon: <BookIcon size={13} color={staticColors.white} />,
               onPress: () => navigation.navigate('SeriesList'),
             },
@@ -504,7 +512,7 @@ export function SecretLibrarySeriesDetailScreen() {
           </Pressable>
         </View>
         <Text style={[styles.headerStats, { color: colors.gray }]}>
-          {seriesInfo.bookCount} {seriesInfo.bookCount === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
+          {t('seriesDetail.bookCount', { count: seriesInfo.bookCount })} · {formatDurationCompact(totalDuration)}
         </Text>
 
         {/* Author byline — tappable */}
@@ -530,7 +538,7 @@ export function SecretLibrarySeriesDetailScreen() {
             accessibilityLabel="Filter by All"
             accessibilityState={{ selected: activeTab === 'all' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'all' && { color: colors.white }]}>All</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'all' && { color: colors.white }]}>{t('seriesDetail.filterAll')}</Text>
           </Pressable>
           {authorList.length > 0 && (
           <Pressable
@@ -540,7 +548,7 @@ export function SecretLibrarySeriesDetailScreen() {
             accessibilityLabel="Filter by Author"
             accessibilityState={{ selected: activeTab === 'author' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'author' && { color: colors.white }]}>Author</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'author' && { color: colors.white }]}>{t('seriesDetail.filterAuthor')}</Text>
           </Pressable>
           )}
           {narratorList.length > 0 && (
@@ -551,7 +559,7 @@ export function SecretLibrarySeriesDetailScreen() {
             accessibilityLabel="Filter by Narrator"
             accessibilityState={{ selected: activeTab === 'narrator' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'narrator' && { color: colors.white }]}>Narrator</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'narrator' && { color: colors.white }]}>{t('seriesDetail.filterNarrator')}</Text>
           </Pressable>
           )}
           {genreList.length > 0 && (
@@ -562,7 +570,7 @@ export function SecretLibrarySeriesDetailScreen() {
             accessibilityLabel="Filter by Genre"
             accessibilityState={{ selected: activeTab === 'genre' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'genre' && { color: colors.white }]}>Genre</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'genre' && { color: colors.white }]}>{t('seriesDetail.filterGenre')}</Text>
           </Pressable>
           )}
         </View>
@@ -595,7 +603,7 @@ export function SecretLibrarySeriesDetailScreen() {
                 onPress={() => handleSortSelect(option.key)}
               >
                 <Text style={[styles.dropdownText, { color: colors.black }, isActive && { fontWeight: '700' }]}>
-                  {option.label}
+                  {sortLabelMap[option.key] || option.label}
                 </Text>
                 {isActive && (
                   <Text style={{ fontSize: 14 }}>{sortDirection === 'asc' ? '\u2191' : '\u2193'}</Text>
@@ -629,7 +637,7 @@ export function SecretLibrarySeriesDetailScreen() {
           renderItem={renderVerticalBookItem}
           ListHeaderComponent={headerContent}
           ListFooterComponent={footerContent}
-          ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.gray }]}>No books found</Text>}
+          ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.gray }]}>{t('seriesDetail.noBooksFound')}</Text>}
           style={[styles.scrollView, { backgroundColor: colors.white }]}
           contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
           showsVerticalScrollIndicator={false}
@@ -666,7 +674,7 @@ export function SecretLibrarySeriesDetailScreen() {
               <ShelfRow books={allBooks} toSpineData={toSpineData} onSpinePress={handleSpinePress} onSpineLongPress={(spine) => { const item = allBooks.find(b => b.id === spine.id); if (item) showMenu(item); }} />
             </View>
             {allBooks.length === 0 && (
-              <Text style={[styles.emptyText, { color: colors.gray }]}>No books found</Text>
+              <Text style={[styles.emptyText, { color: colors.gray }]}>{t('seriesDetail.noBooksFound')}</Text>
             )}
           </View>
         )}

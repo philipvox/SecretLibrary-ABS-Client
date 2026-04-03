@@ -356,6 +356,9 @@ export function TopNav({
                       styles.pillText,
                       { color: pillTextColor },
                     ]}
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
                   >
                     {pill.label}
                   </Text>
@@ -438,13 +441,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   pill: {
-    height: 36,
+    minHeight: 36,
     paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 1,
   },
   pillIconOnly: {
     width: 36,
@@ -461,6 +466,8 @@ const styles = StyleSheet.create({
     fontSize: scale(10),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   circleButton: {
     width: 36,

@@ -318,12 +318,30 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
 
       // Actions
 
-      hydrateFromSQLite: async (_libraryId: string): Promise<number> => {
-        log.debug('Skipping SQLite hydration (colors computed fresh each launch)');
+      hydrateFromSQLite: async (libraryId: string): Promise<number> => {
+        try {
+          const cached = await sqliteCache.getSpineCache(libraryId);
+          if (cached && cached.size > 0) {
+            set({ cache: cached, isPopulated: true, lastPopulatedAt: Date.now() });
+            log.debug(`Hydrated ${cached.size} spine entries from SQLite`);
+            return cached.size;
+          }
+        } catch (err) {
+          log.warn('SQLite spine hydration failed, will recompute:', err);
+        }
         return 0;
       },
 
       populateFromLibrary: async (items: LibraryItem[], libraryId?: string) => {
+        // Skip recomputation if cache is already populated with the same number of items
+        const currentCache = get().cache;
+        if (currentCache.size === items.length && get().isPopulated) {
+          log.debug(`Spine cache already populated with ${currentCache.size} items, skipping recomputation`);
+          // Still extract missing colors in background
+          extractMissingColors(items, get().accentColors, get().setAccentColor);
+          return;
+        }
+
         const startTime = Date.now();
         const newCache = new Map<string, CachedSpineData>();
         const accentColors = get().accentColors;
@@ -641,6 +659,13 @@ export const useSpineCacheStore = create<SpineCacheState & SpineCacheActions>()(
           console.log(`[SpineCache] Hydrated: ${dimCount} server dims, ${manifestCount} manifest, ${colorCount} accent colors`);
 
           useSpineCacheStore.setState({ isHydrated: true });
+
+          // Hydrate spine dimensions from SQLite in background
+          const { useLibraryCache: getLibCache } = require('@/core/cache/libraryCache');
+          const libraryId = getLibCache.getState().currentLibraryId;
+          if (libraryId) {
+            useSpineCacheStore.getState().hydrateFromSQLite(libraryId).catch(() => {});
+          }
 
           const { useLibraryCache } = require('@/core/cache/libraryCache');
           if (manifestCount > 0) {

@@ -453,7 +453,14 @@ class AutomotiveService {
             this.performBrowseSync();
           }, AutomotiveService.BROWSE_SYNC_RETRY_INTERVAL_MS);
         } else {
-          log('Library not loaded after max retries, giving up');
+          // Write an empty-but-valid browse tree so native stops showing "Loading..."
+          // and shows the sign-in placeholder instead of hanging forever
+          log('Library not loaded after max retries — writing empty browse data to unblock native');
+          try {
+            await AndroidAutoModule.writeBrowseData(JSON.stringify([]));
+          } catch (err) {
+            log('Failed to write empty browse data:', err);
+          }
         }
         return;
       }
@@ -488,7 +495,6 @@ class AutomotiveService {
 
     if (!AndroidAutoModule) {
       log('AndroidAutoModule not available - native module not linked');
-      this.setupLibraryCacheListener();
       return;
     }
 
@@ -509,15 +515,15 @@ class AutomotiveService {
       );
       log('Android Auto event listener set up');
 
-      // Set up library cache listener
+      // Set up library cache listener (also triggers initial browse sync for Android)
       this.setupLibraryCacheListener();
 
       // Subscribe to player state changes for MediaSession sync
       await this.setupPlayerStateSync();
 
-      // Sync browse data to native MediaBrowserService (immediate, no debounce)
-      // If library isn't loaded yet, performBrowseSync will auto-retry up to 10 times
-      this.syncBrowseDataToAndroidAuto(true);
+      // NOTE: Don't call syncBrowseDataToAndroidAuto here — setupLibraryCacheListener
+      // already triggers an immediate initial sync (line 328). Calling it twice causes
+      // duplicate concurrent syncs that race against each other.
 
       // Periodic browse sync every 30 min to refresh auth tokens in cover URLs
       // and update recently played list while app is open
@@ -533,7 +539,8 @@ class AutomotiveService {
 
     } catch (error) {
       log('Error initializing Android Auto:', error);
-      this.setupLibraryCacheListener();
+      // setupLibraryCacheListener already called above — don't call again
+      // to avoid duplicate subscriptions causing redundant browse syncs
     }
   }
 
@@ -640,6 +647,9 @@ class AutomotiveService {
 
           // Don't send immediate updatePlaybackState here — let the syncState
           // subscription handle it. Same audio focus conflict as play above.
+
+          // Refresh browse data after pause so Recently Played reflects latest progress
+          setTimeout(() => this.syncBrowseDataToAndroidAuto(), 1000);
         }
         break;
 
@@ -1330,7 +1340,8 @@ class AutomotiveService {
         const item = libraryItems.find(i => i.id === userBook.bookId);
         if (!item) continue;
         const meta = getBookMetadata(item);
-        const progress = item.userMediaProgress?.progress || 0;
+        // Use SQLite progress (accurate) instead of library cache progress (stale)
+        const progress = userBook.progress;
         recentItems.push({
           text: meta?.title || 'Unknown',
           detailText: meta?.authorName || meta?.authors?.[0]?.name || '',
@@ -1844,13 +1855,16 @@ class AutomotiveService {
     item: LibraryItem,
     options?: {
       showProgress?: boolean;
+      progressOverride?: number; // Use SQLite progress instead of stale library cache
       localCoverPath?: string;
       sequence?: number;
     }
   ): BrowseItem {
     const metadata = getBookMetadata(item);
     const duration = getBookDuration(item);
-    const progress = item.userMediaProgress?.progress || 0;
+    // Prefer SQLite progress (progressOverride) over library cache progress —
+    // the cache is from the last API fetch and may be hours stale
+    const progress = options?.progressOverride ?? (item.userMediaProgress?.progress || 0);
     const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
 
     return {
@@ -1885,7 +1899,8 @@ class AutomotiveService {
       // CONTINUE LISTENING - Current book for quick resume
       // =================================================================
       if (playerState.currentBook) {
-        const continueItem = this.createBrowseItem(playerState.currentBook, { showProgress: true });
+        const liveProgress = playerState.duration > 0 ? playerState.position / playerState.duration : undefined;
+        const continueItem = this.createBrowseItem(playerState.currentBook, { showProgress: true, progressOverride: liveProgress });
         sections.push({
           id: 'continue-listening',
           title: 'Continue Listening',
@@ -1908,7 +1923,11 @@ class AutomotiveService {
 
             const item = libraryItems.find(i => i.id === userBook.bookId);
             if (item) {
-              recentItems.push(this.createBrowseItem(item, { showProgress: true }));
+              // Use SQLite progress (accurate) instead of library cache progress (stale)
+              recentItems.push(this.createBrowseItem(item, {
+                showProgress: true,
+                progressOverride: userBook.progress,
+              }));
             }
           }
 

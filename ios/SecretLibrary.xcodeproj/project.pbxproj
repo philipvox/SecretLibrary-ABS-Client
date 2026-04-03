@@ -12,7 +12,9 @@
 		2B3E8EA0D12BB21F4AFEDFEA /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA21FD20E3039AB8A5804FAF /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		51CBCBB51B25BA47DF1C69AA /* Pods_SecretLibrary.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A13C0A0D250C3E32F2DB5C8 /* Pods_SecretLibrary.framework */; };
+		6927204A059770DC73E65CDA /* NativeHttpModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 878556C1CC926FE27C30BAD8 /* NativeHttpModule.m */; };
 		914585E81D924AACA06F825C /* PhoneSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC7839D8118A496096017FB2 /* PhoneSceneDelegate.swift */; };
+		97EA555A3E5DD17C78180B52 /* NativeHttpModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B978F1AA651E1423AFC403 /* NativeHttpModule.swift */; };
 		B9DE196A3A384903A356D893 /* CastModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 172552E0ECD943CD932929B4 /* CastModule.m */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		CEE75E1FA0AB4E20897A2043 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB09998AE14C4F74A646D885 /* CarPlaySceneDelegate.swift */; };
@@ -29,11 +31,13 @@
 		2916D6C6B2F9198470EB9A6A /* Pods-SecretLibrary.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SecretLibrary.debug.xcconfig"; path = "Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary.debug.xcconfig"; sourceTree = "<group>"; };
 		2A13C0A0D250C3E32F2DB5C8 /* Pods_SecretLibrary.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SecretLibrary.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		57BAA14758B06B81AA58B3BD /* Pods-SecretLibrary.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SecretLibrary.release.xcconfig"; path = "Target Support Files/Pods-SecretLibrary/Pods-SecretLibrary.release.xcconfig"; sourceTree = "<group>"; };
+		878556C1CC926FE27C30BAD8 /* NativeHttpModule.m */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.objc; name = NativeHttpModule.m; path = SecretLibrary/NativeHttpModule.m; sourceTree = "<group>"; };
 		8E4EE00340D44538A73DF984 /* CastModule-Bridging-Header.h */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.c.h; name = "CastModule-Bridging-Header.h"; path = "SecretLibrary/CastModule-Bridging-Header.h"; sourceTree = "<group>"; };
 		8FEB2BBEECA13636CB3D881E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = SecretLibrary/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = SecretLibrary/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BA21FD20E3039AB8A5804FAF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-SecretLibrary/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		C7B978F1AA651E1423AFC403 /* NativeHttpModule.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = NativeHttpModule.swift; path = SecretLibrary/NativeHttpModule.swift; sourceTree = "<group>"; };
 		CACAA4C23CF84F58BC7CF616 /* CastModule.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = CastModule.swift; path = SecretLibrary/CastModule.swift; sourceTree = "<group>"; };
 		CB09998AE14C4F74A646D885 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = CarPlaySceneDelegate.swift; path = SecretLibrary/CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		D18E46807BA547AD868E690E /* CarPlay.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };
@@ -71,6 +75,8 @@
 				172552E0ECD943CD932929B4 /* CastModule.m */,
 				8E4EE00340D44538A73DF984 /* CastModule-Bridging-Header.h */,
 				8FEB2BBEECA13636CB3D881E /* PrivacyInfo.xcprivacy */,
+				C7B978F1AA651E1423AFC403 /* NativeHttpModule.swift */,
+				878556C1CC926FE27C30BAD8 /* NativeHttpModule.m */,
 			);
 			name = SecretLibrary;
 			sourceTree = "<group>";
@@ -374,6 +380,8 @@
 				FE9067E037B04B948D083709 /* CastModule.swift in Sources */,
 				B9DE196A3A384903A356D893 /* CastModule.m in Sources */,
 				2B3E8EA0D12BB21F4AFEDFEA /* ExpoModulesProvider.swift in Sources */,
+				97EA555A3E5DD17C78180B52 /* NativeHttpModule.swift in Sources */,
+				6927204A059770DC73E65CDA /* NativeHttpModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

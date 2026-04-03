@@ -15,6 +15,6 @@ export {
   useChapterCleaningLevel,
   getChapterCleaningLevel,
   isChapterCleaningEnabled,
-  CLEANING_LEVEL_INFO,
+  CLEANING_LEVEL_KEYS,
   type ChapterCleaningLevel,
 } from './stores/chapterCleaningStore';

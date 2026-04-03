@@ -83,6 +83,19 @@ export async function endListeningSession(
     logError('[ListeningStats] Failed to record session:', err);
   }
 
+  // If no server session is active, accumulate listening time for later sync.
+  // Pure offline playback never opens a server session, so without this the
+  // server's listening stats would miss all offline-only listening.
+  try {
+    const { sessionService } = await import('../services/sessionService');
+    if (!sessionService.getCurrentSession()) {
+      await sqliteCache.incrementOfflineListeningTime(activeSession.bookId, durationSeconds);
+      log(`[ListeningStats] No server session — accumulated ${durationSeconds}s offline listening time`);
+    }
+  } catch (err) {
+    // Best-effort — don't let this break session cleanup
+  }
+
   activeSession = null;
 }
 

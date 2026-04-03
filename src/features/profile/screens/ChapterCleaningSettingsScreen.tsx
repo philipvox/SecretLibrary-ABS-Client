@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -21,7 +22,7 @@ import { scale, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import {
   useChapterCleaningStore,
-  CLEANING_LEVEL_INFO,
+  CLEANING_LEVEL_KEYS,
   type ChapterCleaningLevel,
 } from '../stores/chapterCleaningStore';
 import { SettingsHeader } from '../components/SettingsHeader';
@@ -47,7 +48,11 @@ interface LevelOptionProps {
 
 function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOptionProps) {
   const colors = useSecretLibraryColors();
-  const info = CLEANING_LEVEL_INFO[level];
+  const { t } = useTranslation();
+  const keys = CLEANING_LEVEL_KEYS[level];
+  const label = t(keys.labelKey);
+  const description = t(keys.descriptionKey);
+  const example = t(keys.exampleKey);
 
   return (
     <TouchableOpacity
@@ -59,7 +64,7 @@ function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOption
       onPress={() => onSelect(level)}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`${info.label} cleaning level${isRecommended ? ', recommended' : ''}${isSelected ? ', currently selected' : ''}`}
+      accessibilityLabel={`${label} cleaning level${isRecommended ? ', recommended' : ''}${isSelected ? ', currently selected' : ''}`}
       accessibilityState={{ selected: isSelected }}
     >
       <View style={styles.levelOptionLeft}>
@@ -72,16 +77,16 @@ function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOption
         <View style={styles.levelContent}>
           <View style={styles.labelRow}>
             <Text style={[styles.levelLabel, { color: colors.black }, isSelected && styles.levelLabelSelected]}>
-              {info.label}
+              {label}
             </Text>
             {isRecommended && (
               <View style={[styles.recommendedBadge, { backgroundColor: colors.grayLight }]}>
-                <Text style={[styles.recommendedText, { color: colors.gray }]}>Recommended</Text>
+                <Text style={[styles.recommendedText, { color: colors.gray }]}>{t('settings.playback.chapterCleaning.recommended')}</Text>
               </View>
             )}
           </View>
-          <Text style={[styles.levelDescription, { color: colors.gray }]}>{info.description}</Text>
-          <Text style={[styles.levelExample, { color: colors.gray }]}>{info.example}</Text>
+          <Text style={[styles.levelDescription, { color: colors.gray }]}>{description}</Text>
+          <Text style={[styles.levelExample, { color: colors.gray }]}>{example}</Text>
         </View>
       </View>
 

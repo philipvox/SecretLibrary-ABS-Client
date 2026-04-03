@@ -5,7 +5,7 @@
     "version": "0.9.266",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
-    "scheme": "secretlibrary",
+    "scheme": ["secretlibrary", "audiobookshelf"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -74,6 +74,7 @@
       "./plugins/exo-player/withExoPlayer",
       "./plugins/chromecast/withChromecast",
       "./plugins/carplay/withCarPlay",
+      "./plugins/native-http/withNativeHttp",
       "expo-splash-screen",
       [
         "expo-audio",

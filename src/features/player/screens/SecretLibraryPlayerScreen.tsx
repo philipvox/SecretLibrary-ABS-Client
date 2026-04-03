@@ -81,6 +81,9 @@ import { useSpineCacheStore, getTypographyForGenres, getSeriesStyle } from '@/sh
 // Chromecast
 import { useCastStore, CastDeviceSheet } from '@/features/chromecast';
 
+// Cover zoom modal
+import { ZoomableCoverModal } from '@/shared/components/ZoomableCoverModal';
+
 // Sheets/Panels
 import { SpeedSheet } from '../sheets/SpeedSheet';
 import { SleepTimerSheet } from '../sheets/SleepTimerSheet';
@@ -311,12 +314,16 @@ export function SecretLibraryPlayerScreen() {
   const castConnected = useCastStore((s) => s.isConnected);
   const showCastPicker = useCastStore((s) => s.showPicker);
   const [castSheetVisible, setCastSheetVisible] = useState(false);
+  const closeCastSheet = useCallback(() => setCastSheetVisible(false), []);
 
   // Sheet state - no sheet open by default
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(0)).current;  // Start hidden
   const sheetTranslateY = useRef(new Animated.Value(screenHeight)).current;  // Start at closed position
+
+  // Cover zoom modal
+  const [coverZoomVisible, setCoverZoomVisible] = useState(false);
 
   // Progress mode: 'book' shows full book progress, 'chapter' shows current chapter progress
   const [progressMode, setProgressMode] = useState<'book' | 'chapter'>('chapter');
@@ -589,19 +596,14 @@ export function SecretLibraryPlayerScreen() {
   const targetTX = miniCoverCenterX - fullCoverCenterX;
   const targetTY = miniCoverCenterY - fullCoverCenterYAtP0;
 
-  // Pinch-to-zoom on cover
-  const coverPinchScale = useSharedValue(1);
-  const coverPinchSavedScale = useSharedValue(1);
-
+  // Pinch-to-zoom on cover — opens fullscreen zoom modal
   const coverPinchGesture = Gesture.Pinch()
-    .onUpdate((e) => {
+    .onEnd((e) => {
       'worklet';
-      coverPinchScale.value = Math.min(coverPinchSavedScale.value * e.scale, 5);
-    })
-    .onEnd(() => {
-      'worklet';
-      coverPinchScale.value = withSpring(1, { damping: 20, stiffness: 200 });
-      coverPinchSavedScale.value = 1;
+      // Open zoom modal if the user pinched outward
+      if (e.scale > 1.1) {
+        runOnJS(setCoverZoomVisible)(true);
+      }
     });
 
   const coverAnimStyle = useAnimatedStyle(() => {
@@ -612,17 +614,12 @@ export function SecretLibraryPlayerScreen() {
     const offsetX = interpolate(p, [0, 0.7], [targetTX, 0], Extrapolation.CLAMP);
     const offsetY = interpolate(p, [0, 0.7], [targetTY, 0], Extrapolation.CLAMP);
 
-    // Combine transition scale with pinch zoom
-    const finalScale = coverScale * coverPinchScale.value;
-
     return {
       transform: [
         { translateX: offsetX },
         { translateY: offsetY },
-        { scale: finalScale },
+        { scale: coverScale },
       ],
-      // Render above everything while pinching
-      zIndex: coverPinchScale.value > 1.01 ? 9999 : 0,
     };
   });
 
@@ -719,9 +716,17 @@ export function SecretLibraryPlayerScreen() {
     setEditingBookmark(null);
   }, [bookId, screenHeight]); // Only depend on bookId to avoid closing on other state changes
 
-  // Delta popup helpers
+  // Delta popup helpers — use setValue during scrubbing to avoid queuing Spring animations
+  const lastDeltaAnimTime = useRef(0);
   const animateDeltaFontSize = useCallback((delta: number) => {
     const targetSize = getDeltaFontSize(delta);
+    const now = Date.now();
+    if (now - lastDeltaAnimTime.current < 100) {
+      // Throttled: set directly without animation to avoid Spring queue buildup
+      deltaFontSize.setValue(targetSize);
+      return;
+    }
+    lastDeltaAnimTime.current = now;
     Animated.spring(deltaFontSize, {
       toValue: targetSize,
       useNativeDriver: false, // fontSize can't use native driver
@@ -1859,7 +1864,7 @@ export function SecretLibraryPlayerScreen() {
       )}
 
       {/* Chromecast device sheet */}
-      <CastDeviceSheet visible={castSheetVisible} onClose={() => setCastSheetVisible(false)} />
+      <CastDeviceSheet visible={castSheetVisible} onClose={closeCastSheet} />
 
       {/* Bookmark Add/Edit Modal */}
       <Modal
@@ -2003,6 +2008,13 @@ export function SecretLibraryPlayerScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Fullscreen cover zoom */}
+      <ZoomableCoverModal
+        visible={coverZoomVisible}
+        coverUrl={coverUrl}
+        onClose={() => setCoverZoomVisible(false)}
+      />
       </RAnimated.View>
     </GestureDetector>
   );

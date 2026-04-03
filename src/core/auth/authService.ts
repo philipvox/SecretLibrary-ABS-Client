@@ -585,6 +585,24 @@ class AuthService {
           return { user, serverUrl };
         }
 
+        // Have token + serverUrl but no user data — recover by fetching from API
+        if (token && serverUrl && !user) {
+          log.warn('Token and URL found but user data missing — fetching from API');
+          try {
+            apiClient.configure({ baseURL: serverUrl, token });
+            const fetchedUser = await apiClient.getCurrentUser();
+            if (fetchedUser) {
+              const userWithToken: User = { ...fetchedUser, token };
+              // Re-persist user data for next time
+              this.storeUser(userWithToken).catch(() => {});
+              log.info(`Session recovered via API for user: ${fetchedUser.username}`);
+              return { user: userWithToken, serverUrl };
+            }
+          } catch (fetchErr) {
+            log.warn('Failed to recover user from API:', fetchErr);
+          }
+        }
+
         // Values missing - this is not a failure, user may not be logged in
         if (!token && !serverUrl && !user) {
           log.debug('No stored session found (user not logged in)');

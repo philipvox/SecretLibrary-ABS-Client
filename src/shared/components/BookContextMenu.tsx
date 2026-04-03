@@ -79,6 +79,7 @@ import { useToastStore } from '@/shared/hooks/useToast';
 import { scale, useTheme } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { logger } from '@/shared/utils/logger';
+import { useTranslation } from 'react-i18next';
 import { SpinePickerContent } from './SpinePickerSheet';
 import type { LibraryItem, Playlist } from '@/core/types';
 
@@ -221,6 +222,7 @@ function PlaylistPicker({
   onBack: () => void;
   onDone: (playlistName?: string, playlistId?: string) => void;
 }) {
+  const { t } = useTranslation();
   const { data: playlists, isLoading } = usePlaylists();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
@@ -237,9 +239,9 @@ function PlaylistPicker({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDone(playlist.name, playlist.id);
     } catch {
-      Alert.alert('Error', 'Failed to add to playlist');
+      Alert.alert(t('contextMenu.errorTitle'), t('contextMenu.failedToAddToPlaylist'));
     }
-  }, [book.id, queryClient, onDone]);
+  }, [book.id, queryClient, onDone, t]);
 
   const handleCreatePlaylist = useCallback(async () => {
     if (!newName.trim() || !libraryId) return;
@@ -254,7 +256,7 @@ function PlaylistPicker({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDone(newName.trim(), playlist.id);
     } catch {
-      Alert.alert('Error', 'Failed to create playlist');
+      Alert.alert(t('contextMenu.errorTitle'), 'Failed to create playlist');
     } finally {
       setSubmitting(false);
     }
@@ -296,7 +298,7 @@ function PlaylistPicker({
         <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Go back">
           <ChevronLeft size={scale(16)} color={WHITE_DIM} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.playlistTitle}>Add to Playlist</Text>
+        <Text style={styles.playlistTitle}>{t('contextMenu.addToPlaylist')}</Text>
         <View style={{ width: scale(16) }} />
       </View>
 
@@ -312,7 +314,7 @@ function PlaylistPicker({
           style={styles.playlistList}
           scrollEnabled={false}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No playlists yet</Text>
+            <Text style={styles.emptyText}>{t('contextMenu.noPlaylistsYet')}</Text>
           }
         />
       )}
@@ -379,6 +381,7 @@ export function BookContextMenu({
   onViewDetails,
   playlistId,
 }: BookContextMenuProps) {
+  const { t } = useTranslation();
   const { colors: _colors } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<RootStackNavigationProp>();
@@ -459,10 +462,10 @@ export function BookContextMenu({
     if (!book) return;
     if (isInQueue) {
       removeFromQueue(book.id);
-      addToast({ type: 'success', message: 'Removed from Queue', duration: 3000, onUndo: () => addToQueue(book) });
+      addToast({ type: 'success', message: t('contextMenu.removedFromQueue'), duration: 3000, onUndo: () => addToQueue(book) });
     } else {
       addToQueue(book);
-      addToast({ type: 'success', message: 'Added to Queue', duration: 3000, onUndo: () => removeFromQueue(book.id) });
+      addToast({ type: 'success', message: t('contextMenu.addedToQueue'), duration: 3000, onUndo: () => removeFromQueue(book.id) });
     }
   }, [book, isInQueue, addToQueue, removeFromQueue, addToast]);
 
@@ -471,23 +474,23 @@ export function BookContextMenu({
     if (isInLibrary) {
       // Confirm before removing
       Alert.alert(
-        'Remove from Library?',
-        'This will remove your reading progress for this book.',
+        t('contextMenu.removeFromLibraryTitle'),
+        t('contextMenu.removeFromLibraryMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Remove',
+            text: t('common.remove'),
             style: 'destructive',
             onPress: () => {
               removeFromLibrary(book.id);
-              addToast({ type: 'success', message: 'Removed from Library', duration: 5000, onUndo: () => addToLibrary(book.id) });
+              addToast({ type: 'success', message: t('contextMenu.removedFromLibrary'), duration: 5000, onUndo: () => addToLibrary(book.id) });
             },
           },
         ],
       );
     } else {
       addToLibrary(book.id);
-      addToast({ type: 'success', message: 'Saved to Library', duration: 3000, onUndo: () => removeFromLibrary(book.id) });
+      addToast({ type: 'success', message: t('contextMenu.savedToLibrary'), duration: 3000, onUndo: () => removeFromLibrary(book.id) });
     }
   }, [book, isInLibrary, addToLibrary, removeFromLibrary, addToast]);
 
@@ -495,13 +498,13 @@ export function BookContextMenu({
     if (!book) return;
     if (isDownloaded) {
       deleteDownload(book.id);
-      addToast({ type: 'info', message: 'Download Removed', duration: 3000 });
+      addToast({ type: 'info', message: t('contextMenu.downloadRemoved'), duration: 3000 });
     } else if (isDownloading) {
       cancelDownload(book.id);
-      addToast({ type: 'info', message: 'Download Cancelled', duration: 3000 });
+      addToast({ type: 'info', message: t('contextMenu.downloadCancelled'), duration: 3000 });
     } else {
       queueDownload(book);
-      addToast({ type: 'success', message: 'Download Started', duration: 3000 });
+      addToast({ type: 'success', message: t('contextMenu.downloadStarted'), duration: 3000 });
     }
   }, [book, isDownloaded, isDownloading, queueDownload, cancelDownload, deleteDownload, addToast]);
 
@@ -509,9 +512,9 @@ export function BookContextMenu({
     if (!book) return;
     try {
       await toggleComplete(book.id);
-      addToast({ type: 'success', message: isComplete ? 'Marked as Unfinished' : 'Marked as Finished', duration: 3000 });
+      addToast({ type: 'success', message: isComplete ? t('contextMenu.markedAsUnfinished') : t('contextMenu.markedAsFinished'), duration: 3000 });
     } catch {
-      addToast({ type: 'info', message: 'Failed to update status', duration: 3000 });
+      addToast({ type: 'info', message: t('contextMenu.failedToUpdateStatus'), duration: 3000 });
     }
   }, [book, isComplete, toggleComplete, addToast]);
 
@@ -562,12 +565,12 @@ export function BookContextMenu({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const bookId = book.id;
       addToast({
-        type: 'success', message: 'Removed from Playlist', duration: 5000,
+        type: 'success', message: t('contextMenu.removeFromPlaylist'), duration: 5000,
         onUndo: async () => { await playlistsApi.batchAdd(playlistId, [bookId]); queryClient.invalidateQueries({ queryKey: ['playlists'] }); },
       });
       onClose();
     } catch {
-      Alert.alert('Error', 'Failed to remove from playlist');
+      Alert.alert(t('contextMenu.errorTitle'), t('contextMenu.failedToRemoveFromPlaylist'));
     }
   }, [book, playlistId, queryClient, onClose, addToast]);
 
@@ -586,7 +589,7 @@ export function BookContextMenu({
 
   // Download label/icon
   const dlLabel = isDownloading ? `${Math.round(dlProgress * 100)}%`
-    : isDownloaded ? 'Remove' : 'Download';
+    : isDownloaded ? t('contextMenu.removeLabel') : t('contextMenu.downloadLabel');
   const DlIcon = isDownloading ? XIcon : isDownloaded ? Trash2 : Download;
 
   return (
@@ -679,7 +682,7 @@ export function BookContextMenu({
                       }} />
                     ) : null}
                     {playlistId && (
-                      <NavRow icon={Trash2} label="Remove from Playlist" onPress={handleRemoveFromPlaylist} danger />
+                      <NavRow icon={Trash2} label={t('contextMenu.removeFromPlaylist')} onPress={handleRemoveFromPlaylist} danger />
                     )}
                   </View>
 
@@ -687,13 +690,13 @@ export function BookContextMenu({
                   <View style={styles.toggleGrid}>
                     <ToggleAction
                       icon={isInQueue ? Check : ListPlus}
-                      label={isInQueue ? 'Queued' : 'Queue'}
+                      label={isInQueue ? t('contextMenu.queuedLabel') : t('contextMenu.queueLabel')}
                       onPress={handleQueueToggle}
                       active={isInQueue}
                     />
                     <ToggleAction
                       icon={isInLibrary ? Check : Library}
-                      label={isInLibrary ? 'Saved' : 'Save'}
+                      label={isInLibrary ? t('contextMenu.savedLabel') : t('contextMenu.saveLabel')}
                       onPress={handleLibraryToggle}
                       active={isInLibrary}
                     />
@@ -706,13 +709,13 @@ export function BookContextMenu({
                     />
                     <ToggleAction
                       icon={CheckCircle}
-                      label={isComplete ? 'Unfinish' : 'Finished'}
+                      label={isComplete ? t('contextMenu.unfinishLabel') : t('contextMenu.finishedLabel')}
                       onPress={handleToggleComplete}
                       active={isComplete}
                     />
                     <ToggleAction
                       icon={ListMusic}
-                      label="Playlist"
+                      label={t('contextMenu.playlistLabel')}
                       onPress={() => setShowPlaylistPicker(true)}
                     />
                   </View>
@@ -727,7 +730,7 @@ export function BookContextMenu({
                         accessibilityRole="button"
                         accessibilityLabel={`View details for ${title}`}
                       >
-                        <Text style={styles.detailsBtnText}>DETAILS</Text>
+                        <Text style={styles.detailsBtnText}>{t('contextMenu.detailsButton')}</Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
@@ -738,7 +741,7 @@ export function BookContextMenu({
                       accessibilityLabel={`Play ${title}`}
                     >
                       <Play size={scale(16)} color={BLACK} fill={BLACK} strokeWidth={0} />
-                      <Text style={styles.playBtnText}>PLAY</Text>
+                      <Text style={styles.playBtnText}>{t('contextMenu.playButton')}</Text>
                     </TouchableOpacity>
                   </View>
                 </>

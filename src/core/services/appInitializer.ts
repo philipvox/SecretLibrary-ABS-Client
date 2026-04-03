@@ -42,6 +42,13 @@ export interface InitResult {
 }
 
 /**
+ * Callback fired as each initialization step completes.
+ * @param fraction - Cumulative progress within the init phase (0 to 1)
+ * @param label - Human-readable description of the step that just finished
+ */
+export type InitProgressCallback = (fraction: number, label: string) => void;
+
+/**
  * Timing data for a single initialization step.
  */
 export interface StepTiming {
@@ -83,11 +90,32 @@ async function withTimeout<T>(
   }
 }
 
+/**
+ * Step weights (relative cost) and labels for progress reporting.
+ * Weights are normalized at runtime — only their ratios matter.
+ */
+const INIT_STEP_CONFIG: Record<string, { weight: number; label: string }> = {
+  sqlite:     { weight: 1, label: 'preparing database' },
+  fonts:      { weight: 2, label: 'loading fonts' },
+  auth:       { weight: 2, label: 'restoring session' },
+  completion: { weight: 1, label: 'loading reading history' },
+  migration:  { weight: 1, label: 'checking for updates' },
+  progress:   { weight: 2, label: 'loading progress' },
+};
+
+/** Sum of all step weights, computed once. */
+const TOTAL_STEP_WEIGHT = Object.values(INIT_STEP_CONFIG).reduce((s, c) => s + c.weight, 0);
+
 class AppInitializer {
   private initPromise: Promise<InitResult> | null = null;
   private isReady = false;
   private failedSteps: string[] = [];
   private stepTimings: Map<string, StepTiming> = new Map();
+
+  /** Progress callback set by caller of initialize() */
+  private onProgress?: InitProgressCallback;
+  /** Accumulated weight of completed steps */
+  private completedWeight = 0;
 
   /**
    * Initialize all critical resources in parallel.
@@ -95,8 +123,11 @@ class AppInitializer {
    *
    * Safety: Has global timeout to prevent infinite splash screen.
    */
-  async initialize(): Promise<InitResult> {
+  async initialize(onProgress?: InitProgressCallback): Promise<InitResult> {
     if (this.initPromise) return this.initPromise;
+
+    this.onProgress = onProgress;
+    this.completedWeight = 0;
 
     // Wrap initialization with global timeout
     const initWithTimeout = Promise.race([
@@ -132,8 +163,22 @@ class AppInitializer {
   }
 
   /**
+   * Report a step completion to the progress callback.
+   * Increments cumulative weight and fires the callback with
+   * the normalized fraction (0-1) and the step's label.
+   */
+  private reportStepComplete(stepName: string): void {
+    const config = INIT_STEP_CONFIG[stepName];
+    if (!config || !this.onProgress) return;
+    this.completedWeight += config.weight;
+    const fraction = Math.min(this.completedWeight / TOTAL_STEP_WEIGHT, 1);
+    this.onProgress(fraction, config.label);
+  }
+
+  /**
    * Execute an initialization step with timing measurement.
    * Wraps with timeout and records duration regardless of outcome.
+   * Automatically reports progress on completion.
    */
   private async timedStep<T>(
     stepName: string,
@@ -153,11 +198,16 @@ class AppInitializer {
         this.failedSteps.push(stepName);
       }
 
+      // Report progress regardless of success/timeout
+      this.reportStepComplete(stepName);
+
       return value;
     } catch (err) {
       const duration = Date.now() - startTime;
       this.stepTimings.set(stepName, { step: stepName, duration, status: 'error' });
       this.trackFailure(stepName, err);
+      // Step is done (failed), still report progress
+      this.reportStepComplete(stepName);
       return undefined;
     }
   }

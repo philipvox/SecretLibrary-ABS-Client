@@ -450,6 +450,14 @@ export const useLibraryCache = create<LibraryCacheState>()(subscribeWithSelector
       // Silently ignore - this can happen during startup before library is selected
       return;
     }
+
+    // Skip refresh if cache was updated recently (< 5 min)
+    const lastUpdated = get().lastUpdated;
+    if (lastUpdated && Date.now() - lastUpdated < 5 * 60 * 1000) {
+      log.debug('Cache is fresh (< 5 min), skipping API refresh');
+      return;
+    }
+
     log.debug('Refreshing cache for library:', id);
     await get().loadCache(id, true);
     // Set lastRefreshed to bust image caches
@@ -855,7 +863,10 @@ export const useLibraryCache = create<LibraryCacheState>()(subscribeWithSelector
       booksWithServerSpines: new Set(),
       booksWithCommunitySpines: new Set(),
       spineManifestVersion: null,
-      // Keep currentLibraryId so we know which library to reload
+      // On logout (skipSqlite=true), clear libraryId so App.tsx isDataReady
+      // evaluates correctly and doesn't re-show the splash screen.
+      // On refresh (skipSqlite=false), keep it so we know which library to reload.
+      ...(skipSqlite ? { currentLibraryId: null } : {}),
     });
 
     // Load spine manifest immediately (don't wait for full cache reload)

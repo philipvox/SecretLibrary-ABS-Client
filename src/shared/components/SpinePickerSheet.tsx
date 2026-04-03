@@ -25,6 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { scale } from '@/shared/theme';
 import { secretLibraryColors, secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { useSpineCacheStore } from '@/features/home/stores/spineCache';
@@ -138,6 +139,7 @@ async function submitToCommunity(
 }
 
 export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerContentProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [spines, setSpines] = useState<SpineOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -268,7 +270,7 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
 
         if (!cancelled) setSpines(options);
       } catch {
-        if (!cancelled) setError('Failed to load spines');
+        if (!cancelled) setError(t('spinePicker.failedToLoadSpines'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -354,10 +356,10 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
       Alert.alert(
-        'Remove Local Spine?',
-        'This will delete your custom spine image for this book.',
+        t('spinePicker.removeLocalSpineTitle'),
+        t('spinePicker.removeLocalSpineMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
             text: 'Remove',
             style: 'destructive',
@@ -436,19 +438,19 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
       const isbn = metadata?.isbn;
 
       Alert.alert(
-        'Share with Community?',
-        'Submit this spine to Secret Spines for other users to enjoy? It will be reviewed before appearing publicly.',
+        t('spinePicker.shareWithCommunityTitle'),
+        t('spinePicker.shareWithCommunityMessage'),
         [
-          { text: 'Skip', style: 'cancel' },
+          { text: t('spinePicker.skip'), style: 'cancel' },
           {
-            text: 'Submit',
+            text: t('spinePicker.submit'),
             onPress: async () => {
               const spineId = await submitToCommunity(destPath, bookId, bookTitle, author, asin, isbn);
               if (spineId) {
                 addPendingSubmission(spineId, bookTitle);
-                Alert.alert('Submitted!', 'Your spine has been submitted for review. You\'ll be notified when it\'s approved.');
+                Alert.alert(t('spinePicker.submittedTitle'), t('spinePicker.submittedMessage'));
               } else {
-                Alert.alert('Upload Failed', 'Could not reach the community server. Your spine is still saved locally.');
+                Alert.alert(t('spinePicker.uploadFailedTitle'), t('spinePicker.uploadFailedMessage'));
               }
             },
           },
@@ -464,7 +466,7 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
       {/* Header with back button */}
       <TouchableOpacity onPress={onBack} style={styles.backRow}>
         <ChevronLeft size={scale(18)} color="rgba(255,255,255,0.5)" />
-        <Text style={styles.backLabel}>Choose Spine</Text>
+        <Text style={styles.backLabel}>{t('spinePicker.chooseSpine')}</Text>
       </TouchableOpacity>
 
       <Text style={styles.bookTitle} numberOfLines={1}>{bookTitle}</Text>
@@ -473,7 +475,7 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={secretLibraryColors.gold} />
-          <Text style={styles.statusText}>Loading spines...</Text>
+          <Text style={styles.statusText}>{t('spinePicker.loadingSpines')}</Text>
         </View>
       ) : error ? (
         <View style={styles.center}>
@@ -516,14 +518,14 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
                     </View>
                   )}
                 </TouchableOpacity>
-                <Text style={styles.cardLabel}>Hold{'\n'}for Color</Text>
+                <Text style={styles.cardLabel}>{t('spinePicker.holdForColor')}</Text>
               </View>
             )}
 
             {spines.map((spine) => {
               const aspect = spine.width / spine.height;
               const displayWidth = SPINE_DISPLAY_HEIGHT * aspect;
-              const label = spine.isLocal ? 'Local' : 'Community\nSpine';
+              const label = spine.isLocal ? t('spinePicker.localSpine') : t('spinePicker.communitySpine');
 
               return (
                 <View key={spine.id} style={styles.spineColumn}>
@@ -567,7 +569,7 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
                   <Plus size={scale(24)} color="rgba(255,255,255,0.3)" />
                 </View>
               </TouchableOpacity>
-              <Text style={styles.cardLabel}>Add{'\n'}Spine</Text>
+              <Text style={styles.cardLabel}>{t('spinePicker.addSpine')}</Text>
             </View>
           </ScrollView>
 
@@ -584,10 +586,10 @@ export function SpinePickerContent({ bookId, bookTitle, onBack }: SpinePickerCon
                 <View style={styles.colorPickerHeader}>
                   <View style={styles.colorPickerTitleRow}>
                     <View style={[styles.previewSwatch, { backgroundColor: previewColor }]} />
-                    <Text style={styles.colorPickerTitle}>Spine Color</Text>
+                    <Text style={styles.colorPickerTitle}>{t('spinePicker.spineColor')}</Text>
                   </View>
                   <TouchableOpacity onPress={handleResetColor} activeOpacity={0.7}>
-                    <Text style={styles.resetLabel}>Reset</Text>
+                    <Text style={styles.resetLabel}>{t('spinePicker.reset')}</Text>
                   </TouchableOpacity>
                 </View>
 

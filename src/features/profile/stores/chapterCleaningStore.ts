@@ -40,30 +40,30 @@ const DEFAULT_SETTINGS: ChapterCleaningSettings = {
   showOriginalNames: false,
 };
 
-/** Level descriptions for UI */
-export const CLEANING_LEVEL_INFO: Record<
+/** i18n key suffixes for each cleaning level */
+export const CLEANING_LEVEL_KEYS: Record<
   ChapterCleaningLevel,
-  { label: string; description: string; example: string }
+  { labelKey: string; descriptionKey: string; exampleKey: string }
 > = {
   off: {
-    label: 'Off',
-    description: 'Show chapter names exactly as stored',
-    example: '"01-BookTitle-Ch1.mp3" shown as-is',
+    labelKey: 'settings.playback.chapterCleaning.offLabel',
+    descriptionKey: 'settings.playback.chapterCleaning.offDescription',
+    exampleKey: 'settings.playback.chapterCleaning.offExample',
   },
   light: {
-    label: 'Light',
-    description: 'Remove track numbers and file extensions',
-    example: '"01 - Chapter 1" → "Chapter 1"',
+    labelKey: 'settings.playback.chapterCleaning.lightLabel',
+    descriptionKey: 'settings.playback.chapterCleaning.lightDescription',
+    exampleKey: 'settings.playback.chapterCleaning.lightExample',
   },
   standard: {
-    label: 'Standard',
-    description: 'Normalize chapter formatting to consistent style',
-    example: '"Ch 1" → "Chapter 1"',
+    labelKey: 'settings.playback.chapterCleaning.standardLabel',
+    descriptionKey: 'settings.playback.chapterCleaning.standardDescription',
+    exampleKey: 'settings.playback.chapterCleaning.standardExample',
   },
   aggressive: {
-    label: 'Aggressive',
-    description: 'Remove book titles and fully standardize',
-    example: '"Harry Potter Ch 1" → "Chapter 1"',
+    labelKey: 'settings.playback.chapterCleaning.aggressiveLabel',
+    descriptionKey: 'settings.playback.chapterCleaning.aggressiveDescription',
+    exampleKey: 'settings.playback.chapterCleaning.aggressiveExample',
   },
 };
 

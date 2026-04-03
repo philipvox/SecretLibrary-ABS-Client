@@ -16,6 +16,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -35,6 +36,7 @@ import { getTitle } from '@/shared/utils/metadata';
 import { useCoverUrl } from '@/core/cache';
 import { CoverStars } from '@/shared/components/CoverStars';
 import { haptics } from '@/core/native/haptics';
+import { useTranslation } from 'react-i18next';
 import { secretLibraryColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import {
   RewindIcon,
@@ -61,6 +63,7 @@ const MINI_PLAYER_BG = '#0f0f0f';
 // =============================================================================
 
 export function GlobalMiniPlayer() {
+  const { t } = useTranslation();
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -92,18 +95,12 @@ export function GlobalMiniPlayer() {
   const keepScreenAwake = usePlayerSettingsStore((s) => s.keepScreenAwake);
   useEffect(() => {
     if (isPlaying && keepScreenAwake) {
-      import('expo-keep-awake').then(({ activateKeepAwakeAsync }) => {
-        activateKeepAwakeAsync('playback');
-      }).catch(() => {});
+      activateKeepAwakeAsync('playback').catch(() => {});
     } else {
-      import('expo-keep-awake').then(({ deactivateKeepAwake }) => {
-        deactivateKeepAwake('playback');
-      }).catch(() => {});
+      deactivateKeepAwake('playback');
     }
     return () => {
-      import('expo-keep-awake').then(({ deactivateKeepAwake }) => {
-        deactivateKeepAwake('playback');
-      }).catch(() => {});
+      deactivateKeepAwake('playback');
     };
   }, [isPlaying, keepScreenAwake]);
 
@@ -236,7 +233,7 @@ export function GlobalMiniPlayer() {
               style={styles.infoContainer}
               onPress={handleOpenPlayer}
               accessibilityRole="button"
-              accessibilityLabel={`Now playing: ${title}. ${chapterName}. Double tap to open full player`}
+              accessibilityLabel={t('miniPlayer.nowPlayingAccessibility', { title, chapter: chapterName })}
             >
               <Animated.View style={[styles.coverWrap, coverAnimStyle]}>
                 <Image source={coverUrl} style={styles.cover} contentFit="cover" cachePolicy="memory-disk" accessible={false} />
@@ -256,8 +253,8 @@ export function GlobalMiniPlayer() {
                 onPress={handleSkipBack}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel="Skip back"
-                accessibilityHint="Double tap to skip backward"
+                accessibilityLabel={t('miniPlayer.skipBack')}
+                accessibilityHint={t('miniPlayer.skipBackHint')}
               >
                 <RewindIcon color={secretLibraryColors.white} size={22} />
               </TouchableOpacity>
@@ -268,8 +265,8 @@ export function GlobalMiniPlayer() {
                 onPress={handleSkipForward}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel="Skip forward"
-                accessibilityHint="Double tap to skip forward"
+                accessibilityLabel={t('miniPlayer.skipForward')}
+                accessibilityHint={t('miniPlayer.skipForwardHint')}
               >
                 <FastForwardIcon color={secretLibraryColors.white} size={22} />
               </TouchableOpacity>
@@ -279,7 +276,7 @@ export function GlobalMiniPlayer() {
                 style={styles.playButton}
                 onPress={handlePlayPause}
                 accessibilityRole="button"
-                accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+                accessibilityLabel={isPlaying ? t('common.pause') : t('common.play')}
               >
                 {isPlaying ? (
                   <PauseIcon color={secretLibraryColors.black} size={18} />

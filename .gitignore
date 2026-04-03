@@ -56,3 +56,4 @@ modules/*/ios/build/
 
 # Git worktrees
 .worktrees/
+.claude/settings.local.json

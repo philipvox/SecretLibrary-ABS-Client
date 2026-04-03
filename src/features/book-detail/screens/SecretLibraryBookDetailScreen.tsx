@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { PlayIcon, PauseIcon } from '@/shared/components/PlayerIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +60,8 @@ import { ViewModePicker, ViewMode } from '@/shared/components/ViewModePicker';
 import { BookGrid } from '@/shared/components/BookGrid';
 import { CoverStarStickers } from '../components/CoverStarStickers';
 import { useStarPositionStore, STAR_HIT_RADIUS } from '../stores/starPositionStore';
+import { useTranslation } from 'react-i18next';
+import { ZoomableCoverModal } from '@/shared/components/ZoomableCoverModal';
 
 // Extended metadata with narrator fields
 interface ExtendedBookMetadata extends BookMetadata {
@@ -203,6 +205,8 @@ interface DropCapParagraphProps {
   expanded: boolean;
   onToggleExpand: () => void;
   colors: ReturnType<typeof useSecretLibraryColors>;
+  showLessLabel?: string;
+  readMoreLabel?: string;
 }
 
 // Layout constants for drop cap
@@ -227,7 +231,7 @@ const DROP_CAP_CONFIG = {
  * │  Full width text continuation below           │
  * └───────────────────────────────────────────────┘
  */
-function DropCapParagraph({ text, expanded, onToggleExpand, colors }: DropCapParagraphProps) {
+function DropCapParagraph({ text, expanded, onToggleExpand, colors, showLessLabel = 'Show less', readMoreLabel = 'Read more' }: DropCapParagraphProps) {
   const { width: screenWidth } = useWindowDimensions();
   const [textSplit, setTextSplit] = useState<{ beside: string; below: string } | null>(null);
 
@@ -309,9 +313,9 @@ function DropCapParagraph({ text, expanded, onToggleExpand, colors }: DropCapPar
 
       {/* Only show Read more if there's enough below text to be truncated (roughly 3+ lines) */}
       {(textSplit?.below || '').length > 150 && (
-        <TouchableOpacity onPress={onToggleExpand} accessibilityRole="button" accessibilityLabel={expanded ? 'Show less of description' : 'Read more of description'}>
+        <TouchableOpacity onPress={onToggleExpand} accessibilityRole="button" accessibilityLabel={expanded ? showLessLabel : readMoreLabel}>
           <Text style={[styles.readMore, { color: colors.black }]}>
-            {expanded ? 'Show less' : 'Read more'}
+            {expanded ? showLessLabel : readMoreLabel}
           </Text>
         </TouchableOpacity>
       )}
@@ -328,6 +332,7 @@ export function SecretLibraryBookDetailScreen() {
   const route = useRoute<RouteProp<BookDetailRouteParams, 'BookDetail'>>();
   const navigation = useNavigation<any>();
   const { id: bookId } = route.params;
+  const { t } = useTranslation();
 
   // Theme-aware colors
   const colors = useSecretLibraryColors();
@@ -382,6 +387,7 @@ export function SecretLibraryBookDetailScreen() {
   const { progress: localProgress, currentTime: localCurrentTime, duration: _localDuration } = useBookProgress(bookId);
   const markFinished = useMarkFinished();
   const [isMarkingProgress, setIsMarkingProgress] = useState(false);
+  const [coverZoomVisible, setCoverZoomVisible] = useState(false);
 
   // Gold star stickers (double-tap to place, double-tap on star to remove)
   const rawStars = useStarPositionStore((s) => s.positions[bookId]);
@@ -448,24 +454,16 @@ export function SecretLibraryBookDetailScreen() {
     return tap;
   }, [handleDoubleTap, panGestureRef]);
 
-  // Pinch-to-zoom on cover
-  const coverPinchScale = useSharedValue(1);
+  // Pinch-to-zoom on cover — opens fullscreen zoom modal
   const coverPinchGesture = useMemo(() =>
     Gesture.Pinch()
-      .onUpdate((e) => {
+      .onEnd((e) => {
         'worklet';
-        coverPinchScale.value = Math.min(e.scale, 5);
-      })
-      .onEnd(() => {
-        'worklet';
-        coverPinchScale.value = withSpring(1, { damping: 20, stiffness: 200 });
+        if (e.scale > 1.1) {
+          runOnJS(setCoverZoomVisible)(true);
+        }
       }),
   []);
-
-  const coverPinchStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: coverPinchScale.value }],
-    zIndex: coverPinchScale.value > 1.01 ? 9999 : 0,
-  }));
 
   const composedCoverGesture = useMemo(() =>
     Gesture.Simultaneous(doubleTapGesture, coverPinchGesture),
@@ -609,7 +607,7 @@ export function SecretLibraryBookDetailScreen() {
       const result = await queueDownload(book);
       if (result && !result.success) {
         haptics.warning();
-        Alert.alert('Download Blocked', result.reason || 'Cannot download right now');
+        Alert.alert(t('bookDetail.downloadBlocked'), result.reason || t('bookDetail.cannotDownload'));
       }
     }
   }, [book, bookId, isDownloaded, isDownloading, isPaused, isPending, isWaitingWifi, queueDownload]);
@@ -676,12 +674,12 @@ export function SecretLibraryBookDetailScreen() {
     if (!book || isMarkingProgress) return;
 
     Alert.alert(
-      'Clear Progress?',
-      'This will reset your listening position to the beginning.',
+      t('bookDetail.clearProgressTitle'),
+      t('bookDetail.clearProgressMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('common.clear'),
           style: 'destructive',
           onPress: async () => {
             setIsMarkingProgress(true);
@@ -988,7 +986,7 @@ export function SecretLibraryBookDetailScreen() {
       haptics.success();
     } catch (e: unknown) {
       logger.warn('handleSyncPosition failed:', e);
-      Alert.alert('Sync Failed', 'Could not update position. Try again.');
+      Alert.alert(t('bookDetail.syncFailedTitle'), t('bookDetail.syncFailedMessage'));
     }
   }, [bookId, currentTime, duration, liveServerProgress, isThisBookLoaded, queryClient, refetch]);
 
@@ -1012,7 +1010,7 @@ export function SecretLibraryBookDetailScreen() {
       haptics.success();
     } catch (e: unknown) {
       logger.warn('handleSessionPositionSync failed:', e);
-      Alert.alert('Sync Failed', 'Could not update position. Try again.');
+      Alert.alert(t('bookDetail.syncFailedTitle'), t('bookDetail.syncFailedMessage'));
     }
   }, [bookId, duration, isThisBookLoaded, queryClient, refetch]);
 
@@ -1141,7 +1139,7 @@ export function SecretLibraryBookDetailScreen() {
                 styles.contentTabText,
                 { color: activeContentTab === 'chapters' ? colors.black : colors.gray },
               ]}>
-                Chapters
+                {t('bookDetail.chapters')}
               </Text>
               <Text style={[styles.contentTabCount, { color: colors.gray }]}>
                 {chapterCount}
@@ -1164,7 +1162,7 @@ export function SecretLibraryBookDetailScreen() {
                   styles.contentTabText,
                   { color: activeContentTab === 'series' ? colors.black : colors.gray },
                 ]}>
-                  Series
+                  {t('bookDetail.series')}
                 </Text>
                 <Text style={[styles.contentTabCount, { color: colors.gray }]}>
                   {seriesBooks.length}
@@ -1187,7 +1185,7 @@ export function SecretLibraryBookDetailScreen() {
                 styles.contentTabText,
                 { color: activeContentTab === 'info' ? colors.black : colors.gray },
               ]}>
-                Info
+                {t('bookDetail.info')}
               </Text>
             </TouchableOpacity>
 
@@ -1472,7 +1470,7 @@ export function SecretLibraryBookDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.infoSectionTitle, { color: colors.black }]}>
-                    Listening Log
+                    {t('bookDetail.listeningLog')}
                   </Text>
                   <Text style={[styles.infoExpandIcon, { color: colors.gray }]}>
                     {sessionsExpanded ? '−' : '+'}
@@ -1482,7 +1480,7 @@ export function SecretLibraryBookDetailScreen() {
                   <View style={[styles.infoCard, { backgroundColor: colors.white, borderColor: colors.grayLine }]}>
                     {sessions.length === 0 ? (
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoValue, { color: colors.gray, flex: 1, textAlign: 'center' }]}>No sessions recorded</Text>
+                        <Text style={[styles.infoValue, { color: colors.gray, flex: 1, textAlign: 'center' }]}>{t('bookDetail.noSessionsRecorded')}</Text>
                       </View>
                     ) : (
                       sessions.map((session, i) => {
@@ -1501,18 +1499,18 @@ export function SecretLibraryBookDetailScreen() {
                               onPress={() => {
                                 haptics.selection();
                                 Alert.alert(
-                                  'Sync to Session Position',
-                                  `Jump to a position from this session?`,
+                                  t('bookDetail.syncToSessionTitle'),
+                                  t('bookDetail.syncToSessionMessage'),
                                   [
                                     {
-                                      text: `Start (${formatDuration(startPos)})`,
+                                      text: `${t('bookDetail.sessionStart')} (${formatDuration(startPos)})`,
                                       onPress: () => handleSessionPositionSync(startPos),
                                     },
                                     {
-                                      text: `End (${formatDuration(endPos)})`,
+                                      text: `${t('bookDetail.sessionEnd')} (${formatDuration(endPos)})`,
                                       onPress: () => handleSessionPositionSync(endPos),
                                     },
-                                    { text: 'Cancel', style: 'cancel' },
+                                    { text: t('common.cancel'), style: 'cancel' },
                                   ]
                                 );
                               }}
@@ -1547,7 +1545,7 @@ export function SecretLibraryBookDetailScreen() {
                     activeOpacity={0.7}
                   >
                     <Text style={[styles.infoSectionTitle, { color: colors.black }]}>
-                      Tags
+                      {t('bookDetail.tags')}
                     </Text>
                     <Text style={[styles.infoExpandIcon, { color: colors.gray }]}>
                       {tagsExpanded ? '−' : '+'}
@@ -1575,12 +1573,12 @@ export function SecretLibraryBookDetailScreen() {
 
               {/* Book Metadata */}
               <View style={styles.infoSection}>
-                <Text style={[styles.infoSectionTitle, { color: colors.black }]}>Details</Text>
+                <Text style={[styles.infoSectionTitle, { color: colors.black }]}>{t('bookDetail.details')}</Text>
                 <View style={[styles.infoCard, { backgroundColor: colors.white, borderColor: colors.grayLine }]}>
                   {metadata?.narrators && metadata.narrators.length > 0 && (
                     <>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>NARRATOR</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.narrator')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]} numberOfLines={2}>
                           {metadata.narrators.join(', ')}
                         </Text>
@@ -1591,7 +1589,7 @@ export function SecretLibraryBookDetailScreen() {
                   {metadata?.publisher && (
                     <>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>PUBLISHER</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.publisher')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{metadata.publisher}</Text>
                       </View>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
@@ -1600,7 +1598,7 @@ export function SecretLibraryBookDetailScreen() {
                   {metadata?.publishedYear && (
                     <>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>YEAR</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.year')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{metadata.publishedYear}</Text>
                       </View>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
@@ -1609,26 +1607,26 @@ export function SecretLibraryBookDetailScreen() {
                   {metadata?.language && (
                     <>
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>LANGUAGE</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.language')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{metadata.language}</Text>
                       </View>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                     </>
                   )}
                   <View style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: colors.gray }]}>DURATION</Text>
+                    <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.durationLabel')}</Text>
                     <Text style={[styles.infoValue, { color: colors.black }]}>{formatDuration(duration)}</Text>
                   </View>
                   <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                   <View style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: colors.gray }]}>CHAPTERS</Text>
+                    <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.chaptersLabel')}</Text>
                     <Text style={[styles.infoValue, { color: colors.black }]}>{chapterCount}</Text>
                   </View>
                   {(book?.media as BookMedia)?.numAudioFiles && (
                     <>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>FILES</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.files')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{(book!.media as BookMedia).numAudioFiles}</Text>
                       </View>
                     </>
@@ -1637,7 +1635,7 @@ export function SecretLibraryBookDetailScreen() {
                     <>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>SIZE</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.size')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{formatBytes((book!.media as BookMedia).size, 1)}</Text>
                       </View>
                     </>
@@ -1646,7 +1644,7 @@ export function SecretLibraryBookDetailScreen() {
                     <>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>ISBN</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.isbn')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{metadata.isbn}</Text>
                       </View>
                     </>
@@ -1655,7 +1653,7 @@ export function SecretLibraryBookDetailScreen() {
                     <>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                       <View style={styles.infoRow}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>ASIN</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.asin')}</Text>
                         <Text style={[styles.infoValue, { color: colors.black }]}>{metadata.asin}</Text>
                       </View>
                     </>
@@ -1664,7 +1662,7 @@ export function SecretLibraryBookDetailScreen() {
                     <>
                       <View style={[styles.infoDivider, { backgroundColor: colors.grayLine }]} />
                       <View style={styles.infoRowVertical}>
-                        <Text style={[styles.infoLabel, { color: colors.gray }]}>GENRES</Text>
+                        <Text style={[styles.infoLabel, { color: colors.gray }]}>{t('bookDetail.genres')}</Text>
                         <View style={styles.tagsList}>
                           {metadata.genres.map((genre, i) => (
                             <TouchableOpacity
@@ -1703,7 +1701,7 @@ export function SecretLibraryBookDetailScreen() {
         pills={[
           {
             key: 'library',
-            label: isInLibrary ? 'In Library' : 'Add to Library',
+            label: isInLibrary ? t('bookDetail.inLibrary') : t('bookDetail.addToLibrary'),
             icon: isInLibrary
               ? <LibraryCheckIcon color={colors.white} size={12} />
               : <LibraryPlusIcon color={colors.black} size={10} />,
@@ -1712,7 +1710,7 @@ export function SecretLibraryBookDetailScreen() {
           },
           {
             key: 'queue',
-            label: isInQueue ? 'Queued' : 'Queue',
+            label: isInQueue ? t('bookDetail.queued') : t('bookDetail.queue'),
             icon: isInQueue
               ? <QueueCheckIcon color={colors.white} size={10} />
               : <QueueIcon color={colors.black} size={10} />,
@@ -1749,7 +1747,7 @@ export function SecretLibraryBookDetailScreen() {
           {/* LEFT COLUMN: Cover + Buttons */}
           <View style={styles.desktopLeftCol}>
             <GestureDetector gesture={composedCoverGesture}>
-            <Animated.View style={[styles.desktopCover, coverPinchStyle]}>
+            <View style={styles.desktopCover}>
               {coverUrl ? (
                 <Image source={{ uri: coverUrl }} placeholder={coverPlaceholderUrl ? { uri: coverPlaceholderUrl } : undefined} placeholderContentFit="cover" style={styles.coverImage} contentFit="cover" cachePolicy="memory-disk" transition={0} />
               ) : (
@@ -1758,23 +1756,23 @@ export function SecretLibraryBookDetailScreen() {
                 </View>
               )}
               <CoverStarStickers stars={stars} />
-            </Animated.View>
+            </View>
             </GestureDetector>
 
             {/* Buttons under cover */}
             <View style={styles.desktopBtnRow}>
               <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black, flex: 1 }]} onPress={handlePlay} activeOpacity={0.8}>
                 {isThisBookPlaying ? <PauseIcon color={colors.white} size={16} /> : <PlayIcon color={colors.white} size={16} />}
-                <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{isThisBookPlaying ? 'Pause' : 'Play'}</Text>
+                <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{isThisBookPlaying ? t('common.pause') : t('common.play')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.btnDownload, { borderColor: colors.black, flex: 1 }, isDownloaded && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }]]}
                 onPress={handleDownload} disabled={isDownloaded} activeOpacity={0.8}
               >
                 {isDownloaded ? (
-                  <><CheckIcon color={colors.white} size={16} /><Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text></>
+                  <><CheckIcon color={colors.white} size={16} /><Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{t('bookDetail.downloaded')}</Text></>
                 ) : (
-                  <><DownloadIcon color={colors.black} size={16} /><Text style={[styles.btnText, { color: colors.black }]}>Download</Text></>
+                  <><DownloadIcon color={colors.black} size={16} /><Text style={[styles.btnText, { color: colors.black }]}>{t('bookDetail.download')}</Text></>
                 )}
               </TouchableOpacity>
             </View>
@@ -1804,14 +1802,14 @@ export function SecretLibraryBookDetailScreen() {
             <View style={[styles.metaRowDesktop, { marginTop: 12, marginBottom: 20 }]}>
               <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{formattedDuration}</Text>
               <Text style={[styles.metaDotDesktop, { color: colors.grayLine }]}>·</Text>
-              <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{chapterCount} chapters</Text>
+              <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{chapterCount} {t('bookDetail.chapters').toLowerCase()}</Text>
               <Text style={[styles.metaDotDesktop, { color: colors.grayLine }]}>·</Text>
               <Text style={[styles.metaStatDesktop, { color: colors.gray }]}>{publishedYear || '—'}</Text>
             </View>
 
             {/* Description */}
             {description ? (
-              <DropCapParagraph text={description} expanded={descriptionExpanded} onToggleExpand={() => setDescriptionExpanded(!descriptionExpanded)} colors={colors} />
+              <DropCapParagraph text={description} expanded={descriptionExpanded} onToggleExpand={() => setDescriptionExpanded(!descriptionExpanded)} colors={colors} showLessLabel={t('bookDetail.showLess')} readMoreLabel={t('bookDetail.readMore')} />
             ) : null}
 
             {/* Genre Pills */}
@@ -1829,11 +1827,11 @@ export function SecretLibraryBookDetailScreen() {
             <View style={[styles.progressSection, { marginBottom: 8 }]}>
               <View style={styles.progressHeader}>
                 <View style={styles.progressLeft}>
-                  <Text style={[styles.progressLabel, { color: colors.gray }]}>Progress</Text>
-                  <Text style={[styles.progressPercent, { color: colors.black }]}>{isFinished ? 'Complete' : `${progressPercent}%`}</Text>
+                  <Text style={[styles.progressLabel, { color: colors.gray }]}>{t('bookDetail.progress')}</Text>
+                  <Text style={[styles.progressPercent, { color: colors.black }]}>{isFinished ? t('bookDetail.complete') : `${progressPercent}%`}</Text>
                 </View>
                 <TouchableOpacity style={styles.markFinishedBtn} onPress={isFinished ? handleUnmarkFinished : handleMarkFinished} activeOpacity={0.7}>
-                  <Text style={[styles.markFinishedText, { color: colors.gray }]}>{isFinished ? 'Unmark Finished' : 'Mark as Finished'}</Text>
+                  <Text style={[styles.markFinishedText, { color: colors.gray }]}>{isFinished ? t('bookDetail.unmarkFinished') : t('bookDetail.markAsFinished')}</Text>
                   <DoubleCheckIcon color={isFinished ? colors.black : colors.gray} size={12} />
                 </TouchableOpacity>
               </View>
@@ -1845,9 +1843,9 @@ export function SecretLibraryBookDetailScreen() {
                   <TouchableOpacity onPress={handleClearProgress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <ResetIcon color={colors.gray} size={12} />
                   </TouchableOpacity>
-                  <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeListened)} listened</Text>
+                  <Text style={[styles.timeText, { color: colors.gray }]}>{t('bookDetail.listened', { time: formatDuration(timeListened) })}</Text>
                 </View>
-                <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeRemaining)} remaining</Text>
+                <Text style={[styles.timeText, { color: colors.gray }]}>{t('bookDetail.remaining', { time: formatDuration(timeRemaining) })}</Text>
               </View>
             </View>
             {/* Chapters tabs — inside the right column on desktop */}
@@ -1860,7 +1858,7 @@ export function SecretLibraryBookDetailScreen() {
         {/* ============ MOBILE: Original stacked layout ============ */}
         <View style={styles.hero}>
           <GestureDetector gesture={composedCoverGesture}>
-          <Animated.View style={[styles.heroCover, coverPinchStyle]}>
+          <View style={styles.heroCover}>
             {coverUrl ? (
               <Image source={{ uri: coverUrl }} placeholder={coverPlaceholderUrl ? { uri: coverPlaceholderUrl } : undefined} placeholderContentFit="cover" style={styles.coverImage} contentFit="cover" cachePolicy="memory-disk" transition={0} />
             ) : (
@@ -1869,7 +1867,7 @@ export function SecretLibraryBookDetailScreen() {
               </View>
             )}
             <CoverStarStickers stars={stars} />
-          </Animated.View>
+          </View>
           </GestureDetector>
 
           <View style={styles.titleContainer}>
@@ -1902,15 +1900,15 @@ export function SecretLibraryBookDetailScreen() {
 
         <View style={[styles.metaGrid, { borderColor: colors.grayLine }]}>
           <View style={styles.metaItem}>
-            <Text style={[styles.metaLabel, { color: colors.gray }]}>Duration</Text>
+            <Text style={[styles.metaLabel, { color: colors.gray }]}>{t('bookDetail.duration')}</Text>
             <Text style={[styles.metaValue, { color: colors.black }]}>{formattedDuration}</Text>
           </View>
           <TouchableOpacity style={[styles.metaItemCenter, { borderColor: colors.grayLine }]} onPress={handleScrollToChapters} activeOpacity={0.7}>
-            <Text style={[styles.metaLabel, { color: colors.gray }]}>Chapters</Text>
+            <Text style={[styles.metaLabel, { color: colors.gray }]}>{t('bookDetail.chapters')}</Text>
             <Text style={[styles.metaValue, styles.metaValueLink, { color: colors.black }]}>{chapterCount}</Text>
           </TouchableOpacity>
           <View style={styles.metaItem}>
-            <Text style={[styles.metaLabel, { color: colors.gray }]}>Published</Text>
+            <Text style={[styles.metaLabel, { color: colors.gray }]}>{t('bookDetail.published')}</Text>
             <Text style={[styles.metaValue, { color: colors.black }]}>{publishedYear || '—'}</Text>
           </View>
         </View>
@@ -1918,21 +1916,21 @@ export function SecretLibraryBookDetailScreen() {
         <View style={styles.actionRow}>
           <TouchableOpacity style={[styles.btnPlay, { backgroundColor: colors.black }]} onPress={handlePlay} activeOpacity={0.8}>
             {isThisBookPlaying ? <PauseIcon color={colors.white} size={16} /> : <PlayIcon color={colors.white} size={16} />}
-            <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{isThisBookPlaying ? 'Pause' : 'Play'}</Text>
+            <Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{isThisBookPlaying ? t('common.pause') : t('common.play')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.btnDownload, { borderColor: colors.black }, isDownloaded && [styles.btnDownloadActive, { backgroundColor: colors.black, borderColor: colors.black }], (isDownloading || isPaused || isWaitingWifi) && { backgroundColor: '#FFFFFF' }]} onPress={handleDownload} disabled={isDownloaded} activeOpacity={0.8}>
-            {isDownloaded ? (<><CheckIcon color={colors.white} size={16} /><Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>Downloaded</Text></>) : isPaused || isDownloading ? (<Text style={[styles.btnText, { color: '#000' }]}>{isPaused ? 'Paused' : 'Downloading'} {Math.round(downloadProgress * 100)}%</Text>) : isWaitingWifi ? (<Text style={[styles.btnText, { color: colors.black }]}>Waiting for WiFi</Text>) : isPending ? (<Text style={[styles.btnText, { color: colors.black }]}>Queued</Text>) : (<><DownloadIcon color={colors.black} size={16} /><Text style={[styles.btnText, { color: colors.black }]}>Download</Text></>)}
+            {isDownloaded ? (<><CheckIcon color={colors.white} size={16} /><Text style={[styles.btnText, styles.btnTextActive, { color: colors.white }]}>{t('bookDetail.downloaded')}</Text></>) : isPaused || isDownloading ? (<Text style={[styles.btnText, { color: '#000' }]}>{isPaused ? t('bookDetail.paused') : t('bookDetail.downloading')} {Math.round(downloadProgress * 100)}%</Text>) : isWaitingWifi ? (<Text style={[styles.btnText, { color: colors.black }]}>{t('bookDetail.waitingForWifi')}</Text>) : isPending ? (<Text style={[styles.btnText, { color: colors.black }]}>{t('bookDetail.queued')}</Text>) : (<><DownloadIcon color={colors.black} size={16} /><Text style={[styles.btnText, { color: colors.black }]}>{t('bookDetail.download')}</Text></>)}
           </TouchableOpacity>
         </View>
 
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <View style={styles.progressLeft}>
-              <Text style={[styles.progressLabel, { color: colors.gray }]}>Progress</Text>
-              <Text style={[styles.progressPercent, { color: colors.black }]}>{isFinished ? 'Complete' : `${progressPercent}%`}</Text>
+              <Text style={[styles.progressLabel, { color: colors.gray }]}>{t('bookDetail.progress')}</Text>
+              <Text style={[styles.progressPercent, { color: colors.black }]}>{isFinished ? t('bookDetail.complete') : `${progressPercent}%`}</Text>
             </View>
             <TouchableOpacity style={styles.markFinishedBtn} onPress={isFinished ? handleUnmarkFinished : handleMarkFinished} activeOpacity={0.7}>
-              <Text style={[styles.markFinishedText, { color: colors.gray }]}>{isFinished ? 'Unmark Finished' : 'Mark as Finished'}</Text>
+              <Text style={[styles.markFinishedText, { color: colors.gray }]}>{isFinished ? t('bookDetail.unmarkFinished') : t('bookDetail.markAsFinished')}</Text>
               <DoubleCheckIcon color={isFinished ? colors.black : colors.gray} size={12} />
             </TouchableOpacity>
           </View>
@@ -1942,9 +1940,9 @@ export function SecretLibraryBookDetailScreen() {
           <View style={styles.progressTimes}>
             <View style={styles.timeWithClear}>
               <TouchableOpacity onPress={handleClearProgress} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}><ResetIcon color={colors.gray} size={12} /></TouchableOpacity>
-              <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeListened)} listened</Text>
+              <Text style={[styles.timeText, { color: colors.gray }]}>{t('bookDetail.listened', { time: formatDuration(timeListened) })}</Text>
             </View>
-            <Text style={[styles.timeText, { color: colors.gray }]}>{formatDuration(timeRemaining)} remaining</Text>
+            <Text style={[styles.timeText, { color: colors.gray }]}>{t('bookDetail.remaining', { time: formatDuration(timeRemaining) })}</Text>
           </View>
         </View>
         </>
@@ -1972,6 +1970,12 @@ export function SecretLibraryBookDetailScreen() {
         </SkullRefreshControl>
       </SeriesSwipeContainer>
 
+      {/* Fullscreen cover zoom */}
+      <ZoomableCoverModal
+        visible={coverZoomVisible}
+        coverUrl={coverUrl}
+        onClose={() => setCoverZoomVisible(false)}
+      />
     </View>
   );
 }

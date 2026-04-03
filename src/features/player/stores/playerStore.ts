@@ -811,9 +811,21 @@ export const usePlayerStore = create<PlayerState & PlayerActions>()(
               const bookFile = index < bookAudioFiles.length ? bookAudioFiles[index] : undefined;
 
               // Use session track duration if available (most reliable for downloaded books)
-              const duration = sessionTrack?.duration || bookFile?.duration || 0;
+              let duration = sessionTrack?.duration || bookFile?.duration || 0;
               // Use session track offset if available, otherwise calculate
               const startOffset = sessionTrack?.startOffset ?? currentOffset;
+
+              if (duration === 0 && audioFileNames.length > 1) {
+                // 0-duration breaks offset calculations for subsequent tracks.
+                // Estimate from total book duration divided equally as a rough fallback.
+                const bookDur = getBookDuration(book);
+                if (bookDur > 0) {
+                  duration = bookDur / audioFileNames.length;
+                  log(`[WARN] Track ${index} (${fileName}) has no duration metadata, estimated ${duration.toFixed(1)}s from book duration`);
+                } else {
+                  log(`[WARN] Track ${index} (${fileName}) has no duration metadata and no book duration available`);
+                }
+              }
 
               const trackInfo = {
                 url: filePath,

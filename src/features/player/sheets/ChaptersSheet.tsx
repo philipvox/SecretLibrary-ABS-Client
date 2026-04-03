@@ -15,6 +15,7 @@ import {
   Animated,
   TextInput,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Image } from 'expo-image';
 import type { BookMetadata } from '@/core/types';
@@ -185,7 +186,7 @@ function PlayingIndicator() {
 }
 
 // Chapter item component
-function ChapterItem({
+const ChapterItem = React.memo(function ChapterItem({
   chapter,
   index,
   isComplete,
@@ -199,12 +200,17 @@ function ChapterItem({
   isComplete: boolean;
   isCurrent: boolean;
   chapterProgress?: number;
-  onSelect: () => void;
+  onSelect: (start: number) => void;
   highlightText?: string;
 }) {
+  const { t } = useTranslation();
   const chapterDuration = chapter.end - chapter.start;
   const chapterNumber = String(index + 1).padStart(2, '0');
-  const displayTitle = chapter.displayTitle || chapter.title || `Chapter ${index + 1}`;
+  const displayTitle = chapter.displayTitle || chapter.title || t('player.chapterFallback', { index: index + 1 });
+
+  const handlePress = useCallback(() => {
+    onSelect(chapter.start);
+  }, [onSelect, chapter.start]);
 
   return (
     <TouchableOpacity
@@ -212,12 +218,18 @@ function ChapterItem({
         styles.chapterItem,
         isCurrent && styles.chapterItemCurrent,
       ]}
-      onPress={onSelect}
+      onPress={handlePress}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`Chapter ${index + 1}, ${displayTitle}, ${formatDuration(chapterDuration)}${isCurrent ? ', currently playing' : ''}${isComplete ? ', completed' : ''}`}
+      accessibilityLabel={t('player.chapters.accessibilityChapter', {
+        number: index + 1,
+        title: displayTitle,
+        duration: formatDuration(chapterDuration),
+        current: isCurrent ? t('player.chapters.currentlyPlaying') : '',
+        complete: isComplete ? t('player.chapters.completed') : '',
+      })}
       accessibilityState={{ selected: isCurrent }}
-      accessibilityHint="Double tap to play this chapter"
+      accessibilityHint={t('player.chapters.accessibilityPlayHint')}
     >
       <Text style={[
         styles.chapterNumber,
@@ -239,7 +251,7 @@ function ChapterItem({
         </Text>
         {isCurrent && chapterProgress !== undefined && (
           <Text style={styles.chapterSubtitle}>
-            {Math.round(chapterProgress * 100)}% · {formatDuration(chapterDuration * (1 - chapterProgress))} remaining
+            {Math.round(chapterProgress * 100)}% · {formatDuration(chapterDuration * (1 - chapterProgress))} {t('player.chapters.remaining')}
           </Text>
         )}
       </View>
@@ -257,7 +269,7 @@ function ChapterItem({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // =============================================================================
 // MAIN COMPONENT
@@ -274,15 +286,30 @@ export function ChaptersSheet({
   const duration = usePlayerStore((s) => s.duration);
   const coverUrl = useCoverUrl(currentBook?.id || '');
 
-  // Search state
+  // Search state with debounce
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedQuery(text), 150);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
 
   // Book metadata
   const metadata = currentBook?.media?.metadata as BookMetadata | undefined;
-  const bookTitle = metadata?.title || 'Unknown Title';
-  const author = metadata?.authorName || metadata?.authors?.[0]?.name || 'Unknown Author';
+  const { t } = useTranslation();
+  const bookTitle = metadata?.title || t('player.chapters.unknownTitle');
+  const author = metadata?.authorName || metadata?.authors?.[0]?.name || t('player.chapters.unknownAuthor');
 
   // Calculate progress
   const bookProgress = duration > 0 ? position / duration : 0;
@@ -304,22 +331,22 @@ export function ChaptersSheet({
   // Calculate time listened
   const timeListened = position;
 
-  // Filter chapters based on search query (fuzzy search)
+  // Filter chapters based on debounced search query (fuzzy search)
   const filteredChapters = useMemo(() => {
-    if (!searchQuery.trim()) {
+    if (!debouncedQuery.trim()) {
       return chapters.map((ch, idx) => ({ chapter: ch, originalIndex: idx }));
     }
 
     return chapters
       .map((chapter, originalIndex) => {
-        const title = chapter.displayTitle || chapter.title || `Chapter ${originalIndex + 1}`;
-        const score = fuzzyMatch(title, searchQuery);
+        const title = chapter.displayTitle || chapter.title || t('player.chapterFallback', { index: originalIndex + 1 });
+        const score = fuzzyMatch(title, debouncedQuery);
         return { chapter, originalIndex, score };
       })
       .filter(item => item.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(({ chapter, originalIndex }) => ({ chapter, originalIndex }));
-  }, [chapters, searchQuery]);
+  }, [chapters, debouncedQuery]);
 
   const handleChapterSelect = useCallback((start: number) => {
     haptics.selection();
@@ -337,6 +364,8 @@ export function ChaptersSheet({
     if (isSearching) {
       setIsSearching(false);
       setSearchQuery('');
+      setDebouncedQuery('');
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
     } else {
       setIsSearching(true);
       setTimeout(() => searchInputRef.current?.focus(), 100);
@@ -345,6 +374,8 @@ export function ChaptersSheet({
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
+    setDebouncedQuery('');
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
     searchInputRef.current?.focus();
   }, []);
 
@@ -355,10 +386,10 @@ export function ChaptersSheet({
       isComplete={item.originalIndex < currentChapterIndex}
       isCurrent={item.originalIndex === currentChapterIndex}
       chapterProgress={item.originalIndex === currentChapterIndex ? chapterProgress : undefined}
-      onSelect={() => handleChapterSelect(item.chapter.start)}
-      highlightText={searchQuery}
+      onSelect={handleChapterSelect}
+      highlightText={debouncedQuery}
     />
-  ), [currentChapterIndex, chapterProgress, handleChapterSelect, searchQuery]);
+  ), [currentChapterIndex, chapterProgress, handleChapterSelect, debouncedQuery]);
 
   const chapterKeyExtractor = useCallback((item: { chapter: ChapterData; originalIndex: number }) =>
     String(item.chapter.id ?? item.originalIndex), []);
@@ -369,9 +400,9 @@ export function ChaptersSheet({
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Chapters</Text>
+        <Text style={styles.title}>{t('player.chapters.title')}</Text>
         <Text style={styles.subtitle}>
-          {totalChapters} chapters · {formatTotalDuration(totalDuration)}
+          {t('player.chapters.subtitle', { count: totalChapters, duration: formatTotalDuration(totalDuration) })}
         </Text>
       </View>
 
@@ -383,22 +414,22 @@ export function ChaptersSheet({
             <TextInput
               ref={searchInputRef}
               style={styles.searchInput}
-              placeholder="Search chapters..."
+              placeholder={t('player.chapters.searchPlaceholder')}
               placeholderTextColor={colors.gray}
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearchChange}
               autoCapitalize="none"
               autoCorrect={false}
-              accessibilityLabel="Search chapters"
+              accessibilityLabel={t('player.chapters.searchChapters')}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel="Clear search">
+              <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('player.chapters.clearSearch')}>
                 <CloseIcon color={colors.gray} size={12} />
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={styles.searchCancelBtn} onPress={handleSearchToggle} accessibilityRole="button" accessibilityLabel="Cancel search">
-            <Text style={styles.searchCancelText}>Cancel</Text>
+          <TouchableOpacity style={styles.searchCancelBtn} onPress={handleSearchToggle} accessibilityRole="button" accessibilityLabel={t('player.chapters.cancelSearch')}>
+            <Text style={styles.searchCancelText}>{t('player.chapters.cancelSearch')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -418,7 +449,7 @@ export function ChaptersSheet({
             </View>
             <View style={styles.bookProgress}>
               <Text style={styles.bookPercent}>{Math.round(bookProgress * 100)}%</Text>
-              <Text style={styles.bookTime}>{formatTotalDuration(timeRemaining)} left</Text>
+              <Text style={styles.bookTime}>{formatTotalDuration(timeRemaining)} {t('player.chapters.left')}</Text>
             </View>
           </View>
 
@@ -429,10 +460,10 @@ export function ChaptersSheet({
             </View>
             <View style={styles.progressLabel}>
               <Text style={styles.progressText}>
-                {completedChapters} of {totalChapters} complete
+                {completedChapters} {t('player.chapters.of')} {totalChapters} {t('player.chapters.complete')}
               </Text>
               <Text style={styles.progressText}>
-                {formatTotalDuration(timeListened)} listened
+                {formatTotalDuration(timeListened)} {t('player.chapters.listened')}
               </Text>
             </View>
           </View>
@@ -448,8 +479,8 @@ export function ChaptersSheet({
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptySearch}>
-            <Text style={styles.emptySearchText}>No chapters found</Text>
-            <Text style={styles.emptySearchSubtext}>Try a different search term</Text>
+            <Text style={styles.emptySearchText}>{t('player.chapters.noChaptersFound')}</Text>
+            <Text style={styles.emptySearchSubtext}>{t('player.chapters.tryDifferentSearch')}</Text>
           </View>
         }
       />
@@ -461,12 +492,12 @@ export function ChaptersSheet({
           onPress={handleSearchToggle}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={isSearching ? 'Close search' : 'Search chapters'}
+          accessibilityLabel={isSearching ? t('player.chapters.closeSearch') : t('player.chapters.searchChapters')}
           accessibilityState={{ selected: isSearching }}
         >
           <SearchIcon color={isSearching ? colors.white : colors.black} size={14} />
           <Text style={[styles.actionButtonText, isSearching && styles.actionButtonTextActive]}>
-            Search
+            {t('player.chapters.search')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -474,10 +505,10 @@ export function ChaptersSheet({
           onPress={handleResume}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Resume playback"
+          accessibilityLabel={t('player.chapters.resume')}
         >
           <PlayIcon color={colors.white} size={14} />
-          <Text style={styles.actionButtonTextPrimary}>Resume</Text>
+          <Text style={styles.actionButtonTextPrimary}>{t('player.chapters.resume')}</Text>
         </TouchableOpacity>
       </View>
     </View>

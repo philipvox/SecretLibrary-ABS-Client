@@ -8,7 +8,7 @@
  * - Series Display
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import type { RootStackNavigationProp } from '@/navigation/types';
 import {
   ListMusic,
@@ -28,7 +29,10 @@ import {
   Check,
   Upload,
   LayoutGrid,
+  Globe,
 } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SUPPORTED_LANGUAGES, setLanguage, getCurrentLanguage } from '@/i18n';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
 import { WebContentContainer } from '@/shared/components/WebContentContainer';
 import { scale, useSecretLibraryColors } from '@/shared/theme';
@@ -37,7 +41,6 @@ import { useSpineCacheStore } from '@/shared/spine';
 import { useLibraryCache } from '@/core/cache';
 import { useMyLibraryStore } from '@/shared/stores/myLibraryStore';
 import { usePlaylistSettingsStore } from '@/shared/stores/playlistSettingsStore';
-import type { DefaultViewType } from '@/shared/stores/playlistSettingsStore';
 import { SettingsHeader } from '../components/SettingsHeader';
 import { SettingsRow } from '../components/SettingsRow';
 import { SectionHeader } from '../components/SectionHeader';
@@ -46,17 +49,17 @@ import { SectionHeader } from '../components/SectionHeader';
 // HELPERS
 // =============================================================================
 
-const DEFAULT_VIEW_LABELS: Record<string, string> = {
-  library: 'My Library',
-  mySeries: 'My Series',
-  lastPlayed: 'Last Played',
-  finished: 'Finished',
+const DEFAULT_VIEW_LABEL_KEYS: Record<string, string> = {
+  library: 'settings.display.defaultViewLibrary',
+  mySeries: 'settings.display.defaultViewMySeries',
+  lastPlayed: 'settings.display.defaultViewLastPlayed',
+  finished: 'settings.display.defaultViewFinished',
 };
 
-const VIEW_MODE_LABELS: Record<string, string> = {
-  shelf: 'Shelf (Spines)',
-  grid: 'Grid (Covers)',
-  list: 'List',
+const VIEW_MODE_LABEL_KEYS: Record<string, string> = {
+  shelf: 'settings.display.viewModeShelf',
+  grid: 'settings.display.viewModeGrid',
+  list: 'settings.display.viewModeList',
 };
 
 const VIEW_MODE_CYCLE: Record<string, string> = {
@@ -65,47 +68,32 @@ const VIEW_MODE_CYCLE: Record<string, string> = {
   list: 'shelf',
 };
 
-function getDefaultViewLabel(defaultView: DefaultViewType): string {
-  if (typeof defaultView === 'string' && defaultView.startsWith('playlist:')) {
-    return 'Playlist';
-  }
-  return DEFAULT_VIEW_LABELS[defaultView as string] || 'My Library';
-}
-
 // =============================================================================
 // SPINE SOURCE
 // =============================================================================
 
 type SpineSource = 'communityAndServer' | 'communityOnly' | 'serverOnly' | 'generatedOnly';
 
-const SPINE_SOURCE_OPTIONS: {
-  key: SpineSource;
-  label: string;
-  description: string;
-  recommended?: boolean;
-}[] = [
-  {
-    key: 'communityAndServer',
-    label: 'Community & Server',
-    description: 'Tries community first, then your server, then generated',
-    recommended: true,
-  },
-  {
-    key: 'communityOnly',
-    label: 'Community Only',
-    description: 'Community library, then generated',
-  },
-  {
-    key: 'serverOnly',
-    label: 'Server Only',
-    description: 'Your server spines, then generated',
-  },
-  {
-    key: 'generatedOnly',
-    label: 'Generated Only',
-    description: 'All spines are procedurally designed',
-  },
+const SPINE_SOURCE_KEYS: { key: SpineSource; recommended?: boolean }[] = [
+  { key: 'communityAndServer', recommended: true },
+  { key: 'communityOnly' },
+  { key: 'serverOnly' },
+  { key: 'generatedOnly' },
 ];
+
+const SPINE_SOURCE_LABEL_KEYS: Record<SpineSource, string> = {
+  communityAndServer: 'settings.display.spineSourceCommunityAndServerLabel',
+  communityOnly: 'settings.display.spineSourceCommunityOnlyLabel',
+  serverOnly: 'settings.display.spineSourceServerOnlyLabel',
+  generatedOnly: 'settings.display.spineSourceGeneratedOnlyLabel',
+};
+
+const SPINE_SOURCE_DESC_KEYS: Record<SpineSource, string> = {
+  communityAndServer: 'settings.display.spineSourceCommunityAndServerDescription',
+  communityOnly: 'settings.display.spineSourceCommunityOnlyDescription',
+  serverOnly: 'settings.display.spineSourceServerOnlyDescription',
+  generatedOnly: 'settings.display.spineSourceGeneratedOnlyDescription',
+};
 
 function deriveSpineSource(community: boolean, server: boolean): SpineSource {
   if (community && server) return 'communityAndServer';
@@ -128,12 +116,16 @@ function spineSourceToFlags(source: SpineSource): { community: boolean; server: 
 // =============================================================================
 
 interface SpineSourceOptionProps {
-  option: typeof SPINE_SOURCE_OPTIONS[number];
+  sourceKey: SpineSource;
+  label: string;
+  description: string;
+  recommended?: boolean;
+  recommendedLabel: string;
   isSelected: boolean;
   onSelect: (key: SpineSource) => void;
 }
 
-function SpineSourceOption({ option, isSelected, onSelect }: SpineSourceOptionProps) {
+function SpineSourceOption({ sourceKey, label, description, recommended, recommendedLabel, isSelected, onSelect }: SpineSourceOptionProps) {
   const colors = useSecretLibraryColors();
 
   return (
@@ -143,10 +135,10 @@ function SpineSourceOption({ option, isSelected, onSelect }: SpineSourceOptionPr
         { borderBottomColor: colors.borderLight },
         isSelected && { backgroundColor: colors.grayLight },
       ]}
-      onPress={() => onSelect(option.key)}
+      onPress={() => onSelect(sourceKey)}
       activeOpacity={0.7}
       accessibilityRole="radio"
-      accessibilityLabel={`${option.label}${option.recommended ? ', recommended' : ''}${isSelected ? ', currently selected' : ''}`}
+      accessibilityLabel={`${label}${recommended ? ', ' + recommendedLabel : ''}${isSelected ? ', currently selected' : ''}`}
       accessibilityState={{ selected: isSelected }}
     >
       <View style={styles.sourceOptionLeft}>
@@ -156,15 +148,15 @@ function SpineSourceOption({ option, isSelected, onSelect }: SpineSourceOptionPr
         <View style={styles.sourceContent}>
           <View style={styles.labelRow}>
             <Text style={[styles.sourceLabel, { color: colors.black }, isSelected && styles.sourceLabelSelected]}>
-              {option.label}
+              {label}
             </Text>
-            {option.recommended && (
+            {recommended && (
               <View style={[styles.recommendedBadge, { backgroundColor: colors.grayLight }]}>
-                <Text style={[styles.recommendedText, { color: colors.gray }]}>Recommended</Text>
+                <Text style={[styles.recommendedText, { color: colors.gray }]}>{recommendedLabel}</Text>
               </View>
             )}
           </View>
-          <Text style={[styles.sourceDescription, { color: colors.gray }]}>{option.description}</Text>
+          <Text style={[styles.sourceDescription, { color: colors.gray }]}>{description}</Text>
         </View>
       </View>
       {isSelected && <Check size={scale(20)} color={colors.black} strokeWidth={2} />}
@@ -180,6 +172,18 @@ export function DisplaySettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<RootStackNavigationProp>();
   const colors = useSecretLibraryColors();
+  const { t } = useTranslation();
+
+  // Language picker
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState(getCurrentLanguage);
+  const [isSystemLang, setIsSystemLang] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem('app_language').then((saved) => {
+      setIsSystemLang(!saved);
+    });
+  }, []);
 
   // Spine settings
   const useServerSpines = useSpineCacheStore((s) => s.useServerSpines);
@@ -235,13 +239,31 @@ export function DisplaySettingsScreen() {
     setSpineServerUrl(urlDraft);
   }, [urlDraft, setSpineServerUrl]);
 
+  const handleLanguageSelect = useCallback(async (code: string) => {
+    if (code === 'system') {
+      await setLanguage('system');
+      setIsSystemLang(true);
+    } else {
+      await setLanguage(code as any);
+      setIsSystemLang(false);
+    }
+    setCurrentLang(getCurrentLanguage());
+    setLanguagePickerOpen(false);
+  }, []);
+
+  const currentLanguageDisplayName = useMemo(() => {
+    if (isSystemLang) return t('settings.display.languageSystem');
+    const lang = SUPPORTED_LANGUAGES.find((l) => l.code === currentLang);
+    return lang ? lang.nativeName : currentLang;
+  }, [isSystemLang, currentLang, t]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
       <StatusBar
         barStyle={colors.isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.grayLight}
       />
-      <SettingsHeader title="Display Settings" />
+      <SettingsHeader title={t('settings.display.title')} />
 
       <ScrollView
         style={styles.scrollView}
@@ -253,27 +275,35 @@ export function DisplaySettingsScreen() {
       >
         <WebContentContainer variant="narrow">
         {/* Home Screen Views */}
-        <SectionHeader title="Home Screen Views" />
+        <SectionHeader title={t('settings.display.sectionHomeScreenViews')} />
         <SettingsRow
           Icon={ListMusic}
-          label="Edit View Settings"
-          description="Reorder views, set default, toggle visibility"
-          value={getDefaultViewLabel(defaultView)}
+          label={t('settings.display.editViewSettingsLabel')}
+          description={t('settings.display.editViewSettingsDescription')}
+          value={
+            typeof defaultView === 'string' && defaultView.startsWith('playlist:')
+              ? t('settings.display.defaultViewPlaylist')
+              : t(DEFAULT_VIEW_LABEL_KEYS[defaultView as string] || 'settings.display.defaultViewLibrary')
+          }
           onPress={() => navigation.navigate('PlaylistSettings')}
         />
 
         {/* Spine Source */}
-        <SectionHeader title="Spine Source" />
+        <SectionHeader title={t('settings.display.sectionSpineSource')} />
         <View style={styles.sourceIntro}>
           <Text style={[styles.sourceIntroText, { color: colors.gray }]}>
-            Where should spine images come from? Books without a match always fall back to generated designs.
+            {t('settings.display.spineSourceIntro')}
           </Text>
         </View>
         <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
-          {SPINE_SOURCE_OPTIONS.map((opt) => (
+          {SPINE_SOURCE_KEYS.map((opt) => (
             <SpineSourceOption
               key={opt.key}
-              option={opt}
+              sourceKey={opt.key}
+              label={t(SPINE_SOURCE_LABEL_KEYS[opt.key])}
+              description={t(SPINE_SOURCE_DESC_KEYS[opt.key])}
+              recommended={opt.recommended}
+              recommendedLabel={t('settings.display.spineSourceRecommended')}
               isSelected={spineSource === opt.key}
               onSelect={handleSpineSourceSelect}
             />
@@ -286,10 +316,10 @@ export function DisplaySettingsScreen() {
             <View style={styles.subSettingSpacing} />
             <SettingsRow
               Icon={Upload}
-              label="Contribute to Community"
+              label={t('settings.display.contributeToCommunityLabel')}
               switchValue={promptCommunitySubmit}
               onSwitchChange={setPromptCommunitySubmit}
-              description="Prompt to submit your spines to the community library"
+              description={t('settings.display.contributeToCommunityDescription')}
             />
           </>
         )}
@@ -302,10 +332,10 @@ export function DisplaySettingsScreen() {
               </View>
               <View style={styles.urlContent}>
                 <Text style={[styles.rowLabel, { color: colors.black }]}>
-                  Spine Server URL
+                  {t('settings.display.spineServerUrlLabel')}
                 </Text>
                 <Text style={[styles.urlHelp, { color: colors.gray }]}>
-                  Leave empty to use your main ABS server
+                  {t('settings.display.spineServerUrlHelp')}
                 </Text>
               </View>
             </View>
@@ -321,7 +351,7 @@ export function DisplaySettingsScreen() {
                 ]}
                 value={urlDraft}
                 onChangeText={setUrlDraft}
-                placeholder="http://192.168.1.100:8786"
+                placeholder={t('settings.display.spineServerUrlPlaceholder')}
                 placeholderTextColor={colors.gray}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -343,12 +373,12 @@ export function DisplaySettingsScreen() {
         )}
 
         {/* Default View Mode */}
-        <SectionHeader title="Default View" />
+        <SectionHeader title={t('settings.display.sectionDefaultView')} />
         <SettingsRow
           Icon={LayoutGrid}
-          label="Default View Mode"
-          description="Choose whether screens open in shelf, grid, or list view"
-          value={VIEW_MODE_LABELS[defaultViewMode] || 'Shelf (Spines)'}
+          label={t('settings.display.defaultViewModeLabel')}
+          description={t('settings.display.defaultViewModeDescription')}
+          value={t(VIEW_MODE_LABEL_KEYS[defaultViewMode] || 'settings.display.viewModeShelf')}
           onPress={() => {
             const next = VIEW_MODE_CYCLE[defaultViewMode] || 'shelf';
             setDefaultViewMode(next as any);
@@ -356,14 +386,67 @@ export function DisplaySettingsScreen() {
         />
 
         {/* Series Display */}
-        <SectionHeader title="Series Display" />
+        <SectionHeader title={t('settings.display.sectionSeriesDisplay')} />
         <SettingsRow
           Icon={Library}
-          label="Hide Single-Book Series"
+          label={t('settings.display.hideSingleBookSeriesLabel')}
           switchValue={hideSingleBookSeries}
           onSwitchChange={handleHideSingleSeriesToggle}
-          description="Hides series that only contain one book"
+          description={t('settings.display.hideSingleBookSeriesDescription')}
         />
+
+        {/* Language */}
+        <SectionHeader title={t('settings.display.languageLabel')} />
+        <SettingsRow
+          Icon={Globe}
+          label={t('settings.display.languageLabel')}
+          description={t('settings.display.languageDescription')}
+          value={currentLanguageDisplayName}
+          onPress={() => setLanguagePickerOpen(!languagePickerOpen)}
+        />
+        {languagePickerOpen && (
+          <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                { borderBottomColor: colors.borderLight },
+                isSystemLang && { backgroundColor: colors.grayLight },
+              ]}
+              onPress={() => handleLanguageSelect('system')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.languageOptionText, { color: colors.black }, isSystemLang && styles.languageOptionTextSelected]}>
+                {t('settings.display.languageSystem')}
+              </Text>
+              {isSystemLang && <Check size={scale(18)} color={colors.black} strokeWidth={2} />}
+            </TouchableOpacity>
+            {SUPPORTED_LANGUAGES.map((lang) => {
+              const isSelected = !isSystemLang && currentLang === lang.code;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageOption,
+                    { borderBottomColor: colors.borderLight },
+                    isSelected && { backgroundColor: colors.grayLight },
+                  ]}
+                  onPress={() => handleLanguageSelect(lang.code)}
+                  activeOpacity={0.7}
+                >
+                  <View>
+                    <Text style={[styles.languageOptionText, { color: colors.black }, isSelected && styles.languageOptionTextSelected]}>
+                      {lang.nativeName}
+                    </Text>
+                    <Text style={[styles.languageOptionSubtext, { color: colors.gray }]}>
+                      {lang.name}
+                    </Text>
+                  </View>
+                  {isSelected && <Check size={scale(18)} color={colors.black} strokeWidth={2} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
         </WebContentContainer>
       </ScrollView>
     </View>
@@ -508,5 +591,26 @@ const styles = StyleSheet.create({
     height: scale(44),
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Language picker
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  languageOptionText: {
+    fontFamily: fonts.playfair.regular,
+    fontSize: scale(15),
+  },
+  languageOptionTextSelected: {
+    fontFamily: fonts.playfair.bold,
+  },
+  languageOptionSubtext: {
+    fontFamily: fonts.jetbrainsMono.regular,
+    fontSize: scale(9),
+    marginTop: 2,
   },
 });

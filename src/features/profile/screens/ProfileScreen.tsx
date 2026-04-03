@@ -36,6 +36,7 @@ import {
   Redo2,
   type LucideIcon,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/core/auth';
 import { TopNavBackIcon } from '@/shared/components';
 import { useDownloads } from '@/core/hooks/useDownloads';
@@ -54,7 +55,7 @@ import { usePlayerStore, useSpeedStore, usePlayerSettingsStore } from '@/shared/
 const SPEED_QUICK_OPTIONS = [1, 1.25, 1.5, 2];
 const SKIP_FORWARD_OPTIONS = [10, 15, 30, 45, 60];
 const SKIP_BACK_OPTIONS = [5, 10, 15, 30, 45];
-import { useChapterCleaningStore, CLEANING_LEVEL_INFO } from '../stores/chapterCleaningStore';
+import { useChapterCleaningStore, CLEANING_LEVEL_KEYS } from '../stores/chapterCleaningStore';
 import { useHapticSettingsStore } from '../stores/hapticSettingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useDNASettingsStore } from '../stores/dnaSettingsStore';
@@ -143,6 +144,7 @@ function ProfileLink({ Icon, label, subtitle, badge, badgeColor, onPress }: Prof
 
 export function ProfileScreen() {
   useScreenLoadTime('ProfileScreen');
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { user, serverUrl, logout, isLoading } = useAuth();
@@ -225,11 +227,13 @@ export function ProfileScreen() {
 
   // Data & Storage subtitle
   const libraryPlaylistId = useLibrarySyncStore((s) => s.libraryPlaylistId);
-  const dataStorageSubtitle = `${downloadCount} book${downloadCount !== 1 ? 's' : ''} · ${formatBytes(totalStorage)}${libraryPlaylistId ? ' · Synced' : ''}`;
+  const dataStorageSubtitle = libraryPlaylistId
+    ? t('profile.links.dataStorageSubtitleSynced', { count: downloadCount, size: formatBytes(totalStorage) })
+    : t('profile.links.dataStorageSubtitle', { count: downloadCount, size: formatBytes(totalStorage) });
 
-  const cleaningLevelInfo = CLEANING_LEVEL_INFO[chapterLevel] ?? CLEANING_LEVEL_INFO['standard'];
-  const playbackSubtitle = `${globalDefaultRate ?? 1}x · ${skipForwardInterval}s/${skipBackInterval}s · ${cleaningLevelInfo.label}`;
-  const hapticsSubtitle = hapticsEnabled ? `On · ${enabledHapticCount} of 8` : 'Off';
+  const cleaningLevelKeys = CLEANING_LEVEL_KEYS[chapterLevel] ?? CLEANING_LEVEL_KEYS['standard'];
+  const playbackSubtitle = `${globalDefaultRate ?? 1}x · ${skipForwardInterval}s/${skipBackInterval}s · ${t(cleaningLevelKeys.labelKey)}`;
+  const hapticsSubtitle = hapticsEnabled ? t('profile.links.hapticsSubtitleOn', { count: enabledHapticCount }) : t('profile.links.hapticsSubtitleOff');
 
   const handleLibrarySwitch = useCallback((id: string) => {
     if (id === activeLibrary?.id) return;
@@ -239,22 +243,22 @@ export function ProfileScreen() {
   }, [activeLibrary?.id, setLibrary, loadCache]);
 
   const handleLogout = useCallback(() => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('profile.identity.signOut'), t('profile.identity.signOutConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: t('profile.identity.signOut'),
         style: 'destructive',
         onPress: async () => {
           haptics.destructiveConfirm();
           try {
             await logout();
           } catch {
-            Alert.alert('Error', 'Failed to sign out. Please try again.');
+            Alert.alert('Error', t('profile.identity.signOutError'));
           }
         },
       },
     ]);
-  }, [logout]);
+  }, [logout, t]);
 
   // Skull logo: tap to go home
   const handleLogoPress = useCallback(() => {
@@ -363,7 +367,7 @@ export function ProfileScreen() {
           <View style={styles.identityRow}>
             <View style={styles.identityInfo}>
               <Text style={[styles.profileName, { color: colors.black }]}>
-                {user?.username || 'User'}
+                {user?.username || t('profile.identity.defaultUsername')}
               </Text>
               <Text style={[styles.profileServer, { color: colors.gray }]} numberOfLines={1}>
                 {serverDisplay}
@@ -382,7 +386,7 @@ export function ProfileScreen() {
                 accessibilityLabel="Sign out"
               >
                 <LogOut size={scale(12)} color={colors.gray} strokeWidth={1.5} />
-                <Text style={[styles.signOutText, { color: colors.gray }]}>Log out</Text>
+                <Text style={[styles.signOutText, { color: colors.gray }]}>{t('profile.identity.logOut')}</Text>
               </TouchableOpacity>
               <View style={styles.dnaContainer}>
                 <TouchableOpacity
@@ -405,11 +409,11 @@ export function ProfileScreen() {
                     color: !hasDNA ? colors.gray
                       : dnaEnabled ? colors.white : colors.gray,
                   }]}>
-                    {!hasDNA ? 'No DNA' : dnaEnabled ? 'DNA' : 'DNA off'}
+                    {!hasDNA ? t('profile.dna.noDna') : dnaEnabled ? t('profile.dna.dnaEnabled') : t('profile.dna.dnaDisabled')}
                   </Text>
                 </TouchableOpacity>
                 <Text style={[styles.dnaExplainer, { color: colors.textMuted }]}>
-                  {!hasDNA ? 'Tag books with dna: to unlock' : dnaEnabled ? 'Mood & vibe recommendations' : 'Tap to enable mood matching'}
+                  {!hasDNA ? t('profile.dna.noDnaExplainer') : dnaEnabled ? t('profile.dna.enabledExplainer') : t('profile.dna.disabledExplainer')}
                 </Text>
               </View>
             </View>
@@ -466,21 +470,21 @@ export function ProfileScreen() {
               <Text style={[styles.statValue, { color: colors.black }]}>
                 {bookCount.toLocaleString()}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.gray }]}>books</Text>
+              <Text style={[styles.statLabel, { color: colors.gray }]}>{t('profile.stats.books')}</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.borderLight }]} />
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: colors.black }]}>
                 {formatListeningTime(totalListened)}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.gray }]}>listened</Text>
+              <Text style={[styles.statLabel, { color: colors.gray }]}>{t('profile.stats.listened')}</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.borderLight }]} />
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: colors.black }]}>
-                {streak} day{streak !== 1 ? 's' : ''}
+                {t('profile.dayStreak', { count: streak })}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.gray }]}>streak</Text>
+              <Text style={[styles.statLabel, { color: colors.gray }]}>{t('profile.stats.streak')}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -499,7 +503,7 @@ export function ProfileScreen() {
             <Text style={[styles.quickTileSmallValue, { color: colors.black }]}>
               {skipBackInterval}s
             </Text>
-            <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>Rewind</Text>
+            <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>{t('profile.quickActions.rewind')}</Text>
           </TouchableOpacity>
 
           {/* Fast Forward */}
@@ -514,7 +518,7 @@ export function ProfileScreen() {
             <Text style={[styles.quickTileSmallValue, { color: colors.black }]}>
               {skipForwardInterval}s
             </Text>
-            <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>Forward</Text>
+            <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>{t('profile.quickActions.forward')}</Text>
           </TouchableOpacity>
 
           {/* Sync */}
@@ -533,9 +537,9 @@ export function ProfileScreen() {
                 <RefreshCw size={scale(16)} color={colors.gray} strokeWidth={1.5} />
               )}
               <Text style={[styles.quickTileSmallValue, { color: colors.black }]}>
-                {isSyncing ? '...' : 'Sync'}
+                {isSyncing ? '...' : t('profile.quickActions.sync')}
               </Text>
-              <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>Library</Text>
+              <Text style={[styles.quickTileSmallLabel, { color: colors.textMuted }]}>{t('profile.quickActions.library')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -582,47 +586,47 @@ export function ProfileScreen() {
         </View>
 
         {/* APP Section */}
-        <Text style={[styles.sectionLabel, { color: colors.gray }]}>APP</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t('profile.sections.app')}</Text>
         <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
           <ProfileLink
             Icon={PlayCircle}
-            label="Playback Settings"
+            label={t('profile.links.playbackSettings')}
             subtitle={playbackSubtitle}
             onPress={() => navigation.navigate('PlaybackSettings')}
           />
           <ProfileLink
             Icon={Palette}
-            label="Display Settings"
+            label={t('profile.links.displaySettings')}
             subtitle={displaySubtitle}
             onPress={() => navigation.navigate('DisplaySettings')}
           />
           <ProfileLink
             Icon={Vibrate}
-            label="Haptics"
+            label={t('profile.links.haptics')}
             subtitle={hapticsSubtitle}
             onPress={() => navigation.navigate('HapticSettings')}
           />
         </View>
 
         {/* SYSTEM Section */}
-        <Text style={[styles.sectionLabel, { color: colors.gray }]}>SYSTEM</Text>
+        <Text style={[styles.sectionLabel, { color: colors.gray }]}>{t('profile.sections.system')}</Text>
         <View style={[styles.sectionContent, { backgroundColor: colors.white }]}>
           <ProfileLink
             Icon={Folder}
-            label="Data & Storage"
+            label={t('profile.links.dataStorage')}
             subtitle={dataStorageSubtitle}
             onPress={() => navigation.navigate('DataStorageSettings')}
           />
           <ProfileLink
             Icon={Info}
-            label="About & Help"
-            subtitle={`v${APP_VERSION} · Bug reports`}
+            label={t('profile.links.aboutHelp')}
+            subtitle={t('profile.links.aboutHelpSubtitle', { version: APP_VERSION })}
             onPress={() => navigation.navigate('About')}
           />
           <ProfileLink
             Icon={HelpCircle}
-            label="Show Tips"
-            subtitle="Replay the walkthrough"
+            label={t('profile.links.showTips')}
+            subtitle={t('profile.links.showTipsSubtitle')}
             onPress={handleShowTips}
           />
         </View>

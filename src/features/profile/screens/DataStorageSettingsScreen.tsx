@@ -55,6 +55,7 @@ import { secretLibraryFonts as fonts } from '@/shared/theme/secretLibrary';
 import { SettingsHeader } from '../components/SettingsHeader';
 import { SettingsRow } from '../components/SettingsRow';
 import { SectionHeader } from '../components/SectionHeader';
+import { useTranslation } from 'react-i18next';
 import { logger } from '@/shared/utils/logger';
 import { formatBytes } from '@/shared/utils/format';
 import { useSpineCacheStore } from '@/shared/spine';
@@ -84,13 +85,14 @@ function PlaylistPickerModal({
 }: PlaylistPickerModalProps) {
   const insets = useSafeAreaInsets();
   const colors = useSecretLibraryColors();
+  const { t } = useTranslation();
 
   const renderPlaylist = ({ item }: { item: Playlist }) => {
     const isSelected = item.id === currentPlaylistId;
     const itemCount = item.items?.length || 0;
     // Friendly names for internal playlists
-    const displayName = item.name === '__sl_my_library' ? 'My Library (auto)'
-      : item.name === '__sl_favorite_series' ? 'My Series (auto)'
+    const displayName = item.name === '__sl_my_library' ? t('settings.storage.pickerMyLibraryAuto')
+      : item.name === '__sl_favorite_series' ? t('settings.storage.pickerMySeriesAuto')
       : item.name;
 
     return (
@@ -108,7 +110,7 @@ function PlaylistPickerModal({
       >
         <View style={styles.playlistInfo}>
           <Text style={[styles.playlistName, { color: colors.black }]}>{displayName}</Text>
-          <Text style={[styles.playlistMeta, { color: colors.gray }]}>{itemCount} book{itemCount !== 1 ? 's' : ''}</Text>
+          <Text style={[styles.playlistMeta, { color: colors.gray }]}>{t('settings.storage.pickerBookCount', { count: itemCount })}</Text>
         </View>
         {isSelected && (
           <Check size={scale(18)} color={colors.black} strokeWidth={2} />
@@ -127,33 +129,33 @@ function PlaylistPickerModal({
       <View style={[styles.modalContainer, { backgroundColor: colors.white, paddingTop: insets.top }]}>
         {/* Header */}
         <View style={[styles.modalHeader, { borderBottomColor: colors.grayLight }]}>
-          <Text style={[styles.modalTitle, { color: colors.black }]}>Choose Playlist</Text>
-          <TouchableOpacity onPress={onClose} style={styles.modalCloseButton} accessibilityRole="button" accessibilityLabel="Close playlist picker">
+          <Text style={[styles.modalTitle, { color: colors.black }]}>{t('settings.storage.pickerTitle')}</Text>
+          <TouchableOpacity onPress={onClose} style={styles.modalCloseButton} accessibilityRole="button" accessibilityLabel={t('settings.storage.pickerClose')}>
             <X size={scale(24)} color={colors.black} strokeWidth={1.5} />
           </TouchableOpacity>
         </View>
 
         <Text style={[styles.modalDescription, { color: colors.gray }]}>
-          Select a playlist to sync with your library, or create a new one.
+          {t('settings.storage.pickerDescription')}
         </Text>
 
         {/* Create New Button */}
-        <TouchableOpacity style={[styles.createNewButton, { borderBottomColor: colors.grayLight }]} onPress={onCreateNew} accessibilityRole="button" accessibilityLabel="Create new playlist">
+        <TouchableOpacity style={[styles.createNewButton, { borderBottomColor: colors.grayLight }]} onPress={onCreateNew} accessibilityRole="button" accessibilityLabel={t('settings.storage.pickerCreateNewPlaylist')}>
           <Plus size={scale(18)} color={colors.black} strokeWidth={1.5} />
-          <Text style={[styles.createNewText, { color: colors.black }]}>Create New Playlist</Text>
+          <Text style={[styles.createNewText, { color: colors.black }]}>{t('settings.storage.pickerCreateNewPlaylist')}</Text>
         </TouchableOpacity>
 
         {/* Playlist List */}
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.gray} />
-            <Text style={[styles.loadingText, { color: colors.gray }]}>Loading playlists...</Text>
+            <Text style={[styles.loadingText, { color: colors.gray }]}>{t('settings.storage.pickerLoadingPlaylists')}</Text>
           </View>
         ) : playlists.length === 0 ? (
           <View style={styles.emptyContainer}>
             <List size={scale(32)} color={colors.gray} strokeWidth={1.5} />
-            <Text style={[styles.emptyText, { color: colors.gray }]}>No playlists yet</Text>
-            <Text style={[styles.emptySubtext, { color: colors.gray }]}>Create one to start syncing</Text>
+            <Text style={[styles.emptyText, { color: colors.gray }]}>{t('settings.storage.pickerNoPlaylists')}</Text>
+            <Text style={[styles.emptySubtext, { color: colors.gray }]}>{t('settings.storage.pickerCreateToStart')}</Text>
           </View>
         ) : (
           <FlatList
@@ -178,6 +180,7 @@ export function DataStorageSettingsScreen() {
   const navigation = useNavigation<any>();
   const { library } = useDefaultLibrary();
   const colors = useSecretLibraryColors();
+  const { t } = useTranslation();
 
   // Downloads data
   const { downloads } = useDownloads();
@@ -233,7 +236,7 @@ export function DataStorageSettingsScreen() {
       if (libraryPlaylistId) {
         const linked = fetchedPlaylists.find(p => p.id === libraryPlaylistId);
         if (linked) {
-          setLinkedPlaylistName(linked.name.startsWith('__sl_') ? 'My Library (auto)' : linked.name);
+          setLinkedPlaylistName(linked.name.startsWith('__sl_') ? t('settings.storage.pickerMyLibraryAuto') : linked.name);
         }
       }
 
@@ -242,7 +245,7 @@ export function DataStorageSettingsScreen() {
       if (currentSeriesId) {
         const linkedSeries = fetchedPlaylists.find(p => p.id === currentSeriesId);
         if (linkedSeries) {
-          setLinkedSeriesPlaylistName(linkedSeries.name.startsWith('__sl_') ? 'My Series (auto)' : linkedSeries.name);
+          setLinkedSeriesPlaylistName(linkedSeries.name.startsWith('__sl_') ? t('settings.storage.pickerMySeriesAuto') : linkedSeries.name);
         }
       }
     } catch (err) {
@@ -273,10 +276,10 @@ export function DataStorageSettingsScreen() {
       //    and onLoad will set fresh dimensions from the new images
       useSpineCacheStore.getState().clearServerSpineDimensions();
       const count = useLibraryCache.getState().booksWithServerSpines.size;
-      Alert.alert('Spines Refreshed', `Loaded ${count} spine images from server.`);
+      Alert.alert(t('settings.storage.alertSpinesRefreshedTitle'), t('settings.storage.alertSpinesRefreshedMessage', { count }));
     } catch (error) {
       logger.error('[DataStorage] Failed to refresh spines:', error);
-      Alert.alert('Error', 'Could not refresh spines. Please try again.');
+      Alert.alert(t('common.error'), t('settings.storage.alertCouldNotRefreshSpines'));
     } finally {
       setIsRefreshingSpines(false);
     }
@@ -294,7 +297,7 @@ export function DataStorageSettingsScreen() {
     try {
       // Set the playlist ID
       useLibrarySyncStore.getState().setLibraryPlaylistId(playlist.id);
-      setLinkedPlaylistName(playlist.name.startsWith('__sl_') ? 'My Library (auto)' : playlist.name);
+      setLinkedPlaylistName(playlist.name.startsWith('__sl_') ? t('settings.storage.pickerMyLibraryAuto') : playlist.name);
 
       // Set up series playlist too
       if (library?.id) {
@@ -306,9 +309,9 @@ export function DataStorageSettingsScreen() {
       await librarySyncService.fullSync();
       setIsSyncing(false);
 
-      Alert.alert('Playlist Linked', `Your library is now syncing with "${playlist.name.startsWith('__sl_') ? 'My Library' : playlist.name}".`);
+      Alert.alert(t('settings.storage.alertPlaylistLinkedTitle'), t('settings.storage.alertPlaylistLinkedMessage', { name: playlist.name.startsWith('__sl_') ? 'My Library' : playlist.name }));
     } catch (err: any) {
-      Alert.alert('Error', 'Could not link playlist. Please try again.');
+      Alert.alert(t('common.error'), t('settings.storage.alertCouldNotLinkPlaylist'));
     } finally {
       setIsEnablingSync(false);
     }
@@ -328,16 +331,16 @@ export function DataStorageSettingsScreen() {
       });
 
       useLibrarySyncStore.getState().setLibraryPlaylistId(newPlaylist.id);
-      setLinkedPlaylistName('My Library (auto)');
+      setLinkedPlaylistName(t('settings.storage.pickerMyLibraryAuto'));
       librarySyncService.getOrCreateSeriesPlaylist(library.id);
 
       setIsSyncing(true);
       await librarySyncService.fullSync();
       setIsSyncing(false);
 
-      Alert.alert('Cloud Sync Enabled', 'Created a new playlist and started syncing.');
+      Alert.alert(t('settings.storage.alertCloudSyncEnabledTitle'), t('settings.storage.alertCloudSyncEnabledMessage'));
     } catch (err: any) {
-      Alert.alert('Error', 'Could not create playlist. Please try again.');
+      Alert.alert(t('common.error'), t('settings.storage.alertCouldNotCreatePlaylist'));
     } finally {
       setIsEnablingSync(false);
     }
@@ -352,7 +355,7 @@ export function DataStorageSettingsScreen() {
   const handleSelectSeriesPlaylist = useCallback(async (playlist: Playlist) => {
     setShowSeriesPlaylistPicker(false);
     useLibrarySyncStore.getState().setSeriesPlaylistId(playlist.id);
-    setLinkedSeriesPlaylistName(playlist.name.startsWith('__sl_') ? 'My Series (auto)' : playlist.name);
+    setLinkedSeriesPlaylistName(playlist.name.startsWith('__sl_') ? t('settings.storage.pickerMySeriesAuto') : playlist.name);
 
     // Sync series
     setIsSyncing(true);
@@ -369,13 +372,13 @@ export function DataStorageSettingsScreen() {
 
     try {
       const _playlistId = await librarySyncService.getOrCreateSeriesPlaylist(library.id);
-      setLinkedSeriesPlaylistName('My Series (auto)');
+      setLinkedSeriesPlaylistName(t('settings.storage.pickerMySeriesAuto'));
 
       setIsSyncing(true);
       await librarySyncService.fullSync();
       setIsSyncing(false);
     } catch (err: any) {
-      Alert.alert('Error', 'Could not create series playlist. Please try again.');
+      Alert.alert(t('common.error'), t('settings.storage.alertCouldNotCreateSeriesPlaylist'));
     }
   }, [library?.id]);
 
@@ -400,9 +403,9 @@ export function DataStorageSettingsScreen() {
     setIsRefreshingCache(true);
     try {
       await refreshCache();
-      Alert.alert('Done', 'Your library has been reloaded from the server.');
+      Alert.alert(t('common.done'), t('settings.storage.alertLibraryReloaded'));
     } catch {
-      Alert.alert('Error', 'Could not reload library. Please check your connection.');
+      Alert.alert(t('common.error'), t('settings.storage.alertCouldNotReloadLibrary'));
     } finally {
       setIsRefreshingCache(false);
     }
@@ -412,20 +415,20 @@ export function DataStorageSettingsScreen() {
     if (isClearingCache) return;
 
     Alert.alert(
-      'Clear Temporary Files?',
-      'This removes cached images and data to free up space. Your downloads and listening progress are safe.',
+      t('settings.storage.alertClearTempFilesTitle'),
+      t('settings.storage.alertClearTempFilesMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('common.clear'),
           onPress: async () => {
             setIsClearingCache(true);
             try {
               await clearCache();
-              Alert.alert('Done', 'Temporary files cleared.');
+              Alert.alert(t('common.done'), t('settings.storage.alertTempFilesCleared'));
             } catch (error) {
               logger.error('[DataStorage] Failed to clear cache:', error);
-              Alert.alert('Error', 'Could not clear files. Please try again.');
+              Alert.alert(t('common.error'), t('settings.storage.alertCouldNotClearFiles'));
             } finally {
               setIsClearingCache(false);
             }
@@ -437,28 +440,28 @@ export function DataStorageSettingsScreen() {
 
   const handleRemoveAllDownloads = useCallback(() => {
     if (downloadCount === 0) {
-      Alert.alert('No Downloads', 'You have no downloaded books.');
+      Alert.alert(t('settings.storage.alertNoDownloadsTitle'), t('settings.storage.alertNoDownloadsMessage'));
       return;
     }
 
     if (isClearingDownloads) return;
 
     Alert.alert(
-      'Remove All Downloads?',
-      `This will delete ${downloadCount} downloaded book${downloadCount !== 1 ? 's' : ''} and free up ${formatBytes(totalStorage)}. You can re-download them anytime.`,
+      t('settings.storage.alertRemoveAllDownloadsTitle'),
+      t('settings.storage.alertRemoveAllDownloadsMessage', { count: downloadCount, size: formatBytes(totalStorage) }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove All',
+          text: t('settings.storage.alertRemoveAll'),
           style: 'destructive',
           onPress: async () => {
             setIsClearingDownloads(true);
             try {
               await downloadManager.clearAllDownloads();
-              Alert.alert('Done', 'All downloads removed.');
+              Alert.alert(t('common.done'), t('settings.storage.alertAllDownloadsRemoved'));
             } catch (error) {
               logger.error('[DataStorage] Failed to clear downloads:', error);
-              Alert.alert('Error', 'Could not remove downloads. Please try again.');
+              Alert.alert(t('common.error'), t('settings.storage.alertCouldNotRemoveDownloads'));
             } finally {
               setIsClearingDownloads(false);
             }
@@ -470,20 +473,20 @@ export function DataStorageSettingsScreen() {
 
   const handleEmptyLibrary = useCallback(() => {
     if (libraryCount === 0) {
-      Alert.alert('Already Empty', 'Your library has no books.');
+      Alert.alert(t('settings.storage.alertAlreadyEmptyTitle'), t('settings.storage.alertAlreadyEmptyMessage'));
       return;
     }
     Alert.alert(
-      'Empty My Library?',
-      `This removes all ${libraryCount} books from your library list. Downloads and progress are not affected.`,
+      t('settings.storage.alertEmptyMyLibraryTitle'),
+      t('settings.storage.alertEmptyMyLibraryMessage', { count: libraryCount }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Empty Library',
+          text: t('settings.storage.alertEmptyLibraryButton'),
           style: 'destructive',
           onPress: () => {
             clearAllLibrary();
-            Alert.alert('Done', 'Your library has been emptied.');
+            Alert.alert(t('common.done'), t('settings.storage.alertLibraryEmptied'));
           },
         },
       ]
@@ -501,12 +504,12 @@ export function DataStorageSettingsScreen() {
 
   const handleDisableCloudSync = useCallback(() => {
     Alert.alert(
-      'Turn Off Cloud Sync?',
-      'Your library will stay on this device but won\'t sync to other devices anymore.',
+      t('settings.storage.alertTurnOffCloudSyncTitle'),
+      t('settings.storage.alertTurnOffCloudSyncMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Turn Off',
+          text: t('settings.storage.alertTurnOff'),
           style: 'destructive',
           onPress: () => {
             const syncStore = useLibrarySyncStore.getState();
@@ -521,20 +524,20 @@ export function DataStorageSettingsScreen() {
 
   const handleResetFromServer = useCallback(() => {
     Alert.alert(
-      'Reset from Server?',
-      'This replaces your local library with the server version. Use this if your library got out of sync.',
+      t('settings.storage.alertResetFromServerTitle'),
+      t('settings.storage.alertResetFromServerMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: async () => {
             setIsSyncing(true);
             try {
               const count = await librarySyncService.resetAndPull();
-              Alert.alert('Done', `Restored ${count} books from server.`);
+              Alert.alert(t('common.done'), t('settings.storage.alertRestoredFromServer', { count }));
             } catch (err: any) {
-              Alert.alert('Error', 'Could not reset. Please try again.');
+              Alert.alert(t('common.error'), t('settings.storage.alertCouldNotReset'));
             } finally {
               setIsSyncing(false);
             }
@@ -545,11 +548,11 @@ export function DataStorageSettingsScreen() {
   }, []);
 
   const formatLastSync = () => {
-    if (!lastSyncAt) return 'Never';
+    if (!lastSyncAt) return t('settings.storage.lastSyncNever');
     const diff = Date.now() - lastSyncAt;
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 60000) return t('settings.storage.lastSyncJustNow');
+    if (diff < 3600000) return t('settings.storage.lastSyncMinutesAgo', { count: Math.floor(diff / 60000) });
+    if (diff < 86400000) return t('settings.storage.lastSyncHoursAgo', { count: Math.floor(diff / 3600000) });
     return new Date(lastSyncAt).toLocaleDateString();
   };
 
@@ -557,7 +560,7 @@ export function DataStorageSettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
       <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
-      <SettingsHeader title="Data & Storage" />
+      <SettingsHeader title={t('settings.storage.title')} />
 
       <ScrollView
         style={styles.scrollView}
@@ -571,7 +574,7 @@ export function DataStorageSettingsScreen() {
           onPress={handleManageDownloads}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`${formatBytes(totalStorage)} used, ${downloadCount} book${downloadCount !== 1 ? 's' : ''} downloaded, tap to manage`}
+          accessibilityLabel={t('settings.storage.storageOverviewA11y', { size: formatBytes(totalStorage), count: downloadCount })}
         >
           <View style={[styles.storageIcon, { backgroundColor: colors.grayLight }]}>
             <Folder size={scale(24)} color={colors.black} strokeWidth={1.5} />
@@ -579,7 +582,7 @@ export function DataStorageSettingsScreen() {
           <View style={styles.storageInfo}>
             <Text style={[styles.storageValue, { color: colors.black }]}>{formatBytes(totalStorage)}</Text>
             <Text style={[styles.storageLabel, { color: colors.gray }]}>
-              {downloadCount} book{downloadCount !== 1 ? 's' : ''} downloaded
+              {t('settings.storage.booksDownloaded', { count: downloadCount })}
             </Text>
           </View>
           <View style={styles.storageChevron}>
@@ -588,126 +591,126 @@ export function DataStorageSettingsScreen() {
         </TouchableOpacity>
 
         {/* Downloads */}
-        <SectionHeader title="Downloads" />
+        <SectionHeader title={t('settings.storage.sectionDownloads')} />
         <SettingsRow
           Icon={Download}
-          label="View Downloaded Books"
+          label={t('settings.storage.viewDownloadedBooks')}
           value={`${downloadCount}`}
           onPress={handleManageDownloads}
-          description="See and manage your offline books"
+          description={t('settings.storage.viewDownloadedBooksDescription')}
         />
         <SettingsRow
           Icon={Wifi}
-          label="Download Only on WiFi"
+          label={t('settings.storage.downloadOnlyOnWifi')}
           switchValue={wifiOnlyEnabled}
           onSwitchChange={handleWifiOnlyToggle}
-          description="Restricts downloads to Wi-Fi networks"
+          description={t('settings.storage.downloadOnlyOnWifiDescription')}
         />
         <SettingsRow
           Icon={Library}
-          label="Auto-Download Series"
+          label={t('settings.storage.autoDownloadSeries')}
           switchValue={autoDownloadSeriesEnabled}
           onSwitchChange={handleAutoDownloadSeriesToggle}
-          description="Queue next book at 80% progress"
+          description={t('settings.storage.autoDownloadSeriesDescription')}
         />
         {/* Cloud Sync */}
-        <SectionHeader title="Cloud Sync" />
+        <SectionHeader title={t('settings.storage.sectionCloudSync')} />
         {isCloudSyncEnabled ? (
           <>
             <SettingsRow
               Icon={List}
-              label="Synced My Library"
-              value={linkedPlaylistName || 'Unknown'}
+              label={t('settings.storage.syncedMyLibrary')}
+              value={linkedPlaylistName || t('settings.storage.unknown')}
               onPress={handleOpenPlaylistPicker}
-              description="Tap to change which playlist syncs"
+              description={t('settings.storage.syncedMyLibraryDescription')}
             />
             <SettingsRow
               Icon={Heart}
-              label="Synced My Series"
-              value={linkedSeriesPlaylistName || 'Not set'}
+              label={t('settings.storage.syncedMySeries')}
+              value={linkedSeriesPlaylistName || t('settings.storage.notSet')}
               onPress={handleOpenSeriesPlaylistPicker}
-              description="Tap to change which playlist syncs series"
+              description={t('settings.storage.syncedMySeriesDescription')}
             />
             <SettingsRow
               Icon={Cloud}
-              label="Sync Status"
+              label={t('settings.storage.syncStatus')}
               value={formatLastSync()}
-              description={`${libraryCount} books in library`}
+              description={t('settings.storage.booksInLibrary', { count: libraryCount })}
             />
             <SettingsRow
               Icon={RefreshCw}
-              label="Sync Now"
+              label={t('settings.storage.syncNow')}
               onPress={handleSyncNow}
               loading={isSyncing}
-              description="Upload and download library changes"
+              description={t('settings.storage.syncNowDescription')}
             />
             <SettingsRow
               Icon={CloudOff}
-              label="Turn Off Cloud Sync"
+              label={t('settings.storage.turnOffCloudSync')}
               onPress={handleDisableCloudSync}
-              description="Stop syncing to other devices"
+              description={t('settings.storage.turnOffCloudSyncDescription')}
               danger
             />
           </>
         ) : (
           <SettingsRow
             Icon={Cloud}
-            label="Turn On Cloud Sync"
+            label={t('settings.storage.turnOnCloudSync')}
             onPress={handleOpenPlaylistPicker}
             loading={isEnablingSync}
-            description={`Sync your ${libraryCount} books across devices`}
+            description={t('settings.storage.turnOnCloudSyncDescription', { count: libraryCount })}
           />
         )}
 
         {/* Troubleshooting */}
-        <SectionHeader title="Troubleshooting" />
+        <SectionHeader title={t('settings.storage.sectionTroubleshooting')} />
         <SettingsRow
           Icon={RefreshCw}
-          label="Reload Library from Server"
+          label={t('settings.storage.reloadLibrary')}
           onPress={handleReloadLibrary}
           loading={isRefreshingCache}
-          description="Re-download your book list and covers"
+          description={t('settings.storage.reloadLibraryDescription')}
         />
         <SettingsRow
           Icon={ImageIcon}
-          label="Refresh Spines"
+          label={t('settings.storage.refreshSpines')}
           onPress={isRefreshingSpines ? undefined : handleRefreshSpines}
           loading={isRefreshingSpines}
-          description="Reload spine images from server"
+          description={t('settings.storage.refreshSpinesDescription')}
         />
         <SettingsRow
           Icon={Trash2}
-          label="Clear Temporary Files"
+          label={t('settings.storage.clearTempFiles')}
           onPress={handleClearTempFiles}
           loading={isClearingCache}
-          description="Frees space without deleting books"
+          description={t('settings.storage.clearTempFilesDescription')}
         />
 
         {/* Danger Zone */}
-        <SectionHeader title="Danger Zone" />
+        <SectionHeader title={t('settings.storage.sectionDangerZone')} />
         {isCloudSyncEnabled && (
           <SettingsRow
             Icon={RefreshCw}
-            label="Reset from Server"
+            label={t('settings.storage.resetFromServer')}
             onPress={handleResetFromServer}
-            description="Replace local library with server version"
+            description={t('settings.storage.resetFromServerDescription')}
             danger
             loading={isSyncing}
           />
         )}
         <SettingsRow
           Icon={Trash2}
-          label="Remove All Downloads"
+          label={t('settings.storage.removeAllDownloads')}
           onPress={handleRemoveAllDownloads}
           loading={isClearingDownloads}
-          description={downloadCount > 0 ? `Delete ${downloadCount} books (${formatBytes(totalStorage)})` : 'No downloads to remove'}
+          description={downloadCount > 0 ? t('settings.storage.removeAllDownloadsDescription', { count: downloadCount, size: formatBytes(totalStorage) }) : t('settings.storage.noDownloadsDescription')}
           danger
         />
         <SettingsRow
           Icon={Trash2}
-          label="Empty My Library"
+          label={t('settings.storage.emptyMyLibrary')}
           onPress={handleEmptyLibrary}
-          description={libraryCount > 0 ? `Remove all ${libraryCount} books from list` : 'Library is empty'}
+          description={libraryCount > 0 ? t('settings.storage.emptyMyLibraryDescription', { count: libraryCount }) : t('settings.storage.emptyLibraryDescription')}
           danger
         />
 
@@ -715,7 +718,7 @@ export function DataStorageSettingsScreen() {
         <View style={styles.infoSection}>
           <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
           <Text style={[styles.infoText, { color: colors.gray }]}>
-            Your listening progress is always saved to the server. Downloads and library data are stored locally on this device.
+            {t('settings.storage.infoNote')}
           </Text>
         </View>
         </WebContentContainer>

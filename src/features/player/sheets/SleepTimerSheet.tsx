@@ -15,6 +15,7 @@ import {
   Animated,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 import { usePlayerStore, useCurrentChapterIndex, useSleepTimer } from '../stores';
 import { useSleepTimerStore } from '../stores/sleepTimerStore';
 import { haptics } from '@/core/native/haptics';
@@ -76,6 +77,8 @@ type TimerMode = 'minutes' | 'end-of-chapter' | 'end-of-book' | 'custom' | null;
 // =============================================================================
 
 export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
+  const { t } = useTranslation();
+
   // Sleep timer state - read directly from sleepTimerStore for real-time countdown
   const sleepTimer = useSleepTimer();
 
@@ -146,7 +149,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
   };
 
   const formatTimeDisplay = (seconds: number): string => {
-    if (seconds <= 0) return 'Off';
+    if (seconds <= 0) return t('sleepTimer.statusOff');
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -219,7 +222,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
   const isTimerActive = sleepTimer !== null && sleepTimer > 0;
   const chapterRemaining = getChapterRemainingMins();
   const bookRemaining = getBookRemainingTime();
-  const displayValue = isTimerActive ? formatTimeDisplay(sleepTimer) : 'Off';
+  const displayValue = isTimerActive ? formatTimeDisplay(sleepTimer) : t('sleepTimer.statusOff');
 
   // ==========================================================================
   // RENDER
@@ -232,20 +235,20 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Sleep Timer</Text>
+        <Text style={styles.title}>{t('sleepTimer.title')}</Text>
         <View style={[styles.status, isTimerActive && styles.statusActive]}>
           {isTimerActive && (
             <Animated.View style={[styles.statusDot, { opacity: pulseAnim }]} />
           )}
           <Text style={[styles.statusText, isTimerActive && styles.statusTextActive]}>
-            {isTimerActive ? 'Active' : 'Off'}
+            {isTimerActive ? t('sleepTimer.statusActive') : t('sleepTimer.statusOff')}
           </Text>
         </View>
       </View>
 
       {/* Timer Display */}
       <View style={styles.timerDisplay}>
-        <Text style={styles.timerDisplayLabel}>Time Remaining</Text>
+        <Text style={styles.timerDisplayLabel}>{t('sleepTimer.timeRemaining')}</Text>
         <Text style={[styles.timerDisplayValue, !isTimerActive && styles.timerDisplayValueOff]}>
           {displayValue}
         </Text>
@@ -253,9 +256,9 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
 
       {/* Quick Set Options */}
       <Text style={styles.sectionLabel}>
-        Quick Set
+        {t('sleepTimer.quickSet')}
         {!isTimerActive && lastTimerType === 'minutes' && lastTimerMinutes && (
-          <Text style={styles.lastUsedHint}> · last used {lastTimerMinutes} min</Text>
+          <Text style={styles.lastUsedHint}> · {t('sleepTimer.lastUsedHint', { minutes: lastTimerMinutes })}</Text>
         )}
       </Text>
       <View style={styles.optionsGrid}>
@@ -280,7 +283,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
                 {option.label}
               </Text>
               <Text style={[styles.optionUnit, isSelected && styles.optionUnitSelected]}>
-                {option.unit}
+                {option.unit === 'hr' ? t('sleepTimer.unitHr') : t('sleepTimer.unitMin')}
               </Text>
             </TouchableOpacity>
           );
@@ -309,13 +312,13 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
               styles.specialOptionTitle,
               timerMode === 'end-of-chapter' && styles.specialOptionTitleSelected,
             ]}>
-              End of Chapter
+              {t('sleepTimer.endOfChapter')}
             </Text>
             <Text style={[
               styles.specialOptionSubtitle,
               timerMode === 'end-of-chapter' && styles.specialOptionSubtitleSelected,
             ]}>
-              ~{chapterRemaining} min remaining
+              {t('sleepTimer.chapterMinRemaining', { minutes: chapterRemaining })}
             </Text>
           </View>
         </TouchableOpacity>
@@ -340,13 +343,13 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
               styles.specialOptionTitle,
               timerMode === 'end-of-book' && styles.specialOptionTitleSelected,
             ]}>
-              End of Book
+              {t('sleepTimer.endOfBook')}
             </Text>
             <Text style={[
               styles.specialOptionSubtitle,
               timerMode === 'end-of-book' && styles.specialOptionSubtitleSelected,
             ]}>
-              {bookRemaining.hours}h {bookRemaining.mins}m remaining
+              {t('sleepTimer.bookTimeRemaining', { hours: bookRemaining.hours, minutes: bookRemaining.mins })}
             </Text>
           </View>
         </TouchableOpacity>
@@ -354,7 +357,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
 
       {/* Custom Time */}
       <View style={styles.customTime}>
-        <Text style={styles.customTimeLabel}>Custom</Text>
+        <Text style={styles.customTimeLabel}>{t('sleepTimer.custom')}</Text>
         <View style={styles.customTimeInputs}>
           <TextInput
             style={styles.customTimeInput}
@@ -379,7 +382,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
           <Text style={styles.customTimeUnit}>m</Text>
         </View>
         <TouchableOpacity style={styles.customTimeSet} onPress={handleCustomSet} accessibilityRole="button" accessibilityLabel="Set custom timer">
-          <Text style={styles.customTimeSetText}>Set</Text>
+          <Text style={styles.customTimeSetText}>{t('sleepTimer.set')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -395,7 +398,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
               accessibilityLabel="Cancel timer"
             >
               <CloseIcon color={colors.orange} size={14} />
-              <Text style={styles.actionButtonCancelText}>Cancel Timer</Text>
+              <Text style={styles.actionButtonCancelText}>{t('sleepTimer.cancelTimer')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButtonPrimary}
@@ -404,7 +407,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
               accessibilityRole="button"
               accessibilityLabel="Done"
             >
-              <Text style={styles.actionButtonPrimaryText}>Done</Text>
+              <Text style={styles.actionButtonPrimaryText}>{t('common.done')}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -415,7 +418,7 @@ export function SleepTimerSheet({ onClose }: SleepTimerSheetProps) {
             accessibilityRole="button"
             accessibilityLabel="Close"
           >
-            <Text style={styles.actionButtonText}>Close</Text>
+            <Text style={styles.actionButtonText}>{t('common.close')}</Text>
           </TouchableOpacity>
         )}
       </View>

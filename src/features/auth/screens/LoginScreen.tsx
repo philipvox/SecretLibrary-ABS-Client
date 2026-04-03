@@ -153,7 +153,7 @@ export function LoginScreen() {
       absCheckAbort.current = controller;
 
       try {
-        const res = await fetch(`${normalizedUrl}/api/status`, {
+        const res = await fetch(`${normalizedUrl}/status`, {
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });
@@ -292,20 +292,23 @@ export function LoginScreen() {
       return;
     }
 
+    setValidationError('');
+    clearError();
+    setSsoLoading(true);
+
     try {
-      setSsoLoading(true);
-      setValidationError('');
-      clearError();
-
-      const token = await oauthService.startOAuthFlow(normalizedUrl);
-
-      // Save server URL for next time
-      await saveLoginInfo(normalizedUrl, '');
+      const result = await oauthService.startOAuthFlow(normalizedUrl);
+      const token = result.user?.token;
+      if (!token) {
+        setValidationError('No token received from SSO');
+        return;
+      }
+      await saveLoginInfo(normalizedUrl, result.user?.username || '');
       await loginWithToken(normalizedUrl, token);
     } catch (err: any) {
-      if (err.message !== 'SSO login was cancelled') {
-        setValidationError(err.message || 'SSO login failed');
-      }
+      // User cancelled the browser — silently return to login screen
+      if (err.message === 'cancelled') return;
+      setValidationError(err.message || 'SSO login failed');
     } finally {
       setSsoLoading(false);
     }
@@ -519,6 +522,7 @@ export function LoginScreen() {
           </Text>
         </View>
       </View>
+
     </KeyboardAvoidingView>
   );
 }

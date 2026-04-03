@@ -16,6 +16,7 @@ import {
 import { Info, X, Settings } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { haptics } from '@/core/native/haptics';
+import { useTranslation } from 'react-i18next';
 import { spacing, scale, useTheme } from '@/shared/theme';
 import { useLocalStorageNoticeStore } from '@/core/stores/localStorageNoticeStore';
 
@@ -26,6 +27,7 @@ interface LocalStorageNoticeModalProps {
 
 export function LocalStorageNoticeModal({ visible, onDismiss }: LocalStorageNoticeModalProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [neverShowAgain, setNeverShowAgain] = useState(false);
   const dismissNotice = useLocalStorageNoticeStore((s) => s.dismissNotice);
@@ -63,25 +65,25 @@ export function LocalStorageNoticeModal({ visible, onDismiss }: LocalStorageNoti
             <View style={[styles.iconContainer, { backgroundColor: colors.accent.primary + '20' }]}>
               <Info size={24} color={colors.accent.primary} strokeWidth={2} />
             </View>
-            <TouchableOpacity onPress={handleDismiss} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
+            <TouchableOpacity onPress={handleDismiss} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <X size={20} color={colors.text.secondary} strokeWidth={2} />
             </TouchableOpacity>
           </View>
 
           {/* Title */}
           <Text style={[styles.title, { color: colors.text.primary }]}>
-            Local Library Storage
+            {t('storage.title')}
           </Text>
 
           {/* Body text */}
           <Text style={[styles.body, { color: colors.text.secondary }]}>
-            Your library data and reading progress are stored locally on this device.
+            {t('storage.bodyLine1')}
           </Text>
           <Text style={[styles.body, { color: colors.text.secondary, marginTop: spacing.sm }]}>
-            If you reinstall the app or clear app data, your library will need to sync again from the server.
+            {t('storage.bodyLine2')}
           </Text>
           <Text style={[styles.body, { color: colors.text.secondary, marginTop: spacing.sm }]}>
-            To configure storage and backup options, visit Settings.
+            {t('storage.bodyLine3')}
           </Text>
 
           {/* Never show again checkbox */}
@@ -90,7 +92,7 @@ export function LocalStorageNoticeModal({ visible, onDismiss }: LocalStorageNoti
             onPress={toggleNeverShow}
             activeOpacity={0.7}
             accessibilityRole="checkbox"
-            accessibilityLabel="Don't show this again"
+            accessibilityLabel={t('storage.dontShowAgain')}
             accessibilityState={{ checked: neverShowAgain }}
           >
             <View style={[
@@ -103,7 +105,7 @@ export function LocalStorageNoticeModal({ visible, onDismiss }: LocalStorageNoti
               )}
             </View>
             <Text style={[styles.checkboxLabel, { color: colors.text.secondary }]}>
-              Don't show this again
+              {t('storage.dontShowAgain')}
             </Text>
           </TouchableOpacity>
 
@@ -113,19 +115,19 @@ export function LocalStorageNoticeModal({ visible, onDismiss }: LocalStorageNoti
               style={[styles.button, styles.secondaryButton, { borderColor: colors.border.default }]}
               onPress={handleDismiss}
               accessibilityRole="button"
-              accessibilityLabel="Got it, dismiss"
+              accessibilityLabel={t('storage.gotIt')}
             >
-              <Text style={[styles.buttonText, { color: colors.text.primary }]}>Got it</Text>
+              <Text style={[styles.buttonText, { color: colors.text.primary }]}>{t('storage.gotIt')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.primaryButton, { backgroundColor: colors.text.primary }]}
               onPress={handleGoToSettings}
               accessibilityRole="button"
-              accessibilityLabel="Go to storage settings"
+              accessibilityLabel={t('storage.settings')}
             >
               <Settings size={16} color={colors.background.primary} strokeWidth={2} />
               <Text style={[styles.buttonText, { color: colors.background.primary, marginLeft: spacing.xs }]}>
-                Settings
+                {t('storage.settings')}
               </Text>
             </TouchableOpacity>
           </View>

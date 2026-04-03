@@ -2,8 +2,22 @@
 
 Quick reference for AI-assisted development on the AudiobookShelf mobile app.
 
+**Start here:** Read [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) for a high-level briefing on what this project is, its current state, recent work, and key decisions.
+
 **Current Version:** See `src/constants/version.ts`
 **Changelog:** See `CHANGELOG.md`
+
+---
+
+## Keeping PROJECT_CONTEXT.md Current (MANDATORY)
+
+`PROJECT_CONTEXT.md` is a living briefing document that every new Claude session reads to understand what's going on. **You must keep it current as you work — not at the end of the session.**
+
+**When to update:** After completing each significant piece of work (fixing a bug, adding a feature, changing architecture, resolving a major issue). If a session crashed right now, PROJECT_CONTEXT.md should reflect everything done so far.
+
+**How to update:** Revise the existing sections — especially "Recent Focus Areas", "What's Working", and "Known Issues". Don't just append — rewrite entries so they represent the current state. Old focus areas that are no longer recent should be dropped or condensed. Keep it under ~100 lines total.
+
+**What NOT to do:** Don't treat this as a changelog (that's CHANGELOG.md). Don't add line items for every small edit. Think of it as: "If a new Claude started right now, what would it need to know?"
 
 ---
 

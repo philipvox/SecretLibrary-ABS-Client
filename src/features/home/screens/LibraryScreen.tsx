@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -111,22 +112,22 @@ type SortMode = 'lastPlayed' | 'added' | 'title' | 'author' | 'progress' | 'seri
 type SortDirection = 'asc' | 'desc';
 type ContentMode = 'library' | 'lastPlayed' | 'finished' | string;  // What content to show (includes playlist:${id})
 
-const SORT_OPTIONS: { key: SortMode; label: string; defaultDir: SortDirection }[] = [
-  { key: 'lastPlayed', label: 'Last Played', defaultDir: 'desc' },
-  { key: 'added', label: 'Added', defaultDir: 'desc' },
-  { key: 'title', label: 'Title', defaultDir: 'asc' },
-  { key: 'author', label: 'Author', defaultDir: 'asc' },
-  { key: 'progress', label: 'Progress', defaultDir: 'desc' },
-  { key: 'series', label: 'Series', defaultDir: 'asc' },
-  { key: 'duration', label: 'Duration', defaultDir: 'desc' },
+const SORT_OPTION_DEFAULTS: { key: SortMode; defaultDir: SortDirection }[] = [
+  { key: 'lastPlayed', defaultDir: 'desc' },
+  { key: 'added', defaultDir: 'desc' },
+  { key: 'title', defaultDir: 'asc' },
+  { key: 'author', defaultDir: 'asc' },
+  { key: 'progress', defaultDir: 'desc' },
+  { key: 'series', defaultDir: 'asc' },
+  { key: 'duration', defaultDir: 'desc' },
 ];
 
-// Base content options (playlists are added dynamically)
-const BASE_CONTENT_OPTIONS: { key: ContentMode; label: string }[] = [
-  { key: 'library', label: 'My Library' },
-  { key: 'mySeries', label: 'My Series' },
-  { key: 'lastPlayed', label: 'Last Played' },
-  { key: 'finished', label: 'Finished' },
+// Base content option keys (labels resolved via i18n inside the component)
+const BASE_CONTENT_KEYS: { key: ContentMode }[] = [
+  { key: 'library' },
+  { key: 'mySeries' },
+  { key: 'lastPlayed' },
+  { key: 'finished' },
 ];
 
 // Download filter cycles: all → downloaded → not-downloaded → all
@@ -318,6 +319,28 @@ function transformToSpineData(
 // =============================================================================
 
 export function LibraryScreen() {
+  const { t } = useTranslation();
+
+  // Translated sort and content option labels — memoized so downstream useMemo deps are stable
+  const SORT_LABELS = useMemo<Record<SortMode, string>>(() => ({
+    lastPlayed: t('library.sortLastPlayed'),
+    added: t('library.sortAdded'),
+    title: t('library.sortTitle'),
+    author: t('library.sortAuthor'),
+    progress: t('library.sortProgress'),
+    series: t('library.sortSeries'),
+    duration: t('library.sortDuration'),
+  }), [t]);
+  const SORT_OPTIONS = useMemo(() => SORT_OPTION_DEFAULTS.map(opt => ({ ...opt, label: SORT_LABELS[opt.key] })), [SORT_LABELS]);
+
+  const CONTENT_LABELS = useMemo<Record<string, string>>(() => ({
+    library: t('library.contentMyLibrary'),
+    mySeries: t('library.contentMySeries'),
+    lastPlayed: t('library.contentLastPlayed'),
+    finished: t('library.contentFinished'),
+  }), [t]);
+  const BASE_CONTENT_OPTIONS = useMemo(() => BASE_CONTENT_KEYS.map(opt => ({ ...opt, label: CONTENT_LABELS[opt.key] || opt.key })), [CONTENT_LABELS]);
+
   const { navigateWithLoading: _navigateWithLoading, jumpToTabWithLoading, navigation } = useNavigationWithLoading();
   // Note: Safe area is handled by TopNav component (includeSafeArea={true} by default)
 
@@ -570,10 +593,10 @@ export function LibraryScreen() {
   const contentOptions = useMemo(() => {
     // Map of all possible items by their order key (__library, __mySeries, etc. or playlist ID)
     const builtInMap: Record<string, { key: ContentMode; label: string }> = {
-      '__library': { key: 'library', label: 'My Library' },
-      '__mySeries': { key: 'mySeries', label: 'My Series' },
-      '__lastPlayed': { key: 'lastPlayed', label: 'Last Played' },
-      '__finished': { key: 'finished', label: 'Finished' },
+      '__library': { key: 'library', label: CONTENT_LABELS.library },
+      '__mySeries': { key: 'mySeries', label: CONTENT_LABELS.mySeries },
+      '__lastPlayed': { key: 'lastPlayed', label: CONTENT_LABELS.lastPlayed },
+      '__finished': { key: 'finished', label: CONTENT_LABELS.finished },
     };
 
     // Build playlist map
@@ -632,18 +655,21 @@ export function LibraryScreen() {
       }
     }
 
-    // Add visible playlists in order
+    // Add visible playlists in order (deduplicate to prevent duplicate keys)
     const orderedPlaylistIds = playlistOrder.filter(id => visiblePlaylistIds.includes(id));
     const remainingVisibleIds = visiblePlaylistIds.filter(id => !playlistOrder.includes(id));
+    const addedPlaylistIds = new Set<string>();
     for (const playlistId of [...orderedPlaylistIds, ...remainingVisibleIds]) {
+      if (addedPlaylistIds.has(playlistId)) continue;
       const playlist = playlists.find(p => p.id === playlistId);
       if (playlist && !playlist.name.startsWith('__sl_')) {
         options.push({ key: `playlist:${playlist.id}`, label: playlist.name });
+        addedPlaylistIds.add(playlistId);
       }
     }
 
     return options;
-  }, [playlists, visiblePlaylistIds, playlistOrder, hiddenBuiltInViews, allItemOrder]);
+  }, [playlists, visiblePlaylistIds, playlistOrder, hiddenBuiltInViews, allItemOrder, CONTENT_LABELS]);
 
   // Get downloaded books
   const { downloads, isLoading: isDownloadsLoading } = useDownloads();
@@ -866,7 +892,7 @@ export function LibraryScreen() {
     haptics.selection();
     setIsSyncing(true);
     useToastStore.getState().clearToasts();
-    useToastStore.getState().addToast({ type: 'info', message: 'Syncing Library…', duration: 8000 });
+    useToastStore.getState().addToast({ type: 'info', message: t('library.syncingLibrary'), duration: 8000 });
     try {
       // 1. Cloud sync — upload/download library changes
       await librarySyncService.fullSync();
@@ -877,10 +903,10 @@ export function LibraryScreen() {
       // 4. Clear cached spine dimensions so fresh images load
       useSpineCacheStore.getState().clearServerSpineDimensions();
       useToastStore.getState().clearToasts();
-      useToastStore.getState().addToast({ type: 'success', message: 'Library Synced', duration: 2000 });
+      useToastStore.getState().addToast({ type: 'success', message: t('library.librarySynced'), duration: 2000 });
     } catch {
       useToastStore.getState().clearToasts();
-      useToastStore.getState().addToast({ type: 'error', message: 'Sync Failed', duration: 3000 });
+      useToastStore.getState().addToast({ type: 'error', message: t('library.syncFailed'), duration: 3000 });
     } finally {
       setIsSyncing(false);
     }
@@ -906,8 +932,8 @@ export function LibraryScreen() {
     if (Platform.OS === 'ios') {
       // Alert.prompt is iOS-only
       Alert.prompt(
-        'New Playlist',
-        'Enter a name for the playlist',
+        t('library.newPlaylist'),
+        t('library.enterPlaylistName'),
         (name) => { createPlaylistWithName(name); },
         'plain-text',
         '',
@@ -947,7 +973,7 @@ export function LibraryScreen() {
       setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       // New sort — use its default direction
-      const defaultDir = SORT_OPTIONS.find(o => o.key === mode)?.defaultDir || 'asc';
+      const defaultDir = SORT_OPTION_DEFAULTS.find(o => o.key === mode)?.defaultDir || 'asc';
       setSortMode(mode);
       setSortDirection(defaultDir);
     }
@@ -988,8 +1014,8 @@ export function LibraryScreen() {
   const buttonInactiveTextColor = colors.gray;
 
   // Get current labels for dropdowns
-  const currentSortLabel = SORT_OPTIONS.find(opt => opt.key === sortMode)?.label || 'Last Played';
-  const currentContentLabel = contentOptions.find(opt => opt.key === contentMode)?.label || 'Library';
+  const currentSortLabel = SORT_OPTIONS.find(opt => opt.key === sortMode)?.label || t('library.sortLastPlayed');
+  const currentContentLabel = contentOptions.find(opt => opt.key === contentMode)?.label || t('library.contentMyLibrary');
 
   // PERF: Memoized row renderer for list view FlatList
   const renderListItem = useCallback(({ item: book }: { item: LibraryBook }) => {
@@ -1148,15 +1174,15 @@ export function LibraryScreen() {
     }
 
     // Fallback text empty state for other modes or when no recommendations
-    let title = 'No Books Saved';
-    let subtitle = 'Add books to your library to see them here';
+    let title = t('library.noBooksSaved');
+    let subtitle = t('library.addBooksSubtitle');
 
     if (contentMode === 'lastPlayed') {
-      title = 'No Recently Played';
-      subtitle = 'Start listening to see your books here';
+      title = t('library.noRecentlyPlayed');
+      subtitle = t('library.startListeningSubtitle');
     } else if (contentMode === 'finished') {
-      title = 'No Finished Books';
-      subtitle = 'Complete a book to see it here';
+      title = t('library.noFinishedBooks');
+      subtitle = t('library.completeBookSubtitle');
     }
 
     return (
@@ -1173,7 +1199,7 @@ export function LibraryScreen() {
           accessibilityLabel="Browse library"
           accessibilityRole="button"
         >
-          <Text style={[styles.browseButtonText, { color: colors.white }]}>Browse Library →</Text>
+          <Text style={[styles.browseButtonText, { color: colors.white }]}>{t('library.browseLibraryButton')}</Text>
         </Pressable>
       </View>
     );
@@ -1515,7 +1541,7 @@ export function LibraryScreen() {
               accessibilityRole="button"
             >
               <Text style={styles.contentDropdownActionText}>
-                + Add Playlist
+                {t('library.addPlaylist')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1537,8 +1563,8 @@ export function LibraryScreen() {
             style={[styles.playlistNameModalContent, { backgroundColor: isDarkMode ? colors.shelfBg : colors.white }]}
             onPress={() => {/* prevent dismiss when tapping inside */}}
           >
-            <Text style={[styles.playlistNameModalTitle, { color: colors.black }]}>New Playlist</Text>
-            <Text style={[styles.playlistNameModalSubtitle, { color: colors.black, opacity: 0.6 }]}>Enter a name for the playlist</Text>
+            <Text style={[styles.playlistNameModalTitle, { color: colors.black }]}>{t('library.newPlaylist')}</Text>
+            <Text style={[styles.playlistNameModalSubtitle, { color: colors.black, opacity: 0.6 }]}>{t('library.enterPlaylistName')}</Text>
             <TextInput
               style={[styles.playlistNameInput, { color: colors.black, borderColor: 'rgba(0,0,0,0.2)' }]}
               value={playlistNameInput}
@@ -1556,7 +1582,7 @@ export function LibraryScreen() {
                 accessibilityLabel="Cancel"
                 accessibilityRole="button"
               >
-                <Text style={[styles.playlistNameModalButtonText, { color: colors.black, opacity: 0.5 }]}>Cancel</Text>
+                <Text style={[styles.playlistNameModalButtonText, { color: colors.black, opacity: 0.5 }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.playlistNameModalButton}
@@ -1564,7 +1590,7 @@ export function LibraryScreen() {
                 accessibilityLabel="Create playlist"
                 accessibilityRole="button"
               >
-                <Text style={[styles.playlistNameModalButtonText, { color: '#F3B60C' }]}>Create</Text>
+                <Text style={[styles.playlistNameModalButtonText, { color: '#F3B60C' }]}>{t('library.create')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

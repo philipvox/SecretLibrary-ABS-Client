@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import {
   Gauge,
   SkipForward,
@@ -42,7 +43,7 @@ import {
 } from '@/shared/stores/playerFacade';
 import {
   useChapterCleaningStore,
-  CLEANING_LEVEL_INFO,
+  CLEANING_LEVEL_KEYS,
   type ChapterCleaningLevel,
 } from '../stores/chapterCleaningStore';
 import { SCREEN_BOTTOM_PADDING } from '@/constants/layout';
@@ -63,8 +64,8 @@ const SKIP_BACK_OPTIONS = [5, 10, 15, 30, 45];
 const SMART_REWIND_MAX_OPTIONS = [15, 30, 45, 60, 90];
 const CHAPTER_CLEANING_LEVELS: ChapterCleaningLevel[] = ['off', 'light', 'standard', 'aggressive'];
 
-function formatSpeed(speed: number): string {
-  return speed === 1.0 ? '1.0× (Normal)' : `${speed}×`;
+function formatSpeed(speed: number, t?: (key: string) => string): string {
+  return speed === 1.0 ? (t ? t('settings.playback.defaultSpeed.normalSpeed') : '1.0× (Normal)') : `${speed}×`;
 }
 
 // =============================================================================
@@ -157,7 +158,11 @@ interface LevelOptionProps {
 
 function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOptionProps) {
   const colors = useSecretLibraryColors();
-  const info = CLEANING_LEVEL_INFO[level];
+  const { t } = useTranslation();
+  const keys = CLEANING_LEVEL_KEYS[level];
+  const label = t(keys.labelKey);
+  const description = t(keys.descriptionKey);
+  const example = t(keys.exampleKey);
 
   return (
     <TouchableOpacity
@@ -169,7 +174,7 @@ function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOption
       onPress={() => onSelect(level)}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`${info.label} cleaning level${isRecommended ? ', recommended' : ''}${isSelected ? ', currently selected' : ''}`}
+      accessibilityLabel={`${label} cleaning level${isRecommended ? ', recommended' : ''}${isSelected ? ', currently selected' : ''}`}
       accessibilityState={{ selected: isSelected }}
     >
       <View style={styles.levelOptionLeft}>
@@ -179,16 +184,16 @@ function LevelOption({ level, isSelected, onSelect, isRecommended }: LevelOption
         <View style={styles.levelContent}>
           <View style={styles.labelRow}>
             <Text style={[styles.levelLabel, { color: colors.black }, isSelected && styles.levelLabelSelected]}>
-              {info.label}
+              {label}
             </Text>
             {isRecommended && (
               <View style={[styles.recommendedBadge, { backgroundColor: colors.grayLight }]}>
-                <Text style={[styles.recommendedText, { color: colors.gray }]}>Recommended</Text>
+                <Text style={[styles.recommendedText, { color: colors.gray }]}>{t('settings.playback.chapterCleaning.recommended')}</Text>
               </View>
             )}
           </View>
-          <Text style={[styles.levelDescription, { color: colors.gray }]}>{info.description}</Text>
-          <Text style={[styles.levelExample, { color: colors.gray }]}>{info.example}</Text>
+          <Text style={[styles.levelDescription, { color: colors.gray }]}>{description}</Text>
+          <Text style={[styles.levelExample, { color: colors.gray }]}>{example}</Text>
         </View>
       </View>
       {isSelected && <Check size={scale(20)} color={colors.black} strokeWidth={2} />}
@@ -204,16 +209,17 @@ interface ExampleRowProps {
 
 function ExampleRow({ before, after, note }: ExampleRowProps) {
   const colors = useSecretLibraryColors();
+  const { t } = useTranslation();
 
   return (
     <View style={[styles.exampleRow, { borderBottomColor: colors.borderLight }]}>
       <View style={styles.exampleBefore}>
-        <Text style={[styles.exampleLabel, { color: colors.gray }]}>Before</Text>
+        <Text style={[styles.exampleLabel, { color: colors.gray }]}>{t('settings.playback.chapterCleaning.before')}</Text>
         <Text style={[styles.exampleText, { color: colors.gray }]} numberOfLines={1}>{before}</Text>
       </View>
       <ArrowRight size={scale(14)} color={colors.gray} strokeWidth={1.5} style={styles.exampleArrow} />
       <View style={styles.exampleAfter}>
-        <Text style={[styles.exampleLabel, { color: colors.gray }]}>After</Text>
+        <Text style={[styles.exampleLabel, { color: colors.gray }]}>{t('settings.playback.chapterCleaning.after')}</Text>
         <Text style={[styles.exampleTextClean, { color: colors.black }]} numberOfLines={1}>{after}</Text>
         {note && <Text style={[styles.exampleNote, { color: colors.gray }]}>{note}</Text>}
       </View>
@@ -229,6 +235,7 @@ export function PlaybackSettingsScreen() {
   const insets = useSafeAreaInsets();
   const _navigation = useNavigation();
   const colors = useSecretLibraryColors();
+  const { t } = useTranslation();
 
   // Player settings from stores
   const globalDefaultRate = useSpeedStore((s) => s.globalDefaultRate);
@@ -277,7 +284,7 @@ export function PlaybackSettingsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.grayLight }]}>
       <StatusBar barStyle={colors.isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.grayLight} />
-      <SettingsHeader title="Playback Settings" />
+      <SettingsHeader title={t('settings.playback.title')} />
 
       <ScrollView
         style={styles.scrollView}
@@ -286,28 +293,28 @@ export function PlaybackSettingsScreen() {
       >
         <WebContentContainer variant="narrow">
         {/* Display & Speed */}
-        <SectionHeader title="Display & Speed" />
+        <SectionHeader title={t('settings.playback.sections.displayAndSpeed')} />
         <SettingsRow
           Icon={Clock}
-          label="Time Display"
-          value={showTimeRemaining ? 'Time Left' : 'Time Played'}
+          label={t('settings.playback.timeDisplay.label')}
+          value={showTimeRemaining ? t('settings.playback.timeDisplay.valueTimeLeft') : t('settings.playback.timeDisplay.valueTimePlayed')}
           onPress={() => setShowTimeRemaining(!showTimeRemaining)}
-          description={showTimeRemaining ? 'Shows how much time remains' : 'Shows how much you\'ve listened'}
+          description={showTimeRemaining ? t('settings.playback.timeDisplay.descriptionTimeLeft') : t('settings.playback.timeDisplay.descriptionTimePlayed')}
         />
         <SettingsRow
           Icon={Gauge}
-          label="Default Speed"
-          value={formatSpeed(globalDefaultRate ?? 1)}
+          label={t('settings.playback.defaultSpeed.label')}
+          value={formatSpeed(globalDefaultRate ?? 1, t)}
           onPress={() => setShowSpeedPicker(true)}
-          description="Applied to books without a saved speed"
+          description={t('settings.playback.defaultSpeed.description')}
         />
 
         {/* Skip Intervals */}
-        <SectionHeader title="Skip Intervals" />
+        <SectionHeader title={t('settings.playback.sections.skipIntervals')} />
         <View style={[styles.pillSelectorContainer, { borderTopColor: colors.borderLight }]}>
           <View style={styles.pillSelectorRow}>
             <SkipForward size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-            <Text style={[styles.pillSelectorLabel, { color: colors.gray }]}>Skip Forward</Text>
+            <Text style={[styles.pillSelectorLabel, { color: colors.gray }]}>{t('settings.playback.skipForward.label')}</Text>
           </View>
           <View style={styles.pillSelectorOptions}>
             {SKIP_FORWARD_OPTIONS.map((seconds) => (
@@ -340,7 +347,7 @@ export function PlaybackSettingsScreen() {
         <View style={[styles.pillSelectorContainer, { borderTopColor: colors.borderLight }]}>
           <View style={styles.pillSelectorRow}>
             <SkipBack size={scale(16)} color={colors.gray} strokeWidth={1.5} />
-            <Text style={[styles.pillSelectorLabel, { color: colors.gray }]}>Skip Back</Text>
+            <Text style={[styles.pillSelectorLabel, { color: colors.gray }]}>{t('settings.playback.skipBack.label')}</Text>
           </View>
           <View style={styles.pillSelectorOptions}>
             {SKIP_BACK_OPTIONS.map((seconds) => (
@@ -372,37 +379,37 @@ export function PlaybackSettingsScreen() {
         </View>
 
         {/* Sleep Timer */}
-        <SectionHeader title="Sleep Timer" />
+        <SectionHeader title={t('settings.playback.sections.sleepTimer')} />
         <SettingsRow
           Icon={Smartphone}
-          label="Shake to Extend"
+          label={t('settings.playback.shakeToExtend.label')}
           switchValue={shakeToExtendEnabled}
           onSwitchChange={setShakeToExtendEnabled}
-          description="Adds 15 minutes when you shake near expiry"
+          description={t('settings.playback.shakeToExtend.description')}
         />
 
         {/* Bluetooth */}
-        <SectionHeader title="Bluetooth" />
+        <SectionHeader title={t('settings.playback.sections.bluetooth')} />
         <SettingsRow
           Icon={Bluetooth}
-          label="Auto-Resume on Connect"
+          label={t('settings.playback.bluetoothAutoResume.label')}
           switchValue={bluetoothAutoResume}
           onSwitchChange={setBluetoothAutoResume}
-          description="Resumes playback when Bluetooth connects"
+          description={t('settings.playback.bluetoothAutoResume.description')}
         />
 
         {/* Smart Rewind */}
-        <SectionHeader title="Smart Rewind" />
+        <SectionHeader title={t('settings.playback.sections.smartRewind')} />
         <SettingsRow
           Icon={RefreshCw}
-          label="Smart Rewind"
+          label={t('settings.playback.smartRewind.label')}
           switchValue={smartRewindEnabled}
           onSwitchChange={setSmartRewindEnabled}
-          description="Rewinds a few seconds after a pause"
+          description={t('settings.playback.smartRewind.description')}
         />
         {smartRewindEnabled && (
           <View style={[styles.maxRewindContainer, { borderTopColor: colors.borderLight }]}>
-            <Text style={[styles.maxRewindLabel, { color: colors.gray }]}>Maximum Rewind</Text>
+            <Text style={[styles.maxRewindLabel, { color: colors.gray }]}>{t('settings.playback.smartRewind.maximumRewind')}</Text>
             <View style={styles.maxRewindOptions}>
               {SMART_REWIND_MAX_OPTIONS.map((seconds) => (
                 <TouchableOpacity
@@ -431,45 +438,45 @@ export function PlaybackSettingsScreen() {
               ))}
             </View>
             <Text style={[styles.maxRewindNote, { color: colors.gray }]}>
-              Rewind amount increases with pause duration
+              {t('settings.playback.smartRewind.note')}
             </Text>
           </View>
         )}
 
         {/* Screen */}
-        <SectionHeader title="Screen" />
+        <SectionHeader title={t('settings.playback.sections.screen')} />
         <SettingsRow
           Icon={Monitor}
-          label="Keep Screen Awake"
+          label={t('settings.playback.keepScreenAwake.label')}
           switchValue={keepScreenAwake}
           onSwitchChange={setKeepScreenAwake}
-          description="Prevents screen from dimming during playback"
+          description={t('settings.playback.keepScreenAwake.description')}
         />
 
         {/* Book Completion */}
-        <SectionHeader title="Book Completion" />
+        <SectionHeader title={t('settings.playback.sections.bookCompletion')} />
         <SettingsRow
           Icon={CheckCircle}
-          label="Completion Prompt"
+          label={t('settings.playback.completionPrompt.label')}
           switchValue={showCompletionPrompt}
           onSwitchChange={setShowCompletionPrompt}
-          description="Shows options when a book finishes"
+          description={t('settings.playback.completionPrompt.description')}
         />
         {!showCompletionPrompt && (
           <SettingsRow
             Icon={CheckSquare}
-            label="Auto-Mark Finished"
+            label={t('settings.playback.autoMarkFinished.label')}
             switchValue={autoMarkFinished}
             onSwitchChange={setAutoMarkFinished}
-            description="Marks books as finished automatically"
+            description={t('settings.playback.autoMarkFinished.description')}
           />
         )}
 
         {/* Chapter Names */}
-        <SectionHeader title="Chapter Names" />
+        <SectionHeader title={t('settings.playback.sections.chapterNames')} />
         <View style={[styles.chapterIntro]}>
           <Text style={[styles.chapterIntroText, { color: colors.gray }]}>
-            Clean up inconsistent chapter names for a more polished listening experience.
+            {t('settings.playback.chapterCleaning.intro')}
           </Text>
         </View>
         <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
@@ -486,7 +493,7 @@ export function PlaybackSettingsScreen() {
 
         {/* Example Transformations */}
         <View style={styles.examplesSection}>
-          <Text style={[styles.examplesSectionTitle, { color: colors.gray }]}>Examples</Text>
+          <Text style={[styles.examplesSectionTitle, { color: colors.gray }]}>{t('settings.playback.chapterCleaning.examples')}</Text>
           <View style={[styles.sectionCard, { backgroundColor: colors.white }]}>
             <ExampleRow before="01 - The Great Gatsby: Chapter 1" after="Chapter 1" />
             <ExampleRow before="D01T05 - Interview With the Vampire" after="Chapter 5" />
@@ -498,8 +505,8 @@ export function PlaybackSettingsScreen() {
         {/* Advanced Chapter Options */}
         <SettingsRow
           Icon={Code}
-          label="Show Original Names"
-          description="Display original metadata for debugging"
+          label={t('settings.playback.showOriginalNames.label')}
+          description={t('settings.playback.showOriginalNames.description')}
           switchValue={showOriginalNames}
           onSwitchChange={setShowOriginalNames}
         />
@@ -508,7 +515,7 @@ export function PlaybackSettingsScreen() {
         <View style={styles.infoSection}>
           <Info size={scale(16)} color={colors.gray} strokeWidth={1.5} />
           <Text style={[styles.infoText, { color: colors.gray }]}>
-            Playback speed is remembered per book. Chapter cleaning only affects display — your server data remains unchanged.
+            {t('settings.playback.infoNote')}
           </Text>
         </View>
         </WebContentContainer>
@@ -517,11 +524,11 @@ export function PlaybackSettingsScreen() {
       {/* Speed Picker Modal */}
       <OptionPicker
         visible={showSpeedPicker}
-        title="Default Playback Speed"
-        subtitle="Used for new books"
+        title={t('settings.playback.defaultSpeed.pickerTitle')}
+        subtitle={t('settings.playback.defaultSpeed.pickerSubtitle')}
         options={SPEED_OPTIONS}
         selectedValue={globalDefaultRate ?? 1}
-        formatOption={formatSpeed}
+        formatOption={(s) => formatSpeed(s, t)}
         onSelect={handleSpeedSelect}
         onClose={() => setShowSpeedPicker(false)}
       />

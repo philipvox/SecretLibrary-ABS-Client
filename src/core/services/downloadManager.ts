@@ -143,6 +143,8 @@ class DownloadManager {
       log('Download directory exists');
       // Clean up orphan directories (from crashed downloads)
       await this.cleanOrphanDirectories();
+      // Clean up DB records whose files were deleted externally
+      await this.cleanStaleRecords();
     }
 
     // Clear any stuck downloads from previous session
@@ -396,12 +398,13 @@ class DownloadManager {
     // Clean up stale progress info
     this.progressInfo.delete(itemId);
 
-    // Remove from database and queue
-    log(`Removing from database and queue...`);
-    await sqliteCache.deleteDownload(itemId);
-
-    // Delete any downloaded files
-    await this.deleteFiles(itemId);
+    // Delete files first, then DB record (see deleteDownload comment for rationale)
+    log(`Removing files and database record...`);
+    try {
+      await this.deleteFiles(itemId);
+    } finally {
+      await sqliteCache.deleteDownload(itemId);
+    }
 
     this.notifyListeners();
     log(`Download cancelled: ${itemId}`);
@@ -545,13 +548,19 @@ class DownloadManager {
   }
 
   /**
-   * Delete downloaded files
+   * Delete downloaded files and DB record.
+   * Deletes files first so a crash mid-operation leaves a stale DB record
+   * (cleaned up by cleanStaleRecords on next init) rather than orphaned files.
    */
   async deleteDownload(itemId: string): Promise<void> {
     log(`Deleting download: ${itemId}`);
-    this.progressInfo.delete(itemId); // Clean up in-memory progress
-    await sqliteCache.deleteDownload(itemId);
-    await this.deleteFiles(itemId);
+    this.progressInfo.delete(itemId);
+    try {
+      await this.deleteFiles(itemId);
+    } finally {
+      // Always remove DB record even if file deletion fails
+      await sqliteCache.deleteDownload(itemId);
+    }
     this.notifyListeners();
     log(`Download deleted: ${itemId}`);
   }
@@ -625,10 +634,23 @@ class DownloadManager {
   }
 
   /**
-   * Check if item is downloaded
+   * Check if item is downloaded.
+   * Verifies both DB status AND that audio files exist on disk.
+   * If DB says complete but files are missing, cleans up the stale record.
    */
   async isDownloaded(itemId: string): Promise<boolean> {
-    return sqliteCache.isDownloaded(itemId);
+    const dbComplete = await sqliteCache.isDownloaded(itemId);
+    if (!dbComplete) return false;
+
+    // Verify files actually exist
+    const files = await this.getDownloadedFiles(itemId);
+    if (files.length > 0) return true;
+
+    // DB says complete but no files — clean up stale record
+    logWarn(`Stale download record for ${itemId}: DB says complete but no audio files found. Removing.`);
+    await sqliteCache.deleteDownload(itemId);
+    trackEvent('download_stale_record_cleaned', { itemId });
+    return false;
   }
 
   /**
@@ -774,6 +796,50 @@ class DownloadManager {
     } catch (error) {
       // Don't fail init if orphan cleanup fails
       logWarn('Failed to clean orphan directories:', error);
+    }
+  }
+
+  /**
+   * Clean up stale DB records: downloads marked 'complete' whose files no longer exist.
+   * Handles the reverse of cleanOrphanDirectories — e.g. OS storage cleanup or external deletion.
+   */
+  private async cleanStaleRecords(): Promise<void> {
+    try {
+      log('Checking for stale download records...');
+
+      const completeDownloads = await sqliteCache.getDownloadsByStatus('complete');
+      let staleRemoved = 0;
+
+      for (const download of completeDownloads) {
+        const dirPath = this.getLocalPath(download.itemId);
+        const info = await FileSystem.getInfoAsync(dirPath);
+
+        if (!info.exists || !info.isDirectory) {
+          logWarn(`Stale record: ${download.itemId} — directory missing, removing DB record`);
+          await sqliteCache.deleteDownload(download.itemId);
+          staleRemoved++;
+          continue;
+        }
+
+        // Directory exists but check if it has actual audio files
+        const contents = await FileSystem.readDirectoryAsync(dirPath);
+        const hasAudio = contents.some(isAudioFile);
+        if (!hasAudio) {
+          logWarn(`Stale record: ${download.itemId} — directory exists but no audio files, removing`);
+          await FileSystem.deleteAsync(dirPath, { idempotent: true });
+          await sqliteCache.deleteDownload(download.itemId);
+          staleRemoved++;
+        }
+      }
+
+      if (staleRemoved > 0) {
+        log(`Cleaned up ${staleRemoved} stale download records`);
+        trackEvent('download_stale_records_cleaned', { count: staleRemoved });
+      } else {
+        log('No stale download records found');
+      }
+    } catch (error) {
+      logWarn('Failed to clean stale records:', error);
     }
   }
 

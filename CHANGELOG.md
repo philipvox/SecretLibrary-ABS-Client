@@ -9,6 +9,58 @@ All notable changes to the AudiobookShelf app are documented in this file.
 
 ---
 
+## [0.9.283] - 2026-04-03
+
+### Improved — Cover pinch-to-zoom modal
+- Background now semi-transparent (80% opacity) instead of near-black, so the screen behind is visible
+- Pinching back to 1x or double-tapping while zoomed smoothly springs back to center before closing (no more instant snap)
+- Modal closes automatically after the spring animation completes
+
+### Files Modified
+- `src/shared/components/ZoomableCoverModal.tsx`
+
+---
+
+## [0.9.282] - 2026-04-03
+
+### Improved — Real splash screen progress
+- Splash progress bar now reflects actual initialization steps instead of fixed breakpoints
+- appInitializer reports progress via callback as each step completes (SQLite, fonts, auth, completion, migration, progress store)
+- Status text shows what's really happening: "preparing database...", "loading fonts...", "restoring session...", "loading reading history...", "loading progress...", "connecting to server...", "loading library...", "syncing library..."
+- Added new i18n keys for all splash step labels across 11 locales
+
+### Fixed — Server unreachable hangs on splash for 30 seconds
+- When the server is unreachable during startup, the app now immediately shows the login screen instead of waiting for the 30-second cache timeout
+- Detects library cache load failure (error set, not loading, not loaded) and clears the in-memory session
+- Login screen pre-fills the server URL and username from saved values
+- Shows "server unreachable" status briefly before transitioning
+
+### Improved — Spine loading behind splash
+- Spine images now prefetch behind the splash screen so the shelf shows real spines on first render
+- Waits for community manifest to match before starting prefetch (fixes race where prefetch ran before manifest loaded)
+- Only prefetches first 12 visible shelf spines with known community/server spines (not entire library)
+- Community spine URLs built directly without `apiClient` cache buster — prevents black flash on background refresh
+- Community spine server now serves pre-generated 800px small versions (`?h=800`, ~17KB vs ~33KB full-size)
+- 6s fallback if manifest stalls, 5s download timeout
+
+### Fixed — Code review bug fixes
+- iOS `NativeHttpModule`: URLSession memory leak (added defer cleanup)
+- Barrel export build error: `CLEANING_LEVEL_INFO` → `CLEANING_LEVEL_KEYS`
+- `SleepTimerSheet`: hardcoded English string replaced with `t()` call
+- Sort label maps: fragile English-keyed lookups replaced with stable `.key` property
+- Android Auto "Continue Listening": stale progress from library cache replaced with live player position
+- iOS `getWithCookies`: added `NoRedirectDelegate` to match Android behavior
+
+### Added — i18n: BookmarksSheet + ChaptersSheet
+- Added `player.bookmarks` (24 keys) and `player.chapters` (23 keys) to all 11 locales
+- Full accessibility strings, search, filter, export translations
+
+### Added — Cover pinch-to-zoom
+- Replaced inline pinch-scale with fullscreen `ZoomableCoverModal` on player and book detail screens
+- Supports pinch zoom (max 3x), two-finger pan with boundary clamping, double-tap toggle, smooth springs
+
+---
+
 ## [0.9.281] - 2026-04-02
 
 ### Fixed — Logout Hang
@@ -25,12 +77,53 @@ All notable changes to the AudiobookShelf app are documented in this file.
 - Error messages now use a red-tinted background with a visible border instead of the nearly-invisible 8% white overlay
 - Error icon changed to red for better contrast on dark backgrounds
 
+### Fixed — Android Auto crash from thread-unsafe browse data access
+The native `AndroidAutoMediaBrowserService` accessed a `@Volatile` field (`browseData`) with a force-unwrap (`!!`) after a null check — a classic TOCTOU race. If another thread nulled the field between the check and the access, the service crashed with a `NullPointerException`, taking down Android Auto. All access points now snapshot the volatile field into a local `val` before use. JSON parsing is also wrapped in try-catch per item so one malformed entry can't crash the whole browse tree.
+
+### Fixed — Cold-start race condition between Android Auto and app init
+When Android Auto connected before the app was open (cold start), multiple code paths called `setupLibraryCacheListener()` — creating duplicate subscriptions that fired redundant browse syncs racing against each other. Removed the duplicate calls so initialization is deterministic regardless of startup order.
+
+### Fixed — Android Auto stuck on "Loading library..." forever
+When the JS browse sync retries exhausted (30 attempts over 60 seconds) without the library loading, nothing was written to the browse data file. The native service's polling loop would time out after 120 seconds, then show "sign in" — but if the library loaded later, the retry counter was already maxed and no sync would ever run. Now writes an empty browse tree on retry exhaustion to unblock the native side, and the library cache listener resets the counter when data arrives.
+
+### Fixed — Recently Played showing stale progress in Android Auto / CarPlay
+Progress percentages in the "Recently Played" browse section came from the library cache (last API fetch, potentially hours stale) instead of the SQLite `user_books` table (updated in real-time during playback). Now uses SQLite progress for all recently played items. Browse data also refreshes after pausing so the list updates immediately.
+
+### Added — Internationalization (i18n) Framework
+Added `i18next` and `react-i18next` with `expo-localization` for locale detection. All user-facing strings across 15+ screens are now translation-ready via `useTranslation()` hook and `t()` calls. English translation file at `src/i18n/`. i18n initializes in parallel with app startup so there's no added loading time.
+
+### Improved — Player Performance
+- **ChaptersSheet**: `ChapterItem` wrapped in `React.memo` with stable callback pattern — prevents re-rendering all chapter items when the current chapter changes. Added 150ms debounced fuzzy search so filtering doesn't fire on every keystroke.
+- **BookmarksSheet**: `BookmarkItem` wrapped in `React.memo` with stable callback pattern — eliminates 3 inline arrow functions per item that were defeating memoization.
+- **Slider delta animation**: Throttled font-size Spring animations during scrubbing (100ms gate) — prevents queuing 60+ animations/sec on the JS thread.
+- **GlobalMiniPlayer**: Replaced dynamic `import('expo-keep-awake')` with static import — no longer re-imports the module on every play/pause toggle.
+- **CastDeviceSheet**: Memoized `onClose` callback.
+
 ### Files Modified
 - `src/core/auth/authService.ts` — withTimeout utility, timeout on server logout + clearStorage
 - `src/core/auth/authContext.tsx` — non-throwing logout, saveLoginHint on all auth paths
 - `src/features/auth/screens/LoginScreen.tsx` — error container styling
-- `src/constants/version.ts` — version bump
-- `CHANGELOG.md` — this entry
+- `plugins/android-auto/src/AndroidAutoMediaBrowserService.kt` — TOCTOU fix, JSON safety
+- `android/app/src/main/java/com/secretlibrary/app/automotive/AndroidAutoMediaBrowserService.kt` — Same (build copy)
+- `src/features/automotive/automotiveService.ts` — Cold-start race fix, retry exhaustion fallback, SQLite progress for browse items, pause-triggered browse sync
+- `App.tsx` — i18n initialization, localized splash strings
+- `src/i18n/` — New i18n config and English translations
+- `src/features/player/sheets/ChaptersSheet.tsx` — React.memo, debounced search, stable callbacks
+- `src/features/player/sheets/BookmarksSheet.tsx` — React.memo, stable callbacks
+- `src/features/player/screens/SecretLibraryPlayerScreen.tsx` — Throttled delta animation, memoized cast handler
+- `src/navigation/components/GlobalMiniPlayer.tsx` — Static keep-awake import
+- `src/features/player/sheets/SleepTimerSheet.tsx` — i18n strings
+- `src/features/profile/screens/*.tsx` — i18n strings (Profile, About, Settings screens)
+- `src/features/home/screens/LibraryScreen.tsx` — i18n strings
+- `src/features/search/screens/SearchScreen.tsx` — i18n strings
+- `src/features/book-detail/screens/SecretLibraryBookDetailScreen.tsx` — i18n strings
+- `src/features/author/screens/SecretLibraryAuthorDetailScreen.tsx` — i18n strings
+- `src/features/series/screens/SecretLibrarySeriesDetailScreen.tsx` — i18n strings
+- `src/shared/components/BookContextMenu.tsx` — i18n strings
+- `src/shared/components/LocalStorageNoticeModal.tsx` — i18n strings
+- `src/shared/components/SpinePickerSheet.tsx` — i18n strings
+- `package.json` — Added i18next, react-i18next, expo-localization
+- `src/constants/version.ts` — Version bump
 
 ---
 

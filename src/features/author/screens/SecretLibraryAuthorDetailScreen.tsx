@@ -44,6 +44,7 @@ import { logger } from '@/shared/utils/logger';
 import { BookSpineVerticalData, ShelfRow } from '@/shared/spine';
 import { BookGrid } from '@/shared/components/BookGrid';
 import Svg, { Path } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 
 // Sort types for detail screens
 type DetailSortMode = 'publishedYear' | 'title' | 'duration' | 'progress';
@@ -163,6 +164,7 @@ export function SecretLibraryAuthorDetailScreen() {
   const colors = useSecretLibraryColors();
   const isDarkMode = colors.isDark;
   const { showMenu } = useBookContextMenu();
+  const { t } = useTranslation();
 
   // Handle both param formats
   const authorName = route.params.authorName || route.params.name || '';
@@ -237,7 +239,13 @@ export function SecretLibraryAuthorDetailScreen() {
     setShowSortDropdown(false);
   }, [sortMode]);
 
-  const currentSortLabel = DETAIL_SORT_OPTIONS.find(o => o.key === sortMode)?.label || 'Published';
+  const sortLabelMap: Record<string, string> = {
+    publishedYear: t('authorDetail.sortPublished'),
+    title: t('authorDetail.sortTitle'),
+    duration: t('authorDetail.sortDuration'),
+    progress: t('authorDetail.sortProgress'),
+  };
+  const currentSortLabel = sortLabelMap[sortMode] || t('authorDetail.sortPublished');
 
   // All books sorted by selected sort mode
   const allBooks = useMemo(() => {
@@ -512,7 +520,7 @@ export function SecretLibraryAuthorDetailScreen() {
         </View>
         <View style={[styles.emptyContainer, { backgroundColor: colors.white }]}>
           <UserIcon size={48} color={colors.gray} />
-          <Text style={[styles.emptyTitle, { color: colors.black }]}>Author not found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.black }]}>{t('authorDetail.authorNotFound')}</Text>
         </View>
       </View>
     );
@@ -539,7 +547,7 @@ export function SecretLibraryAuthorDetailScreen() {
         </View>
         <View style={[styles.emptyContainer, { backgroundColor: colors.white }]}>
           <UserIcon size={48} color={colors.gray} />
-          <Text style={[styles.emptyTitle, { color: colors.black }]}>Author not found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.black }]}>{t('authorDetail.authorNotFound')}</Text>
         </View>
       </View>
     );
@@ -561,7 +569,7 @@ export function SecretLibraryAuthorDetailScreen() {
           pills={[
             {
               key: 'all-authors',
-              label: 'All Authors',
+              label: t('authorDetail.allAuthors'),
               icon: <UserIcon size={16} color={staticColors.white} />,
               onPress: () => navigation.navigate('AuthorsList'),
             },
@@ -597,7 +605,7 @@ export function SecretLibraryAuthorDetailScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.headerName, { color: staticColors.white }]}>{authorInfo.name}</Text>
               <Text style={[styles.headerStats, { color: colors.gray }]}>
-                {authorInfo.bookCount} {authorInfo.bookCount === 1 ? 'book' : 'books'} · {formatDurationCompact(totalDuration)}
+                {t('authorDetail.bookCount', { count: authorInfo.bookCount })} · {formatDurationCompact(totalDuration)}
               </Text>
             </View>
           </View>
@@ -613,7 +621,7 @@ export function SecretLibraryAuthorDetailScreen() {
               </Text>
               <Pressable onPress={() => setDescriptionExpanded(true)} hitSlop={8}>
                 <Text style={[styles.readMoreText, { color: colors.gray }]}>
-                  Read more
+                  {t('authorDetail.readMore')}
                 </Text>
               </Pressable>
             </View>
@@ -630,7 +638,7 @@ export function SecretLibraryAuthorDetailScreen() {
             accessibilityLabel="Filter by All"
             accessibilityState={{ selected: activeTab === 'all' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'all' && { color: colors.white }]}>All</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'all' && { color: colors.white }]}>{t('authorDetail.filterAll')}</Text>
           </Pressable>
           {seriesList.length > 0 && (
           <Pressable
@@ -640,7 +648,7 @@ export function SecretLibraryAuthorDetailScreen() {
             accessibilityLabel="Filter by Series"
             accessibilityState={{ selected: activeTab === 'series' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'series' && { color: colors.white }]}>Series</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'series' && { color: colors.white }]}>{t('authorDetail.filterSeries')}</Text>
           </Pressable>
           )}
           {narratorList.length > 0 && (
@@ -651,7 +659,7 @@ export function SecretLibraryAuthorDetailScreen() {
             accessibilityLabel="Filter by Narrator"
             accessibilityState={{ selected: activeTab === 'narrator' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'narrator' && { color: colors.white }]}>Narrator</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'narrator' && { color: colors.white }]}>{t('authorDetail.filterNarrator')}</Text>
           </Pressable>
           )}
           {genreList.length > 0 && (
@@ -662,7 +670,7 @@ export function SecretLibraryAuthorDetailScreen() {
             accessibilityLabel="Filter by Genre"
             accessibilityState={{ selected: activeTab === 'genre' }}
           >
-            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'genre' && { color: colors.white }]}>Genre</Text>
+            <Text style={[styles.tabText, { color: colors.gray }, activeTab === 'genre' && { color: colors.white }]}>{t('authorDetail.filterGenre')}</Text>
           </Pressable>
           )}
         </View>
@@ -695,7 +703,7 @@ export function SecretLibraryAuthorDetailScreen() {
                 onPress={() => handleSortSelect(option.key)}
               >
                 <Text style={[styles.dropdownText, { color: colors.black }, isActive && { fontWeight: '700' }]}>
-                  {option.label}
+                  {sortLabelMap[option.key] || option.label}
                 </Text>
                 {isActive && (
                   <Text style={{ fontSize: 14 }}>{sortDirection === 'asc' ? '\u2191' : '\u2193'}</Text>
@@ -731,7 +739,7 @@ export function SecretLibraryAuthorDetailScreen() {
       {/* Back to books link */}
       <Pressable onPress={() => setDescriptionExpanded(false)} hitSlop={8} style={{ marginTop: 24 }}>
         <Text style={[styles.readMoreText, { color: colors.gray }]}>
-          Back to books
+          {t('authorDetail.backToBooks')}
         </Text>
       </Pressable>
     </ScrollView>
@@ -784,10 +792,10 @@ export function SecretLibraryAuthorDetailScreen() {
           ListFooterComponent={footerContent}
           ListEmptyComponent={
             isFetchingBooks ? (
-              <Text style={[styles.emptyText, { color: colors.gray }]}>Loading books...</Text>
+              <Text style={[styles.emptyText, { color: colors.gray }]}>{t('authorDetail.loadingBooks')}</Text>
             ) : fetchError ? (
               <View style={{ alignItems: 'center', paddingTop: 40 }}>
-                <Text style={[styles.emptyText, { color: colors.gray }]}>Failed to load books</Text>
+                <Text style={[styles.emptyText, { color: colors.gray }]}>{t('authorDetail.failedToLoadBooks')}</Text>
                 <Text style={[styles.emptyText, { color: colors.gray, fontSize: scale(10), marginTop: 4 }]}>{fetchError}</Text>
                 <Pressable
                   style={{ marginTop: 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: colors.grayLine }}
@@ -795,11 +803,11 @@ export function SecretLibraryAuthorDetailScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Retry loading books"
                 >
-                  <Text style={[styles.emptyText, { color: colors.black, marginTop: 0 }]}>Try Again</Text>
+                  <Text style={[styles.emptyText, { color: colors.black, marginTop: 0 }]}>{t('authorDetail.tryAgain')}</Text>
                 </Pressable>
               </View>
             ) : (
-              <Text style={[styles.emptyText, { color: colors.gray }]}>No books found</Text>
+              <Text style={[styles.emptyText, { color: colors.gray }]}>{t('authorDetail.noBooksFound')}</Text>
             )
           }
           style={[styles.scrollView, { backgroundColor: colors.white }]}
@@ -833,13 +841,13 @@ export function SecretLibraryAuthorDetailScreen() {
 
         {/* Loading state while fetching author books from API */}
         {isFetchingBooks && allBooks.length === 0 && (
-          <Text style={[styles.emptyText, { color: colors.gray }]}>Loading books...</Text>
+          <Text style={[styles.emptyText, { color: colors.gray }]}>{t('authorDetail.loadingBooks')}</Text>
         )}
 
         {/* Error state if fetch failed and no cached data available */}
         {fetchError && allBooks.length === 0 && !isFetchingBooks && (
           <View style={{ alignItems: 'center', paddingTop: 40, paddingHorizontal: 24 }}>
-            <Text style={[styles.emptyText, { color: colors.gray }]}>Failed to load books</Text>
+            <Text style={[styles.emptyText, { color: colors.gray }]}>{t('authorDetail.failedToLoadBooks')}</Text>
             <Text style={[styles.emptyText, { color: colors.gray, fontSize: scale(10), marginTop: 4 }]}>{fetchError}</Text>
             <Pressable
               style={{ marginTop: 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: colors.grayLine }}
@@ -847,7 +855,7 @@ export function SecretLibraryAuthorDetailScreen() {
               accessibilityRole="button"
               accessibilityLabel="Retry loading books"
             >
-              <Text style={[styles.emptyText, { color: colors.black, marginTop: 0 }]}>Try Again</Text>
+              <Text style={[styles.emptyText, { color: colors.black, marginTop: 0 }]}>{t('authorDetail.tryAgain')}</Text>
             </Pressable>
           </View>
         )}
@@ -858,7 +866,7 @@ export function SecretLibraryAuthorDetailScreen() {
             {allBooksBySeries.map((group, index) => (
               <CollapsibleSection
                 key={group.name}
-                title={group.name}
+                title={group.name === 'Standalone' ? t('authorDetail.standalone') : group.name}
                 count={group.books.length}
                 defaultExpanded={index === 0}
                 onTitlePress={group.name !== 'Standalone' ? () => handleSeriesPress(group.name) : undefined}
@@ -868,7 +876,7 @@ export function SecretLibraryAuthorDetailScreen() {
               </CollapsibleSection>
             ))}
             {allBooksBySeries.length === 0 && (
-              <Text style={[styles.emptyText, { color: colors.gray }]}>No books found</Text>
+              <Text style={[styles.emptyText, { color: colors.gray }]}>{t('authorDetail.noBooksFound')}</Text>
             )}
           </View>
         )}

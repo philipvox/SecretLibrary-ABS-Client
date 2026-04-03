@@ -211,8 +211,10 @@ class BackgroundSyncService {
     // SQLite write only - no network, no queue processing
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
 
-    // Emergency backup — fast AsyncStorage write that survives force-close
-    this.saveEmergencyPosition(itemId, position, duration);
+    // NOTE: Emergency backup (AsyncStorage) intentionally NOT written here.
+    // This method is called every 2s during playback — AsyncStorage writes at that
+    // frequency are wasteful. Emergency backup is written in saveProgress() (key moments:
+    // pause, background) and in the AppState background handler.
 
     // Keep playbackCache in sync so progressService.getProgressData()
     // returns current position instead of stale startup-time value.
@@ -255,6 +257,9 @@ class BackgroundSyncService {
 
     // STEP 1: Write to SQLite immediately (fast, offline-capable)
     await sqliteCache.setPlaybackProgress(itemId, position, duration, false);
+
+    // Emergency backup at key moments (pause, background, finish)
+    this.saveEmergencyPosition(itemId, position, duration);
 
     // FIX: Keep playbackCache in sync so progressService.getProgressData()
     // returns current position on next loadBook() call

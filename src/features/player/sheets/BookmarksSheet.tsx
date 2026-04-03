@@ -4,7 +4,7 @@
  * Bookmarks panel - Dark editorial design with filter tabs, bookmark types, and notes.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   Alert,
   Clipboard,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Svg, { Path } from 'react-native-svg';
 import { haptics } from '@/core/native/haptics';
 import { scale } from '@/shared/theme';
@@ -184,39 +185,52 @@ function FilterTab({
   );
 }
 
-function BookmarkItem({
+const BookmarkItem = memo(function BookmarkItem({
   bookmark,
   onPlay,
   onEdit,
   onDelete,
 }: {
   bookmark: Bookmark;
-  onPlay: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onPlay: (bookmark: Bookmark) => void;
+  onEdit: (bookmark: Bookmark) => void;
+  onDelete: (bookmark: Bookmark) => void;
 }) {
+  const { t } = useTranslation();
   const hasNote = bookmark.note && bookmark.note.trim().length > 0;
   const iconBgStyle = hasNote ? styles.bookmarkIconNote : styles.bookmarkIconDefault;
 
+  const handlePlay = useCallback(() => {
+    onPlay(bookmark);
+  }, [onPlay, bookmark]);
+
+  const handleEdit = useCallback(() => {
+    onEdit(bookmark);
+  }, [onEdit, bookmark]);
+
   const handleDelete = useCallback(() => {
     Alert.alert(
-      'Delete Bookmark',
-      `Delete bookmark at ${formatTime(bookmark.time)}?`,
+      t('player.bookmarks.deleteBookmark'),
+      t('player.bookmarks.deleteBookmarkMessage', { time: formatTime(bookmark.time) }),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onDelete },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.delete'), style: 'destructive', onPress: () => onDelete(bookmark) },
       ]
     );
-  }, [bookmark.time, onDelete]);
+  }, [bookmark, onDelete, t]);
 
   return (
     <TouchableOpacity
       style={styles.bookmarkItem}
-      onPress={onPlay}
+      onPress={handlePlay}
       activeOpacity={0.8}
       accessibilityRole="button"
-      accessibilityLabel={`Bookmark at ${formatTime(bookmark.time)}, ${bookmark.chapterTitle || 'Unknown Chapter'}${hasNote ? `, note: ${bookmark.note}` : ''}`}
-      accessibilityHint="Double tap to play from this bookmark"
+      accessibilityLabel={t('player.bookmarks.accessibilityBookmarkAt', {
+        time: formatTime(bookmark.time),
+        chapter: bookmark.chapterTitle || t('player.bookmarks.unknownChapter'),
+        note: hasNote ? `, ${bookmark.note}` : '',
+      })}
+      accessibilityHint={t('player.bookmarks.accessibilityPlayHint')}
     >
       <View style={styles.bookmarkHeader}>
         <View style={[styles.bookmarkIcon, iconBgStyle]} accessible={false}>
@@ -228,26 +242,26 @@ function BookmarkItem({
         </View>
         <View style={styles.bookmarkMeta}>
           <Text style={styles.bookmarkChapter} numberOfLines={1}>
-            {bookmark.chapterTitle || 'Unknown Chapter'}
+            {bookmark.chapterTitle || t('player.bookmarks.unknownChapter')}
           </Text>
           <Text style={styles.bookmarkTimestamp}>{formatTime(bookmark.time)}</Text>
         </View>
         <View style={styles.bookmarkActions}>
           <TouchableOpacity
             style={styles.bookmarkActionBtn}
-            onPress={onPlay}
+            onPress={handlePlay}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="Play from bookmark"
+            accessibilityLabel={t('player.bookmarks.playFromBookmark')}
           >
             <PlayIcon color={dark.text} size={12} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bookmarkActionBtn}
-            onPress={onEdit}
+            onPress={handleEdit}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="Edit bookmark"
+            accessibilityLabel={t('player.bookmarks.editBookmark')}
           >
             <EditIcon color={dark.text} size={12} />
           </TouchableOpacity>
@@ -256,7 +270,7 @@ function BookmarkItem({
             onPress={handleDelete}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="Delete bookmark"
+            accessibilityLabel={t('player.bookmarks.deleteBookmark')}
           >
             <DeleteIcon color={dark.danger} size={12} />
           </TouchableOpacity>
@@ -272,7 +286,7 @@ function BookmarkItem({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // =============================================================================
 // MAIN COMPONENT
@@ -288,6 +302,7 @@ export function BookmarksSheet({
   onAddBookmark,
   onAddBookmarkWithDetails,
 }: BookmarksSheetProps) {
+  const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState<BookmarkType>('all');
 
   // Filter bookmarks
@@ -338,9 +353,9 @@ export function BookmarksSheet({
   const renderBookmarkItem = useCallback(({ item }: { item: Bookmark }) => (
     <BookmarkItem
       bookmark={item}
-      onPlay={() => handlePlay(item)}
-      onEdit={() => handleEdit(item)}
-      onDelete={() => handleDelete(item)}
+      onPlay={handlePlay}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
     />
   ), [handlePlay, handleEdit, handleDelete]);
 
@@ -348,7 +363,7 @@ export function BookmarksSheet({
 
   const handleExport = useCallback(async () => {
     if (bookmarks.length === 0) {
-      Alert.alert('No Bookmarks', 'There are no bookmarks to export.');
+      Alert.alert(t('player.bookmarks.noBookmarks'), t('player.bookmarks.noBookmarksToExport'));
       return;
     }
 
@@ -357,25 +372,25 @@ export function BookmarksSheet({
     haptics.selection();
 
     Alert.alert(
-      'Export Bookmarks',
-      `Export ${bookmarks.length} bookmark${bookmarks.length !== 1 ? 's' : ''}?`,
+      t('player.bookmarks.exportBookmarks'),
+      t('player.bookmarks.exportCount', { count: bookmarks.length }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Copy to Clipboard',
+          text: t('player.bookmarks.copyToClipboard'),
           onPress: () => {
             Clipboard.setString(exportText);
             haptics.success();
-            Alert.alert('Copied', 'Bookmarks copied to clipboard.');
+            Alert.alert(t('player.bookmarks.copied'));
           },
         },
         {
-          text: 'Share',
+          text: t('player.bookmarks.share'),
           onPress: async () => {
             try {
               await Share.share({
                 message: exportText,
-                title: bookTitle ? `Bookmarks - ${bookTitle}` : 'Bookmarks',
+                title: bookTitle ? `${t('player.bookmarks.title')} - ${bookTitle}` : t('player.bookmarks.title'),
               });
             } catch (error) {
               console.error('Share error:', error);
@@ -384,7 +399,7 @@ export function BookmarksSheet({
         },
       ]
     );
-  }, [bookmarks, bookTitle]);
+  }, [bookmarks, bookTitle, t]);
 
   // Empty state
   if (bookmarks.length === 0) {
@@ -393,17 +408,17 @@ export function BookmarksSheet({
         <View style={styles.handle} />
 
         <View style={styles.header}>
-          <Text style={styles.title}>Bookmarks</Text>
-          <Text style={styles.subtitle}>None saved</Text>
+          <Text style={styles.title}>{t('player.bookmarks.title')}</Text>
+          <Text style={styles.subtitle}>{t('player.bookmarks.noneSaved')}</Text>
         </View>
 
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
             <BookmarkIcon color={dark.textSecondary} size={28} />
           </View>
-          <Text style={styles.emptyTitle}>No bookmarks yet</Text>
+          <Text style={styles.emptyTitle}>{t('player.bookmarks.emptyTitle')}</Text>
           <Text style={styles.emptyText}>
-            Tap the button below to add a{'\n'}bookmark at the current position
+            {t('player.bookmarks.emptyPrompt')}
           </Text>
         </View>
 
@@ -413,10 +428,10 @@ export function BookmarksSheet({
             onPress={handleAddBookmark}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Add Bookmark"
+            accessibilityLabel={t('player.addBookmark')}
           >
             <PlusIcon color={dark.bg} size={14} />
-            <Text style={styles.actionButtonTextPrimary}>Add Bookmark</Text>
+            <Text style={styles.actionButtonTextPrimary}>{t('player.addBookmark')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -429,26 +444,26 @@ export function BookmarksSheet({
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Bookmarks</Text>
-        <Text style={styles.subtitle}>{bookmarks.length} saved</Text>
+        <Text style={styles.title}>{t('player.bookmarks.title')}</Text>
+        <Text style={styles.subtitle}>{t('player.bookmarks.saved', { count: bookmarks.length })}</Text>
       </View>
 
       {/* Filter Tabs */}
       <View style={styles.filterTabs}>
         <FilterTab
-          label="All"
+          label={t('player.bookmarks.filterAll')}
           count={counts.all}
           isActive={activeFilter === 'all'}
           onPress={() => setActiveFilter('all')}
         />
         <FilterTab
-          label="Bookmarks"
+          label={t('player.bookmarks.filterBookmarks')}
           count={counts.bookmark}
           isActive={activeFilter === 'bookmark'}
           onPress={() => setActiveFilter('bookmark')}
         />
         <FilterTab
-          label="Notes"
+          label={t('player.bookmarks.filterNotes')}
           count={counts.note}
           isActive={activeFilter === 'note'}
           onPress={() => setActiveFilter('note')}
@@ -471,20 +486,20 @@ export function BookmarksSheet({
           onPress={handleExport}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Export bookmarks"
+          accessibilityLabel={t('player.bookmarks.export')}
         >
           <ExportIcon color={dark.text} size={14} />
-          <Text style={styles.actionButtonText}>Export</Text>
+          <Text style={styles.actionButtonText}>{t('player.bookmarks.export')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.actionButtonPrimary]}
           onPress={handleAddBookmark}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Add Bookmark"
+          accessibilityLabel={t('player.addBookmark')}
         >
           <PlusIcon color={dark.bg} size={14} />
-          <Text style={styles.actionButtonTextPrimary}>Add Bookmark</Text>
+          <Text style={styles.actionButtonTextPrimary}>{t('player.addBookmark')}</Text>
         </TouchableOpacity>
       </View>
     </View>

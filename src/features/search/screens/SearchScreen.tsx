@@ -42,6 +42,7 @@ import { fuzzyMatch, findSuggestions, expandAbbreviations } from '../utils/fuzzy
 import { spacing, radius, scale, useSecretLibraryColors } from '@/shared/theme';
 import { secretLibraryColors as staticColors, secretLibraryFonts } from '@/shared/theme/secretLibrary';
 import { useIsDarkMode } from '@/shared/theme/themeStore';
+import { useTranslation } from 'react-i18next';
 import { useDNASettingsStore } from '@/shared/stores/dnaSettingsStore';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/hooks/useToast';
@@ -282,6 +283,7 @@ const DnaRangeSlider = React.memo(function DnaRangeSlider({
 });
 
 export function SearchScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ Search: SearchScreenParams }, 'Search'>>();
@@ -1077,7 +1079,7 @@ export function SearchScreen() {
             setHasCommittedSearch(false);
           },
           onClear: handleClear,
-          placeholder: 'Search books, authors, series...',
+          placeholder: t('search.placeholder'),
           onSubmitEditing: handleSearch,
           onFocus: handleInputFocus,
           onBlur: handleInputBlur,
@@ -1092,7 +1094,7 @@ export function SearchScreen() {
                   { borderColor: headerBorderColor },
                 ]}
                 onPress={handleBarcodeScannerOpen}
-                accessibilityLabel="Scan ISBN barcode"
+                accessibilityLabel={t('search.scanBarcode')}
                 accessibilityRole="button"
               >
                 <Icon name="ScanBarcode" size={12} color={headerIconColor} strokeWidth={1.5} />
@@ -1105,7 +1107,7 @@ export function SearchScreen() {
                   activeFilterCount > 0 && styles.filterButtonActive,
                 ]}
                 onPress={() => setShowFilterSheet(true)}
-                accessibilityLabel={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+                accessibilityLabel={`${t('search.filtersLabel')}${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
                 accessibilityRole="button"
               >
                 <Icon name="SlidersHorizontal" size={12} color={activeFilterCount > 0 ? (colors.isDark ? staticColors.black : staticColors.white) : headerIconColor} strokeWidth={1.5} />
@@ -1131,7 +1133,7 @@ export function SearchScreen() {
               {/* Books */}
               {autocompleteSuggestions.books.length > 0 && (
                 <View style={styles.autocompleteSectionContainer}>
-                  <Text style={styles.autocompleteSection}>BOOKS</Text>
+                  <Text style={styles.autocompleteSection}>{t('search.autocompleteBooks')}</Text>
                   {autocompleteSuggestions.books.map((book) => (
                     <TouchableOpacity
                       key={book.id}
@@ -1154,7 +1156,7 @@ export function SearchScreen() {
               {/* Authors */}
               {autocompleteSuggestions.authors.length > 0 && (
                 <View style={styles.autocompleteSectionContainer}>
-                  <Text style={styles.autocompleteSection}>AUTHORS</Text>
+                  <Text style={styles.autocompleteSection}>{t('search.autocompleteAuthors')}</Text>
                   {autocompleteSuggestions.authors.map((author) => {
                     const imageUrl = author.id && author.imagePath
                       ? apiClient.getAuthorImageUrl(author.id)
@@ -1179,7 +1181,7 @@ export function SearchScreen() {
                         )}
                         <View style={styles.autocompleteItemContent}>
                           <Text style={styles.autocompleteTitle}>{author.name}</Text>
-                          <Text style={styles.autocompleteMeta}>{author.bookCount} books</Text>
+                          <Text style={styles.autocompleteMeta}>{t('search.booksCount', { count: author.bookCount })}</Text>
                         </View>
                         <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
                       </TouchableOpacity>
@@ -1191,7 +1193,7 @@ export function SearchScreen() {
               {/* Series */}
               {autocompleteSuggestions.series.length > 0 && (
                 <View style={styles.autocompleteSectionContainer}>
-                  <Text style={styles.autocompleteSection}>SERIES</Text>
+                  <Text style={styles.autocompleteSection}>{t('search.autocompleteSeries')}</Text>
                   {autocompleteSuggestions.series.map((series) => (
                     <TouchableOpacity
                       key={series.name}
@@ -1203,7 +1205,7 @@ export function SearchScreen() {
                     >
                       <View style={styles.autocompleteItemContent}>
                         <Text style={styles.autocompleteTitle}>{series.name}</Text>
-                        <Text style={styles.autocompleteMeta}>{series.bookCount} books</Text>
+                        <Text style={styles.autocompleteMeta}>{t('search.booksCount', { count: series.bookCount })}</Text>
                       </View>
                       <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
                     </TouchableOpacity>
@@ -1214,7 +1216,7 @@ export function SearchScreen() {
               {/* Narrators */}
               {autocompleteSuggestions.narrators.length > 0 && (
                 <View style={styles.autocompleteSectionContainer}>
-                  <Text style={styles.autocompleteSection}>NARRATORS</Text>
+                  <Text style={styles.autocompleteSection}>{t('search.autocompleteNarrators')}</Text>
                   {autocompleteSuggestions.narrators.map((narrator) => (
                     <TouchableOpacity
                       key={narrator.name}
@@ -1226,7 +1228,7 @@ export function SearchScreen() {
                     >
                       <View style={styles.autocompleteItemContent}>
                         <Text style={styles.autocompleteTitle}>{narrator.name}</Text>
-                        <Text style={styles.autocompleteMeta}>{narrator.bookCount} books narrated</Text>
+                        <Text style={styles.autocompleteMeta}>{t('search.booksCount', { count: narrator.bookCount })}</Text>
                       </View>
                       <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
                     </TouchableOpacity>
@@ -1237,7 +1239,7 @@ export function SearchScreen() {
               {/* Tags / Genres / DNA */}
               {autocompleteSuggestions.tags.length > 0 && (
                 <View style={styles.autocompleteSectionContainer}>
-                  <Text style={styles.autocompleteSection}>TAGS</Text>
+                  <Text style={styles.autocompleteSection}>{t('search.autocompleteTags')}</Text>
                   {autocompleteSuggestions.tags.map((tag) => (
                     <TouchableOpacity
                       key={tag.baseTag}
@@ -1262,7 +1264,7 @@ export function SearchScreen() {
                             <Text style={{ color: TEXT_TERTIARY }}> ({tag.minScore}–{tag.maxScore})</Text>
                           )}
                         </Text>
-                        <Text style={styles.autocompleteMeta}>{tag.bookCount} books</Text>
+                        <Text style={styles.autocompleteMeta}>{t('search.booksCount', { count: tag.bookCount })}</Text>
                       </View>
                       <Icon name="ChevronRight" size={14} color={TEXT_TERTIARY} strokeWidth={2} />
                     </TouchableOpacity>
@@ -1309,7 +1311,7 @@ export function SearchScreen() {
             <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 24 }}>
               <Icon name="AlertTriangle" size={40} color={TEXT_TERTIARY} />
               <Text style={[styles.noResultsTitle, { marginTop: 16 }]}>
-                Unable to load library
+                {t('search.unableToLoadLibrary')}
               </Text>
               <Text style={{ color: TEXT_SECONDARY, fontSize: scale(12), textAlign: 'center', marginTop: 8 }}>
                 {cacheError}
@@ -1321,7 +1323,7 @@ export function SearchScreen() {
                 accessibilityLabel="Retry loading library"
               >
                 <Text style={{ color: TEXT_INVERSE, fontFamily: secretLibraryFonts.jetbrainsMono.regular, fontSize: scale(12) }}>
-                  Try Again
+                  {t('search.tryAgain')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1337,7 +1339,7 @@ export function SearchScreen() {
               {showDnaTagPicker ? (
                 <View>
                   <View style={styles.dnaTagPickerHeader}>
-                    <Text style={styles.dnaAddText}>DNA FILTERS</Text>
+                    <Text style={styles.dnaAddText}>{t('search.dnaFilters')}</Text>
                     <TouchableOpacity onPress={() => setShowDnaTagPicker(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Close DNA filter picker">
                       <Icon name="X" size={14} color={TEXT_TERTIARY} strokeWidth={1.5} />
                     </TouchableOpacity>
@@ -1376,7 +1378,7 @@ export function SearchScreen() {
               ) : (
                 <TouchableOpacity style={styles.dnaAddButton} onPress={() => setShowDnaTagPicker(true)} accessibilityRole="button" accessibilityLabel="Add DNA filter">
                   <Icon name="Plus" size={12} color={TEXT_TERTIARY} strokeWidth={1.5} />
-                  <Text style={styles.dnaAddText}>DNA filter</Text>
+                  <Text style={styles.dnaAddText}>{t('search.addFilter')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1385,10 +1387,10 @@ export function SearchScreen() {
             {previousSearches.length > 0 ? (
               <View style={styles.previousSearches}>
                 <View style={styles.previousSearchesHeader}>
-                  <Text style={styles.previousSearchesTitle}>Recent Searches</Text>
+                  <Text style={styles.previousSearchesTitle}>{t('search.recentSearches')}</Text>
 
                   <TouchableOpacity onPress={clearSearchHistory} accessibilityRole="button" accessibilityLabel="Clear search history">
-                    <Text style={styles.clearHistoryText}>Clear</Text>
+                    <Text style={styles.clearHistoryText}>{t('search.clear')}</Text>
                   </TouchableOpacity>
                 </View>
                 {previousSearches.slice(0, DISPLAY_HISTORY).map((search, idx) => (
@@ -1415,8 +1417,8 @@ export function SearchScreen() {
             ) : (
               <View style={styles.emptyState}>
                 <Icon name="Search" size={48} color={TEXT_TERTIARY} />
-                <Text style={styles.emptyTitle}>Search your library</Text>
-                <Text style={styles.emptySubtitle}>Find books by title, author, narrator, or series</Text>
+                <Text style={styles.emptyTitle}>{t('search.searchYourLibrary')}</Text>
+                <Text style={styles.emptySubtitle}>{t('search.findBooksSubtitle')}</Text>
               </View>
             )}
 
@@ -1438,7 +1440,7 @@ export function SearchScreen() {
                 accessibilityLabel="Discover"
               >
                 <Icon name="Globe" size={18} color={colors.black} strokeWidth={1} />
-                <Text style={[styles.bigBrowseButtonText, { color: colors.black }]}>Discover</Text>
+                <Text style={[styles.bigBrowseButtonText, { color: colors.black }]}>{t('search.discover')}</Text>
               </TouchableOpacity>
               <View style={styles.browseRecoveryGrid}>
                 <TouchableOpacity
@@ -1448,7 +1450,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse genres"
                 >
                   <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.genres')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.browseRecoveryItem}
@@ -1457,7 +1459,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse authors"
                 >
                   <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.authors')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.browseRecoveryItem}
@@ -1466,7 +1468,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse series"
                 >
                   <Icon name="Library" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.series')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.browseRecoveryItem}
@@ -1475,7 +1477,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse by duration"
                 >
                   <Icon name="Timer" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.duration')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1505,7 +1507,7 @@ export function SearchScreen() {
             {showDnaTagPicker ? (
               <View>
                 <View style={styles.dnaTagPickerHeader}>
-                  <Text style={styles.dnaAddText}>DNA FILTERS</Text>
+                  <Text style={styles.dnaAddText}>{t('search.dnaFilters')}</Text>
                   <TouchableOpacity onPress={() => setShowDnaTagPicker(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Icon name="X" size={14} color={TEXT_TERTIARY} strokeWidth={1.5} />
                   </TouchableOpacity>
@@ -1558,7 +1560,7 @@ export function SearchScreen() {
             ) : (
               <TouchableOpacity style={styles.dnaAddButton} onPress={() => setShowDnaTagPicker(true)} accessibilityRole="button" accessibilityLabel="Add DNA filter">
                 <Icon name="Plus" size={12} color={TEXT_TERTIARY} strokeWidth={1.5} />
-                <Text style={styles.dnaAddText}>Add filter</Text>
+                <Text style={styles.dnaAddText}>{t('search.addFilter')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1569,13 +1571,13 @@ export function SearchScreen() {
           <View style={styles.noResultsContainer}>
             <View style={styles.noResultsHeader}>
               <Icon name="Search" size={40} color={TEXT_TERTIARY} />
-              <Text style={styles.noResultsTitle}>No results for "{debouncedQuery}"</Text>
+              <Text style={styles.noResultsTitle}>{t('search.noResultsFor', { query: debouncedQuery })}</Text>
             </View>
 
             {/* Spelling suggestions */}
             {spellingSuggestions.length > 0 && (
               <View style={styles.spellingSuggestions}>
-                <Text style={styles.didYouMean}>Did you mean:</Text>
+                <Text style={styles.didYouMean}>{t('search.didYouMean')}</Text>
                 {spellingSuggestions.map((suggestion, idx) => (
                   <TouchableOpacity
                     key={idx}
@@ -1600,7 +1602,7 @@ export function SearchScreen() {
                 accessibilityLabel="Discover"
               >
                 <Icon name="Globe" size={18} color={colors.black} strokeWidth={1} />
-                <Text style={[styles.bigBrowseButtonText, { color: colors.black }]}>Discover</Text>
+                <Text style={[styles.bigBrowseButtonText, { color: colors.black }]}>{t('search.discover')}</Text>
               </TouchableOpacity>
               <View style={styles.browseRecoveryGrid}>
                 <TouchableOpacity
@@ -1610,7 +1612,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse genres"
                 >
                   <Icon name="Sparkles" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Genres</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.genres')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.browseRecoveryItem}
@@ -1619,7 +1621,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse authors"
                 >
                   <Icon name="CircleUser" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Authors</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.authors')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.browseRecoveryItem}
@@ -1628,7 +1630,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse series"
                 >
                   <Icon name="Library" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Series</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.series')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.browseRecoveryItem}
@@ -1637,7 +1639,7 @@ export function SearchScreen() {
                   accessibilityLabel="Browse by duration"
                 >
                   <Icon name="Timer" size={24} color={colors.black} strokeWidth={1} />
-                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>Duration</Text>
+                  <Text style={[styles.browseRecoveryText, { color: colors.black }]}>{t('search.duration')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1658,7 +1660,7 @@ export function SearchScreen() {
         {hasActiveSearch && bookResults.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>BOOKS</Text>
+              <Text style={styles.sectionLabel}>{t('search.autocompleteBooks')}</Text>
             </View>
             <View>
               {bookResults.slice(0, 10).map((book, index) => {
@@ -1686,10 +1688,10 @@ export function SearchScreen() {
         {hasActiveSearch && seriesResults.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Series</Text>
+              <Text style={styles.sectionTitle}>{t('search.series')}</Text>
               {seriesResults.length > 3 && (
                 <TouchableOpacity onPress={() => navigation.navigate('SeriesList')} accessibilityRole="link" accessibilityLabel="View all series">
-                  <Text style={styles.viewAllText}>VIEW ALL</Text>
+                  <Text style={styles.viewAllText}>{t('search.viewAll')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1725,10 +1727,10 @@ export function SearchScreen() {
         {hasActiveSearch && authorResults.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Authors</Text>
+              <Text style={styles.sectionTitle}>{t('search.authors')}</Text>
               {authorResults.length > 2 && (
                 <TouchableOpacity onPress={() => navigation.navigate('AuthorsList')} accessibilityRole="link" accessibilityLabel="View all authors">
-                  <Text style={styles.viewAllText}>View All</Text>
+                  <Text style={styles.viewAllText}>{t('search.viewAll')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1755,7 +1757,7 @@ export function SearchScreen() {
                     )}
                     <View style={styles.entityInfo}>
                       <Text style={styles.entityName}>{author.name}</Text>
-                      <Text style={styles.entityMeta}>{author.bookCount} books</Text>
+                      <Text style={styles.entityMeta}>{t('search.booksCount', { count: author.bookCount })}</Text>
                     </View>
                     <Icon name="ChevronRight" size={20} color={TEXT_TERTIARY} />
                   </TouchableOpacity>
@@ -1769,10 +1771,10 @@ export function SearchScreen() {
         {hasActiveSearch && narratorResults.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Narrators</Text>
+              <Text style={styles.sectionTitle}>{t('search.narrators')}</Text>
               {narratorResults.length > 2 && (
                 <TouchableOpacity onPress={() => navigation.navigate('NarratorsList')} accessibilityRole="link" accessibilityLabel="View all narrators">
-                  <Text style={styles.viewAllText}>View All</Text>
+                  <Text style={styles.viewAllText}>{t('search.viewAll')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1791,7 +1793,7 @@ export function SearchScreen() {
                   </View>
                   <View style={styles.entityInfo}>
                     <Text style={styles.entityName}>{narrator.name}</Text>
-                    <Text style={styles.entityMeta}>{narrator.bookCount} books narrated</Text>
+                    <Text style={styles.entityMeta}>{t('search.booksCount', { count: narrator.bookCount })}</Text>
                   </View>
                   <Icon name="ChevronRight" size={20} color={TEXT_TERTIARY} />
                 </TouchableOpacity>
