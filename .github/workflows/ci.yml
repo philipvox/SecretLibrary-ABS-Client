@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Metro bundle (Android)
+        run: npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/android-bundle.js --assets-dest /tmp/android-assets
+
+      - name: Metro bundle (iOS)
+        run: npx react-native bundle --platform ios --dev false --entry-file index.js --bundle-output /tmp/ios-bundle.js --assets-dest /tmp/ios-assets
